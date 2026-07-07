@@ -12,7 +12,7 @@ depends_on: [DES-0006]
 
 > **Status: REVIEW PENDING** — Do not implement until approved.
 
-**Extends:** [auth-spec.md](auth-spec.md) (DES-0006)  
+**Extends:** [06-auth-spec.md](06-auth-spec.md) (DES-0006)  
 **Blueprint:** [monti_multi_tenant_ai_call_center_blueprint.md](../../monti_multi_tenant_ai_call_center_blueprint.md) §10 NATS, §12.2 Redis  
 **Current baseline:** Sprint 3 auth — Postgres-only refresh tokens, synchronous store writes, NATS used only for `call.*` events.
 
@@ -262,7 +262,7 @@ JWT parse stays local (no Redis). Optional `AUTH_CACHE_ENRICH=true` loads `auth:
 
 ## 9. HTTP API impact
 
-**No breaking changes** to [api-spec.md](api-spec.md) auth section.
+**No breaking changes** to [04-api-spec.md](04-api-spec.md) auth section.
 
 New **observability** only:
 

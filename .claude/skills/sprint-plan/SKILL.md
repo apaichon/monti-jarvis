@@ -12,8 +12,9 @@ description: Plan or groom a sprint for Monti Jarvis — read the roadmap, scope
 3. Read completed tasks in `docs/sdlc/04-tasks/` and `docs/sdlc/03-sprints/_velocity.json`.
 4. Create `docs/sdlc/03-sprints/SPRINT-NNN.md` from the structure below (NNN = roadmap number).
 5. Create linked `docs/sdlc/04-tasks/TASK-NNNN.md` and `docs/sdlc/01-features/FEAT-NNNN-*.md`.
-6. Update `docs/sdlc/00-roadmap/ROADMAP.md` "Current sprint" / "Next sprint" sections.
-7. Run **`km-sync`** to set sprint `in_progress` and tasks `todo`.
+6. Run **`sprint-tech-specs`** — workflow, er-diagram, api-spec, ux-ui ASCII + mapping, and `<slug>-spec.md` if needed.
+7. Update `docs/sdlc/00-roadmap/ROADMAP.md` "Current sprint" / "Next sprint" sections.
+8. Run **`km-sync`** to set sprint `in_progress` and tasks `todo`.
 
 ## sprint file structure
 ```markdown
@@ -49,6 +50,6 @@ make test, manual checks
 - Only one sprint is `in_progress` at a time.
 - Every task must name an owner (dev/devops/tester) and testable ACs.
 - Defer auth/KYC/ticketing unless explicitly in roadmap scope.
-- Update `02-design/` when APIs, schema, or UX change.
+- Use **`sprint-tech-specs`** for all `02-design/` updates — do not hand-edit specs ad hoc during sprint-plan.
 
-See `docs/sdlc/README.md`, `docs/sdlc/00-roadmap/ROADMAP.md`, `docs/sdlc/02-design/`.
+See `docs/sdlc/README.md`, `docs/sdlc/00-roadmap/ROADMAP.md`, `docs/sdlc/02-design/`, **`sprint-tech-specs`**.

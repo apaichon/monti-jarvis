@@ -45,7 +45,7 @@ This ingests the four sample Markdown files under `docs/samples/km/`.
 
 ## API reference
 
-Canonical spec: [`docs/sdlc/02-design/api-spec.md`](sdlc/02-design/api-spec.md) · UX mapping: [`ux-ui.md`](sdlc/02-design/ux-ui.md)
+Canonical spec: [`docs/sdlc/02-design/04-api-spec.md`](sdlc/02-design/04-api-spec.md) · UX mapping: [`05-ux-ui.md`](sdlc/02-design/05-ux-ui.md)
 
 **REST client:** [`docs/km-setup.http`](km-setup.http) — runnable requests for VS Code REST Client or IntelliJ HTTP Client (health, seed, upload, reset, RAG chat).
 

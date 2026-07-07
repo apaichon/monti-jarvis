@@ -42,4 +42,4 @@ Out:
 - Sprint 1: `/api/chat`, `/ws/voice`, call sessions, topic tabs, `DEMO_TENANT_ID`
 - Infra: MinIO, ClickHouse (`poc-gml-clickhouse` or `CLICKHOUSE_URL`)
 - Blueprint §12.3, §17.4
-- Design: `docs/sdlc/02-design/workflow.md`, `api-spec.md`, `er-diagram.md`
+- Design: `docs/sdlc/02-design/02-workflow.md`, `04-api-spec.md`, `03-er-diagram.md`

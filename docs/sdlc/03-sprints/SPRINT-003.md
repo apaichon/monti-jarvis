@@ -44,7 +44,7 @@ Introduce **JWT authentication** and a **three-role RBAC skeleton** (platform / 
 ## Feature
 
 - [FEAT-0003 — Auth and RBAC](../01-features/FEAT-0003-auth-rbac.md)
-- Design: [auth-spec](../02-design/auth-spec.md) · [auth-cache-events-spec](../02-design/auth-cache-events-spec.md)
+- Design: [06-auth-spec](../02-design/06-auth-spec.md) · [07-auth-cache-events-spec](../02-design/07-auth-cache-events-spec.md)
 
 ## Verification
 

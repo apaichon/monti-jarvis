@@ -16,7 +16,7 @@ docs/sdlc/05-obsidian/
   03-sprints/  # one note per SPRINT-NNN
   04-tasks/    # one note per TASK-NNNN
   01-features/ # one note per FEAT-NNNN
-  02-design/   # architecture, api-spec, ux-ui
+  02-design/   # 01-architecture … NN-<slug>-spec (ordered)
   packages/    # internal/* and apps/customer-web
 ```
 

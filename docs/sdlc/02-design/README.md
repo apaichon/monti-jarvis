@@ -2,17 +2,26 @@
 
 System design artifacts for Monti Jarvis.
 
-| Doc | Description | Status |
-| --- | --- | --- |
-| [auth-spec.md](auth-spec.md) | **Sprint 3** JWT, RBAC, route policy — **review first** | `review_pending` |
-| [architecture.md](architecture.md) | Layers, packages, infra topology | `review_pending` |
-| [workflow.md](workflow.md) | Chat, voice, call, KM, auth sequences | `review_pending` |
-| [er-diagram.md](er-diagram.md) | Postgres + ClickHouse + MinIO entities | `review_pending` |
-| [api-spec.md](api-spec.md) | REST, WebSocket, SSE contract | `review_pending` |
-| [ux-ui.md](ux-ui.md) | ASCII wireframes with API mapping | `review_pending` |
+**Naming:** `NN-<slug>.md` — numeric prefix is **DES id** (oldest → newest). New docs take the next `DES-NNNN` and matching `NN-` filename.
 
-**Sprint 3 gate:** Approve [auth-spec.md](auth-spec.md) (incl. open questions §13) before TASK-0010 implementation.
+| # | Doc | Sprint | Description | Status |
+| ---: | --- | --- | --- | --- |
+| 01 | [01-architecture.md](01-architecture.md) | 1+ | Layers, packages, infra topology | `review_pending` |
+| 02 | [02-workflow.md](02-workflow.md) | 1+ | Chat, voice, call, KM, auth, packages sequences | `approved` |
+| 03 | [03-er-diagram.md](03-er-diagram.md) | 1+ | Postgres + ClickHouse + MinIO entities | `approved` |
+| 04 | [04-api-spec.md](04-api-spec.md) | 1+ | REST, WebSocket, SSE contract | `approved` |
+| 05 | [05-ux-ui.md](05-ux-ui.md) | 1+ | ASCII wireframes — customer + platform admin P0–P6 | `approved` |
+| 06 | [06-auth-spec.md](06-auth-spec.md) | 3 | JWT, RBAC, route policy | `shipped` |
+| 07 | [07-auth-cache-events-spec.md](07-auth-cache-events-spec.md) | 3 | Redis cache, write-behind, NATS auth events | `approved` |
+| 08 | [08-packages-spec.md](08-packages-spec.md) | 4 | Package catalog + tenant entitlements (jsonb rules) | `approved` |
+| 09 | [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) | 4 | Platform admin portal `/admin` | `approved` |
+
+**Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
+
+**Sprint 4 gate:** ✅ Implement TASK-0014+ — APIs per [08-packages-spec.md](08-packages-spec.md), portal per [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md).
 
 **Stack:** Go `net/http` · SvelteKit customer portal · Postgres · Redis 8 · MinIO · ClickHouse · NATS · LiveKit · Gemini
 
 **Verify:** [test matrix](../05-test-scenarios/TEST-MATRIX.md) · [manual tests](../06-manual-tests/) · [deploy](../07-deployment/LOCAL-DEV.md)
+
+**Excel exports:** [excel-output/](excel-output/) mirrors the same `NN-` prefix order.

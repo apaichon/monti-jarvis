@@ -28,7 +28,7 @@ Run at sprint close or when docs feel stale.
    - Sprint-linked features exist under `docs/sdlc/01-features/`.
    - ACs in feature spec are referenced in tasks where appropriate.
 
-5. **Design docs:** `02-design/` has architecture, workflow, er-diagram, api-spec, ux-ui.
+5. **Design docs:** `02-design/` uses `NN-<slug>.md` prefix (01–08 oldest→newest); README index must match files on disk.
 
 6. **Test & release docs:**
    - `05-test-scenarios/TEST-MATRIX.md` covers active sprint ACs

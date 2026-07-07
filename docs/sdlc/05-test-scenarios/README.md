@@ -10,4 +10,4 @@ Functional and regression scenarios mapped to feature acceptance criteria. Use t
 
 - Manual UAT: [`../06-manual-tests/`](../06-manual-tests/)
 - Automated tests: `go test ./...` (see matrix for package mapping)
-- Design contracts: [`../02-design/api-spec.md`](../02-design/api-spec.md)
+- Design contracts: [`../02-design/04-api-spec.md`](../02-design/04-api-spec.md)

@@ -93,11 +93,29 @@ AUTH_DISABLED=false → Bearer JWT → middleware → RBAC on KM writes
 
 Customer portal (`/`) stays **unauthenticated** for inbound demo. Admin KM ops use Bearer token (curl / future admin UI).
 
-## Future (roadmap)
+## Platform admin portal (Sprint 4 — in progress)
 
-- Sprint 4: packages + entitlements
+```text
+apps/platform-admin-web/build  →  GET /admin/*  (internal/platformweb)
+  /admin/login     → POST /api/auth/login
+  /admin/profile   → GET /api/auth/me
+  /admin/packages  → GET/POST/PUT/DELETE /api/platform/packages*
+  /admin/tenants/{id}/entitlement → entitlement APIs
+```
+
+## Packages layer (Sprint 4)
+
+```text
+AUTH_DISABLED=false → platform_admin via portal or API
+                    → rules jsonb + package_rule_schemas versions
+                    → entitlements.Resolve + Redis cache (no enforcement yet)
+```
+
+Customer portal (`/`) stays public demo. Tenant admin UI deferred Sprint 15+.
+
+## Future (roadmap)
 - Sprint 15: tenant admin KM wizard
 - Sprint 19–20: customer register/auth UI
-- Production: separate customer/tenant/admin Svelte apps; Go API behind load balancer
+- Production: Go API behind load balancer; three Svelte apps (customer / tenant / platform)
 
-See [auth-spec.md](auth-spec.md), [workflow.md](workflow.md), [er-diagram.md](er-diagram.md), [api-spec.md](api-spec.md).
+See [06-auth-spec.md](06-auth-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), [04-api-spec.md](04-api-spec.md).

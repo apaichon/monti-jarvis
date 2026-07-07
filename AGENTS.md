@@ -8,7 +8,7 @@
 - Use Redis DB index `4` with the `monti_jarvis:` prefix.
 - Use MinIO bucket `monti-jarvis` with prefixes `calls/` and `km/`.
 - ClickHouse database `monti_jarvis` for KM embeddings (`km_embeddings`).
-- Prefer small, testable Go packages under `internal/`; customer UI in `apps/customer-web/`.
+- Prefer small, testable Go packages under `internal/`; customer UI in `apps/customer-web/`; platform admin in `apps/platform-admin-web/`.
 - Workforce agents live in `internal/workforce/`; KM/RAG in `internal/km`, `internal/rag`, `internal/clickhouse`, `internal/scope`.
 - Defer full auth/KYC/ticketing unless explicitly in sprint scope.
 
@@ -29,6 +29,7 @@
 | `km-context` | Start of any agent task — load active sprint slice |
 | `km-sync` | End of task — propagate status across SDLC docs |
 | `sprint-plan` | Open or groom a sprint |
+| `sprint-tech-specs` | Per-sprint design pack — workflow, ER, API, UX/UI ASCII + mapping |
 | `sprint-status` | Standup / mid-sprint progress report |
 | `feature-spec` | Scaffold a feature with ACs |
 | `release-cut` | Sprint close — VERSION + tag |
@@ -54,8 +55,8 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** _Sprint 4 planning_ — see `docs/sdlc/00-roadmap/ROADMAP.md`
+**Current sprint:** `SPRINT-004` — Platform Admin: Portal + Packages (v0.5.0) — `apps/platform-admin-web` at `/admin`
 
 **Shipped:** v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
 
-**KM ops:** `docs/KM_SETUP.md` · **API:** `docs/sdlc/02-design/api-spec.md` · **Deploy:** `docs/sdlc/07-deployment/LOCAL-DEV.md` · **UAT:** `docs/sdlc/06-manual-tests/`
+**KM ops:** `docs/KM_SETUP.md` · **API:** `docs/sdlc/02-design/04-api-spec.md` · **Deploy:** `docs/sdlc/07-deployment/LOCAL-DEV.md` · **UAT:** `docs/sdlc/06-manual-tests/`

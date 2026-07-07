@@ -1,9 +1,9 @@
 ---
 id: DES-0002
 title: Workflows
-status: review_pending
+status: approved
 updated: 2026-07-07
-sprint: SPRINT-003
+sprint: SPRINT-004
 ---
 
 # Workflows — Monti Jarvis
@@ -183,4 +183,116 @@ No login required. All handlers use `tenant_id = DEMO_TENANT_ID`. Identical to v
 | `indexed` | Postgres + ClickHouse ready |
 | `failed` | Embed or index error |
 
-See [auth-spec.md](auth-spec.md), [api-spec.md](api-spec.md), [ux-ui.md](ux-ui.md).
+## 9. Package catalog CRUD (Sprint 4)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant G as Go :8091
+  participant M as auth middleware
+  participant P as internal/packages
+  participant DB as Postgres
+
+  Op->>G: POST /api/platform/packages {slug, name, limits, ...}
+  G->>M: validate JWT + platform_admin
+  alt forbidden
+    M-->>Op: 403
+  else ok
+    M->>P: Create(ctx, input)
+    P->>DB: validate rules vs package_rule_schemas
+    P->>DB: INSERT packages + package_limits (rules jsonb)
+    G-->>Op: 201 {id, slug, limits, ...}
+  end
+```
+
+## 10. Assign tenant entitlement (Sprint 4)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant G as Go :8091
+  participant E as internal/entitlements
+  participant DB as Postgres
+  participant R as Redis
+
+  Op->>G: POST /api/platform/tenants/demo/entitlement {package_id}
+  G->>G: RBAC platform_admin
+  G->>DB: revoke prior active row (if any)
+  G->>DB: INSERT tenant_entitlements + rules_snapshot + rules_schema_id
+  G->>R: DEL monti_jarvis:entitlement:demo
+  G-->>Op: 200 effective entitlement JSON
+```
+
+## 11. Entitlement resolve + cache (Sprint 4)
+
+```mermaid
+sequenceDiagram
+  participant C as Client (tenant_admin)
+  participant G as Go :8091
+  participant E as internal/entitlements
+  participant R as Redis
+  participant DB as Postgres
+
+  C->>G: GET /api/entitlements/me + Bearer
+  G->>G: tenant_id from JWT
+  G->>E: Resolve(tenant_id)
+  E->>R: GET monti_jarvis:entitlement:{tenant_id}
+  alt cache hit
+    R-->>E: cached JSON
+  else cache miss
+    E->>DB: tenant_entitlements JOIN packages JOIN package_limits (rules jsonb)
+    E->>R: SETEX key TTL payload
+  end
+  E-->>G: effective limits
+  G-->>C: 200 {tenant_id, package, limits, status}
+```
+
+## State: package (Sprint 4)
+
+| Status | Meaning |
+| --- | --- |
+| `draft` | Not assignable; hidden from default list |
+| `active` | Assignable to tenants |
+| `archived` | No new assignments; existing entitlements honored until revoked |
+
+## State: tenant entitlement (Sprint 4)
+
+| Status | Meaning |
+| --- | --- |
+| `active` | Tenant receives package limits (at most one per tenant) |
+| `suspended` | Limits withheld; row kept for audit |
+| `revoked` | Operator ended entitlement; resolver returns fallback |
+| `expired` | `valid_until` passed (Sprint 9+ subscriptions) |
+
+## 12. Platform admin login (Sprint 4)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser /admin
+  participant G as Go :8091
+  participant A as internal/auth
+
+  B->>G: POST /api/auth/login {email, password}
+  G->>A: Login + issue tokens
+  G-->>B: {access_token, refresh_token, user}
+  B->>B: sessionStorage tokens
+  B->>G: GET /admin/packages (SPA)
+  G-->>B: platform-admin-web index.html
+  B->>G: GET /api/platform/packages + Bearer
+  G-->>B: packages[]
+```
+
+## 13. Platform admin logout (Sprint 4)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant G as Go :8091
+
+  B->>G: POST /api/auth/logout + Bearer
+  G-->>B: 200
+  B->>B: clear sessionStorage
+  B->>B: navigate /admin/login
+```
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

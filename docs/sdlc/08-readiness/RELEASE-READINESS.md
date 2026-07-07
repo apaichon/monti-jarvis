@@ -67,7 +67,7 @@ curl -fsS http://localhost:8091/api/workforce
 - [ ] Manual test checklist completed ([`06-manual-tests/`](../06-manual-tests/))
 - [ ] Test matrix scenarios for this sprint marked pass ([`05-test-scenarios/TEST-MATRIX.md`](../05-test-scenarios/TEST-MATRIX.md))
 - [ ] `AGENTS.md` current sprint line updated
-- [ ] API spec matches shipped routes ([`02-design/api-spec.md`](../02-design/api-spec.md))
+- [ ] API spec matches shipped routes ([`02-design/04-api-spec.md`](../02-design/04-api-spec.md))
 
 ## G. Sign-off
 

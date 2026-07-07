@@ -10,7 +10,8 @@ description: Scaffold a feature specification for Monti Jarvis — problem state
 2. Draft the spec using the template below. ACs must be **independently testable**.
 3. Save to `docs/sdlc/01-features/FEAT-NNNN-<slug>.md`.
 4. Link from the active sprint commitment table.
-5. Run **`km-sync`** to register the feature link.
+5. Run **`sprint-tech-specs`** to produce workflow, ER, API, and UX/UI artifacts for the sprint.
+6. Run **`km-sync`** to register the feature link.
 
 ## Template
 ```markdown

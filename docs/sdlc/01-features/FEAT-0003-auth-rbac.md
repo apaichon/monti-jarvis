@@ -44,4 +44,4 @@ Out:
 
 - Blueprint §11.3, §12.1, multi-tenant isolation rules
 - Sprint 2: KM APIs, `DEMO_TENANT_ID`, Postgres `callcenter` schema
-- Design updates: `02-design/api-spec.md`, `er-diagram.md`, `architecture.md`
+- Design updates: `02-design/04-api-spec.md`, `03-er-diagram.md`, `01-architecture.md`

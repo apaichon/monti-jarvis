@@ -43,7 +43,7 @@ AI answers in the customer portal use **tenant-approved knowledge** with **scope
 ## Feature
 
 - [FEAT-0002 — KM and Scope RAG](../01-features/FEAT-0002-km-scope-rag.md)
-- Design: [api-spec](../02-design/api-spec.md) · [workflow](../02-design/workflow.md) · [ux-ui](../02-design/ux-ui.md)
+- Design: [api-spec](../02-design/04-api-spec.md) · [workflow](../02-design/02-workflow.md) · [ux-ui](../02-design/05-ux-ui.md)
 
 ## Stack delivered
 

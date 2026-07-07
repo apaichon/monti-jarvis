@@ -6,7 +6,7 @@ Numbered folders keep artifacts ordered and easy to navigate.
 | --- | --- | --- |
 | `00` | [00-roadmap/](00-roadmap/) | 35-sprint roadmap |
 | `01` | [01-features/](01-features/) | Feature specs (`FEAT-NNNN`) |
-| `02` | [02-design/](02-design/) | Architecture, workflow, ER, API, UX/UI |
+| `02` | [02-design/](02-design/) | Architecture, workflow, ER, API, UX/UI — use **`sprint-tech-specs`** skill per sprint |
 | `03` | [03-sprints/](03-sprints/) | Sprint plans (`SPRINT-NNN`) |
 | `04` | [04-tasks/](04-tasks/) | Task tickets (`TASK-NNNN`) |
 | `05` | [05-test-scenarios/](05-test-scenarios/) | AC → scenario matrix (auto vs manual) |
@@ -16,7 +16,7 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** _Planning Sprint 4_ — see [`00-roadmap/ROADMAP.md`](00-roadmap/ROADMAP.md)
+**Current sprint:** [`SPRINT-004`](03-sprints/SPRINT-004.md) — Platform Admin: Portal + Packages · target **v0.5.0**
 
 **Shipped:** v0.4.0 [`SPRINT-003`](03-sprints/SPRINT-003.md) · v0.3.0 [`SPRINT-002`](03-sprints/SPRINT-002.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
 

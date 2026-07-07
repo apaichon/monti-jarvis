@@ -135,7 +135,7 @@ Passwords are **dev-only**; document in `LOCAL-DEV.md`, never use in production.
 
 ## 6. HTTP API
 
-Base: `http://localhost:8091`. See [api-spec.md](api-spec.md) § Auth for full contract.
+Base: `http://localhost:8091`. See [04-api-spec.md](04-api-spec.md) § Auth for full contract.
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |

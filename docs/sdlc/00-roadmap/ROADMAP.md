@@ -11,6 +11,7 @@
 | Official Sprint 1 | **Shipped v0.2.0** — Customer: Conversation (Svelte + LiveKit + NATS + Gemini voice) |
 | Official Sprint 2 | **Shipped v0.3.0** — Customer: KM and Scope (ClickHouse RAG, per-avatar KB, citations) |
 | Official Sprint 3 | **Shipped v0.4.0** — Backend: Auth (JWT, RBAC, Redis cache, NATS events) |
+| Official Sprint 4 | **In progress** — Platform Admin: Portal + Packages (login, profile, catalog UI) |
 
 ---
 
@@ -114,25 +115,31 @@ Each active sprint gets:
 docs/sdlc/README.md
 docs/sdlc/00-roadmap/ROADMAP.md
 docs/sdlc/01-features/FEAT-NNNN-<slug>.md
-docs/sdlc/02-design/          architecture, workflow, er-diagram, api-spec, ux-ui
+docs/sdlc/02-design/          01-architecture … 09-platform-admin-portal-spec (NN- prefix)
 docs/sdlc/03-sprints/SPRINT-NNN.md
 docs/sdlc/04-tasks/TASK-NNNN.md
 ```
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Current sprint: SPRINT-003
-
-**Platform:** Backend  
-**Feature:** Auth  
-**Goal:** JWT auth, tenant model, RBAC skeleton; protect KM admin APIs while keeping auth-disabled dev demo.
-
-See `docs/sdlc/03-sprints/SPRINT-003.md` and [FEAT-0003](../01-features/FEAT-0003-auth-rbac.md).
-
-**Last shipped:** SPRINT-003 · **v0.4.0**
-
-## Next sprint: SPRINT-004
+## Current sprint: SPRINT-004
 
 **Platform:** Platform Admin  
-**Feature:** Packages  
-**Goal:** Commercial package catalog and entitlements (depends on Sprint 3 auth).
+**Feature:** Portal + Packages  
+**Goal:** Platform admin portal (`/admin`) — login, logout, profile, package/entitlement UI + JSONB rules APIs.
+
+See `docs/sdlc/03-sprints/SPRINT-004.md` and [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md).
+
+**Release target:** v0.5.0
+
+## Last shipped: SPRINT-003
+
+**Platform:** Backend · **Feature:** Auth · **v0.4.0**
+
+See [SPRINT-003](../03-sprints/SPRINT-003.md) · [FEAT-0003](../01-features/FEAT-0003-auth-rbac.md).
+
+## Next sprint: SPRINT-005
+
+**Platform:** Platform Admin  
+**Feature:** Avatars  
+**Goal:** Platform-managed AI avatar catalog and tenant assignment (depends on Sprint 3 auth).

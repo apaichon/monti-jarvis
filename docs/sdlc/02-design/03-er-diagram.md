@@ -1,14 +1,29 @@
 ---
 id: DES-0003
 title: Entity Relationship Diagram
-status: review_pending
+status: approved
 updated: 2026-07-08
-sprint: SPRINT-003
+sprint: SPRINT-004
 ---
 
 # ER Diagram — Monti Jarvis
 
 Database `monti_jarvis`, Postgres schema `callcenter`. ClickHouse database `monti_jarvis` for vectors/analytics.
+
+## Audit columns (standard)
+
+Every durable Postgres table in `callcenter` carries four audit fields (migration `001_audit_columns_postgres`, `internal/store/audit.go`):
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `created_at` | `timestamptz` | Row insert time; default `now()` |
+| `updated_at` | `timestamptz` | Auto-set on `UPDATE` via `touch_updated_at()` trigger |
+| `created_by` | `text` | Actor user id; default `'system'`; set from JWT via `internal/auditctx` |
+| `updated_by` | `text` | Last mutator user id; default `'system'` |
+
+**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
+
+ClickHouse analytics tables use `created_at`, `updated_at`, `created_by`, `updated_by` (`002_audit_columns_clickhouse` + `EnsureAuthEventsSchema`).
 
 ## Postgres (`callcenter`)
 
@@ -19,6 +34,11 @@ erDiagram
   users ||--o{ refresh_tokens : has
   tenants ||--o{ call_sessions : owns
   tenants ||--o{ knowledge_documents : owns
+  tenants ||--o{ tenant_entitlements : entitled
+  package_rule_schemas ||--o{ package_limits : shapes
+  package_rule_schemas ||--o{ tenant_entitlements : snapshot_schema
+  packages ||--o{ tenant_entitlements : grants
+  packages ||--|| package_limits : defines
   embedding_models ||--o{ knowledge_index_runs : indexes_with
   voice_providers ||--o{ call_sessions : uses
   voice_providers ||--o{ ai_employee_configs : default_voice
@@ -33,6 +53,9 @@ erDiagram
     text name
     text status
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   users {
@@ -42,6 +65,9 @@ erDiagram
     text display_name
     text status
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   user_roles {
@@ -49,6 +75,9 @@ erDiagram
     text role
     text tenant_id FK
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   refresh_tokens {
@@ -58,6 +87,9 @@ erDiagram
     timestamptz expires_at
     timestamptz revoked_at
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   calls {
@@ -66,6 +98,8 @@ erDiagram
     text title
     timestamptz created_at
     timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   messages {
@@ -74,6 +108,9 @@ erDiagram
     text role
     text content
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   call_sessions {
@@ -85,6 +122,10 @@ erDiagram
     timestamptz started_at
     timestamptz ended_at
     text recording_key
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   call_turns {
@@ -94,6 +135,9 @@ erDiagram
     text content
     jsonb source_chunk_ids
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   embedding_models {
@@ -103,6 +147,9 @@ erDiagram
     int dimensions
     text status
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   voice_providers {
@@ -112,6 +159,9 @@ erDiagram
     text modality
     text status
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   ai_employee_configs {
@@ -120,7 +170,10 @@ erDiagram
     text voice_provider_id FK
     text text_provider_id FK
     text embedding_model_id FK
+    timestamptz created_at
     timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   knowledge_documents {
@@ -136,6 +189,8 @@ erDiagram
     int chunk_count
     timestamptz created_at
     timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   knowledge_index_runs {
@@ -147,6 +202,10 @@ erDiagram
     text status
     timestamptz started_at
     timestamptz completed_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   knowledge_chunks {
@@ -161,6 +220,60 @@ erDiagram
     text embedding_model_id FK
     int index_version
     timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  package_rule_schemas {
+    text id PK
+    int version UK
+    text name
+    jsonb fields
+    text status
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  packages {
+    text id PK
+    text slug UK
+    text name
+    text status
+    int price_cents
+    text currency
+    text billing_period
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  package_limits {
+    text package_id PK_FK
+    text rules_schema_id FK
+    jsonb rules
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_entitlements {
+    text id PK
+    text tenant_id FK
+    text package_id FK
+    text rules_schema_id FK
+    jsonb rules_snapshot
+    text status
+    timestamptz valid_from
+    timestamptz valid_until
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 ```
 
@@ -182,6 +295,10 @@ erDiagram
 | `users` | Login identities *(Sprint 3)* |
 | `user_roles` | RBAC role per user/tenant *(Sprint 3)* |
 | `refresh_tokens` | Hashed refresh tokens *(Sprint 3)* |
+| `package_rule_schemas` | Versioned JSONB field catalog for package `rules` *(Sprint 4)* |
+| `packages` | Commercial catalog — Starter/Pro/Enterprise *(Sprint 4)* |
+| `package_limits` | `rules` jsonb per package; shape from `package_rule_schemas` *(Sprint 4)* |
+| `tenant_entitlements` | Assignment + `rules_snapshot` at bind time *(Sprint 4)* |
 
 ### Indexes
 
@@ -215,6 +332,10 @@ erDiagram
     text provider
     text model_key
     int dimensions
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 
   voice_providers {
@@ -222,6 +343,10 @@ erDiagram
     text provider
     text model_key
     text modality
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
   }
 ```
 
@@ -254,7 +379,10 @@ erDiagram
     string km_scope
     string content
     array_float32 embedding
+    datetime created_at
     datetime updated_at
+    string created_by
+    string updated_by
   }
 
   qa_events {
@@ -266,6 +394,24 @@ erDiagram
     string event_type
     string embedding_model_id
     datetime created_at
+    datetime updated_at
+    string created_by
+    string updated_by
+  }
+
+  auth_events {
+    string event_id
+    string event
+    string tenant_id
+    string user_id
+    string email
+    string role
+    string ip
+    string user_agent
+    datetime created_at
+    datetime updated_at
+    string created_by
+    string updated_by
   }
 
   call_provider_events {
@@ -275,6 +421,9 @@ erDiagram
     string voice_provider_id
     string event_type
     datetime created_at
+    datetime updated_at
+    string created_by
+    string updated_by
   }
 ```
 
@@ -287,6 +436,8 @@ erDiagram
 | `content_version` | Matches Postgres document content generation |
 | `index_version` | Matches `knowledge_index_runs`; invalidate old vectors on re-index |
 | `chunk_id` | Join key to Postgres `knowledge_chunks.id` |
+| `created_at` / `updated_at` / `created_by` / `updated_by` | Audit fields on all analytics tables (shipped Sprint 3) |
+| `auth_events` | NATS auth lifecycle mirror (`auth.user.logged_in`, `logged_out`, etc.) |
 
 **Search rule:** `WHERE tenant_id = ? AND agent_id = ? AND embedding_model_id = ? AND index_version = active AND km_scope IN (?)` — never mix models in cosine ranking.
 
@@ -317,6 +468,7 @@ monti-jarvis/
 | --- | --- | --- |
 | `monti_jarvis:call:{session_id}` | 24h | agent_id, updated_at (legacy chat) |
 | `monti_jarvis:call:active:{id}` | 24h | tenant_id, room_name, status, started_at |
+| `monti_jarvis:entitlement:{tenant_id}` | 15m (env) | package slug, status, effective limits JSON *(Sprint 4)* |
 
 ## Workforce (in-memory, not DB)
 
@@ -336,10 +488,10 @@ Agents `ava`, `max`, `luna`, `neo` defined in `internal/workforce/workforce.go` 
 
 | Sprint | Tables |
 | --- | --- |
-| 4+ | `packages`, `entitlements` |
+| 4 ✅ (v0.5.0 target) | `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements` |
 | 6+ | `tenant_registrations`, `brands` |
 | 15 | `km_scope_assignments`, tenant-driven re-index |
 | 21 | `ai_employees`, `ai_employee_configs` (full catalog) |
 | 22 | `conversation_records` (ClickHouse denorm) |
 
-See [architecture.md](architecture.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.

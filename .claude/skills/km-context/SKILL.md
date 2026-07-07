@@ -26,7 +26,7 @@ knowledge graph yet).
    - Sprint goal + status
    - Task table (id, status, owner)
    - In-scope / out-of-scope reminders
-   - Key files and APIs for this sprint (`docs/sdlc/02-design/api-spec.md`)
+   - Key files and APIs for this sprint (`docs/sdlc/02-design/04-api-spec.md`)
 
 ## Output
 A markdown briefing. Do **not** dump full task bodies unless the task is the focus.
