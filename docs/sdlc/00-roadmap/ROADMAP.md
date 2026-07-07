@@ -11,7 +11,8 @@
 | Official Sprint 1 | **Shipped v0.2.0** — Customer: Conversation (Svelte + LiveKit + NATS + Gemini voice) |
 | Official Sprint 2 | **Shipped v0.3.0** — Customer: KM and Scope (ClickHouse RAG, per-avatar KB, citations) |
 | Official Sprint 3 | **Shipped v0.4.0** — Backend: Auth (JWT, RBAC, Redis cache, NATS events) |
-| Official Sprint 4 | **In progress** — Platform Admin: Portal + Packages (login, profile, catalog UI) |
+| Official Sprint 4 | **Shipped v0.5.0** — Platform Admin: Portal + Packages (login, profile, catalog UI) |
+| Official Sprint 5 | **In progress** — Platform Admin: Avatars (catalog + tenant assignment) |
 
 ---
 
@@ -22,8 +23,8 @@
 | 1 | Customer | Conversation | A | — ✅ v0.2.0 |
 | 2 | Customer | Add KM and Scope | A | 1 ✅ v0.3.0 |
 | 3 | Backend | Auth | B | — ✅ v0.4.0 |
-| 4 | Platform Admin | Packages | B | 3 |
-| 5 | Platform Admin | Avatars | B | 3 |
+| 4 | Platform Admin | Packages | B | 3 ✅ v0.5.0 |
+| 5 | Platform Admin | Avatars | B | 3, 4 |
 | 6 | Tenant | Register | C | 3 |
 | 7 | Platform Admin | KYC Tenant | C | 6 |
 | 8 | Platform Admin | Payment Gateway | C | 3 |
@@ -126,9 +127,11 @@ Use `sprint-plan` skill when opening a new sprint.
 
 **Platform:** Platform Admin  
 **Feature:** Avatars  
-**Goal:** Platform-managed AI avatar catalog and tenant assignment (depends on Sprint 3 auth).
+**Goal:** Postgres avatar catalog, platform CRUD, per-tenant assignment, DB-backed `/api/workforce`.
 
-See `docs/sdlc/03-sprints/` (open with `sprint-plan` when ready).
+See [SPRINT-005](../03-sprints/SPRINT-005.md) and [FEAT-0005](../01-features/FEAT-0005-avatar-catalog.md).
+
+**Release target:** v0.6.0
 
 ## Last shipped: SPRINT-004
 
@@ -136,8 +139,8 @@ See `docs/sdlc/03-sprints/` (open with `sprint-plan` when ready).
 
 See [SPRINT-004](../03-sprints/SPRINT-004.md) · [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md).
 
-## Next sprint: SPRINT-005
+## Next sprint: SPRINT-006
 
-**Platform:** Platform Admin  
-**Feature:** Avatars  
-**Goal:** Platform-managed AI avatar catalog and tenant assignment (depends on Sprint 3 auth).
+**Platform:** Tenant  
+**Feature:** Register  
+**Goal:** Tenant self-registration flow (depends on Sprint 3 auth).

@@ -55,7 +55,7 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** `SPRINT-005` — Platform Admin: Avatars (plan with `sprint-plan`)
+**Current sprint:** `SPRINT-005` — Platform Admin: Avatars (v0.6.0) — catalog + tenant assignment
 
 **Shipped:** v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
 
