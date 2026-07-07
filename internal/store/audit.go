@@ -23,6 +23,12 @@ var auditableTables = []string{
 	"users",
 	"user_roles",
 	"refresh_tokens",
+	"package_rule_schemas",
+	"packages",
+	"package_limits",
+	"tenant_entitlements",
+	"embedding_models",
+	"voice_providers",
 }
 
 func (s *Store) ensureAuditSchema(ctx context.Context) error {

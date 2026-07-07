@@ -75,7 +75,7 @@ func (s *Store) ensurePackagesSchema(ctx context.Context) error {
   version int NOT NULL UNIQUE,
   name text NOT NULL,
   fields jsonb NOT NULL,
-  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deprecated'))%s
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deprecated')),%s
 )`, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.packages (
   id text PRIMARY KEY,
@@ -85,12 +85,12 @@ func (s *Store) ensurePackagesSchema(ctx context.Context) error {
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
   price_cents int NOT NULL DEFAULT 0,
   currency text NOT NULL DEFAULT 'USD',
-  billing_period text NOT NULL DEFAULT 'monthly'%s
+  billing_period text NOT NULL DEFAULT 'monthly',%s
 )`, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.package_limits (
   package_id text PRIMARY KEY REFERENCES %s.packages(id) ON DELETE CASCADE,
   rules_schema_id text NOT NULL REFERENCES %s.package_rule_schemas(id),
-  rules jsonb NOT NULL%s
+  rules jsonb NOT NULL,%s
 )`, schema, schema, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.tenant_entitlements (
   id text PRIMARY KEY,
@@ -100,7 +100,7 @@ func (s *Store) ensurePackagesSchema(ctx context.Context) error {
   rules_snapshot jsonb NOT NULL,
   status text NOT NULL CHECK (status IN ('active', 'suspended', 'revoked', 'expired')),
   valid_from timestamptz NOT NULL DEFAULT now(),
-  valid_until timestamptz%s
+  valid_until timestamptz,%s
 )`, schema, schema, schema, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS tenant_entitlements_one_active_idx
 ON %s.tenant_entitlements (tenant_id) WHERE status = 'active'`, schema),
@@ -109,14 +109,14 @@ ON %s.tenant_entitlements (tenant_id) WHERE status = 'active'`, schema),
   provider text NOT NULL,
   model_key text NOT NULL,
   dimensions int NOT NULL DEFAULT 768,
-  status text NOT NULL DEFAULT 'active'%s
+  status text NOT NULL DEFAULT 'active',%s
 )`, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.voice_providers (
   id text PRIMARY KEY,
   provider text NOT NULL,
   model_key text NOT NULL,
   modality text NOT NULL DEFAULT 'audio',
-  status text NOT NULL DEFAULT 'active'%s
+  status text NOT NULL DEFAULT 'active',%s
 )`, schema, auditColumnsDDL),
 	}
 	for _, stmt := range stmts {

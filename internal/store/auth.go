@@ -41,7 +41,7 @@ func (s *Store) ensureAuthSchema(ctx context.Context) error {
   slug text NOT NULL UNIQUE,
   name text NOT NULL,
   status text NOT NULL DEFAULT 'active'
-    CHECK (status IN ('active', 'suspended'))%s
+    CHECK (status IN ('active', 'suspended')),%s
 )`, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.users (
   id text PRIMARY KEY,
@@ -49,12 +49,12 @@ func (s *Store) ensureAuthSchema(ctx context.Context) error {
   password_hash text NOT NULL,
   display_name text NOT NULL DEFAULT '',
   status text NOT NULL DEFAULT 'active'
-    CHECK (status IN ('active', 'disabled'))%s
+    CHECK (status IN ('active', 'disabled')),%s
 )`, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.user_roles (
   user_id text NOT NULL REFERENCES %s.users(id) ON DELETE CASCADE,
   role text NOT NULL CHECK (role IN ('platform_admin', 'tenant_admin', 'customer')),
-  tenant_id text REFERENCES %s.tenants(id) ON DELETE CASCADE%s,
+  tenant_id text REFERENCES %s.tenants(id) ON DELETE CASCADE,%s,
   PRIMARY KEY (user_id, role)
 )`, schema, schema, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.refresh_tokens (
@@ -62,7 +62,7 @@ func (s *Store) ensureAuthSchema(ctx context.Context) error {
   user_id text NOT NULL REFERENCES %s.users(id) ON DELETE CASCADE,
   token_hash text NOT NULL UNIQUE,
   expires_at timestamptz NOT NULL,
-  revoked_at timestamptz%s
+  revoked_at timestamptz,%s
 )`, schema, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS refresh_tokens_user_idx ON %s.refresh_tokens (user_id)`, schema),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS refresh_tokens_expires_idx ON %s.refresh_tokens (expires_at)`, schema),
