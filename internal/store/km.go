@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/libra/monti-jarvis/internal/auditctx"
 	"github.com/libra/monti-jarvis/internal/km"
 	"github.com/minio/minio-go/v7"
 )
@@ -14,13 +15,14 @@ func (s *Store) CreateKnowledgeDocument(ctx context.Context, doc km.Document) (k
 		return km.Document{}, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
+	actor := auditctx.ActorID(ctx)
 	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
 INSERT INTO %s.knowledge_documents
-  (id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+  (id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version, created_by, updated_by)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)
 RETURNING id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version, created_at, updated_at`,
 		schema),
-		doc.ID, doc.TenantID, doc.AgentID, doc.Filename, doc.ObjectKey, doc.Mime, doc.Status, doc.KMScope, doc.KMVersion,
+		doc.ID, doc.TenantID, doc.AgentID, doc.Filename, doc.ObjectKey, doc.Mime, doc.Status, doc.KMScope, doc.KMVersion, actor,
 	).Scan(
 		&doc.ID, &doc.TenantID, &doc.AgentID, &doc.Filename, &doc.ObjectKey, &doc.Mime, &doc.Status, &doc.KMScope, &doc.KMVersion, &doc.CreatedAt, &doc.UpdatedAt,
 	)
@@ -32,10 +34,11 @@ func (s *Store) UpdateKnowledgeDocumentStatus(ctx context.Context, id, status st
 		return fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
+	actor := auditctx.ActorID(ctx)
 	_, err := s.pg.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.knowledge_documents
-SET status = $2, km_version = $3, chunk_count = $4, updated_at = now()
-WHERE id = $1`, schema), id, status, version, chunkCount)
+SET status = $2, km_version = $3, chunk_count = $4, updated_by = $5
+WHERE id = $1`, schema), id, status, version, chunkCount, actor)
 	return err
 }
 
@@ -129,13 +132,14 @@ func (s *Store) ReplaceKnowledgeChunks(ctx context.Context, tenantID, agentID, d
 DELETE FROM %s.knowledge_chunks WHERE document_id = $1`, schema), documentID); err != nil {
 		return err
 	}
+	actor := auditctx.ActorID(ctx)
 	for i, chunk := range chunks {
 		chunkID := chunkIDs[i]
 		if _, err := tx.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s.knowledge_chunks
-  (id, document_id, tenant_id, agent_id, chunk_index, content, km_scope)
-VALUES ($1,$2,$3,$4,$5,$6,$7)`, schema),
-			chunkID, documentID, tenantID, agentID, chunk.Index, chunk.Content, kmScope,
+  (id, document_id, tenant_id, agent_id, chunk_index, content, km_scope, created_by, updated_by)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8)`, schema),
+			chunkID, documentID, tenantID, agentID, chunk.Index, chunk.Content, kmScope, actor,
 		); err != nil {
 			return err
 		}

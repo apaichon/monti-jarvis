@@ -37,6 +37,17 @@ func NewService(store DocumentStore, ch *clickhouse.Client, embed *gemini.Client
 	return &Service{store: store, ch: ch, embed: embed, tenant: tenantID}
 }
 
+func (s *Service) WithTenant(tenantID string) *Service {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	if t := strings.TrimSpace(tenantID); t != "" {
+		cp.tenant = t
+	}
+	return &cp
+}
+
 func (s *Service) Ingest(ctx context.Context, agentID, filename string, data []byte, kmScope string) (Document, error) {
 	agentID = strings.ToLower(strings.TrimSpace(agentID))
 	if !scope.ValidAgent(agentID) {

@@ -3,6 +3,7 @@ package env
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -34,7 +35,15 @@ type Config struct {
 	ClickHouseDB       string
 	ClickHouseUser     string
 	ClickHousePassword string
-	GeminiEmbedModel string
+	GeminiEmbedModel   string
+	AuthDisabled           bool
+	JWTSecret              string
+	JWTAccessTTL           time.Duration
+	JWTRefreshTTL          time.Duration
+	AuthCacheEnabled       bool
+	AuthWriteBehindEnabled bool
+	AuthEventsEnabled      bool
+	AuthUserCacheTTL       time.Duration
 }
 
 func Load() Config {
@@ -75,7 +84,27 @@ func Load() Config {
 		ClickHouseUser:     envOr("CLICKHOUSE_USER", "monti"),
 		ClickHousePassword: envOr("CLICKHOUSE_PASSWORD", "monti"),
 		GeminiEmbedModel: envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
+		AuthDisabled:           envBool("AUTH_DISABLED", true),
+		JWTSecret:              os.Getenv("JWT_SECRET"),
+		JWTAccessTTL:           envDuration("JWT_ACCESS_TTL", 15*time.Minute),
+		JWTRefreshTTL:          envDuration("JWT_REFRESH_TTL", 168*time.Hour),
+		AuthCacheEnabled:       envBool("AUTH_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
+		AuthWriteBehindEnabled: envBool("AUTH_WRITE_BEHIND_ENABLED", os.Getenv("REDIS_URL") != ""),
+		AuthEventsEnabled:      envBool("AUTH_EVENTS_ENABLED", envOr("NATS_URL", "nats://localhost:4222") != ""),
+		AuthUserCacheTTL:       envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
 	}
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func envOr(key, fallback string) string {

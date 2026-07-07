@@ -40,14 +40,19 @@ CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".calls (
   agent_id text NOT NULL DEFAULT 'ava',
   title text NOT NULL DEFAULT 'Inbound call',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
 );
 CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".messages (
   id bigserial PRIMARY KEY,
   call_id text NOT NULL REFERENCES "$POSTGRES_SCHEMA".calls(id) ON DELETE CASCADE,
   role text NOT NULL CHECK (role IN ('caller', 'agent')),
   content text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
 );
 CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".call_sessions (
   id text PRIMARY KEY,
@@ -56,7 +61,11 @@ CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".call_sessions (
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'ended')),
   started_at timestamptz NOT NULL DEFAULT now(),
   ended_at timestamptz,
-  recording_key text
+  recording_key text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
 );
 CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".call_turns (
   id bigserial PRIMARY KEY,
@@ -64,7 +73,10 @@ CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".call_turns (
   role text NOT NULL CHECK (role IN ('caller', 'agent', 'system')),
   content text NOT NULL,
   source_chunk_ids jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
 );
 CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".knowledge_documents (
   id text PRIMARY KEY,
@@ -78,7 +90,9 @@ CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".knowledge_documents (
   km_version integer NOT NULL DEFAULT 1,
   chunk_count integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
 );
 CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".knowledge_chunks (
   id text PRIMARY KEY,
@@ -88,10 +102,81 @@ CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".knowledge_chunks (
   chunk_index integer NOT NULL,
   content text NOT NULL,
   km_scope text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
 );
 CREATE INDEX IF NOT EXISTS knowledge_documents_agent_idx ON "$POSTGRES_SCHEMA".knowledge_documents (tenant_id, agent_id);
 CREATE INDEX IF NOT EXISTS knowledge_chunks_agent_idx ON "$POSTGRES_SCHEMA".knowledge_chunks (tenant_id, agent_id);
+CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".tenants (
+  id text PRIMARY KEY,
+  slug text NOT NULL UNIQUE,
+  name text NOT NULL,
+  status text NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'suspended')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
+);
+CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".users (
+  id text PRIMARY KEY,
+  email text NOT NULL UNIQUE,
+  password_hash text NOT NULL,
+  display_name text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'disabled')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
+);
+CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".user_roles (
+  user_id text NOT NULL REFERENCES "$POSTGRES_SCHEMA".users(id) ON DELETE CASCADE,
+  role text NOT NULL CHECK (role IN ('platform_admin', 'tenant_admin', 'customer')),
+  tenant_id text REFERENCES "$POSTGRES_SCHEMA".tenants(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system',
+  PRIMARY KEY (user_id, role)
+);
+CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".refresh_tokens (
+  id text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES "$POSTGRES_SCHEMA".users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  expires_at timestamptz NOT NULL,
+  revoked_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system'
+);
+CREATE INDEX IF NOT EXISTS refresh_tokens_user_idx ON "$POSTGRES_SCHEMA".refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS refresh_tokens_expires_idx ON "$POSTGRES_SCHEMA".refresh_tokens (expires_at);
+SQL
+
+DEMO_TENANT_ID=${DEMO_TENANT_ID:-demo}
+echo "==> Seeding auth tenants and dev users..."
+psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO "$POSTGRES_SCHEMA".tenants (id, slug, name, status)
+VALUES ('$DEMO_TENANT_ID', '$DEMO_TENANT_ID', 'Demo Tenant', 'active')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO "$POSTGRES_SCHEMA".users (id, email, password_hash, display_name, status)
+VALUES
+  ('usr_platform', 'platform@monti.local', '\$2a\$12\$lQ5/HO3QPAqZQxC76Am3NOuV7U/UWpnFVvuUynx.ABDL/ZiiRGBSW', 'Monti Platform', 'active'),
+  ('usr_demo_admin', 'admin@demo.local', '\$2a\$12\$5n9IyLvIFmjwBczbeJJ1J.pHXTsnwRX4uADFrIol6xw2TLYsF9qq2', 'Demo Admin', 'active')
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO "$POSTGRES_SCHEMA".user_roles (user_id, role, tenant_id)
+VALUES ('usr_platform', 'platform_admin', NULL)
+ON CONFLICT (user_id, role) DO NOTHING;
+
+INSERT INTO "$POSTGRES_SCHEMA".user_roles (user_id, role, tenant_id)
+VALUES ('usr_demo_admin', 'tenant_admin', '$DEMO_TENANT_ID')
+ON CONFLICT (user_id, role) DO NOTHING;
 SQL
 
 if docker ps --format '{{.Names}}' | grep -qx 'poc-gml-minio'; then
@@ -116,11 +201,60 @@ CLICKHOUSE_DB=${CLICKHOUSE_DB:-monti_jarvis}
 CLICKHOUSE_USER=${CLICKHOUSE_USER:-monti}
 CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-monti}
 if curl -fsS "$CLICKHOUSE_URL/ping" >/dev/null 2>&1; then
-  echo "==> Ensuring ClickHouse database $CLICKHOUSE_DB exists..."
-  curl -fsS "$CLICKHOUSE_URL/?user=$CLICKHOUSE_USER&password=$CLICKHOUSE_PASSWORD" \
-    --data "CREATE DATABASE IF NOT EXISTS $CLICKHOUSE_DB" >/dev/null
+  echo "==> Ensuring ClickHouse database and tables exist..."
+  CH_BASE="$CLICKHOUSE_URL/?user=$CLICKHOUSE_USER&password=$CLICKHOUSE_PASSWORD"
+  curl -fsS "$CH_BASE" --data "CREATE DATABASE IF NOT EXISTS $CLICKHOUSE_DB" >/dev/null
+  curl -fsS "$CH_BASE&database=$CLICKHOUSE_DB" --data "
+CREATE TABLE IF NOT EXISTS km_embeddings (
+  tenant_id String,
+  agent_id String,
+  document_id String,
+  chunk_id String,
+  km_scope String,
+  km_version UInt32,
+  content String,
+  embedding Array(Float32),
+  created_at DateTime DEFAULT now(),
+  updated_at DateTime DEFAULT now(),
+  created_by String DEFAULT 'system',
+  updated_by String DEFAULT 'system'
+) ENGINE = MergeTree()
+ORDER BY (tenant_id, agent_id, km_scope, chunk_id)" >/dev/null
+  curl -fsS "$CH_BASE&database=$CLICKHOUSE_DB" --data "
+CREATE TABLE IF NOT EXISTS qa_events (
+  event_id String,
+  tenant_id String,
+  agent_id String,
+  topic String,
+  question String,
+  event_type String,
+  created_at DateTime DEFAULT now(),
+  updated_at DateTime DEFAULT now(),
+  created_by String DEFAULT 'system',
+  updated_by String DEFAULT 'system'
+) ENGINE = MergeTree()
+ORDER BY (tenant_id, created_at)" >/dev/null
+  curl -fsS "$CH_BASE&database=$CLICKHOUSE_DB" --data "
+CREATE TABLE IF NOT EXISTS auth_events (
+  event_id String,
+  event String,
+  tenant_id String,
+  user_id String,
+  email String,
+  role String,
+  ip String,
+  user_agent String,
+  created_at DateTime DEFAULT now(),
+  updated_at DateTime DEFAULT now(),
+  created_by String DEFAULT 'system',
+  updated_by String DEFAULT 'system'
+) ENGINE = MergeTree()
+ORDER BY (tenant_id, created_at, event_id)" >/dev/null
 else
   echo "note: ClickHouse not reachable at $CLICKHOUSE_URL — run 'make infra-up' for monti-clickhouse"
 fi
+
+echo "==> Applying database migrations..."
+"$ROOT_DIR/scripts/migrate.sh"
 
 echo "infra ready: Postgres monti_jarvis schema $POSTGRES_SCHEMA, Redis DB 4, MinIO $MINIO_BUCKET, NATS :4222, LiveKit :7880, ClickHouse :8123"

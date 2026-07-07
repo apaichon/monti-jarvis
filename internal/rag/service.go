@@ -43,6 +43,17 @@ func New(ch *clickhouse.Client, embed *gemini.Client, tenantID string) *Service 
 	return &Service{ch: ch, embed: embed, tenant: tenantID, cache: newPreloadCache()}
 }
 
+func (s *Service) WithTenant(tenantID string) *Service {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	if t := strings.TrimSpace(tenantID); t != "" {
+		cp.tenant = t
+	}
+	return &cp
+}
+
 func (s *Service) Enabled() bool {
 	return s != nil && s.embed != nil && s.embed.Enabled() && s.ch != nil && s.ch.Enabled()
 }

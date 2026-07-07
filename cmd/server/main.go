@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/libra/monti-jarvis/internal/auth"
 	"github.com/libra/monti-jarvis/internal/calls"
 	"github.com/libra/monti-jarvis/internal/clickhouse"
 	"github.com/libra/monti-jarvis/internal/customerweb"
@@ -37,6 +38,8 @@ type server struct {
 	rag    *rag.Service
 	ch     *clickhouse.Client
 	bus    *natsbus.Bus
+	auth   *auth.Service
+	guard  *auth.HTTPGuard
 	static http.Handler
 	legacy http.Handler
 }
@@ -98,6 +101,43 @@ func main() {
 	ragSvc := rag.New(ch, ai, cfg.DemoTenantID)
 	kmSvc := km.NewService(st, ch, ai, cfg.DemoTenantID)
 
+	var authSvc *auth.Service
+	if !cfg.AuthDisabled {
+		var err error
+		authSvc, err = auth.NewService(auth.Dependencies{
+			Store: st,
+			Bus:   bus,
+			CH:    ch,
+			Cfg: auth.Config{
+				JWTSecret:          cfg.JWTSecret,
+				AccessTTL:          cfg.JWTAccessTTL,
+				RefreshTTL:         cfg.JWTRefreshTTL,
+				UserCacheTTL:       cfg.AuthUserCacheTTL,
+				AuthDisabled:       cfg.AuthDisabled,
+				CacheEnabled:       cfg.AuthCacheEnabled,
+				WriteBehindEnabled: cfg.AuthWriteBehindEnabled,
+				EventsEnabled:      cfg.AuthEventsEnabled,
+				RedisPrefix:        cfg.RedisPrefix,
+			},
+		})
+		if err != nil {
+			log.Printf("infra warning: auth: %v", err)
+		} else {
+			authSvc.Start(rootCtx)
+		}
+	}
+	if bus != nil && bus.Enabled() && cfg.AuthEventsEnabled {
+		if err := bus.EnsureAuthStream(rootCtx); err != nil {
+			log.Printf("infra warning: nats auth stream: %v", err)
+		}
+	}
+	if ch != nil && ch.Enabled() {
+		if err := ch.EnsureAuthEventsSchema(rootCtx); err != nil {
+			log.Printf("infra warning: clickhouse auth_events: %v", err)
+		}
+	}
+	guard := auth.NewHTTPGuard(authSvc, cfg.AuthDisabled)
+
 	s := &server{
 		cfg:    cfg,
 		ai:     ai,
@@ -108,6 +148,8 @@ func main() {
 		rag:    ragSvc,
 		ch:     ch,
 		bus:    bus,
+		auth:   authSvc,
+		guard:  guard,
 		static: customerweb.Handler(cfg.CustomerWebDir),
 		legacy: web.Handler(),
 	}
@@ -115,21 +157,25 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /api/infra", s.infra)
-	mux.HandleFunc("POST /api/calls", s.createCall)
-	mux.HandleFunc("GET /api/calls/{id}", s.getCall)
-	mux.HandleFunc("POST /api/calls/{id}/token", s.issueCallToken)
-	mux.HandleFunc("POST /api/calls/{id}/end", s.endCall)
-	mux.HandleFunc("GET /api/calls/{id}/turns", s.listCallTurns)
-	mux.HandleFunc("POST /api/calls/{id}/turns", s.addCallTurn)
-	mux.HandleFunc("GET /api/calls/{id}/events", s.callEvents)
+	mux.Handle("POST /api/calls", guard.OptionalBearer(http.HandlerFunc(s.createCall)))
+	mux.Handle("GET /api/calls/{id}", guard.OptionalBearer(http.HandlerFunc(s.getCall)))
+	mux.Handle("POST /api/calls/{id}/token", guard.OptionalBearer(http.HandlerFunc(s.issueCallToken)))
+	mux.Handle("POST /api/calls/{id}/end", guard.OptionalBearer(http.HandlerFunc(s.endCall)))
+	mux.Handle("GET /api/calls/{id}/turns", guard.OptionalBearer(http.HandlerFunc(s.listCallTurns)))
+	mux.Handle("POST /api/calls/{id}/turns", guard.OptionalBearer(http.HandlerFunc(s.addCallTurn)))
+	mux.Handle("GET /api/calls/{id}/events", guard.OptionalBearer(http.HandlerFunc(s.callEvents)))
 
 	mux.HandleFunc("GET /api/workforce", s.workforce)
 	mux.HandleFunc("POST /api/chat", s.chat)
-	mux.HandleFunc("GET /api/km/agents/{agent_id}", s.getAgentKnowledge)
-	mux.HandleFunc("GET /api/km/agents/{agent_id}/documents", s.listAgentDocuments)
-	mux.HandleFunc("POST /api/km/agents/{agent_id}/documents", s.uploadAgentDocument)
-	mux.HandleFunc("POST /api/km/agents/{agent_id}/reset", s.resetAgentKnowledge)
-	mux.HandleFunc("POST /api/km/seed", s.seedKnowledge)
+	mux.Handle("GET /api/km/agents/{agent_id}", guard.OptionalBearer(http.HandlerFunc(s.getAgentKnowledge)))
+	mux.Handle("GET /api/km/agents/{agent_id}/documents", guard.OptionalBearer(http.HandlerFunc(s.listAgentDocuments)))
+	mux.Handle("POST /api/km/agents/{agent_id}/documents", guard.RequireKMWrite(http.HandlerFunc(s.uploadAgentDocument)))
+	mux.Handle("POST /api/km/agents/{agent_id}/reset", guard.RequireKMWrite(http.HandlerFunc(s.resetAgentKnowledge)))
+	mux.Handle("POST /api/km/seed", guard.RequirePlatformAdmin(http.HandlerFunc(s.seedKnowledge)))
+	mux.HandleFunc("POST /api/auth/login", s.login)
+	mux.HandleFunc("POST /api/auth/refresh", s.refreshToken)
+	mux.HandleFunc("POST /api/auth/logout", s.logout)
+	mux.Handle("GET /api/auth/me", guard.RequireBearer(http.HandlerFunc(s.me)))
 	mux.HandleFunc("GET /ws/voice", s.voice.Handler())
 	mux.HandleFunc("GET /legacy", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/legacy/", http.StatusFound)
@@ -140,14 +186,14 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           withCORS(withCommonHeaders(mux)),
+		Handler:           withCORS(cfg.AuthDisabled, withCommonHeaders(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	go func() {
 		health := st.Health(context.Background())
-		log.Printf("monti-jarvis listening on :%s customer_web=%s livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
-			cfg.Port, cfg.CustomerWebDir, lk.Enabled(), bus != nil && bus.Enabled(),
+		log.Printf("monti-jarvis listening on :%s customer_web=%s auth_disabled=%t livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
+			cfg.Port, cfg.CustomerWebDir, cfg.AuthDisabled, lk.Enabled(), bus != nil && bus.Enabled(),
 			health.Postgres, health.Redis, cfg.LegacyUIEnabled)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
@@ -168,7 +214,8 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":      s.cfg.LiveKitAPIKey != "",
 		"nats":         s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":       "SPRINT-002",
+		"sprint":       "SPRINT-003",
+		"auth_disabled": s.cfg.AuthDisabled,
 		"rag":          s.rag != nil && s.rag.Enabled(),
 		"customer_web": s.cfg.CustomerWebDir,
 	})
@@ -194,7 +241,20 @@ func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 			h.ClickHouse = "ok"
 		}
 	}
-	writeJSON(w, http.StatusOK, h)
+	out := map[string]any{
+		"postgres":    h.Postgres,
+		"redis":       h.Redis,
+		"minio":       h.Minio,
+		"clickhouse":  h.ClickHouse,
+		"nats":        h.NATS,
+		"livekit":     h.LiveKit,
+	}
+	if s.auth != nil && s.auth.Enabled() {
+		out["auth_cache"] = s.auth.CacheStatus()
+		out["auth_events"] = s.auth.EventsStatus()
+		out["auth_write_behind_lag"] = s.auth.WriteBehindLag(ctx)
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *server) workforce(w http.ResponseWriter, _ *http.Request) {
@@ -295,11 +355,15 @@ func withCommonHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func withCORS(next http.Handler) http.Handler {
+func withCORS(authDisabled bool, next http.Handler) http.Handler {
+	allowHeaders := "Content-Type, X-Tenant-Id"
+	if !authDisabled {
+		allowHeaders += ", Authorization"
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Tenant-Id")
+		w.Header().Set("Access-Control-Allow-Headers", allowHeaders)
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

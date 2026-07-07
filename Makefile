@@ -7,7 +7,7 @@ CUSTOMER_WEB_DIR := apps/customer-web
 COMPOSE_FILE := infra/docker-compose.yml
 
 .PHONY: help build run start stop restart status logs test \
-	customer-web customer-dev clean km-seed \
+	customer-web customer-dev clean km-seed db-migrate \
 	infra-check infra-up infra-down infra-init infra-destroy infra-reset up down
 
 help:
@@ -25,6 +25,7 @@ help:
 	@printf "  make customer-dev   vite dev on :5173 (proxies API)\n"
 	@printf "  make test           go test ./...\n"
 	@printf "  make km-seed        ingest sample KB for all avatars\n"
+	@printf "  make db-migrate     apply Postgres + ClickHouse audit migrations\n"
 	@printf "Infra:\n"
 	@printf "  make infra-reset    destroy then init all infra\n"
 	@printf "  make infra-destroy  stop compose, drop DB, flush Redis, remove MinIO bucket\n"
@@ -89,7 +90,8 @@ test:
 	go test ./...
 
 km-seed:
-	@curl -fsS -X POST http://localhost:$(PORT)/api/km/seed | python3 -m json.tool
+	@chmod +x scripts/km-seed.sh
+	@./scripts/km-seed.sh | python3 -m json.tool
 
 infra-check:
 	@./scripts/infra-check.sh
@@ -102,6 +104,10 @@ infra-down:
 
 infra-init:
 	@./scripts/infra-init.sh
+
+db-migrate:
+	@chmod +x scripts/migrate.sh
+	@./scripts/migrate.sh
 
 infra-destroy:
 	@./scripts/infra-destroy.sh

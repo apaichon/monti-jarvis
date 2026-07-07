@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/libra/monti-jarvis/internal/auditctx"
 	"github.com/libra/monti-jarvis/internal/env"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -78,6 +79,13 @@ func Open(ctx context.Context, cfg env.Config) (*Store, []string) {
 	return s, warnings
 }
 
+func (s *Store) Redis() *redis.Client {
+	if s == nil {
+		return nil
+	}
+	return s.redis
+}
+
 func (s *Store) Close() {
 	if s.pg != nil {
 		s.pg.Close()
@@ -115,14 +123,18 @@ func (s *Store) Health(ctx context.Context) Health {
 
 func (s *Store) SaveExchange(ctx context.Context, sessionID, agentID, userText, assistantText string) {
 	if s.pg != nil {
+		actor := auditctx.ActorID(ctx)
+		schema := quoteIdent(s.cfg.PostgresSchema)
 		_, _ = s.pg.Exec(ctx,
-			fmt.Sprintf(`INSERT INTO %s.calls (id, agent_id, updated_at) VALUES ($1, $2, now())
-ON CONFLICT (id) DO UPDATE SET agent_id = EXCLUDED.agent_id, updated_at = now()`, quoteIdent(s.cfg.PostgresSchema)),
-			sessionID, agentID,
+			fmt.Sprintf(`INSERT INTO %s.calls (id, agent_id, created_by, updated_by)
+VALUES ($1, $2, $3, $3)
+ON CONFLICT (id) DO UPDATE SET agent_id = EXCLUDED.agent_id, updated_by = EXCLUDED.updated_by`, schema),
+			sessionID, agentID, actor,
 		)
 		_, _ = s.pg.Exec(ctx,
-			fmt.Sprintf(`INSERT INTO %s.messages (call_id, role, content) VALUES ($1, 'caller', $2), ($1, 'agent', $3)`, quoteIdent(s.cfg.PostgresSchema)),
-			sessionID, userText, assistantText,
+			fmt.Sprintf(`INSERT INTO %s.messages (call_id, role, content, created_by, updated_by)
+VALUES ($1, 'caller', $2, $3, $3), ($1, 'agent', $4, $3, $3)`, schema),
+			sessionID, userText, actor, assistantText,
 		)
 	}
 	if s.redis != nil {
@@ -141,16 +153,13 @@ CREATE SCHEMA IF NOT EXISTS %s;
 CREATE TABLE IF NOT EXISTS %s.calls (
   id text PRIMARY KEY,
   agent_id text NOT NULL DEFAULT 'ava',
-  title text NOT NULL DEFAULT 'Inbound call',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  title text NOT NULL DEFAULT 'Inbound call',%s
 );
 CREATE TABLE IF NOT EXISTS %s.messages (
   id bigserial PRIMARY KEY,
   call_id text NOT NULL REFERENCES %s.calls(id) ON DELETE CASCADE,
   role text NOT NULL CHECK (role IN ('caller', 'agent')),
-  content text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  content text NOT NULL,%s
 );
 CREATE TABLE IF NOT EXISTS %s.call_sessions (
   id text PRIMARY KEY,
@@ -159,15 +168,14 @@ CREATE TABLE IF NOT EXISTS %s.call_sessions (
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'ended')),
   started_at timestamptz NOT NULL DEFAULT now(),
   ended_at timestamptz,
-  recording_key text
+  recording_key text,%s
 );
 CREATE TABLE IF NOT EXISTS %s.call_turns (
   id bigserial PRIMARY KEY,
   call_id text NOT NULL REFERENCES %s.call_sessions(id) ON DELETE CASCADE,
   role text NOT NULL CHECK (role IN ('caller', 'agent', 'system')),
   content text NOT NULL,
-  source_chunk_ids jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
+  source_chunk_ids jsonb,%s
 );
 CREATE TABLE IF NOT EXISTS %s.knowledge_documents (
   id text PRIMARY KEY,
@@ -179,9 +187,7 @@ CREATE TABLE IF NOT EXISTS %s.knowledge_documents (
   status text NOT NULL DEFAULT 'uploaded',
   km_scope text NOT NULL DEFAULT 'general',
   km_version integer NOT NULL DEFAULT 1,
-  chunk_count integer NOT NULL DEFAULT 0,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  chunk_count integer NOT NULL DEFAULT 0,%s
 );
 CREATE TABLE IF NOT EXISTS %s.knowledge_chunks (
   id text PRIMARY KEY,
@@ -190,12 +196,18 @@ CREATE TABLE IF NOT EXISTS %s.knowledge_chunks (
   agent_id text NOT NULL,
   chunk_index integer NOT NULL,
   content text NOT NULL,
-  km_scope text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  km_scope text NOT NULL,%s
 );
 CREATE INDEX IF NOT EXISTS knowledge_documents_agent_idx ON %s.knowledge_documents (tenant_id, agent_id);
-CREATE INDEX IF NOT EXISTS knowledge_chunks_agent_idx ON %s.knowledge_chunks (tenant_id, agent_id);`, schema, schema, schema, schema, schema, schema, schema, schema, schema, schema, schema, schema))
-	return err
+CREATE INDEX IF NOT EXISTS knowledge_chunks_agent_idx ON %s.knowledge_chunks (tenant_id, agent_id);`,
+		schema, schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, schema))
+	if err != nil {
+		return err
+	}
+	if err := s.ensureAuthSchema(ctx); err != nil {
+		return err
+	}
+	return s.ensureAuditSchema(ctx)
 }
 
 func quoteIdent(value string) string {

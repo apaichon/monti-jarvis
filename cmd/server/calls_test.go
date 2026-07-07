@@ -13,7 +13,7 @@ import (
 	"github.com/libra/monti-jarvis/internal/lktoken"
 )
 
-func TestHealthIncludesSprint002(t *testing.T) {
+func TestHealthIncludesSprint003(t *testing.T) {
 	s := &server{
 		cfg:   env.Load(),
 		ai:    gemini.New("", "", ""),
@@ -32,8 +32,11 @@ func TestHealthIncludesSprint002(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if payload["sprint"] != "SPRINT-002" {
+	if payload["sprint"] != "SPRINT-003" {
 		t.Fatalf("sprint = %v", payload["sprint"])
+	}
+	if payload["auth_disabled"] != true {
+		t.Fatalf("auth_disabled = %v", payload["auth_disabled"])
 	}
 }
 

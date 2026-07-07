@@ -81,7 +81,10 @@ func (c *Client) EnsureSchema(ctx context.Context) error {
   km_version UInt32,
   content String,
   embedding Array(Float32),
-  updated_at DateTime DEFAULT now()
+  created_at DateTime DEFAULT now(),
+  updated_at DateTime DEFAULT now(),
+  created_by String DEFAULT 'system',
+  updated_by String DEFAULT 'system'
 ) ENGINE = MergeTree()
 ORDER BY (tenant_id, agent_id, km_scope, chunk_id)`, db),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.qa_events (
@@ -91,11 +94,37 @@ ORDER BY (tenant_id, agent_id, km_scope, chunk_id)`, db),
   topic String,
   question String,
   event_type String,
-  created_at DateTime DEFAULT now()
+  created_at DateTime DEFAULT now(),
+  updated_at DateTime DEFAULT now(),
+  created_by String DEFAULT 'system',
+  updated_by String DEFAULT 'system'
 ) ENGINE = MergeTree()
 ORDER BY (tenant_id, created_at)`, db),
 	}
 	for _, stmt := range statements {
+		if err := c.exec(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	return c.ensureAuditSchema(ctx)
+}
+
+func (c *Client) ensureAuditSchema(ctx context.Context) error {
+	if !c.Enabled() {
+		return nil
+	}
+	db := quoteIdent(c.db)
+	stmts := []string{
+		fmt.Sprintf(`ALTER TABLE %s.km_embeddings
+  ADD COLUMN IF NOT EXISTS created_at DateTime DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS created_by String DEFAULT 'system',
+  ADD COLUMN IF NOT EXISTS updated_by String DEFAULT 'system'`, db),
+		fmt.Sprintf(`ALTER TABLE %s.qa_events
+  ADD COLUMN IF NOT EXISTS updated_at DateTime DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS created_by String DEFAULT 'system',
+  ADD COLUMN IF NOT EXISTS updated_by String DEFAULT 'system'`, db),
+	}
+	for _, stmt := range stmts {
 		if err := c.exec(ctx, stmt); err != nil {
 			return err
 		}

@@ -83,10 +83,40 @@ make up
 | `CLICKHOUSE_URL` | Sprint 2+ | `http://localhost:8123` |
 | `CLICKHOUSE_DB` | No | `monti_jarvis` |
 | `DEMO_TENANT_ID` | No | `demo` |
+| `AUTH_DISABLED` | No | `true` (default) — keeps no-login customer demo |
+| `JWT_SECRET` | When auth on | ≥32 bytes; required when `AUTH_DISABLED=false` |
+| `JWT_ACCESS_TTL` | No | `15m` |
+| `JWT_REFRESH_TTL` | No | `168h` (7 days) |
 | `NATS_URL` | No | Optional lifecycle events |
 | `LIVEKIT_*` | No | Optional token API |
 
 See `infra/.env.example` for the full list.
+
+## Auth (Sprint 3)
+
+By default **`AUTH_DISABLED=true`** — all APIs behave like v0.3.0 (public customer portal, `demo` tenant).
+
+Dev seed users (created by `make infra-init`):
+
+| Email | Password | Role |
+| --- | --- | --- |
+| `platform@monti.local` | `monti-platform` | `platform_admin` |
+| `admin@demo.local` | `demo-admin` | `tenant_admin` (`demo`) |
+
+Enable auth:
+
+```bash
+# infra/.env.dev
+AUTH_DISABLED=false
+JWT_SECRET=your-long-random-secret-at-least-32-characters
+
+make restart
+curl -X POST http://localhost:8091/api/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@demo.local","password":"demo-admin"}'
+```
+
+Protected when auth is on: `POST /api/km/agents/*/documents`, `/reset` (tenant_admin+), `POST /api/km/seed` (platform_admin only).
 
 ## Verify deployment
 
@@ -102,6 +132,15 @@ Sprint 2 additionally:
 ```bash
 make km-seed
 curl http://localhost:8091/api/km/agents/ava
+```
+
+Sprint 3 auth smoke (`AUTH_DISABLED=false`):
+
+```bash
+TOKEN=$(curl -fsS -X POST http://localhost:8091/api/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@demo.local","password":"demo-admin"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+curl -fsS http://localhost:8091/api/auth/me -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Troubleshooting

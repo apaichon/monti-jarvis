@@ -9,14 +9,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libra/monti-jarvis/internal/auth"
+	"github.com/libra/monti-jarvis/internal/km"
 	"github.com/libra/monti-jarvis/internal/scope"
 )
 
-func (s *server) tenantID(r *http.Request) string {
-	if v := strings.TrimSpace(r.Header.Get("X-Tenant-Id")); v != "" {
-		return v
-	}
-	return s.cfg.DemoTenantID
+func (s *server) resolvedTenant(r *http.Request) string {
+	return auth.ResolveTenant(r.Context(), r.Header.Get("X-Tenant-Id"), s.cfg.AuthDisabled, s.cfg.DemoTenantID)
+}
+
+func (s *server) kmFor(r *http.Request) *km.Service {
+	return s.km.WithTenant(s.resolvedTenant(r))
 }
 
 func (s *server) getAgentKnowledge(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +30,7 @@ func (s *server) getAgentKnowledge(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	info, err := s.km.AgentKnowledge(ctx, agentID)
+	info, err := s.kmFor(r).AgentKnowledge(ctx, agentID)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -43,7 +46,7 @@ func (s *server) listAgentDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	docs, err := s.km.ListAgentDocuments(ctx, agentID)
+	docs, err := s.kmFor(r).ListAgentDocuments(ctx, agentID)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -79,7 +82,7 @@ func (s *server) uploadAgentDocument(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
-	doc, err := s.km.Ingest(ctx, agentID, header.Filename, data, kmScope)
+	doc, err := s.kmFor(r).Ingest(ctx, agentID, header.Filename, data, kmScope)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -95,7 +98,7 @@ func (s *server) resetAgentKnowledge(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	if err := s.km.ResetAgent(ctx, agentID); err != nil {
+	if err := s.kmFor(r).ResetAgent(ctx, agentID); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
@@ -119,7 +122,7 @@ func (s *server) seedKnowledge(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "missing sample file: "+path)
 			return
 		}
-		doc, err := s.km.Ingest(ctx, agentID, agentID+".md", data, scope.DefaultScope(agentID))
+		doc, err := s.kmFor(r).Ingest(ctx, agentID, agentID+".md", data, scope.DefaultScope(agentID))
 		if err != nil {
 			writeError(w, http.StatusBadGateway, agentID+": "+err.Error())
 			return

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libra/monti-jarvis/internal/auditctx"
 	"github.com/libra/monti-jarvis/internal/calltypes"
 )
 
@@ -15,11 +16,12 @@ func (s *Store) CreateCallSession(ctx context.Context, id, tenantID, roomName st
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	var session calltypes.Session
+	actor := auditctx.ActorID(ctx)
 	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
-INSERT INTO %s.call_sessions (id, tenant_id, room_name, status)
-VALUES ($1, $2, $3, 'active')
+INSERT INTO %s.call_sessions (id, tenant_id, room_name, status, created_by, updated_by)
+VALUES ($1, $2, $3, 'active', $4, $4)
 RETURNING id, tenant_id, room_name, status, started_at`, schema),
-		id, tenantID, roomName,
+		id, tenantID, roomName, actor,
 	).Scan(&session.ID, &session.TenantID, &session.RoomName, &session.Status, &session.StartedAt)
 	if err != nil {
 		return calltypes.Session{}, err
@@ -63,11 +65,12 @@ func (s *Store) EndCallSession(ctx context.Context, id string) (calltypes.Sessio
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	var session calltypes.Session
 	var endedAt time.Time
+	actor := auditctx.ActorID(ctx)
 	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
 UPDATE %s.call_sessions
-SET status = 'ended', ended_at = now()
+SET status = 'ended', ended_at = now(), updated_by = $2
 WHERE id = $1 AND status = 'active'
-RETURNING id, tenant_id, room_name, status, started_at, ended_at`, schema), id,
+RETURNING id, tenant_id, room_name, status, started_at, ended_at`, schema), id, actor,
 	).Scan(&session.ID, &session.TenantID, &session.RoomName, &session.Status, &session.StartedAt, &endedAt)
 	if err != nil {
 		return calltypes.Session{}, err
@@ -91,11 +94,12 @@ func (s *Store) AddCallTurn(ctx context.Context, callID, role, content string) (
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	var turn calltypes.Turn
+	actor := auditctx.ActorID(ctx)
 	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
-INSERT INTO %s.call_turns (call_id, role, content)
-VALUES ($1, $2, $3)
+INSERT INTO %s.call_turns (call_id, role, content, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $4)
 RETURNING id, role, content, created_at`, schema),
-		callID, role, content,
+		callID, role, content, actor,
 	).Scan(&turn.ID, &turn.Role, &turn.Content, &turn.CreatedAt)
 	return turn, err
 }

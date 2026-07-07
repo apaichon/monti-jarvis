@@ -23,7 +23,19 @@ POSTGRES_SCHEMA=${POSTGRES_SCHEMA:-callcenter}
 REDIS_URL=${REDIS_URL:-redis://localhost:6379/4}
 MINIO_BUCKET=${MINIO_BUCKET:-monti-jarvis}
 
-echo "==> Stopping Monti Jarvis compose services (NATS, LiveKit)..."
+CLICKHOUSE_URL=${CLICKHOUSE_URL:-http://localhost:8123}
+CLICKHOUSE_DB=${CLICKHOUSE_DB:-monti_jarvis}
+CLICKHOUSE_USER=${CLICKHOUSE_USER:-monti}
+CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-monti}
+echo "==> Dropping ClickHouse database $CLICKHOUSE_DB..."
+if curl -fsS "$CLICKHOUSE_URL/ping" >/dev/null 2>&1; then
+  curl -fsS "$CLICKHOUSE_URL/?user=$CLICKHOUSE_USER&password=$CLICKHOUSE_PASSWORD" \
+    --data "DROP DATABASE IF EXISTS $CLICKHOUSE_DB" >/dev/null 2>&1 || echo "warn: could not drop ClickHouse database"
+else
+  echo "note: ClickHouse not reachable — skipping database drop"
+fi
+
+echo "==> Stopping Monti Jarvis compose services (NATS, LiveKit, ClickHouse)..."
 if command -v docker >/dev/null 2>&1; then
   docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 else
@@ -62,4 +74,4 @@ else
   echo "minio container not found — skipping bucket removal"
 fi
 
-echo "infra destroyed: compose down, monti_jarvis DB dropped, Redis flushed, MinIO bucket removed"
+echo "infra destroyed: ClickHouse DB dropped, compose down, monti_jarvis DB dropped, Redis flushed, MinIO bucket removed"
