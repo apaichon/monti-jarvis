@@ -22,4 +22,4 @@ Project skills are under `.claude/skills/` (adapted from Jarvis Chat):
 
 ## SDLC
 
-Sprint and task docs live in `docs/sdlc/`. Current sprint: `docs/sdlc/sprints/SPRINT-001.md`.
+Sprint and task docs live in `docs/sdlc/`. Official 35-sprint roadmap: `docs/sdlc/ROADMAP.md`. Business blueprint: `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0). Next sprint: `docs/sdlc/sprints/SPRINT-001.md` (Customer: Conversation). Prototype v0.1.0: `docs/sdlc/sprints/SPRINT-000-prototype.md`.

@@ -1,0 +1,35 @@
+# Monti Jarvis local infra — NATS + LiveKit (Sprint 1+)
+# Datastores (Postgres/Redis/MinIO) reuse shared poc-gml-* containers when present.
+# Usage: docker compose -f infra/docker-compose.yml up -d
+
+name: monti-jarvis
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    container_name: monti-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: monti-livekit
+    command: ["--dev", "--bind", "0.0.0.0"]
+    environment:
+      LIVEKIT_KEYS: "devkey: secret"
+    ports:
+      - "7880:7880"
+      - "7881:7881/udp"
+      - "7882:7882/udp"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7880"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

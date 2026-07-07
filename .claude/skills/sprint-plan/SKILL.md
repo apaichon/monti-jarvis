@@ -6,10 +6,11 @@ description: Plan or groom a sprint for Monti Jarvis — scope a sprint goal, wr
 # sprint-plan — groom and open a sprint
 
 ## Procedure
-1. Read completed tasks in `docs/sdlc/tasks/` and note carry-over items.
-2. Pick a coherent **sprint goal** (one sentence) and the smallest set of features that achieve it (~5–12 points for greenfield).
-3. Create `docs/sdlc/sprints/SPRINT-NNN.md` from the structure below.
-4. Create linked `docs/sdlc/tasks/TASK-NNNN.md` files with testable ACs.
+1. Read `docs/sdlc/ROADMAP.md` for the official 35-sprint sequence and dependencies.
+2. Read completed tasks in `docs/sdlc/tasks/` and note carry-over items.
+3. Open the **next roadmap sprint** — do not skip ahead without explicit user approval.
+4. Create `docs/sdlc/sprints/SPRINT-NNN.md` from the structure below (NNN matches roadmap sprint number).
+5. Create linked `docs/sdlc/tasks/TASK-NNNN.md` files with testable ACs.
 
 ## sprint file structure
 ```markdown
@@ -37,4 +38,4 @@ description: Plan or groom a sprint for Monti Jarvis — scope a sprint goal, wr
 - Every task must name an owner and testable ACs.
 - Defer auth/KYC/ticketing/CRM unless explicitly in scope.
 
-See `docs/sdlc/sprints/SPRINT-001.md`.
+See `docs/sdlc/ROADMAP.md` and `docs/sdlc/sprints/SPRINT-001.md`.

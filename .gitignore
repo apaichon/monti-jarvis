@@ -6,3 +6,6 @@
 .run/
 monti-jarvis
 coverage.out
+apps/customer-web/node_modules
+apps/customer-web/build
+apps/customer-web/.svelte-kit

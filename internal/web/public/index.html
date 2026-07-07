@@ -103,6 +103,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 }
 .portrait.robot:before { background: linear-gradient(160deg, #b8c6d4, #1f344c); }
 .portrait.robot:after { border-bottom-color: #00a8ff; }
+.portrait.photo { background: rgb(4 14 28 / 72%); }
+.portrait.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.portrait.photo:before, .portrait.photo:after { display: none; }
 .assistant-name { text-align: center; }
 .assistant-name h2 { margin: 0; font-size: 28px; line-height: 1; }
 .assistant-name p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
@@ -312,8 +315,12 @@ function makeWave(container, count = 42) {
     container.append(bar);
   }
 }
-function portraitClass(a) { return `portrait${a.robot ? " robot" : ""}`; }
+function portraitClass(a) { return `portrait photo${a.robot ? " robot" : ""}`; }
 function portraitStyle(a) { return `--assistant-color:${a.color};--skin:${a.skin || "#d9e3ef"};--hair:${a.hair || "#3b4f66"}`; }
+function portraitSrc(a) { return a.image || `/images/${a.id}.jpg`; }
+function portraitHTML(a) {
+  return `<div class="${portraitClass(a)}" style="${portraitStyle(a)}"><img src="${portraitSrc(a)}" alt="${a.name}" loading="lazy"></div>`;
+}
 function miniWave(color) {
   return `<div class="wave" style="height:20px;justify-content:flex-start;--assistant-color:${color}">${Array.from({ length: 16 }, (_, i) => `<span class="bar" style="--i:${i};--h:${2 + Math.round(Math.abs(Math.sin(i)) * 10)}"></span>`).join("")}</div>`;
 }
@@ -323,7 +330,7 @@ function renderAssistants() {
     button.className = `assistant-card${selectedAgent && a.id === selectedAgent.id ? " active" : ""}`;
     button.type = "button";
     button.innerHTML = `
-      <div class="${portraitClass(a)}" style="${portraitStyle(a)}"></div>
+      ${portraitHTML(a)}
       <div>
         <div><strong>${a.name}</strong>${a.popular ? ' <span class="tag">Popular</span>' : ""}</div>
         <div class="assistant-meta">${a.role}</div>
@@ -347,6 +354,7 @@ function applyAssistant() {
   assistantTrait.textContent = `${selectedAgent.role} · ${selectedAgent.trait}`;
   assistantPortrait.className = portraitClass(selectedAgent);
   assistantPortrait.setAttribute("style", portraitStyle(selectedAgent));
+  assistantPortrait.innerHTML = `<img src="${portraitSrc(selectedAgent)}" alt="${selectedAgent.name}" loading="lazy">`;
   assistantHalo.style.setProperty("--assistant-color", selectedAgent.color);
   voiceWave.style.setProperty("--assistant-color", selectedAgent.color);
 }

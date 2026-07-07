@@ -1,0 +1,125 @@
+# Monti AI Call Center — 35-Sprint Roadmap
+
+**Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
+**Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
+
+## Prototype status
+
+| Item | Status |
+| --- | --- |
+| `monti-jarvis` v0.1.0 Go spike | Shipped — maps to **Sprint 21** (workforce + conversation) |
+| Official Sprint 1 | **Customer: Conversation** — rebuild in Svelte + LiveKit + NATS |
+
+---
+
+## Sprint index
+
+| Sprint | Platform | Feature | Phase | Depends on |
+| ---: | --- | --- | --- | --- |
+| 1 | Customer | Conversation | A | — |
+| 2 | Customer | Add KM and Scope | A | 1 |
+| 3 | Backend | Auth | B | — |
+| 4 | Platform Admin | Packages | B | 3 |
+| 5 | Platform Admin | Avatars | B | 3 |
+| 6 | Tenant | Register | C | 3 |
+| 7 | Platform Admin | KYC Tenant | C | 6 |
+| 8 | Platform Admin | Payment Gateway | C | 3 |
+| 9 | Tenant | Buy Package | C | 4, 6, 8 |
+| 10 | Platform Admin | Billing | C | 9 |
+| 11 | Platform Admin | Receipt | C | 10 |
+| 12 | Tenant | Tax Invoice | C | 10, 11 |
+| 13 | Platform Admin | Quota, Rate Limit | B | 3, 4 |
+| 14 | Tenant | Embed to Web | D | 1, 6 |
+| 15 | Tenant | Set Scope and KM | D | 2, 6 |
+| 16 | Tenant | Settings, Locale, Limit, Quota | D | 13, 15 |
+| 17 | Tenant | Test and Preview | D | 15, 16 |
+| 18 | Tenant | Customer Tier | D | 16 |
+| 19 | Customer | Register | E | 3 |
+| 20 | Customer | Auth | E | 19 |
+| 21 | Customer | Select AI Workforce to Conversation | A | 1, 5 |
+| 22 | Platform / Tenant | Conversation Records | F | 1, 3 |
+| 23 | Tenant | Tickets | F | 22 |
+| 24 | Tenant | Review | F | 22, 23 |
+| 25 | Tenant | Dashboard | F | 22 (ClickHouse) |
+| 26 | Tenant | Monitoring | F | 25 |
+| 27 | Platform | Audit Log | G | 3 |
+| 28 | Platform | Monitoring | G | 27 |
+| 29 | Platform | Dashboard | G | 28 (ClickHouse) |
+| 30 | Platform | Monitoring | G | 29 |
+| 31 | Tuning | gRPC, Cache on Prod | H | 25+ |
+| 32 | Tuning | Partition, Hardening | H | 31 |
+| 33 | Infra | Scale, Auto Scale | I | 32 |
+| 34 | Infra | Canary Deployment | I | 33 |
+| 35 | Infra | Backup Restore Archive | I | 33 |
+
+---
+
+## Phase definitions
+
+### Phase A — Customer core (1, 2, 21)
+
+Prove inbound AI call value before billing complexity.
+
+- **Sprint 1:** Svelte customer portal, LiveKit voice room, transcript, NATS call events, Postgres sessions, Redis 8 active state.
+- **Sprint 2:** KM ingest → MinIO → embed → ClickHouse `km_embeddings`; scope enforcement; RAG in orchestrator.
+- **Sprint 21:** Platform avatar catalog + tenant assignment; workforce picker in conversation UI.
+
+### Phase B — Platform foundation (3, 4, 5, 13)
+
+Multi-tenant SaaS skeleton.
+
+- Auth (JWT/session, RBAC: platform / tenant / customer)
+- Commercial packages and platform-managed avatars
+- Quota and rate limits (Redis 8 counters + Postgres entitlements)
+
+### Phase C — Tenant commerce (6–12)
+
+Onboarding and monetization.
+
+- Tenant registration → KYC → payment gateway → package purchase → billing → receipt → tax invoice
+
+### Phase D — Tenant go-live (14–18)
+
+- Web embed widget, tenant KM/scope admin, locale/settings/limits, test sandbox, customer tiers
+
+### Phase E — Customer identity (19–20)
+
+- Optional customer accounts for history and tier benefits
+
+### Phase F — Tenant operations (22–26)
+
+- Conversation records, tickets, QA review, ClickHouse dashboards and monitoring
+
+### Phase G — Platform operations (27–30)
+
+- Cross-tenant audit, monitoring, dashboards
+
+### Phase H — Production tuning (31–32)
+
+- gRPC internal APIs, Redis 8 cache strategy, ClickHouse partitioning, security hardening
+
+### Phase I — Infra scale (33–35)
+
+- Autoscale, canary deployments, backup/restore/archive
+
+---
+
+## Sprint file convention
+
+Each active sprint gets:
+
+```text
+docs/sdlc/sprints/SPRINT-NNN.md
+docs/sdlc/tasks/TASK-NNNN.md
+docs/sdlc/features/FEAT-NNNN-<slug>.md
+```
+
+Use `sprint-plan` skill when opening a new sprint.
+
+## Next sprint: SPRINT-001 (official)
+
+**Platform:** Customer  
+**Feature:** Conversation  
+**Goal:** Svelte + LiveKit inbound voice conversation with transcript and NATS lifecycle events.
+
+See `docs/sdlc/sprints/SPRINT-001.md` (to be re-groomed from prototype scope).

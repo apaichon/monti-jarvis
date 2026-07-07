@@ -12,9 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/libra/monti-jarvis/internal/calls"
+	"github.com/libra/monti-jarvis/internal/customerweb"
 	"github.com/libra/monti-jarvis/internal/env"
 	"github.com/libra/monti-jarvis/internal/gemini"
 	"github.com/libra/monti-jarvis/internal/live"
+	"github.com/libra/monti-jarvis/internal/lktoken"
+	"github.com/libra/monti-jarvis/internal/natsbus"
 	"github.com/libra/monti-jarvis/internal/store"
 	"github.com/libra/monti-jarvis/internal/web"
 	"github.com/libra/monti-jarvis/internal/workforce"
@@ -24,8 +28,11 @@ type server struct {
 	cfg    env.Config
 	ai     *gemini.Client
 	voice  *live.Relay
+	calls  *calls.Service
 	store  *store.Store
+	bus    *natsbus.Bus
 	static http.Handler
+	legacy http.Handler
 }
 
 type chatRequest struct {
@@ -53,32 +60,66 @@ func main() {
 	}
 	defer st.Close()
 
+	var bus *natsbus.Bus
+	if cfg.NATSURL != "" {
+		nc, err := natsbus.Connect(cfg.NATSURL)
+		if err != nil {
+			log.Printf("infra warning: nats: %v", err)
+		} else {
+			bus = nc
+			defer bus.Close()
+		}
+	}
+
+	lk := lktoken.Config{
+		APIKey:    cfg.LiveKitAPIKey,
+		APISecret: cfg.LiveKitAPISecret,
+		LiveURL:   cfg.LiveKitURL,
+	}
+
 	s := &server{
 		cfg:    cfg,
 		ai:     gemini.New(cfg.GeminiAPIKey, cfg.GeminiModel),
 		voice:  live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}),
+		calls:  calls.New(st, bus, lk, cfg.DemoTenantID),
 		store:  st,
-		static: web.Handler(),
+		bus:    bus,
+		static: customerweb.Handler(cfg.CustomerWebDir),
+		legacy: web.Handler(),
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /api/infra", s.infra)
+	mux.HandleFunc("POST /api/calls", s.createCall)
+	mux.HandleFunc("GET /api/calls/{id}", s.getCall)
+	mux.HandleFunc("POST /api/calls/{id}/token", s.issueCallToken)
+	mux.HandleFunc("POST /api/calls/{id}/end", s.endCall)
+	mux.HandleFunc("GET /api/calls/{id}/turns", s.listCallTurns)
+	mux.HandleFunc("POST /api/calls/{id}/turns", s.addCallTurn)
+	mux.HandleFunc("GET /api/calls/{id}/events", s.callEvents)
+
 	mux.HandleFunc("GET /api/workforce", s.workforce)
 	mux.HandleFunc("POST /api/chat", s.chat)
 	mux.HandleFunc("GET /ws/voice", s.voice.Handler())
+	mux.HandleFunc("GET /legacy", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/legacy/", http.StatusFound)
+	})
+	mux.Handle("/legacy/", http.StripPrefix("/legacy", s.legacy))
+
 	mux.Handle("/", s.static)
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           withCommonHeaders(mux),
+		Handler:           withCORS(withCommonHeaders(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	go func() {
 		health := st.Health(context.Background())
-		log.Printf("monti-jarvis listening on :%s text_model=%s live_model=%s gemini=%t postgres=%s redis=%s minio=%s workforce=%d",
-			cfg.Port, cfg.GeminiModel, cfg.GeminiLiveModel, s.ai.Enabled(), health.Postgres, health.Redis, health.Minio, len(workforce.All()))
+		log.Printf("monti-jarvis listening on :%s customer_web=%s livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
+			cfg.Port, cfg.CustomerWebDir, lk.Enabled(), bus != nil && bus.Enabled(),
+			health.Postgres, health.Redis, cfg.LegacyUIEnabled)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
 		}
@@ -92,17 +133,30 @@ func main() {
 
 func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":        true,
-		"gemini":    s.ai.Enabled(),
-		"voice":     s.voice.Enabled(),
-		"workforce": len(workforce.All()),
+		"ok":           true,
+		"gemini":       s.ai != nil && s.ai.Enabled(),
+		"voice":        s.voice != nil && s.voice.Enabled(),
+		"livekit":      s.cfg.LiveKitAPIKey != "",
+		"nats":         s.bus != nil && s.bus.Enabled(),
+		"legacy_ui":    s.cfg.LegacyUIEnabled,
+		"sprint":       "SPRINT-001",
+		"customer_web": s.cfg.CustomerWebDir,
 	})
 }
 
 func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
-	writeJSON(w, http.StatusOK, s.store.Health(ctx))
+	h := s.store.Health(ctx)
+	h.NATS = "disabled"
+	if s.bus != nil && s.bus.Enabled() {
+		h.NATS = "ok"
+	}
+	h.LiveKit = "disabled"
+	if s.cfg.LiveKitAPIKey != "" {
+		h.LiveKit = "configured"
+	}
+	writeJSON(w, http.StatusOK, h)
 }
 
 func (s *server) workforce(w http.ResponseWriter, _ *http.Request) {
@@ -193,6 +247,19 @@ func writeError(w http.ResponseWriter, status int, message string) {
 func withCommonHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func withCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }

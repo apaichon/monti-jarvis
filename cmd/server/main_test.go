@@ -6,24 +6,26 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/libra/monti-jarvis/internal/workforce"
+	"github.com/libra/monti-jarvis/internal/env"
 )
 
-func TestWorkforceEndpointReturnsAgents(t *testing.T) {
-	s := &server{}
+func TestWorkforceEndpointWhenLegacyEnabled(t *testing.T) {
+	cfg := env.Load()
+	cfg.LegacyUIEnabled = true
+	s := &server{cfg: cfg}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/workforce", s.workforce)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/workforce", nil)
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
-
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/workforce", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
 	var payload struct {
-		Agents []workforce.Agent `json:"agents"`
+		Agents []struct {
+			ID string `json:"id"`
+		} `json:"agents"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
 		t.Fatalf("Decode() error = %v", err)
@@ -34,27 +36,6 @@ func TestWorkforceEndpointReturnsAgents(t *testing.T) {
 }
 
 func TestCompactHistoryCapsMessages(t *testing.T) {
-	history := make([]struct {
-		Role    string
-		Content string
-	}, 20)
-	for i := range history {
-		history[i].Role = "user"
-		history[i].Content = "msg"
-	}
-
-	var gemHistory []struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
-	for _, item := range history {
-		gemHistory = append(gemHistory, struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		}{Role: item.Role, Content: item.Content})
-	}
-
-	// compactHistory is tested indirectly via length behavior
 	out := compactHistory(nil, "latest")
 	if len(out) != 1 || out[0].Content != "latest" {
 		t.Fatalf("compactHistory(nil) = %#v, want single latest message", out)

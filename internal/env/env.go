@@ -23,6 +23,13 @@ type Config struct {
 	MinioBucket     string
 	MinioPrefix     string
 	MinioUseSSL     bool
+	DemoTenantID    string
+	LegacyUIEnabled bool
+	NATSURL         string
+	LiveKitURL      string
+	LiveKitAPIKey   string
+	LiveKitAPISecret string
+	CustomerWebDir  string
 }
 
 func Load() Config {
@@ -36,21 +43,28 @@ func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Port:            envOr("PORT", "8091"),
-		GeminiAPIKey:    os.Getenv("GEMINI_API_KEY"),
-		GeminiModel:     envOr("GEMINI_MODEL", "gemini-flash-latest"),
-		GeminiLiveModel: envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
-		Voice:           envOr("VOICE", "Aoede"),
-		PostgresURL:     os.Getenv("POSTGRES_URL"),
-		PostgresSchema:  envOr("POSTGRES_SCHEMA", "callcenter"),
-		RedisURL:        os.Getenv("REDIS_URL"),
-		RedisPrefix:     envOr("REDIS_PREFIX", "monti_jarvis:"),
-		MinioEndpoint:   os.Getenv("MINIO_ENDPOINT"),
-		MinioAccessKey:  os.Getenv("MINIO_ACCESS_KEY"),
-		MinioSecretKey:  os.Getenv("MINIO_SECRET_KEY"),
-		MinioBucket:     envOr("MINIO_BUCKET", "monti-jarvis"),
-		MinioPrefix:     envOr("MINIO_PREFIX", "calls/"),
-		MinioUseSSL:     envBool("MINIO_USE_SSL", false),
+		Port:             envOr("PORT", "8091"),
+		GeminiAPIKey:     os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:      envOr("GEMINI_MODEL", "gemini-flash-latest"),
+		GeminiLiveModel:  envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
+		Voice:            envOr("VOICE", "Aoede"),
+		PostgresURL:      os.Getenv("POSTGRES_URL"),
+		PostgresSchema:   envOr("POSTGRES_SCHEMA", "callcenter"),
+		RedisURL:         os.Getenv("REDIS_URL"),
+		RedisPrefix:      envOr("REDIS_PREFIX", "monti_jarvis:"),
+		MinioEndpoint:    os.Getenv("MINIO_ENDPOINT"),
+		MinioAccessKey:   os.Getenv("MINIO_ACCESS_KEY"),
+		MinioSecretKey:   os.Getenv("MINIO_SECRET_KEY"),
+		MinioBucket:      envOr("MINIO_BUCKET", "monti-jarvis"),
+		MinioPrefix:      envOr("MINIO_PREFIX", "calls/"),
+		MinioUseSSL:      envBool("MINIO_USE_SSL", false),
+		DemoTenantID:     envOr("DEMO_TENANT_ID", "demo"),
+		LegacyUIEnabled:  envBool("LEGACY_UI_ENABLED", false),
+		NATSURL:          envOr("NATS_URL", "nats://localhost:4222"),
+		LiveKitURL:       envOr("LIVEKIT_URL", "ws://localhost:7880"),
+		LiveKitAPIKey:    envOr("LIVEKIT_API_KEY", "devkey"),
+		LiveKitAPISecret: envOr("LIVEKIT_API_SECRET", "secret"),
+		CustomerWebDir:   envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
 	}
 }
 

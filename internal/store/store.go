@@ -24,6 +24,8 @@ type Health struct {
 	Postgres string `json:"postgres"`
 	Redis    string `json:"redis"`
 	Minio    string `json:"minio"`
+	NATS     string `json:"nats"`
+	LiveKit  string `json:"livekit"`
 }
 
 func Open(ctx context.Context, cfg env.Config) (*Store, []string) {
@@ -148,7 +150,23 @@ CREATE TABLE IF NOT EXISTS %s.messages (
   role text NOT NULL CHECK (role IN ('caller', 'agent')),
   content text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
-);`, schema, schema, schema, schema))
+);
+CREATE TABLE IF NOT EXISTS %s.call_sessions (
+  id text PRIMARY KEY,
+  tenant_id text NOT NULL DEFAULT 'demo',
+  room_name text NOT NULL UNIQUE,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'ended')),
+  started_at timestamptz NOT NULL DEFAULT now(),
+  ended_at timestamptz,
+  recording_key text
+);
+CREATE TABLE IF NOT EXISTS %s.call_turns (
+  id bigserial PRIMARY KEY,
+  call_id text NOT NULL REFERENCES %s.call_sessions(id) ON DELETE CASCADE,
+  role text NOT NULL CHECK (role IN ('caller', 'agent', 'system')),
+  content text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);`, schema, schema, schema, schema, schema, schema, schema))
 	return err
 }
 

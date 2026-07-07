@@ -6,41 +6,42 @@ import (
 )
 
 type Agent struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Role    string `json:"role"`
-	Trait   string `json:"trait"`
-	Color   string `json:"color"`
-	Voice   string `json:"voice"`
-	Popular bool   `json:"popular,omitempty"`
-	Robot   bool   `json:"robot,omitempty"`
-	Skin    string `json:"skin,omitempty"`
-	Hair    string `json:"hair,omitempty"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	Trait    string `json:"trait"`
+	Color    string `json:"color"`
+	Voice    string `json:"voice"`
+	Image    string `json:"image"`
+	Popular  bool   `json:"popular,omitempty"`
+	Robot    bool   `json:"robot,omitempty"`
+	Skin     string `json:"skin,omitempty"`
+	Hair     string `json:"hair,omitempty"`
 	Greeting string `json:"greeting"`
 }
 
 var agents = []Agent{
 	{
 		ID: "ava", Name: "Ava", Role: "General Support", Trait: "Warm & Patient",
-		Color: "#008cff", Voice: "Aoede", Popular: true,
+		Color: "#008cff", Voice: "Aoede", Image: "/images/ava.jpg", Popular: true,
 		Skin: "#f0bd9b", Hair: "#5a3428",
 		Greeting: "Thank you for calling. I'm Ava from general support. How can I help you today?",
 	},
 	{
 		ID: "max", Name: "Max", Role: "Billing Specialist", Trait: "Calm & Precise",
-		Color: "#0076ff", Voice: "Charon",
+		Color: "#0076ff", Voice: "Charon", Image: "/images/max.jpg",
 		Skin: "#e8ad88", Hair: "#2d221f",
 		Greeting: "Hi, this is Max from billing. I can help with invoices, payments, and account questions.",
 	},
 	{
 		ID: "luna", Name: "Luna", Role: "Technical Support", Trait: "Clear & Helpful",
-		Color: "#b14dff", Voice: "Kore",
+		Color: "#b14dff", Voice: "Kore", Image: "/images/luna.jpg",
 		Skin: "#efc0a1", Hair: "#7c52c8",
 		Greeting: "Hello, Luna here from technical support. Tell me what's going on and we'll troubleshoot it together.",
 	},
 	{
 		ID: "neo", Name: "Neo", Role: "Triage Bot", Trait: "Fast & Neutral", Robot: true,
-		Color: "#00a8ff", Voice: "Puck",
+		Color: "#00a8ff", Voice: "Puck", Image: "/images/neo.jpg",
 		Greeting: "Neo triage online. Share your issue in one sentence and I'll route you to the right specialist.",
 	},
 }

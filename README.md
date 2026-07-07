@@ -1,24 +1,39 @@
 # Monti Jarvis — Inbound Call Center
 
-Voice-first inbound call center service built on the same lean stack as [Jarvis Chat](https://github.com/libra/jarvis): one Go server, embedded browser UI, Gemini text + voice relay, and optional shared local infra.
+Multi-tenant AI call center platform. **Sprint 1** delivers the customer conversation portal: Svelte + shadcn UI, LiveKit voice rooms, Postgres sessions, Redis 8 state, and NATS lifecycle events.
 
-## First release scope
+## Current sprint (SPRINT-001)
 
-- **AI avatar workforce** — select Ava, Max, Luna, or Neo; each agent has role-specific prompts and voice
-- **Inbound Q&A** — text chat and voice-to-voice conversation to answer caller questions
-- **No auth / no ticketing yet** — login, KYC, CRM, and ticket flows are planned later
+- **Customer portal** — `apps/customer-web` (SvelteKit + Tailwind + shadcn-style components)
+- **LiveKit calls** — `POST /api/calls`, token issue, mic join, end call
+- **Transcript** — SSE stream + turn history
+- **Legacy v0.1.0** — set `LEGACY_UI_ENABLED=true` for `/legacy` (Gemini direct voice)
 
 ## Run
 
 ```bash
 cp infra/.env.dev.example infra/.env.dev
-# set GEMINI_API_KEY in infra/.env.dev
-make infra-check
-make infra-init
-make start
+make up      # destroy + init infra, start server (:8091)
+```
+
+Or step by step:
+
+```bash
+make infra-reset   # destroy + init (NATS, LiveKit, DB, Redis, MinIO)
+make start         # build + start server
+make stop          # stop server
+make restart       # stop + start server
+make down          # stop server + destroy infra
 ```
 
 Open http://localhost:8091.
+
+**Dev mode** (hot reload UI):
+
+```bash
+make run          # API on :8091
+make customer-dev # Svelte on :5173 (proxies /api)
+```
 
 ## Commands
 
@@ -33,15 +48,18 @@ make infra-init   # create monti_jarvis DB/schema and MinIO bucket
 make test
 ```
 
-## API
+## API (Sprint 1)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/healthz` | Liveness + Gemini/voice status |
-| GET | `/api/workforce` | List AI avatar agents |
-| POST | `/api/chat` | Text Q&A with `agent_id`, `topic`, `message` |
-| GET | `/ws/voice?agent=ava` | Voice call with selected agent |
-| GET | `/api/infra` | Postgres / Redis / MinIO health |
+| GET | `/healthz` | Liveness + LiveKit/NATS status |
+| POST | `/api/calls` | Create call session + LiveKit room |
+| GET | `/api/calls/{id}` | Call session status |
+| POST | `/api/calls/{id}/token` | LiveKit join token |
+| POST | `/api/calls/{id}/end` | End call |
+| GET | `/api/calls/{id}/turns` | Transcript turns |
+| GET | `/api/calls/{id}/events` | SSE transcript stream |
+| GET | `/api/infra` | Postgres / Redis / MinIO / NATS / LiveKit |
 
 ## Infra isolation
 
