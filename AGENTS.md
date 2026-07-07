@@ -54,8 +54,8 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** `docs/sdlc/03-sprints/SPRINT-003.md` (Backend: Auth · **design review** — see `docs/sdlc/02-design/auth-spec.md`)
+**Current sprint:** _Sprint 4 planning_ — see `docs/sdlc/00-roadmap/ROADMAP.md`
 
-**Shipped:** v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
+**Shipped:** v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
 
 **KM ops:** `docs/KM_SETUP.md` · **API:** `docs/sdlc/02-design/api-spec.md` · **Deploy:** `docs/sdlc/07-deployment/LOCAL-DEV.md` · **UAT:** `docs/sdlc/06-manual-tests/`
