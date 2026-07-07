@@ -23,8 +23,16 @@
       "velocity": 16,
       "closed": "2026-07-07",
       "release": "v0.4.0"
+    },
+    {
+      "id": "SPRINT-004",
+      "committed_points": 25,
+      "completed_points": 25,
+      "velocity": 16,
+      "closed": "2026-07-07",
+      "release": "v0.5.0"
     }
   ],
   "average_velocity": 16,
-  "note": "Sprint 3 closed at 100% — JWT auth, RBAC, Redis cache, NATS auth events."
+  "note": "Sprint 4 closed at 100% (stretch 25 pts) — platform admin portal, packages APIs, entitlements cache."
 }

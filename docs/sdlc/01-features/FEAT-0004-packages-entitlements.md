@@ -1,5 +1,5 @@
 # Feature: Platform Admin Portal + Packages   (FEAT-0004)
-**Sprint:** SPRINT-004   **Owner:** DEV   **Status:** in_progress
+**Sprint:** SPRINT-004   **Owner:** DEV   **Status:** shipped v0.5.0
 
 ## Problem
 

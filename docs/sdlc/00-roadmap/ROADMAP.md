@@ -122,21 +122,19 @@ docs/sdlc/04-tasks/TASK-NNNN.md
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Current sprint: SPRINT-004
+## Current sprint: SPRINT-005
 
 **Platform:** Platform Admin  
-**Feature:** Portal + Packages  
-**Goal:** Platform admin portal (`/admin`) — login, logout, profile, package/entitlement UI + JSONB rules APIs.
+**Feature:** Avatars  
+**Goal:** Platform-managed AI avatar catalog and tenant assignment (depends on Sprint 3 auth).
 
-See `docs/sdlc/03-sprints/SPRINT-004.md` and [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md).
+See `docs/sdlc/03-sprints/` (open with `sprint-plan` when ready).
 
-**Release target:** v0.5.0
+## Last shipped: SPRINT-004
 
-## Last shipped: SPRINT-003
+**Platform:** Platform Admin · **Feature:** Portal + Packages · **v0.5.0**
 
-**Platform:** Backend · **Feature:** Auth · **v0.4.0**
-
-See [SPRINT-003](../03-sprints/SPRINT-003.md) · [FEAT-0003](../01-features/FEAT-0003-auth-rbac.md).
+See [SPRINT-004](../03-sprints/SPRINT-004.md) · [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md).
 
 ## Next sprint: SPRINT-005
 

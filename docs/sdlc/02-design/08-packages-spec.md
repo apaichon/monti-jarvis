@@ -1,7 +1,7 @@
 ---
 id: DES-0008
 title: Packages and Entitlements Specification
-status: approved
+status: shipped
 updated: 2026-07-08
 sprint: SPRINT-004
 ---

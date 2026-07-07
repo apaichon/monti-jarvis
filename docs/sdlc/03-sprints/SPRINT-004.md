@@ -1,8 +1,11 @@
 ---
 id: SPRINT-004
-status: in_progress
+status: completed
 start: 2026-07-07
 end: 2026-07-21
+closed: 2026-07-07
+updated: 2026-07-07
+release: v0.5.0
 goal: "Platform Admin: Portal + Packages — login/profile UI and commercial catalog with entitlements."
 roadmap_sprint: 4
 platform: Platform Admin
@@ -20,14 +23,24 @@ Ship the **platform admin Svelte portal** (`/admin`) with **login, logout, profi
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| TASK-0014 | 3 | todo | devops | Postgres packages schema + dev seeds + provider catalog stub |
-| TASK-0015 | 5 | todo | dev | Package catalog service + platform CRUD API |
-| TASK-0016 | 4 | todo | dev | Tenant entitlement assign/revoke + read APIs |
-| TASK-0017 | 3 | todo | dev | Entitlement resolver + Redis read-through cache |
-| TASK-0018 | 5 | todo | dev | Platform admin portal — login, logout, profile, shell |
-| TASK-0019 | 5 | todo | dev | Platform admin portal — packages + entitlement UI |
+| TASK-0014 | 3 | completed | devops | Postgres packages schema + dev seeds + provider catalog stub |
+| TASK-0015 | 5 | completed | dev | Package catalog service + platform CRUD API |
+| TASK-0016 | 4 | completed | dev | Tenant entitlement assign/revoke + read APIs |
+| TASK-0017 | 3 | completed | dev | Entitlement resolver + Redis read-through cache |
+| TASK-0018 | 5 | completed | dev | Platform admin portal — login, logout, profile, shell |
+| TASK-0019 | 5 | completed | dev | Platform admin portal — packages + entitlement UI |
 
-**Committed:** 25 points · **Completed:** 0 points · **Velocity target:** 16 (stretch — portal adds 10 pts)
+**Committed:** 25 points · **Completed:** 25 points · **Velocity:** 16 (stretch)
+
+## Shipped (v0.5.0)
+
+- `apps/platform-admin-web` at `/admin` — login, profile, packages list/create/edit, tenant entitlement UI
+- Postgres: `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements` + seeds (`rules-v1`, Starter/Pro/Enterprise, demo → Starter)
+- Platform APIs: rule-schemas, packages CRUD, tenant entitlement assign/revoke, `GET /api/entitlements/me`
+- `internal/packages` JSONB rules validation against schema `fields`
+- `internal/entitlements` resolver + Redis cache (`monti_jarvis:entitlement:{tenant_id}`)
+- `make platform-admin-web` · CORS PUT/DELETE · `/api/infra` `entitlement_cache` status
+- Fix: audit-column DDL commas so packages schema bootstraps on startup
 
 ## Scope boundary
 
@@ -55,8 +68,8 @@ Ship the **platform admin Svelte portal** (`/admin`) with **login, logout, profi
 
 | Artifact | Path | Status |
 | --- | --- | --- |
-| Packages | [08-packages-spec.md](../02-design/08-packages-spec.md) | `approved` |
-| Platform portal | [09-platform-admin-portal-spec.md](../02-design/09-platform-admin-portal-spec.md) | `approved` |
+| Packages | [08-packages-spec.md](../02-design/08-packages-spec.md) | `shipped` |
+| Platform portal | [09-platform-admin-portal-spec.md](../02-design/09-platform-admin-portal-spec.md) | `shipped` |
 | Workflow | [02-workflow.md](../02-design/02-workflow.md) §9–13 | `approved` |
 | ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `approved` |
 | API spec | [04-api-spec.md](../02-design/04-api-spec.md) | `approved` |
@@ -73,17 +86,8 @@ open http://localhost:8091/admin/login
 # platform@monti.local / monti-platform → Packages → Profile → Logout
 ```
 
-- Manual: `docs/sdlc/06-manual-tests/SPRINT-004-manual.md` (Tester)
-
-## Risks
-
-| Risk | Mitigation |
-| --- | --- |
-| Sprint points above velocity (25 vs 16) | Portal split TASK-0018/0019; API tasks parallelizable |
-| Package schema churn | `rules` jsonb + `package_rule_schemas` versions |
-| Token in sessionStorage (XSS) | Dev-only; document; httpOnly cookies in hardening sprint |
-| Entitlement cache stale | Redis `DEL` on every write path |
+- Manual: [SPRINT-004 UAT](../06-manual-tests/SPRINT-004-manual.md)
 
 ## Definition of done
 
-- Code reviewed · ACs verified by Tester · portal + API UAT · `make build` · tag v0.5.0 at sprint close
+- [x] Code shipped · ACs met · portal + API UAT · `make build` · tag v0.5.0

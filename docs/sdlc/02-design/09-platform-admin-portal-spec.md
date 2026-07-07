@@ -1,7 +1,7 @@
 ---
 id: DES-0009
 title: Platform Admin Portal Specification
-status: approved
+status: shipped
 updated: 2026-07-08
 sprint: SPRINT-004
 owner: SA
