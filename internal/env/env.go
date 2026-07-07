@@ -30,7 +30,8 @@ type Config struct {
 	LiveKitURL      string
 	LiveKitAPIKey   string
 	LiveKitAPISecret string
-	CustomerWebDir   string
+	CustomerWebDir      string
+	PlatformAdminWebDir string
 	ClickHouseURL      string
 	ClickHouseDB       string
 	ClickHouseUser     string
@@ -43,7 +44,9 @@ type Config struct {
 	AuthCacheEnabled       bool
 	AuthWriteBehindEnabled bool
 	AuthEventsEnabled      bool
-	AuthUserCacheTTL       time.Duration
+	AuthUserCacheTTL         time.Duration
+	EntitlementCacheEnabled  bool
+	EntitlementCacheTTL      time.Duration
 }
 
 func Load() Config {
@@ -78,7 +81,8 @@ func Load() Config {
 		LiveKitURL:       envOr("LIVEKIT_URL", "ws://localhost:7880"),
 		LiveKitAPIKey:    envOr("LIVEKIT_API_KEY", "devkey"),
 		LiveKitAPISecret: envOr("LIVEKIT_API_SECRET", "secret"),
-		CustomerWebDir:   envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
+		CustomerWebDir:      envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
+		PlatformAdminWebDir: envOr("PLATFORM_ADMIN_WEB_DIR", "apps/platform-admin-web/build"),
 		ClickHouseURL:      envOr("CLICKHOUSE_URL", "http://localhost:8123"),
 		ClickHouseDB:       envOr("CLICKHOUSE_DB", "monti_jarvis"),
 		ClickHouseUser:     envOr("CLICKHOUSE_USER", "monti"),
@@ -91,7 +95,9 @@ func Load() Config {
 		AuthCacheEnabled:       envBool("AUTH_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
 		AuthWriteBehindEnabled: envBool("AUTH_WRITE_BEHIND_ENABLED", os.Getenv("REDIS_URL") != ""),
 		AuthEventsEnabled:      envBool("AUTH_EVENTS_ENABLED", envOr("NATS_URL", "nats://localhost:4222") != ""),
-		AuthUserCacheTTL:       envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
+		AuthUserCacheTTL:        envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
+		EntitlementCacheEnabled: envBool("ENTITLEMENT_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
+		EntitlementCacheTTL:     envDuration("ENTITLEMENT_CACHE_TTL", 15*time.Minute),
 	}
 }
 

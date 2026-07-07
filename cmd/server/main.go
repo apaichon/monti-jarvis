@@ -16,7 +16,9 @@ import (
 	"github.com/libra/monti-jarvis/internal/calls"
 	"github.com/libra/monti-jarvis/internal/clickhouse"
 	"github.com/libra/monti-jarvis/internal/customerweb"
+	"github.com/libra/monti-jarvis/internal/entitlements"
 	"github.com/libra/monti-jarvis/internal/env"
+	"github.com/libra/monti-jarvis/internal/platformweb"
 	"github.com/libra/monti-jarvis/internal/gemini"
 	"github.com/libra/monti-jarvis/internal/km"
 	"github.com/libra/monti-jarvis/internal/live"
@@ -38,10 +40,12 @@ type server struct {
 	rag    *rag.Service
 	ch     *clickhouse.Client
 	bus    *natsbus.Bus
-	auth   *auth.Service
-	guard  *auth.HTTPGuard
-	static http.Handler
-	legacy http.Handler
+	auth         *auth.Service
+	guard        *auth.HTTPGuard
+	entitlements *entitlements.Service
+	static       http.Handler
+	platform     http.Handler
+	legacy       http.Handler
 }
 
 type chatRequest struct {
@@ -139,19 +143,21 @@ func main() {
 	guard := auth.NewHTTPGuard(authSvc, cfg.AuthDisabled)
 
 	s := &server{
-		cfg:    cfg,
-		ai:     ai,
-		voice:  live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}, ragSvc),
-		calls:  calls.New(st, bus, lk, cfg.DemoTenantID),
-		store:  st,
-		km:     kmSvc,
-		rag:    ragSvc,
-		ch:     ch,
-		bus:    bus,
-		auth:   authSvc,
-		guard:  guard,
-		static: customerweb.Handler(cfg.CustomerWebDir),
-		legacy: web.Handler(),
+		cfg:          cfg,
+		ai:           ai,
+		voice:        live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}, ragSvc),
+		calls:        calls.New(st, bus, lk, cfg.DemoTenantID),
+		store:        st,
+		km:           kmSvc,
+		rag:          ragSvc,
+		ch:           ch,
+		bus:          bus,
+		auth:         authSvc,
+		guard:        guard,
+		entitlements: entitlements.New(st, cfg),
+		static:       customerweb.Handler(cfg.CustomerWebDir),
+		platform:     platformweb.Handler(cfg.PlatformAdminWebDir),
+		legacy:       web.Handler(),
 	}
 
 	mux := http.NewServeMux()
@@ -176,11 +182,25 @@ func main() {
 	mux.HandleFunc("POST /api/auth/refresh", s.refreshToken)
 	mux.HandleFunc("POST /api/auth/logout", s.logout)
 	mux.Handle("GET /api/auth/me", guard.RequireBearer(http.HandlerFunc(s.me)))
+	mux.Handle("GET /api/platform/rule-schemas", guard.RequirePlatformAdmin(http.HandlerFunc(s.listRuleSchemas)))
+	mux.Handle("GET /api/platform/packages", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPackages)))
+	mux.Handle("POST /api/platform/packages", guard.RequirePlatformAdmin(http.HandlerFunc(s.createPackage)))
+	mux.Handle("GET /api/platform/packages/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPackage)))
+	mux.Handle("PUT /api/platform/packages/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.updatePackage)))
+	mux.Handle("DELETE /api/platform/packages/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.archivePackage)))
+	mux.Handle("GET /api/platform/tenants/{tenant_id}/entitlement", guard.RequirePlatformAdmin(http.HandlerFunc(s.getTenantEntitlement)))
+	mux.Handle("POST /api/platform/tenants/{tenant_id}/entitlement", guard.RequirePlatformAdmin(http.HandlerFunc(s.assignTenantEntitlement)))
+	mux.Handle("DELETE /api/platform/tenants/{tenant_id}/entitlement", guard.RequirePlatformAdmin(http.HandlerFunc(s.revokeTenantEntitlement)))
+	mux.Handle("GET /api/entitlements/me", guard.RequireTenantAdminOrPlatform(http.HandlerFunc(s.entitlementMe)))
 	mux.HandleFunc("GET /ws/voice", s.voice.Handler())
 	mux.HandleFunc("GET /legacy", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/legacy/", http.StatusFound)
 	})
 	mux.Handle("/legacy/", http.StripPrefix("/legacy", s.legacy))
+	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/", http.StatusFound)
+	})
+	mux.Handle("/admin/", s.platform)
 
 	mux.Handle("/", s.static)
 
@@ -192,8 +212,8 @@ func main() {
 
 	go func() {
 		health := st.Health(context.Background())
-		log.Printf("monti-jarvis listening on :%s customer_web=%s auth_disabled=%t livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
-			cfg.Port, cfg.CustomerWebDir, cfg.AuthDisabled, lk.Enabled(), bus != nil && bus.Enabled(),
+		log.Printf("monti-jarvis listening on :%s customer_web=%s platform_admin=%s auth_disabled=%t livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
+			cfg.Port, cfg.CustomerWebDir, cfg.PlatformAdminWebDir, cfg.AuthDisabled, lk.Enabled(), bus != nil && bus.Enabled(),
 			health.Postgres, health.Redis, cfg.LegacyUIEnabled)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
@@ -214,10 +234,11 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":      s.cfg.LiveKitAPIKey != "",
 		"nats":         s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":       "SPRINT-003",
-		"auth_disabled": s.cfg.AuthDisabled,
-		"rag":          s.rag != nil && s.rag.Enabled(),
-		"customer_web": s.cfg.CustomerWebDir,
+		"sprint":            "SPRINT-004",
+		"auth_disabled":     s.cfg.AuthDisabled,
+		"rag":               s.rag != nil && s.rag.Enabled(),
+		"customer_web":      s.cfg.CustomerWebDir,
+		"platform_admin_web": s.cfg.PlatformAdminWebDir,
 	})
 }
 
@@ -253,6 +274,9 @@ func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 		out["auth_cache"] = s.auth.CacheStatus()
 		out["auth_events"] = s.auth.EventsStatus()
 		out["auth_write_behind_lag"] = s.auth.WriteBehindLag(ctx)
+	}
+	if s.entitlements != nil {
+		out["entitlement_cache"] = s.entitlements.CacheStatus()
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -362,7 +386,7 @@ func withCORS(authDisabled bool, next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", allowHeaders)
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

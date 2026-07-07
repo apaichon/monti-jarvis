@@ -73,6 +73,30 @@ func (g *HTTPGuard) RequireKMWrite(next http.Handler) http.Handler {
 	})
 }
 
+func (g *HTTPGuard) RequireTenantAdminOrPlatform(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if g.authDisabled {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if g.svc == nil || !g.svc.Enabled() {
+			writeAuthError(w, ErrNotConfigured)
+			return
+		}
+		ac, err := g.svc.ParseBearer(r.Header.Get("Authorization"))
+		if err != nil {
+			writeAuthError(w, ErrUnauthorized)
+			return
+		}
+		if ac.Role != RolePlatformAdmin && ac.Role != RoleTenantAdmin {
+			writeAuthError(w, ErrForbidden)
+			return
+		}
+		ctx := auditctx.WithActor(WithContext(r.Context(), ac), ac.UserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func (g *HTTPGuard) RequirePlatformAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if g.authDisabled {

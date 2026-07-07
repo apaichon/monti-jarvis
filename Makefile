@@ -4,10 +4,11 @@ PID := $(RUN_DIR)/server.pid
 LOG := $(RUN_DIR)/server.log
 PORT ?= 8091
 CUSTOMER_WEB_DIR := apps/customer-web
+PLATFORM_ADMIN_WEB_DIR := apps/platform-admin-web
 COMPOSE_FILE := infra/docker-compose.yml
 
 .PHONY: help build run start stop restart status logs test \
-	customer-web customer-dev clean km-seed db-migrate \
+	customer-web customer-dev platform-admin-web platform-admin-dev clean km-seed db-migrate \
 	infra-check infra-up infra-down infra-init infra-destroy infra-reset up down
 
 help:
@@ -20,9 +21,11 @@ help:
 	@printf "  make status         process + /healthz\n"
 	@printf "  make logs           tail server log\n"
 	@printf "  make run            foreground server\n"
-	@printf "  make build          build customer-web + Go binary\n"
-	@printf "  make customer-web   build Svelte portal only\n"
+	@printf "  make build          build customer-web + platform-admin-web + Go binary\n"
+	@printf "  make customer-web   build Svelte customer portal only\n"
 	@printf "  make customer-dev   vite dev on :5173 (proxies API)\n"
+	@printf "  make platform-admin-web   build platform admin portal only\n"
+	@printf "  make platform-admin-dev   vite dev on :5174 (proxies API)\n"
 	@printf "  make test           go test ./...\n"
 	@printf "  make km-seed        ingest sample KB for all avatars\n"
 	@printf "  make db-migrate     apply Postgres + ClickHouse audit migrations\n"
@@ -40,7 +43,13 @@ customer-web:
 customer-dev:
 	@cd $(CUSTOMER_WEB_DIR) && npm install && npm run dev
 
-build: customer-web
+platform-admin-web:
+	@cd $(PLATFORM_ADMIN_WEB_DIR) && npm install && npm run build
+
+platform-admin-dev:
+	@cd $(PLATFORM_ADMIN_WEB_DIR) && npm install && npm run dev
+
+build: customer-web platform-admin-web
 	go build -o $(BINARY) ./cmd/server
 
 run:
@@ -119,4 +128,5 @@ up: infra-reset start
 down: stop infra-destroy
 
 clean:
-	rm -rf $(BINARY) $(RUN_DIR) $(CUSTOMER_WEB_DIR)/node_modules $(CUSTOMER_WEB_DIR)/build
+	rm -rf $(BINARY) $(RUN_DIR) $(CUSTOMER_WEB_DIR)/node_modules $(CUSTOMER_WEB_DIR)/build \
+		$(PLATFORM_ADMIN_WEB_DIR)/node_modules $(PLATFORM_ADMIN_WEB_DIR)/build
