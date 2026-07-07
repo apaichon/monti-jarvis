@@ -1,5 +1,5 @@
 # Feature: Auth and RBAC Skeleton   (FEAT-0003)
-**Sprint:** SPRINT-003   **Owner:** DEV
+**Sprint:** SPRINT-003   **Owner:** DEV   **Status:** shipped v0.4.0
 
 ## Problem
 

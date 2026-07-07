@@ -1,7 +1,7 @@
 ---
 id: DES-0006
 title: Auth & RBAC Specification
-status: review_pending
+status: shipped
 updated: 2026-07-07
 sprint: SPRINT-003
 owner: SA
@@ -9,7 +9,7 @@ owner: SA
 
 # Auth & RBAC Specification — Sprint 3
 
-> **Status: REVIEW PENDING** — Do not implement until this spec and linked design updates are approved.
+> **Status: SHIPPED** — v0.4.0 (SPRINT-003)
 
 **Feature:** [FEAT-0003](../01-features/FEAT-0003-auth-rbac.md)  
 **Sprint:** [SPRINT-003](../03-sprints/SPRINT-003.md)

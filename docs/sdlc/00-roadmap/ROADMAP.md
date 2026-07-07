@@ -10,6 +10,7 @@
 | `monti-jarvis` v0.1.0 Go spike | Shipped — maps to **Sprint 21** (workforce + conversation) |
 | Official Sprint 1 | **Shipped v0.2.0** — Customer: Conversation (Svelte + LiveKit + NATS + Gemini voice) |
 | Official Sprint 2 | **Shipped v0.3.0** — Customer: KM and Scope (ClickHouse RAG, per-avatar KB, citations) |
+| Official Sprint 3 | **Shipped v0.4.0** — Backend: Auth (JWT, RBAC, Redis cache, NATS events) |
 
 ---
 
@@ -19,7 +20,7 @@
 | ---: | --- | --- | --- | --- |
 | 1 | Customer | Conversation | A | — ✅ v0.2.0 |
 | 2 | Customer | Add KM and Scope | A | 1 ✅ v0.3.0 |
-| 3 | Backend | Auth | B | — |
+| 3 | Backend | Auth | B | — ✅ v0.4.0 |
 | 4 | Platform Admin | Packages | B | 3 |
 | 5 | Platform Admin | Avatars | B | 3 |
 | 6 | Tenant | Register | C | 3 |
@@ -128,7 +129,7 @@ Use `sprint-plan` skill when opening a new sprint.
 
 See `docs/sdlc/03-sprints/SPRINT-003.md` and [FEAT-0003](../01-features/FEAT-0003-auth-rbac.md).
 
-**Last shipped:** SPRINT-002 · **v0.3.0**
+**Last shipped:** SPRINT-003 · **v0.4.0**
 
 ## Next sprint: SPRINT-004
 

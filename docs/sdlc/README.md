@@ -16,8 +16,8 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** [`03-sprints/SPRINT-003.md`](03-sprints/SPRINT-003.md) — Backend: Auth (target v0.4.0)
+**Current sprint:** _Planning Sprint 4_ — see [`00-roadmap/ROADMAP.md`](00-roadmap/ROADMAP.md)
 
-**Shipped:** v0.3.0 [`SPRINT-002`](03-sprints/SPRINT-002.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
+**Shipped:** v0.4.0 [`SPRINT-003`](03-sprints/SPRINT-003.md) · v0.3.0 [`SPRINT-002`](03-sprints/SPRINT-002.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
 
 **Ops:** [`docs/KM_SETUP.md`](../KM_SETUP.md) · **Deploy:** [`07-deployment/LOCAL-DEV.md`](07-deployment/LOCAL-DEV.md) · **UAT:** [`06-manual-tests/SPRINT-002-manual.md`](06-manual-tests/SPRINT-002-manual.md)
