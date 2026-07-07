@@ -120,14 +120,18 @@ docs/sdlc/04-tasks/TASK-NNNN.md
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Current sprint
-
-*Between sprints — run `sprint-plan` to open SPRINT-003.*
-
-**Last shipped:** SPRINT-002 · **v0.3.0** · KM and Scope RAG
-
-## Next sprint: SPRINT-003
+## Current sprint: SPRINT-003
 
 **Platform:** Backend  
 **Feature:** Auth  
-**Goal:** JWT/session auth, RBAC skeleton (platform / tenant / customer).
+**Goal:** JWT auth, tenant model, RBAC skeleton; protect KM admin APIs while keeping auth-disabled dev demo.
+
+See `docs/sdlc/03-sprints/SPRINT-003.md` and [FEAT-0003](../01-features/FEAT-0003-auth-rbac.md).
+
+**Last shipped:** SPRINT-002 · **v0.3.0**
+
+## Next sprint: SPRINT-004
+
+**Platform:** Platform Admin  
+**Feature:** Packages  
+**Goal:** Commercial package catalog and entitlements (depends on Sprint 3 auth).

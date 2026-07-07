@@ -1,9 +1,9 @@
 ---
 id: DES-0005
 title: UX/UI — ASCII Wireframes
-status: active
+status: review_pending
 updated: 2026-07-07
-sprint: SPRINT-002
+sprint: SPRINT-003
 ---
 
 # UX/UI — Customer Portal (ASCII)
@@ -139,6 +139,25 @@ Same API mapping; vanilla JS in `internal/web/public/index.html`. Useful referen
 | Radius | panels `26px`, bubbles `16px` |
 | Font | Inter |
 
+## Sprint 3 — Auth (no customer UI change)
+
+Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login screen in Sprint 3.
+
+| Surface | Sprint 3 UX | API |
+| --- | --- | --- |
+| Customer portal `/` | No login; same as v0.3.0 | Public chat/voice |
+| KM admin (ops) | curl / REST client only | `POST /api/auth/login` → Bearer on KM writes |
+| Future tenant admin | Deferred Sprint 15+ | — |
+
+```text
+┌─────────────────────────────────────────┐
+│  Ops / Tester (terminal or REST Client) │
+│  POST /api/auth/login                   │
+│  → store access_token                   │
+│  → Authorization: Bearer on km-seed     │
+└─────────────────────────────────────────┘
+```
+
 ## Component → file
 
 | Component | Path |
@@ -150,4 +169,4 @@ Same API mapping; vanilla JS in `internal/web/public/index.html`. Useful referen
 | Chat API | `src/lib/api/chat.ts` |
 | Voice | `src/lib/voice/gemini.ts` |
 
-See [api-spec.md](api-spec.md) and [workflow.md](workflow.md).
+See [auth-spec.md](auth-spec.md), [api-spec.md](api-spec.md), [workflow.md](workflow.md).

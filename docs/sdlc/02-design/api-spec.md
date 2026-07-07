@@ -1,16 +1,18 @@
 ---
 id: DES-0004
 title: API Specification
-status: active
+status: review_pending
 updated: 2026-07-07
-sprint: SPRINT-002
+sprint: SPRINT-003
 ---
 
 # API Specification — Monti Jarvis
 
 **Base URL:** `http://localhost:8091`  
-**Auth:** none (Sprint 1–2); header `X-Tenant-Id: demo` optional for KM  
-**CORS:** `*` — methods `GET, POST, OPTIONS`; headers `Content-Type, X-Tenant-Id`
+**Auth (Sprint 3 — draft):** `AUTH_DISABLED=true` (default) — same as v0.3.0. When `AUTH_DISABLED=false`, use `Authorization: Bearer <access_token>` on protected routes. See [auth-spec.md](auth-spec.md).  
+**CORS:** `*` — methods `GET, POST, OPTIONS`; headers `Content-Type, X-Tenant-Id`, `Authorization`
+
+> **REVIEW PENDING** — Auth section below is design-only until [auth-spec.md](auth-spec.md) is approved.
 
 ## Health & infra
 
@@ -26,7 +28,8 @@ Liveness + feature flags.
   "livekit": true,
   "nats": true,
   "rag": true,
-  "sprint": "SPRINT-002",
+  "sprint": "SPRINT-003",
+  "auth_disabled": true,
   "customer_web": "apps/customer-web/build"
 }
 ```
@@ -165,6 +168,41 @@ Add turn. Body: `{role, content}`
 
 SSE stream. Event `turn` with turn JSON payload.
 
+## Auth (Sprint 3 — draft)
+
+### `POST /api/auth/login`
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `email` | string | yes |
+| `password` | string | yes |
+
+**Response 200:** `{access_token, refresh_token, expires_in, token_type, user}`
+
+**Errors:** `401` invalid credentials · `503` auth not configured
+
+### `POST /api/auth/refresh`
+
+Body: `{ "refresh_token": "..." }` → new token pair.
+
+### `POST /api/auth/logout`
+
+Bearer access token or body `{refresh_token}` → revokes refresh.
+
+### `GET /api/auth/me`
+
+Bearer required → `{id, email, display_name, role, tenant_id}`.
+
+### Protected routes (when `AUTH_DISABLED=false`)
+
+| Route | Roles |
+| --- | --- |
+| `POST /api/km/agents/{id}/documents` | `tenant_admin`, `platform_admin` |
+| `POST /api/km/agents/{id}/reset` | `tenant_admin`, `platform_admin` |
+| `POST /api/km/seed` | `platform_admin` |
+
+Public unchanged: `/api/chat`, `/ws/voice`, `GET /api/km/*`, `/api/workforce`.
+
 ## Knowledge base (per avatar)
 
 ### `GET /api/km/agents/{agent_id}`
@@ -205,4 +243,4 @@ Ingest sample files from `docs/samples/km/{agent}.md` for all four agents.
 {"error": "human-readable message"}
 ```
 
-See [ux-ui.md](ux-ui.md) for screen → API mapping and [docs/KM_SETUP.md](../../KM_SETUP.md) for KM operations.
+See [auth-spec.md](auth-spec.md), [ux-ui.md](ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

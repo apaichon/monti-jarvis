@@ -1,9 +1,9 @@
 ---
 id: DES-0002
 title: Workflows
-status: active
+status: review_pending
 updated: 2026-07-07
-sprint: SPRINT-002
+sprint: SPRINT-003
 ---
 
 # Workflows — Monti Jarvis
@@ -127,6 +127,46 @@ sequenceDiagram
   G-->>B: event: turn {role, content}
 ```
 
+## 6. Auth login (Sprint 3 — draft)
+
+```mermaid
+sequenceDiagram
+  participant C as Client (curl/admin)
+  participant G as Go :8091
+  participant DB as Postgres
+  participant A as internal/auth
+
+  C->>G: POST /api/auth/login {email, password}
+  G->>DB: lookup user + role
+  G->>A: verify bcrypt
+  A->>A: issue access JWT + refresh opaque
+  G->>DB: insert refresh_tokens (hash)
+  G-->>C: {access_token, refresh_token, user}
+```
+
+## 7. Protected KM upload (auth enabled)
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant G as Go server
+  participant M as auth middleware
+  participant KM as internal/km
+
+  C->>G: POST /api/km/.../documents + Bearer
+  G->>M: validate JWT, check tenant_admin
+  alt forbidden
+    M-->>C: 403
+  else ok
+    M->>KM: Ingest(tenant_id from context)
+    KM-->>C: 201 document
+  end
+```
+
+## 8. Dev bypass (`AUTH_DISABLED=true`)
+
+No login required. All handlers use `tenant_id = DEMO_TENANT_ID`. Identical to v0.3.0 flows above.
+
 ## State: call session
 
 | Status | Meaning |
@@ -143,4 +183,4 @@ sequenceDiagram
 | `indexed` | Postgres + ClickHouse ready |
 | `failed` | Embed or index error |
 
-See [api-spec.md](api-spec.md) and [ux-ui.md](ux-ui.md).
+See [auth-spec.md](auth-spec.md), [api-spec.md](api-spec.md), [ux-ui.md](ux-ui.md).

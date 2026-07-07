@@ -1,9 +1,9 @@
 ---
 id: DES-0003
 title: Entity Relationship Diagram
-status: active
+status: review_pending
 updated: 2026-07-07
-sprint: SPRINT-002
+sprint: SPRINT-003
 ---
 
 # ER Diagram — Monti Jarvis
@@ -14,9 +14,47 @@ Database `monti_jarvis`, Postgres schema `callcenter`. ClickHouse database `mont
 
 ```mermaid
 erDiagram
+  tenants ||--o{ user_roles : scopes
+  users ||--o{ user_roles : has
+  users ||--o{ refresh_tokens : has
+  tenants ||--o{ call_sessions : owns
+  tenants ||--o{ knowledge_documents : owns
   calls ||--o{ messages : has
   call_sessions ||--o{ call_turns : has
   knowledge_documents ||--o{ knowledge_chunks : has
+
+  tenants {
+    text id PK
+    text slug UK
+    text name
+    text status
+    timestamptz created_at
+  }
+
+  users {
+    text id PK
+    text email UK
+    text password_hash
+    text display_name
+    text status
+    timestamptz created_at
+  }
+
+  user_roles {
+    text user_id FK
+    text role
+    text tenant_id FK
+    timestamptz created_at
+  }
+
+  refresh_tokens {
+    text id PK
+    text user_id FK
+    text token_hash UK
+    timestamptz expires_at
+    timestamptz revoked_at
+    timestamptz created_at
+  }
 
   calls {
     text id PK
@@ -90,6 +128,10 @@ erDiagram
 | `call_turns` | Voice/text turns per call session |
 | `knowledge_documents` | KM upload metadata per agent |
 | `knowledge_chunks` | Chunk text; links to ClickHouse `chunk_id` |
+| `tenants` | SaaS tenant registry *(Sprint 3)* |
+| `users` | Login identities *(Sprint 3)* |
+| `user_roles` | RBAC role per user/tenant *(Sprint 3)* |
+| `refresh_tokens` | Hashed refresh tokens *(Sprint 3)* |
 
 ### Indexes
 
@@ -148,8 +190,8 @@ Agents `ava`, `max`, `luna`, `neo` defined in `internal/workforce/workforce.go` 
 
 | Sprint | Tables |
 | --- | --- |
-| 3 Auth | `users`, `sessions`, `tenant_users` |
-| 6+ | `tenants`, `brands`, `packages` |
+| 4+ | `packages`, `entitlements` |
+| 6+ | `tenant_registrations`, `brands` |
 | 15 | `km_scope_assignments` (tenant admin) |
 | 22 | `conversation_records` (ClickHouse denorm) |
 

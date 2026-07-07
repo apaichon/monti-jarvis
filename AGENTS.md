@@ -54,7 +54,7 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** *between sprints* — next `docs/sdlc/03-sprints/SPRINT-003.md` (Auth)
+**Current sprint:** `docs/sdlc/03-sprints/SPRINT-003.md` (Backend: Auth · **design review** — see `docs/sdlc/02-design/auth-spec.md`)
 
 **Shipped:** v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
 
