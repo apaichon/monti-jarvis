@@ -21,7 +21,7 @@ export class GeminiVoice {
   private recorder: AudioWorkletNode | null = null;
   private player: AudioWorkletNode | null = null;
 
-  async start(agentId: string, callbacks: VoiceCallbacks) {
+  async start(agentId: string, topic: string, callbacks: VoiceCallbacks) {
     this.micStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
@@ -38,22 +38,44 @@ export class GeminiVoice {
     this.player.connect(this.playbackCtx.destination);
 
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-    this.ws = new WebSocket(`${scheme}://${location.host}/ws/voice?agent=${encodeURIComponent(agentId)}`);
+    const params = new URLSearchParams({ agent: agentId, topic: topic || 'general' });
+    this.ws = new WebSocket(`${scheme}://${location.host}/ws/voice?${params}`);
 
+    let ready = false;
     await new Promise<void>((resolve, reject) => {
       if (!this.ws) return reject(new Error('WebSocket failed'));
-      this.ws.addEventListener('open', () => {
-        callbacks.onLive?.(true);
-        resolve();
+      const timeout = window.setTimeout(
+        () => reject(new Error('Voice connection timed out')),
+        15000
+      );
+      const fail = (message: string) => {
+        window.clearTimeout(timeout);
+        reject(new Error(message));
+      };
+      this.ws.addEventListener('error', () => fail('Voice connection failed'));
+      this.ws.addEventListener('close', () => {
+        if (!ready) fail('Voice connection closed');
       });
-      this.ws.addEventListener('error', () => reject(new Error('Voice connection failed')));
+      this.ws.addEventListener('message', (event) => {
+        const msg: VoiceMsg = JSON.parse(event.data as string);
+        if (msg.type === 'ready') {
+          ready = true;
+          window.clearTimeout(timeout);
+          callbacks.onLive?.(true);
+          resolve();
+          return;
+        }
+        if (msg.type === 'error') {
+          fail(msg.message || 'Voice error');
+        }
+      });
     });
 
     this.ws.addEventListener('message', (event) => this.handleMessage(event.data, callbacks));
     this.ws.addEventListener('close', () => callbacks.onLive?.(false));
     this.recorder.port.onmessage = (event) => {
       if (!(event.data instanceof Float32Array)) return;
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      if (!ready || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
       this.ws.send(JSON.stringify({ type: 'audio', data: floatToBase64PCM16(event.data) }));
     };
   }

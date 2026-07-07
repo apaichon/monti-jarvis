@@ -1,0 +1,352 @@
+package clickhouse
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+)
+
+type Client struct {
+	baseURL  string
+	db       string
+	user     string
+	password string
+	http     *http.Client
+}
+
+type ChunkHit struct {
+	ChunkID    string
+	DocumentID string
+	AgentID    string
+	KMScope    string
+	Content    string
+	Score      float64
+}
+
+func New(baseURL, database, user, password string) *Client {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if baseURL == "" {
+		return nil
+	}
+	if database == "" {
+		database = "monti_jarvis"
+	}
+	return &Client{
+		baseURL:  baseURL,
+		db:       database,
+		user:     strings.TrimSpace(user),
+		password: password,
+		http:     &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+func (c *Client) Enabled() bool {
+	return c != nil && c.baseURL != ""
+}
+
+func (c *Client) Ping(ctx context.Context) error {
+	if !c.Enabled() {
+		return fmt.Errorf("clickhouse is not configured")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/ping", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("clickhouse ping: http %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (c *Client) EnsureSchema(ctx context.Context) error {
+	db := quoteIdent(c.db)
+	statements := []string{
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", db),
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.km_embeddings (
+  tenant_id String,
+  agent_id String,
+  document_id String,
+  chunk_id String,
+  km_scope String,
+  km_version UInt32,
+  content String,
+  embedding Array(Float32),
+  updated_at DateTime DEFAULT now()
+) ENGINE = MergeTree()
+ORDER BY (tenant_id, agent_id, km_scope, chunk_id)`, db),
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.qa_events (
+  event_id String,
+  tenant_id String,
+  agent_id String,
+  topic String,
+  question String,
+  event_type String,
+  created_at DateTime DEFAULT now()
+) ENGINE = MergeTree()
+ORDER BY (tenant_id, created_at)`, db),
+	}
+	for _, stmt := range statements {
+		if err := c.exec(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type EmbeddingRow struct {
+	TenantID   string
+	AgentID    string
+	DocumentID string
+	ChunkID    string
+	KMScope    string
+	KMVersion  uint32
+	Content    string
+	Embedding  []float32
+}
+
+func (c *Client) ReplaceDocumentEmbeddings(ctx context.Context, tenantID, agentID, documentID string, version uint32, rows []EmbeddingRow) error {
+	if !c.Enabled() {
+		return fmt.Errorf("clickhouse is not configured")
+	}
+	del := fmt.Sprintf(
+		"ALTER TABLE %s.km_embeddings DELETE WHERE tenant_id = '%s' AND agent_id = '%s' AND document_id = '%s'",
+		quoteIdent(c.db), escape(tenantID), escape(agentID), escape(documentID),
+	)
+	if err := c.exec(ctx, del); err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return c.insertEmbeddings(ctx, rows)
+}
+
+func (c *Client) DeleteAgentEmbeddings(ctx context.Context, tenantID, agentID string) error {
+	if !c.Enabled() {
+		return fmt.Errorf("clickhouse is not configured")
+	}
+	q := fmt.Sprintf(
+		"ALTER TABLE %s.km_embeddings DELETE WHERE tenant_id = '%s' AND agent_id = '%s'",
+		quoteIdent(c.db), escape(tenantID), escape(agentID),
+	)
+	return c.exec(ctx, q)
+}
+
+func (c *Client) InsertQAEvent(ctx context.Context, tenantID, agentID, topic, question, eventType string) error {
+	if !c.Enabled() {
+		return nil
+	}
+	q := fmt.Sprintf(
+		`INSERT INTO %s.qa_events (event_id, tenant_id, agent_id, topic, question, event_type) VALUES ('%s','%s','%s','%s','%s','%s')`,
+		quoteIdent(c.db),
+		escape(randomID()),
+		escape(tenantID),
+		escape(agentID),
+		escape(topic),
+		escape(question),
+		escape(eventType),
+	)
+	return c.exec(ctx, q)
+}
+
+func (c *Client) Search(ctx context.Context, tenantID, agentID string, scopes []string, query []float32, topK, candidateLimit int) ([]ChunkHit, error) {
+	if !c.Enabled() {
+		return nil, fmt.Errorf("clickhouse is not configured")
+	}
+	if topK <= 0 {
+		topK = 5
+	}
+	if candidateLimit <= 0 {
+		candidateLimit = 50
+	}
+	scopeFilter := ""
+	if len(scopes) > 0 {
+		parts := make([]string, len(scopes))
+		for i, s := range scopes {
+			parts[i] = "'" + escape(s) + "'"
+		}
+		scopeFilter = " AND km_scope IN (" + strings.Join(parts, ",") + ")"
+	}
+
+	// Fetch candidate rows and rank in Go for portable dev setups.
+	q := fmt.Sprintf(`
+SELECT chunk_id, document_id, agent_id, km_scope, content, embedding
+FROM %s.km_embeddings
+WHERE tenant_id = '%s' AND agent_id = '%s'%s
+LIMIT %d
+FORMAT JSON`,
+		quoteIdent(c.db), escape(tenantID), escape(agentID), scopeFilter, candidateLimit,
+	)
+
+	body, err := c.query(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	type row struct {
+		ChunkID    string    `json:"chunk_id"`
+		DocumentID string    `json:"document_id"`
+		AgentID    string    `json:"agent_id"`
+		KMScope    string    `json:"km_scope"`
+		Content    string    `json:"content"`
+		Embedding  []float32 `json:"embedding"`
+	}
+	var parsed struct {
+		Data []row `json:"data"`
+	}
+	if err := jsonUnmarshal(body, &parsed); err != nil {
+		return nil, err
+	}
+
+	hits := make([]ChunkHit, 0, len(parsed.Data))
+	for _, r := range parsed.Data {
+		hits = append(hits, ChunkHit{
+			ChunkID:    r.ChunkID,
+			DocumentID: r.DocumentID,
+			AgentID:    r.AgentID,
+			KMScope:    r.KMScope,
+			Content:    r.Content,
+			Score:      cosineSimilarity(query, r.Embedding),
+		})
+	}
+	sortHits(hits)
+	if len(hits) > topK {
+		hits = hits[:topK]
+	}
+	return hits, nil
+}
+
+func (c *Client) ListAgentChunks(ctx context.Context, tenantID, agentID string, scopes []string, limit int) ([]ChunkHit, error) {
+	if !c.Enabled() {
+		return nil, fmt.Errorf("clickhouse is not configured")
+	}
+	if limit <= 0 {
+		limit = 8
+	}
+	scopeFilter := ""
+	if len(scopes) > 0 {
+		parts := make([]string, len(scopes))
+		for i, s := range scopes {
+			parts[i] = "'" + escape(s) + "'"
+		}
+		scopeFilter = " AND km_scope IN (" + strings.Join(parts, ",") + ")"
+	}
+	q := fmt.Sprintf(`
+SELECT chunk_id, document_id, agent_id, km_scope, content
+FROM %s.km_embeddings
+WHERE tenant_id = '%s' AND agent_id = '%s'%s
+ORDER BY updated_at DESC
+LIMIT %d
+FORMAT JSON`,
+		quoteIdent(c.db), escape(tenantID), escape(agentID), scopeFilter, limit,
+	)
+	body, err := c.query(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	type row struct {
+		ChunkID    string `json:"chunk_id"`
+		DocumentID string `json:"document_id"`
+		AgentID    string `json:"agent_id"`
+		KMScope    string `json:"km_scope"`
+		Content    string `json:"content"`
+	}
+	var parsed struct {
+		Data []row `json:"data"`
+	}
+	if err := jsonUnmarshal(body, &parsed); err != nil {
+		return nil, err
+	}
+	out := make([]ChunkHit, 0, len(parsed.Data))
+	for _, r := range parsed.Data {
+		out = append(out, ChunkHit{
+			ChunkID:    r.ChunkID,
+			DocumentID: r.DocumentID,
+			AgentID:    r.AgentID,
+			KMScope:    r.KMScope,
+			Content:    r.Content,
+			Score:      1,
+		})
+	}
+	return out, nil
+}
+
+func (c *Client) insertEmbeddings(ctx context.Context, rows []EmbeddingRow) error {
+	var buf bytes.Buffer
+	for _, row := range rows {
+		vec := vectorLiteral(row.Embedding)
+		line := fmt.Sprintf(
+			"INSERT INTO %s.km_embeddings (tenant_id, agent_id, document_id, chunk_id, km_scope, km_version, content, embedding) VALUES ('%s','%s','%s','%s','%s',%d,'%s',%s)\n",
+			quoteIdent(c.db),
+			escape(row.TenantID),
+			escape(row.AgentID),
+			escape(row.DocumentID),
+			escape(row.ChunkID),
+			escape(row.KMScope),
+			row.KMVersion,
+			escape(row.Content),
+			vec,
+		)
+		buf.WriteString(line)
+	}
+	return c.exec(ctx, buf.String())
+}
+
+func (c *Client) exec(ctx context.Context, query string) error {
+	_, err := c.query(ctx, query)
+	return err
+}
+
+func (c *Client) query(ctx context.Context, query string) ([]byte, error) {
+	params := url.Values{"database": {c.db}}
+	if c.user != "" {
+		params.Set("user", c.user)
+	}
+	if c.password != "" {
+		params.Set("password", c.password)
+	}
+	endpoint := c.baseURL + "/?" + params.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(query))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("clickhouse: http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return body, nil
+}
+
+func quoteIdent(name string) string {
+	return name
+}
+
+func escape(value string) string {
+	return strings.ReplaceAll(value, "'", "''")
+}
+
+func vectorLiteral(values []float32) string {
+	parts := make([]string, len(values))
+	for i, v := range values {
+		parts[i] = fmt.Sprintf("%g", v)
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}

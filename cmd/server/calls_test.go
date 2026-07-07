@@ -13,11 +13,11 @@ import (
 	"github.com/libra/monti-jarvis/internal/lktoken"
 )
 
-func TestHealthIncludesSprint001(t *testing.T) {
+func TestHealthIncludesSprint002(t *testing.T) {
 	s := &server{
 		cfg:   env.Load(),
-		ai:    gemini.New("", ""),
-		voice: live.New(live.Config{}),
+		ai:    gemini.New("", "", ""),
+		voice: live.New(live.Config{}, nil),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
@@ -32,7 +32,7 @@ func TestHealthIncludesSprint001(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if payload["sprint"] != "SPRINT-001" {
+	if payload["sprint"] != "SPRINT-002" {
 		t.Fatalf("sprint = %v", payload["sprint"])
 	}
 }

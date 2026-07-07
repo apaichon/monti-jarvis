@@ -4,7 +4,7 @@
 **Date:** 2026-07-07  
 **Product Direction:** Multi-tenant AI Call Center as a Service  
 **Primary Start Point:** Inbound AI calls for high-value businesses  
-**Official Roadmap:** 35 sprints — see [Section 17](#17-official-35-sprint-roadmap) and `docs/sdlc/ROADMAP.md`
+**Official Roadmap:** 35 sprints — see [Section 17](#17-official-35-sprint-roadmap) and `docs/sdlc/00-roadmap/ROADMAP.md`
 
 ---
 
@@ -1358,7 +1358,7 @@ Sprint 31–32 Tuning
   → Sprint 33–35 Infra
 ```
 
-Full sprint files: `docs/sdlc/ROADMAP.md` and `docs/sdlc/sprints/SPRINT-NNN.md` (created per sprint).
+Full SDLC tree: `docs/sdlc/README.md` — roadmap, features, design, sprints, tasks.
 
 ---
 

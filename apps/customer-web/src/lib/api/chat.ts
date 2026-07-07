@@ -3,9 +3,19 @@ export type ChatMessage = {
   content: string;
 };
 
+export type ChatSource = {
+  chunk_id: string;
+  document_id: string;
+  scope: string;
+  excerpt: string;
+  score: number;
+};
+
 export type ChatResponse = {
   session_id: string;
   reply: string;
+  sources?: ChatSource[];
+  missing_km?: boolean;
   error?: string;
 };
 

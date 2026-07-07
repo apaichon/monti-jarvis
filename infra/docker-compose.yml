@@ -1,5 +1,6 @@
-# Monti Jarvis local infra — NATS + LiveKit (Sprint 1+)
+# Monti Jarvis local infra — NATS + LiveKit + ClickHouse (Sprint 1+)
 # Datastores (Postgres/Redis/MinIO) reuse shared poc-gml-* containers when present.
+# ClickHouse uses monti-clickhouse with :8123 published (poc-gml-clickhouse has no host port).
 # Usage: docker compose -f infra/docker-compose.yml up -d
 
 name: monti-jarvis
@@ -30,6 +31,26 @@ services:
       - "7882:7882/udp"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:7880"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: monti-clickhouse
+    environment:
+      CLICKHOUSE_DB: monti_jarvis
+      CLICKHOUSE_USER: monti
+      CLICKHOUSE_PASSWORD: monti
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
       interval: 5s
       timeout: 3s
       retries: 10

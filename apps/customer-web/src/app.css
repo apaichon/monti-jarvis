@@ -444,6 +444,28 @@ button {
   background: rgb(20 12 38 / 72%);
 }
 
+.citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.citation {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  border: 1px solid rgb(0 183 255 / 28%);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.citation.warn {
+  color: #ffb347;
+  border-color: rgb(255 179 71 / 35%);
+}
+
 .composer-wrap {
   display: grid;
   gap: 8px;

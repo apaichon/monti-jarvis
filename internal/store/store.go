@@ -21,11 +21,12 @@ type Store struct {
 }
 
 type Health struct {
-	Postgres string `json:"postgres"`
-	Redis    string `json:"redis"`
-	Minio    string `json:"minio"`
-	NATS     string `json:"nats"`
-	LiveKit  string `json:"livekit"`
+	Postgres   string `json:"postgres"`
+	Redis      string `json:"redis"`
+	Minio      string `json:"minio"`
+	ClickHouse string `json:"clickhouse"`
+	NATS       string `json:"nats"`
+	LiveKit    string `json:"livekit"`
 }
 
 func Open(ctx context.Context, cfg env.Config) (*Store, []string) {
@@ -87,7 +88,7 @@ func (s *Store) Close() {
 }
 
 func (s *Store) Health(ctx context.Context) Health {
-	h := Health{Postgres: "disabled", Redis: "disabled", Minio: "disabled"}
+	h := Health{Postgres: "disabled", Redis: "disabled", Minio: "disabled", ClickHouse: "disabled"}
 	if s.pg != nil {
 		h.Postgres = "ok"
 		if err := s.pg.Ping(ctx); err != nil {
@@ -165,8 +166,35 @@ CREATE TABLE IF NOT EXISTS %s.call_turns (
   call_id text NOT NULL REFERENCES %s.call_sessions(id) ON DELETE CASCADE,
   role text NOT NULL CHECK (role IN ('caller', 'agent', 'system')),
   content text NOT NULL,
+  source_chunk_ids jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
-);`, schema, schema, schema, schema, schema, schema, schema))
+);
+CREATE TABLE IF NOT EXISTS %s.knowledge_documents (
+  id text PRIMARY KEY,
+  tenant_id text NOT NULL,
+  agent_id text NOT NULL,
+  filename text NOT NULL,
+  object_key text NOT NULL,
+  mime text NOT NULL DEFAULT 'text/plain',
+  status text NOT NULL DEFAULT 'uploaded',
+  km_scope text NOT NULL DEFAULT 'general',
+  km_version integer NOT NULL DEFAULT 1,
+  chunk_count integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS %s.knowledge_chunks (
+  id text PRIMARY KEY,
+  document_id text NOT NULL REFERENCES %s.knowledge_documents(id) ON DELETE CASCADE,
+  tenant_id text NOT NULL,
+  agent_id text NOT NULL,
+  chunk_index integer NOT NULL,
+  content text NOT NULL,
+  km_scope text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS knowledge_documents_agent_idx ON %s.knowledge_documents (tenant_id, agent_id);
+CREATE INDEX IF NOT EXISTS knowledge_chunks_agent_idx ON %s.knowledge_chunks (tenant_id, agent_id);`, schema, schema, schema, schema, schema, schema, schema, schema, schema, schema, schema, schema))
 	return err
 }
 

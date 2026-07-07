@@ -8,7 +8,8 @@
 | Item | Status |
 | --- | --- |
 | `monti-jarvis` v0.1.0 Go spike | Shipped — maps to **Sprint 21** (workforce + conversation) |
-| Official Sprint 1 | **Customer: Conversation** — rebuild in Svelte + LiveKit + NATS |
+| Official Sprint 1 | **Shipped v0.2.0** — Customer: Conversation (Svelte + LiveKit + NATS + Gemini voice) |
+| Official Sprint 2 | **Shipped v0.3.0** — Customer: KM and Scope (ClickHouse RAG, per-avatar KB, citations) |
 
 ---
 
@@ -16,8 +17,8 @@
 
 | Sprint | Platform | Feature | Phase | Depends on |
 | ---: | --- | --- | --- | --- |
-| 1 | Customer | Conversation | A | — |
-| 2 | Customer | Add KM and Scope | A | 1 |
+| 1 | Customer | Conversation | A | — ✅ v0.2.0 |
+| 2 | Customer | Add KM and Scope | A | 1 ✅ v0.3.0 |
 | 3 | Backend | Auth | B | — |
 | 4 | Platform Admin | Packages | B | 3 |
 | 5 | Platform Admin | Avatars | B | 3 |
@@ -109,17 +110,24 @@ Onboarding and monetization.
 Each active sprint gets:
 
 ```text
-docs/sdlc/sprints/SPRINT-NNN.md
-docs/sdlc/tasks/TASK-NNNN.md
-docs/sdlc/features/FEAT-NNNN-<slug>.md
+docs/sdlc/README.md
+docs/sdlc/00-roadmap/ROADMAP.md
+docs/sdlc/01-features/FEAT-NNNN-<slug>.md
+docs/sdlc/02-design/          architecture, workflow, er-diagram, api-spec, ux-ui
+docs/sdlc/03-sprints/SPRINT-NNN.md
+docs/sdlc/04-tasks/TASK-NNNN.md
 ```
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Next sprint: SPRINT-001 (official)
+## Current sprint
 
-**Platform:** Customer  
-**Feature:** Conversation  
-**Goal:** Svelte + LiveKit inbound voice conversation with transcript and NATS lifecycle events.
+*Between sprints — run `sprint-plan` to open SPRINT-003.*
 
-See `docs/sdlc/sprints/SPRINT-001.md` (to be re-groomed from prototype scope).
+**Last shipped:** SPRINT-002 · **v0.3.0** · KM and Scope RAG
+
+## Next sprint: SPRINT-003
+
+**Platform:** Backend  
+**Feature:** Auth  
+**Goal:** JWT/session auth, RBAC skeleton (platform / tenant / customer).

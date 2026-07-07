@@ -29,7 +29,12 @@ type Config struct {
 	LiveKitURL      string
 	LiveKitAPIKey   string
 	LiveKitAPISecret string
-	CustomerWebDir  string
+	CustomerWebDir   string
+	ClickHouseURL      string
+	ClickHouseDB       string
+	ClickHouseUser     string
+	ClickHousePassword string
+	GeminiEmbedModel string
 }
 
 func Load() Config {
@@ -65,6 +70,11 @@ func Load() Config {
 		LiveKitAPIKey:    envOr("LIVEKIT_API_KEY", "devkey"),
 		LiveKitAPISecret: envOr("LIVEKIT_API_SECRET", "secret"),
 		CustomerWebDir:   envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
+		ClickHouseURL:      envOr("CLICKHOUSE_URL", "http://localhost:8123"),
+		ClickHouseDB:       envOr("CLICKHOUSE_DB", "monti_jarvis"),
+		ClickHouseUser:     envOr("CLICKHOUSE_USER", "monti"),
+		ClickHousePassword: envOr("CLICKHOUSE_PASSWORD", "monti"),
+		GeminiEmbedModel: envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
 	}
 }
 

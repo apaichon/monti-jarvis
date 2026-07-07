@@ -13,9 +13,10 @@ import (
 )
 
 type Client struct {
-	apiKey string
-	model  string
-	http   *http.Client
+	apiKey     string
+	model      string
+	embedModel string
+	http       *http.Client
 }
 
 type Message struct {
@@ -23,11 +24,12 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-func New(apiKey, model string) *Client {
+func New(apiKey, model, embedModel string) *Client {
 	return &Client{
-		apiKey: apiKey,
-		model:  model,
-		http:   &http.Client{Timeout: 45 * time.Second},
+		apiKey:     apiKey,
+		model:      model,
+		embedModel: normalizeEmbedModel(embedModel),
+		http:       &http.Client{Timeout: 45 * time.Second},
 	}
 }
 

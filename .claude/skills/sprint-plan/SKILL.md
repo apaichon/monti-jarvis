@@ -1,41 +1,54 @@
 ---
 name: sprint-plan
-description: Plan or groom a sprint for Monti Jarvis — scope a sprint goal, write docs/sdlc/sprints/SPRINT-NNN.md with tasks and acceptance criteria. Use when starting a new iteration or re-grooming the active one. (PM agent)
+description: Plan or groom a sprint for Monti Jarvis — read the roadmap, scope a sprint goal, write docs/sdlc/03-sprints/SPRINT-NNN.md with tasks and acceptance criteria, and create linked TASK-NNNN.md files. Use when starting a new iteration or re-grooming the active one. (PM agent)
 ---
 
 # sprint-plan — groom and open a sprint
 
 ## Procedure
-1. Read `docs/sdlc/ROADMAP.md` for the official 35-sprint sequence and dependencies.
-2. Read completed tasks in `docs/sdlc/tasks/` and note carry-over items.
-3. Open the **next roadmap sprint** — do not skip ahead without explicit user approval.
-4. Create `docs/sdlc/sprints/SPRINT-NNN.md` from the structure below (NNN matches roadmap sprint number).
-5. Create linked `docs/sdlc/tasks/TASK-NNNN.md` files with testable ACs.
+1. Run **`km-context`** (previous sprint) to see what carried over.
+2. Read `docs/sdlc/00-roadmap/ROADMAP.md`. Pick the **next roadmap sprint** — do not skip ahead
+   without explicit user approval.
+3. Read completed tasks in `docs/sdlc/04-tasks/` and `docs/sdlc/03-sprints/_velocity.json`.
+4. Create `docs/sdlc/03-sprints/SPRINT-NNN.md` from the structure below (NNN = roadmap number).
+5. Create linked `docs/sdlc/04-tasks/TASK-NNNN.md` and `docs/sdlc/01-features/FEAT-NNNN-*.md`.
+6. Update `docs/sdlc/00-roadmap/ROADMAP.md` "Current sprint" / "Next sprint" sections.
+7. Run **`km-sync`** to set sprint `in_progress` and tasks `todo`.
 
 ## sprint file structure
 ```markdown
-# Sprint NNN — <title>   (<start> → <end>)
-**Goal:** <one sentence>
+---
+id: SPRINT-NNN
+status: in_progress
+start: YYYY-MM-DD
+end: YYYY-MM-DD
+goal: "..."
+roadmap_sprint: N
+platform: Customer|Backend|...
+depends_on: [SPRINT-NNN]
+---
+
+# SPRINT-NNN — <title>
+
+## Goal
+<one sentence>
 
 ## Commitment
-| Task | Points | Outcome |
-| --- | ---: | --- |
+| Task | Points | Status | Owner | Outcome |
 
-## Scope Boundary
-- In scope: …
-- Out of scope: …
+## Scope boundary
+In / Out
 
 ## Verification
-- `go test ./...`
-- manual checks …
+make test, manual checks
 
 ## Risks
-- …
 ```
 
 ## Guardrails
-- Only one sprint is "active" at a time.
-- Every task must name an owner and testable ACs.
-- Defer auth/KYC/ticketing/CRM unless explicitly in scope.
+- Only one sprint is `in_progress` at a time.
+- Every task must name an owner (dev/devops/tester) and testable ACs.
+- Defer auth/KYC/ticketing unless explicitly in roadmap scope.
+- Update `02-design/` when APIs, schema, or UX change.
 
-See `docs/sdlc/ROADMAP.md` and `docs/sdlc/sprints/SPRINT-001.md`.
+See `docs/sdlc/README.md`, `docs/sdlc/00-roadmap/ROADMAP.md`, `docs/sdlc/02-design/`.

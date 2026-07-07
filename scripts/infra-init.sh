@@ -63,8 +63,35 @@ CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".call_turns (
   call_id text NOT NULL REFERENCES "$POSTGRES_SCHEMA".call_sessions(id) ON DELETE CASCADE,
   role text NOT NULL CHECK (role IN ('caller', 'agent', 'system')),
   content text NOT NULL,
+  source_chunk_ids jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".knowledge_documents (
+  id text PRIMARY KEY,
+  tenant_id text NOT NULL,
+  agent_id text NOT NULL,
+  filename text NOT NULL,
+  object_key text NOT NULL,
+  mime text NOT NULL DEFAULT 'text/plain',
+  status text NOT NULL DEFAULT 'uploaded',
+  km_scope text NOT NULL DEFAULT 'general',
+  km_version integer NOT NULL DEFAULT 1,
+  chunk_count integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "$POSTGRES_SCHEMA".knowledge_chunks (
+  id text PRIMARY KEY,
+  document_id text NOT NULL REFERENCES "$POSTGRES_SCHEMA".knowledge_documents(id) ON DELETE CASCADE,
+  tenant_id text NOT NULL,
+  agent_id text NOT NULL,
+  chunk_index integer NOT NULL,
+  content text NOT NULL,
+  km_scope text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS knowledge_documents_agent_idx ON "$POSTGRES_SCHEMA".knowledge_documents (tenant_id, agent_id);
+CREATE INDEX IF NOT EXISTS knowledge_chunks_agent_idx ON "$POSTGRES_SCHEMA".knowledge_chunks (tenant_id, agent_id);
 SQL
 
 if docker ps --format '{{.Names}}' | grep -qx 'poc-gml-minio'; then
@@ -84,4 +111,16 @@ else
   echo "note: run 'make infra-up' or 'docker compose -f infra/docker-compose.yml up -d' for LiveKit"
 fi
 
-echo "infra ready: Postgres monti_jarvis schema $POSTGRES_SCHEMA, Redis DB 4, MinIO $MINIO_BUCKET, NATS :4222, LiveKit :7880"
+CLICKHOUSE_URL=${CLICKHOUSE_URL:-http://localhost:8123}
+CLICKHOUSE_DB=${CLICKHOUSE_DB:-monti_jarvis}
+CLICKHOUSE_USER=${CLICKHOUSE_USER:-monti}
+CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-monti}
+if curl -fsS "$CLICKHOUSE_URL/ping" >/dev/null 2>&1; then
+  echo "==> Ensuring ClickHouse database $CLICKHOUSE_DB exists..."
+  curl -fsS "$CLICKHOUSE_URL/?user=$CLICKHOUSE_USER&password=$CLICKHOUSE_PASSWORD" \
+    --data "CREATE DATABASE IF NOT EXISTS $CLICKHOUSE_DB" >/dev/null
+else
+  echo "note: ClickHouse not reachable at $CLICKHOUSE_URL — run 'make infra-up' for monti-clickhouse"
+fi
+
+echo "infra ready: Postgres monti_jarvis schema $POSTGRES_SCHEMA, Redis DB 4, MinIO $MINIO_BUCKET, NATS :4222, LiveKit :7880, ClickHouse :8123"

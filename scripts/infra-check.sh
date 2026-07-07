@@ -32,3 +32,13 @@ if docker ps --format '{{.Names}}' | grep -qx 'monti-livekit'; then
 else
   echo "livekit container monti-livekit not found (optional: :7880)"
 fi
+
+if curl -fsS http://localhost:8123/ping >/dev/null 2>&1; then
+  echo "clickhouse ok (localhost:8123)"
+elif docker ps --format '{{.Names}}' | grep -qx 'monti-clickhouse'; then
+  docker exec monti-clickhouse wget -qO- http://localhost:8123/ping >/dev/null && echo "clickhouse container ok (host port not published)"
+elif docker ps --format '{{.Names}}' | grep -qx 'poc-gml-clickhouse'; then
+  echo "clickhouse poc-gml-clickhouse running but localhost:8123 unreachable — run 'make infra-up' for monti-clickhouse"
+else
+  echo "clickhouse not found (run 'make infra-up' for monti-clickhouse on :8123)"
+fi

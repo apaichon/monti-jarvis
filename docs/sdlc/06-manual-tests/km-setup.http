@@ -1,0 +1,235 @@
+# Monti Jarvis — KM & RAG REST client
+# Open in VS Code (REST Client) or IntelliJ HTTP Client.
+# Prereq: make infra-up && make start && GEMINI_API_KEY in infra/.env.dev
+#
+# Run requests top-to-bottom for a full smoke, or use individual sections.
+
+@baseUrl = http://localhost:8091
+@tenantId = demo
+
+### ── Health & infra ───────────────────────────────────────────────
+
+# @name healthz
+GET {{baseUrl}}/healthz
+
+###
+
+# @name infra
+GET {{baseUrl}}/api/infra
+
+###
+
+# @name workforce
+GET {{baseUrl}}/api/workforce
+
+### ── KM: seed all avatars (quick start) ───────────────────────────
+
+# @name kmSeedAll
+POST {{baseUrl}}/api/km/seed
+X-Tenant-Id: {{tenantId}}
+
+### ── KM: agent status ─────────────────────────────────────────────
+
+# @name kmStatusAva
+GET {{baseUrl}}/api/km/agents/ava
+X-Tenant-Id: {{tenantId}}
+
+###
+
+# @name kmStatusMax
+GET {{baseUrl}}/api/km/agents/max
+X-Tenant-Id: {{tenantId}}
+
+###
+
+# @name kmStatusLuna
+GET {{baseUrl}}/api/km/agents/luna
+X-Tenant-Id: {{tenantId}}
+
+###
+
+# @name kmStatusNeo
+GET {{baseUrl}}/api/km/agents/neo
+X-Tenant-Id: {{tenantId}}
+
+### ── KM: list documents ───────────────────────────────────────────
+
+# @name kmListDocsMax
+GET {{baseUrl}}/api/km/agents/max/documents
+X-Tenant-Id: {{tenantId}}
+
+### ── KM: upload per avatar ────────────────────────────────────────
+# Paths are relative to this file (docs/km-setup.http).
+
+# @name kmUploadAva
+POST {{baseUrl}}/api/km/agents/ava/documents
+X-Tenant-Id: {{tenantId}}
+Content-Type: multipart/form-data; boundary=MontiBoundary
+
+--MontiBoundary
+Content-Disposition: form-data; name="file"; filename="ava.md"
+Content-Type: text/markdown
+
+< ./samples/km/ava.md
+--MontiBoundary
+Content-Disposition: form-data; name="scope"
+
+general
+--MontiBoundary--
+
+###
+
+# @name kmUploadMax
+POST {{baseUrl}}/api/km/agents/max/documents
+X-Tenant-Id: {{tenantId}}
+Content-Type: multipart/form-data; boundary=MontiBoundary
+
+--MontiBoundary
+Content-Disposition: form-data; name="file"; filename="max.md"
+Content-Type: text/markdown
+
+< ./samples/km/max.md
+--MontiBoundary
+Content-Disposition: form-data; name="scope"
+
+billing
+--MontiBoundary--
+
+###
+
+# @name kmUploadLuna
+POST {{baseUrl}}/api/km/agents/luna/documents
+X-Tenant-Id: {{tenantId}}
+Content-Type: multipart/form-data; boundary=MontiBoundary
+
+--MontiBoundary
+Content-Disposition: form-data; name="file"; filename="luna.md"
+Content-Type: text/markdown
+
+< ./samples/km/luna.md
+--MontiBoundary
+Content-Disposition: form-data; name="scope"
+
+technical
+--MontiBoundary--
+
+###
+
+# @name kmUploadNeo
+POST {{baseUrl}}/api/km/agents/neo/documents
+X-Tenant-Id: {{tenantId}}
+Content-Type: multipart/form-data; boundary=MontiBoundary
+
+--MontiBoundary
+Content-Disposition: form-data; name="file"; filename="neo.md"
+Content-Type: text/markdown
+
+< ./samples/km/neo.md
+--MontiBoundary
+Content-Disposition: form-data; name="scope"
+
+general
+--MontiBoundary--
+
+### ── KM: reset (single agent) ─────────────────────────────────────
+
+# @name kmResetMax
+POST {{baseUrl}}/api/km/agents/max/reset
+X-Tenant-Id: {{tenantId}}
+
+### ── KM: reset all + re-seed ──────────────────────────────────────
+
+# @name kmResetAva
+POST {{baseUrl}}/api/km/agents/ava/reset
+X-Tenant-Id: {{tenantId}}
+
+###
+
+# @name kmResetMax2
+POST {{baseUrl}}/api/km/agents/max/reset
+X-Tenant-Id: {{tenantId}}
+
+###
+
+# @name kmResetLuna
+POST {{baseUrl}}/api/km/agents/luna/reset
+X-Tenant-Id: {{tenantId}}
+
+###
+
+# @name kmResetNeo
+POST {{baseUrl}}/api/km/agents/neo/reset
+X-Tenant-Id: {{tenantId}}
+
+###
+
+# @name kmSeedAfterReset
+POST {{baseUrl}}/api/km/seed
+X-Tenant-Id: {{tenantId}}
+
+### ── RAG verification (chat) ──────────────────────────────────────
+# Expect sources[] when KM is seeded and topic matches scope.
+
+# @name chatMaxBillingGrounded
+POST {{baseUrl}}/api/chat
+Content-Type: application/json
+
+{
+  "agent_id": "max",
+  "topic": "billing",
+  "message": "When are invoices due?",
+  "history": []
+}
+
+###
+
+# @name chatAvaGeneralGrounded
+POST {{baseUrl}}/api/chat
+Content-Type: application/json
+
+{
+  "agent_id": "ava",
+  "topic": "general",
+  "message": "What are your business hours?",
+  "history": []
+}
+
+###
+
+# @name chatLunaTechnicalGrounded
+POST {{baseUrl}}/api/chat
+Content-Type: application/json
+
+{
+  "agent_id": "luna",
+  "topic": "technical",
+  "message": "My microphone is not working on calls",
+  "history": []
+}
+
+###
+
+# @name chatMissingKM
+POST {{baseUrl}}/api/chat
+Content-Type: application/json
+
+{
+  "agent_id": "ava",
+  "topic": "general",
+  "message": "What is the secret project codename Zeta-9?",
+  "history": []
+}
+
+###
+
+# @name chatScopeMismatch
+# Ava on technical tab — should not cite Luna-only technical KB.
+POST {{baseUrl}}/api/chat
+Content-Type: application/json
+
+{
+  "agent_id": "ava",
+  "topic": "technical",
+  "message": "My microphone is not working on calls",
+  "history": []
+}

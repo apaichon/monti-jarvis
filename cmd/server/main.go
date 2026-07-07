@@ -13,12 +13,15 @@ import (
 	"time"
 
 	"github.com/libra/monti-jarvis/internal/calls"
+	"github.com/libra/monti-jarvis/internal/clickhouse"
 	"github.com/libra/monti-jarvis/internal/customerweb"
 	"github.com/libra/monti-jarvis/internal/env"
 	"github.com/libra/monti-jarvis/internal/gemini"
+	"github.com/libra/monti-jarvis/internal/km"
 	"github.com/libra/monti-jarvis/internal/live"
 	"github.com/libra/monti-jarvis/internal/lktoken"
 	"github.com/libra/monti-jarvis/internal/natsbus"
+	"github.com/libra/monti-jarvis/internal/rag"
 	"github.com/libra/monti-jarvis/internal/store"
 	"github.com/libra/monti-jarvis/internal/web"
 	"github.com/libra/monti-jarvis/internal/workforce"
@@ -30,6 +33,9 @@ type server struct {
 	voice  *live.Relay
 	calls  *calls.Service
 	store  *store.Store
+	km     *km.Service
+	rag    *rag.Service
+	ch     *clickhouse.Client
 	bus    *natsbus.Bus
 	static http.Handler
 	legacy http.Handler
@@ -44,9 +50,11 @@ type chatRequest struct {
 }
 
 type chatResponse struct {
-	SessionID string `json:"session_id"`
-	AgentID   string `json:"agent_id"`
-	Reply     string `json:"reply"`
+	SessionID string       `json:"session_id"`
+	AgentID   string       `json:"agent_id"`
+	Reply     string       `json:"reply"`
+	Sources   []rag.Source `json:"sources,omitempty"`
+	MissingKM bool         `json:"missing_km,omitempty"`
 }
 
 func main() {
@@ -77,12 +85,28 @@ func main() {
 		LiveURL:   cfg.LiveKitURL,
 	}
 
+	ch := clickhouse.New(cfg.ClickHouseURL, cfg.ClickHouseDB, cfg.ClickHouseUser, cfg.ClickHousePassword)
+	if ch != nil && ch.Enabled() {
+		if err := ch.EnsureSchema(rootCtx); err != nil {
+			log.Printf("infra warning: clickhouse schema: %v", err)
+		} else if err := ch.Ping(rootCtx); err != nil {
+			log.Printf("infra warning: clickhouse ping: %v", err)
+		}
+	}
+
+	ai := gemini.New(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.GeminiEmbedModel)
+	ragSvc := rag.New(ch, ai, cfg.DemoTenantID)
+	kmSvc := km.NewService(st, ch, ai, cfg.DemoTenantID)
+
 	s := &server{
 		cfg:    cfg,
-		ai:     gemini.New(cfg.GeminiAPIKey, cfg.GeminiModel),
-		voice:  live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}),
+		ai:     ai,
+		voice:  live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}, ragSvc),
 		calls:  calls.New(st, bus, lk, cfg.DemoTenantID),
 		store:  st,
+		km:     kmSvc,
+		rag:    ragSvc,
+		ch:     ch,
 		bus:    bus,
 		static: customerweb.Handler(cfg.CustomerWebDir),
 		legacy: web.Handler(),
@@ -101,6 +125,11 @@ func main() {
 
 	mux.HandleFunc("GET /api/workforce", s.workforce)
 	mux.HandleFunc("POST /api/chat", s.chat)
+	mux.HandleFunc("GET /api/km/agents/{agent_id}", s.getAgentKnowledge)
+	mux.HandleFunc("GET /api/km/agents/{agent_id}/documents", s.listAgentDocuments)
+	mux.HandleFunc("POST /api/km/agents/{agent_id}/documents", s.uploadAgentDocument)
+	mux.HandleFunc("POST /api/km/agents/{agent_id}/reset", s.resetAgentKnowledge)
+	mux.HandleFunc("POST /api/km/seed", s.seedKnowledge)
 	mux.HandleFunc("GET /ws/voice", s.voice.Handler())
 	mux.HandleFunc("GET /legacy", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/legacy/", http.StatusFound)
@@ -139,7 +168,8 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":      s.cfg.LiveKitAPIKey != "",
 		"nats":         s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":       "SPRINT-001",
+		"sprint":       "SPRINT-002",
+		"rag":          s.rag != nil && s.rag.Enabled(),
 		"customer_web": s.cfg.CustomerWebDir,
 	})
 }
@@ -155,6 +185,14 @@ func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 	h.LiveKit = "disabled"
 	if s.cfg.LiveKitAPIKey != "" {
 		h.LiveKit = "configured"
+	}
+	h.ClickHouse = "disabled"
+	if s.ch != nil && s.ch.Enabled() {
+		if err := s.ch.Ping(ctx); err != nil {
+			h.ClickHouse = err.Error()
+		} else {
+			h.ClickHouse = "ok"
+		}
 	}
 	writeJSON(w, http.StatusOK, h)
 }
@@ -190,7 +228,11 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 50*time.Second)
 	defer cancel()
 
-	reply, err := s.ai.Reply(ctx, workforce.SystemPrompt(agent), history)
+	topic := strings.TrimSpace(req.Topic)
+	ragResult, _ := s.rag.Retrieve(ctx, agent.ID, topic, req.Message)
+	prompt := s.rag.AugmentPrompt(workforce.SystemPrompt(agent), agent.ID, topic, req.Message, ragResult)
+
+	reply, err := s.ai.Reply(ctx, prompt, history)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -201,6 +243,8 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		SessionID: sessionID,
 		AgentID:   agent.ID,
 		Reply:     reply,
+		Sources:   ragResult.Sources,
+		MissingKM: ragResult.MissingKM,
 	})
 }
 
@@ -255,7 +299,7 @@ func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Tenant-Id")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

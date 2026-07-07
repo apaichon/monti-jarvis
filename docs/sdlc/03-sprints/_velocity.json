@@ -1,0 +1,22 @@
+{
+  "sprints": [
+    {
+      "id": "SPRINT-001",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-07",
+      "release": "v0.2.0"
+    },
+    {
+      "id": "SPRINT-002",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-07",
+      "release": "v0.3.0"
+    }
+  ],
+  "average_velocity": 16,
+  "note": "Sprint 2 closed at 100% — KM/RAG, ClickHouse, voice preload optimizations."
+}

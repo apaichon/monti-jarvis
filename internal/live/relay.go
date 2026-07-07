@@ -11,10 +11,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/libra/monti-jarvis/internal/rag"
 	"github.com/libra/monti-jarvis/internal/workforce"
 )
 
-const liveURL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+const (
+	liveURL          = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+	voiceRAGTimeout  = 1500 * time.Millisecond
+)
 
 type Config struct {
 	APIKey string
@@ -23,10 +27,11 @@ type Config struct {
 
 type Relay struct {
 	cfg Config
+	rag *rag.Service
 }
 
-func New(cfg Config) *Relay {
-	return &Relay{cfg: cfg}
+func New(cfg Config, ragSvc *rag.Service) *Relay {
+	return &Relay{cfg: cfg, rag: ragSvc}
 }
 
 func (r *Relay) Enabled() bool {
@@ -41,6 +46,7 @@ func (r *Relay) Handler() http.HandlerFunc {
 		}
 
 		agent := workforce.Resolve(req.URL.Query().Get("agent"))
+		topic := strings.TrimSpace(req.URL.Query().Get("topic"))
 		client, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
 			log.Printf("voice upgrade: %v", err)
@@ -51,7 +57,7 @@ func (r *Relay) Handler() http.HandlerFunc {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 
-		gem, err := r.dial(ctx, agent)
+		gem, err := r.dial(ctx, agent, topic)
 		if err != nil {
 			log.Printf("gemini live dial: %v", err)
 			_ = client.WriteJSON(serverMsg{Type: "error", Message: "Gemini Live connection failed"})
@@ -164,13 +170,44 @@ func (r *Relay) Handler() http.HandlerFunc {
 	}
 }
 
-func (r *Relay) dial(ctx context.Context, agent workforce.Agent) (*websocket.Conn, error) {
+func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic string) (*websocket.Conn, error) {
+	start := time.Now()
+	prompt := workforce.SystemPrompt(agent)
+
+	type ragOut struct {
+		result rag.Result
+		err    error
+	}
+	ragCh := make(chan ragOut, 1)
+	go func() {
+		if r.rag == nil || !r.rag.Enabled() {
+			ragCh <- ragOut{}
+			return
+		}
+		ragCtx, cancel := context.WithTimeout(ctx, voiceRAGTimeout)
+		defer cancel()
+		result, err := r.rag.RetrieveForVoice(ragCtx, agent.ID, topic)
+		ragCh <- ragOut{result: result, err: err}
+	}()
+
 	endpoint := liveURL + "?key=" + url.QueryEscape(r.cfg.APIKey)
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
-	if err := conn.WriteJSON(r.setup(agent)); err != nil {
+
+	select {
+	case out := <-ragCh:
+		if out.err != nil {
+			log.Printf("voice rag preload: %v (using base prompt)", out.err)
+		} else if r.rag != nil {
+			prompt = r.rag.BuildVoicePrompt(prompt, agent.ID, topic, out.result)
+		}
+	case <-time.After(voiceRAGTimeout):
+		log.Printf("voice rag preload: timeout after %s (using base prompt)", voiceRAGTimeout)
+	}
+
+	if err := conn.WriteJSON(r.setupMessage(agent, prompt)); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
@@ -183,10 +220,11 @@ func (r *Relay) dial(ctx context.Context, agent workforce.Agent) (*websocket.Con
 		_ = conn.Close()
 		return nil, &setupError{Ack: ack}
 	}
+	log.Printf("voice dial agent=%s topic=%s rag+setup=%s", agent.ID, topic, time.Since(start).Round(time.Millisecond))
 	return conn, nil
 }
 
-func (r *Relay) setup(agent workforce.Agent) map[string]any {
+func (r *Relay) setupMessage(agent workforce.Agent, prompt string) map[string]any {
 	voice := strings.TrimSpace(agent.Voice)
 	if voice == "" {
 		voice = "Aoede"
@@ -202,7 +240,7 @@ func (r *Relay) setup(agent workforce.Agent) map[string]any {
 			},
 		},
 		"systemInstruction": map[string]any{
-			"parts": []map[string]any{{"text": workforce.SystemPrompt(agent)}},
+			"parts": []map[string]any{{"text": prompt}},
 		},
 		"inputAudioTranscription":  map[string]any{},
 		"outputAudioTranscription": map[string]any{},

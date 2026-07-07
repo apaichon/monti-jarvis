@@ -9,7 +9,7 @@
     subscribeTurns,
     type CallSession
   } from '$lib/api/calls';
-  import { sendChat, type ChatMessage as ChatHistoryEntry } from '$lib/api/chat';
+  import { sendChat, type ChatMessage as ChatHistoryEntry, type ChatSource } from '$lib/api/chat';
   import { formatInfra, loadInfra } from '$lib/api/infra';
   import { loadWorkforce, type Agent } from '$lib/api/workforce';
   import { GeminiVoice } from '$lib/voice/gemini';
@@ -20,6 +20,8 @@
     content: string;
     initial: string;
     voiceRole?: string;
+    sources?: ChatSource[];
+    missingKm?: boolean;
   };
 
   const topics = [
@@ -151,29 +153,30 @@
     error = '';
     busy = true;
     transcriptKeys.clear();
-    voiceState = 'Opening microphone...';
+    voiceState = 'Connecting to agent...';
     try {
-      const created = await createCall();
+      const gemini = new GeminiVoice();
+      const [created] = await Promise.all([
+        createCall(),
+        gemini.start(selectedAgent.id, topic, {
+          onLive: (v) => {
+            live = v;
+            voiceState = v ? `On call with ${selectedAgent?.name}.` : `Ready to call ${selectedAgent?.name}.`;
+          },
+          onTranscript: (role, text) => {
+            upsertVoiceTurn(role, text);
+            if (session) void persistTurn(session.id, role, text);
+          },
+          onError: (message) => {
+            error = message;
+          }
+        })
+      ]);
+
       session = created;
       chatSessionId = created.id;
-
       unsubscribe = subscribeTurns(created.id, (turn) => {
         upsertVoiceTurn(turn.role, turn.content);
-      });
-
-      const gemini = new GeminiVoice();
-      await gemini.start(selectedAgent.id, {
-        onLive: (v) => {
-          live = v;
-          voiceState = v ? `On call with ${selectedAgent?.name}.` : `Ready to call ${selectedAgent?.name}.`;
-        },
-        onTranscript: (role, text) => {
-          upsertVoiceTurn(role, text);
-          if (session) void persistTurn(session.id, role, text);
-        },
-        onError: (message) => {
-          error = message;
-        }
       });
 
       voice = gemini;
@@ -246,7 +249,11 @@
         history: payloadHistory
       });
       chatSessionId = data.session_id;
-      messages = messages.map((m) => (m.id === thinking.id ? { ...m, content: data.reply } : m));
+      messages = messages.map((m) =>
+        m.id === thinking.id
+          ? { ...m, content: data.reply, sources: data.sources, missingKm: data.missing_km }
+          : m
+      );
       chatHistory = [...chatHistory, { role: 'assistant', content: data.reply }];
     } catch (err) {
       messages = messages.filter((m) => m.id !== thinking.id);
@@ -367,7 +374,18 @@
       {#each messages as msg (msg.id)}
         <div class="msg" class:user={msg.role === 'user'}>
           <div class="dot">{msg.initial}</div>
-          <div class="bubble" class:user={msg.role === 'user'}>{msg.content}</div>
+          <div class="bubble" class:user={msg.role === 'user'}>
+            {msg.content}
+            {#if msg.sources && msg.sources.length > 0}
+              <div class="citations">
+                {#each msg.sources as src (src.chunk_id)}
+                  <span class="citation" title={src.excerpt}>{src.scope} · KB</span>
+                {/each}
+              </div>
+            {:else if msg.missingKm}
+              <div class="citations"><span class="citation warn">No KB match</span></div>
+            {/if}
+          </div>
         </div>
       {/each}
     </section>
