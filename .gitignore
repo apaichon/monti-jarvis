@@ -1,0 +1,8 @@
+.DS_Store
+.env
+.env.*
+!infra/.env.example
+!infra/.env.dev.example
+.run/
+monti-jarvis
+coverage.out

@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monti Call Center</title>
+<link rel="icon" href="/images/monti-logo.png" type="image/png">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #020712;
+  --ink: #f7fbff;
+  --muted: #8fa5bf;
+  --panel: rgb(5 16 31 / 82%);
+  --panel-2: rgb(8 23 42 / 78%);
+  --line: rgb(96 151 210 / 24%);
+  --cyan: #00b7ff;
+  --blue: #006dff;
+  --green: #12f2a5;
+  --red: #ff3b3b;
+  --radius: 18px;
+  --shadow-soft: 0 28px 90px rgb(0 0 0 / 46%);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; margin: 0; }
+html { height: 100%; }
+body {
+  background:
+    radial-gradient(circle at 18% 8%, rgb(0 110 255 / 22%), transparent 30%),
+    radial-gradient(circle at 78% 82%, rgb(169 77 255 / 16%), transparent 34%),
+    linear-gradient(135deg, #02050d 0%, #05101f 46%, #00030a 100%);
+  color: var(--ink);
+  overflow: hidden;
+}
+button, textarea { font: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.app {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(310px, 390px) minmax(0, 920px);
+  gap: clamp(18px, 4vw, 42px);
+  align-items: start;
+  justify-content: center;
+  padding: clamp(16px, 4vw, 44px);
+  overflow: hidden;
+}
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgb(8 20 38 / 88%), rgb(3 11 23 / 94%)),
+    radial-gradient(circle at 50% 14%, rgb(0 132 255 / 16%), transparent 32%);
+  box-shadow: var(--shadow-soft), inset 0 0 0 1px rgb(255 255 255 / 4%);
+}
+.control-panel {
+  height: calc(100vh - (clamp(16px, 4vw, 44px) * 2));
+  min-height: 0;
+  padding: 20px;
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  gap: 18px;
+  overflow: hidden;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark {
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 1px solid rgb(0 183 255 / 45%);
+  box-shadow: 0 0 20px rgb(0 183 255 / 35%);
+  object-fit: cover; flex-shrink: 0;
+}
+.brand h1 { margin: 0; font-size: 17px; letter-spacing: 3px; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.assistant-orb { display: grid; justify-items: center; gap: 14px; padding: 12px 0 4px; }
+.halo {
+  width: 218px; height: 218px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 2px solid var(--assistant-color, var(--blue));
+  box-shadow: 0 0 42px color-mix(in srgb, var(--assistant-color, var(--blue)) 68%, transparent);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe { 50% { transform: scale(1.025); } }
+.portrait {
+  width: 176px; height: 176px; border-radius: 50%; overflow: hidden; position: relative;
+  background:
+    radial-gradient(circle at 50% 28%, var(--skin, #f1c5a8) 0 16%, transparent 17%),
+    radial-gradient(ellipse at 50% 44%, var(--hair, #5b3526) 0 28%, transparent 29%),
+    linear-gradient(160deg, #143257, #07111f 60%);
+}
+.portrait:before {
+  content: ""; position: absolute; inset: 55% 18% 0; border-radius: 20px 20px 0 0;
+  background: linear-gradient(160deg, #dce8ff, #263b5a 36%, #0a1626 37%);
+}
+.portrait:after {
+  content: ""; position: absolute; left: 44px; right: 44px; top: 94px; height: 9px;
+  border-bottom: 2px solid rgb(60 20 20 / 60%); border-radius: 50%;
+}
+.portrait.robot {
+  background:
+    radial-gradient(circle at 38% 36%, #00a8ff 0 7%, transparent 8%),
+    radial-gradient(circle at 62% 36%, #00a8ff 0 7%, transparent 8%),
+    linear-gradient(160deg, #d6e3ef, #607387 46%, #0d1827);
+}
+.portrait.robot:before { background: linear-gradient(160deg, #b8c6d4, #1f344c); }
+.portrait.robot:after { border-bottom-color: #00a8ff; }
+.assistant-name { text-align: center; }
+.assistant-name h2 { margin: 0; font-size: 28px; line-height: 1; }
+.assistant-name p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+.wave { height: 58px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.bar {
+  width: 3px; height: calc(8px + var(--h) * 1px); border-radius: 8px;
+  background: linear-gradient(180deg, transparent, var(--assistant-color, var(--cyan)), var(--blue), transparent);
+  animation: wave 1.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -70ms);
+}
+@keyframes wave { 50% { height: calc(18px + var(--h) * 1.55px); filter: drop-shadow(0 0 8px var(--cyan)); } }
+.voice-card {
+  border: 1px solid rgb(70 132 190 / 24%); border-radius: var(--radius);
+  background: var(--panel-2); padding: 14px; display: grid; gap: 10px;
+}
+.voice-row { display: grid; grid-template-columns: 1fr 116px; gap: 10px; align-items: center; }
+.status-pill {
+  min-height: 38px; border: 1px solid rgb(0 183 255 / 22%); border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums;
+  color: var(--cyan); background: rgb(0 110 255 / 8%);
+}
+.voice-button {
+  min-height: 38px; border: 1px solid rgb(0 183 255 / 40%); border-radius: 999px;
+  background: linear-gradient(180deg, rgb(0 132 255 / 28%), rgb(0 80 180 / 18%));
+  color: var(--ink);
+}
+.voice-button.live {
+  border-color: rgb(255 59 59 / 50%);
+  background: linear-gradient(180deg, rgb(255 59 59 / 28%), rgb(180 30 30 / 18%));
+}
+.voice-state { color: var(--muted); font-size: 13px; min-height: 1.2em; }
+.assistants {
+  min-height: 0; overflow: auto; display: grid; gap: 10px; align-content: start;
+  padding-right: 4px;
+}
+.assistant-card {
+  border: 1px solid rgb(70 132 190 / 20%); border-radius: 16px;
+  background: rgb(4 14 28 / 72%); padding: 12px;
+  display: grid; grid-template-columns: 54px 1fr auto; gap: 10px; align-items: center;
+  text-align: left; color: inherit;
+}
+.assistant-card .portrait { width: 54px; height: 54px; }
+.assistant-card .portrait:before { inset: 58% 20% 0; }
+.assistant-card .portrait:after { left: 16px; right: 16px; top: 30px; height: 5px; }
+.assistant-card.active {
+  border-color: var(--assistant-color, var(--cyan));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--assistant-color, var(--cyan)) 35%, transparent);
+}
+.assistant-meta { color: var(--muted); font-size: 12px; }
+.tag {
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--cyan); border: 1px solid rgb(0 183 255 / 30%); border-radius: 999px; padding: 3px 8px;
+}
+.workspace {
+  height: calc(100vh - (clamp(16px, 4vw, 44px) * 2));
+  min-height: 0; padding: 20px; display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto; gap: 16px; overflow: hidden;
+}
+.topbar { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+.topbar h2 { margin: 0 0 10px; font-size: 22px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab {
+  border: 1px solid rgb(70 132 190 / 24%); border-radius: 999px; padding: 8px 14px;
+  background: transparent; color: var(--muted);
+}
+.tab.active {
+  color: var(--ink); border-color: rgb(0 183 255 / 45%);
+  background: rgb(0 110 255 / 14%);
+}
+.infra { color: var(--muted); font-size: 12px; text-align: right; }
+.chat {
+  min-height: 0; overflow: auto; display: grid; gap: 12px; align-content: start;
+  padding-right: 4px;
+}
+.msg { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; }
+.dot {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700;
+  background: rgb(0 110 255 / 18%); border: 1px solid rgb(0 183 255 / 30%);
+}
+.msg.user .dot { background: rgb(169 77 255 / 18%); border-color: rgb(169 77 255 / 30%); }
+.bubble {
+  border: 1px solid rgb(70 132 190 / 20%); border-radius: 16px;
+  background: rgb(4 14 28 / 72%); padding: 12px 14px; line-height: 1.5;
+}
+.bubble.user { background: rgb(20 12 38 / 72%); }
+.composer-wrap { display: grid; gap: 8px; }
+.composer { display: grid; grid-template-columns: 1fr 96px; gap: 10px; }
+textarea {
+  min-height: 52px; max-height: 140px; resize: vertical;
+  border: 1px solid rgb(70 132 190 / 24%); border-radius: 16px;
+  background: rgb(3 11 23 / 88%); color: var(--ink); padding: 12px 14px;
+}
+.send {
+  border: 1px solid rgb(0 183 255 / 40%); border-radius: 16px;
+  background: linear-gradient(180deg, rgb(0 132 255 / 30%), rgb(0 80 180 / 18%));
+  color: var(--ink);
+}
+.error { color: var(--red); font-size: 13px; min-height: 1.2em; }
+@media (max-width: 980px) {
+  body { overflow: auto; }
+  .app { grid-template-columns: 1fr; height: auto; overflow: visible; }
+  .control-panel, .workspace { height: auto; }
+  .composer { grid-template-columns: 1fr; }
+  .voice-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <aside class="panel control-panel">
+    <header class="brand">
+      <img class="brand-mark" src="/images/monti-logo.png" width="46" height="46" alt="Monti AI Ambassadors">
+      <div>
+        <h1>MONTI</h1>
+        <p>Inbound Call Center · AI Workforce</p>
+      </div>
+    </header>
+
+    <section class="assistant-orb">
+      <div class="halo" id="assistant-halo"><div class="portrait" id="assistant-portrait"></div></div>
+      <div class="assistant-name">
+        <h2 id="assistant-name">Ava</h2>
+        <p id="assistant-trait">General Support</p>
+      </div>
+      <div class="wave" id="voice-wave" aria-hidden="true"></div>
+    </section>
+
+    <section class="voice-card">
+      <div class="voice-row">
+        <div class="status-pill" id="voice-timer">00:00:00</div>
+        <button class="voice-button" id="voice-toggle" type="button">Start call</button>
+      </div>
+      <div class="voice-state" id="voice-state">Select an agent, then start an inbound voice call.</div>
+    </section>
+
+    <section class="assistants" id="assistant-list" aria-label="Choose AI agent"></section>
+  </aside>
+
+  <section class="panel workspace">
+    <header class="topbar">
+      <div>
+        <h2>Caller Desk</h2>
+        <div class="tabs" role="tablist" aria-label="Call topic">
+          <button class="tab active" data-topic="general">General</button>
+          <button class="tab" data-topic="billing">Billing</button>
+          <button class="tab" data-topic="technical">Technical</button>
+        </div>
+      </div>
+      <div class="infra" id="infra-status">checking infra</div>
+    </header>
+
+    <section class="chat" id="stream" aria-live="polite">
+      <div class="msg assistant">
+        <div class="dot">A</div>
+        <div class="bubble">Welcome to Monti Inbound Call Center. Choose an AI agent on the left, then type a question or start a voice call.</div>
+      </div>
+    </section>
+
+    <section class="composer-wrap">
+      <form id="form">
+        <div class="composer">
+          <textarea id="input" placeholder="Ask your question..." autocomplete="off"></textarea>
+          <button class="send" id="send" type="submit">Send</button>
+        </div>
+        <div class="error" id="error"></div>
+      </form>
+      <div class="infra" id="session">New call session</div>
+    </section>
+  </section>
+</main>
+
+<script>
+let agents = [];
+const stream = document.querySelector("#stream");
+const form = document.querySelector("#form");
+const input = document.querySelector("#input");
+const send = document.querySelector("#send");
+const errorBox = document.querySelector("#error");
+const sessionEl = document.querySelector("#session");
+const infraEl = document.querySelector("#infra-status");
+const voiceToggle = document.querySelector("#voice-toggle");
+const voiceState = document.querySelector("#voice-state");
+const voiceTimer = document.querySelector("#voice-timer");
+const assistantList = document.querySelector("#assistant-list");
+const assistantHalo = document.querySelector("#assistant-halo");
+const assistantPortrait = document.querySelector("#assistant-portrait");
+const assistantName = document.querySelector("#assistant-name");
+const assistantTrait = document.querySelector("#assistant-trait");
+const voiceWave = document.querySelector("#voice-wave");
+
+let sessionId = "";
+let topic = "general";
+let selectedAgent = null;
+let voiceStartedAt = 0;
+let timerID = 0;
+const history = [];
+const voice = { ws: null, micStream: null, captureCtx: null, playbackCtx: null, source: null, recorder: null, player: null, live: false };
+
+function makeWave(container, count = 42) {
+  container.innerHTML = "";
+  for (let i = 0; i < count; i++) {
+    const bar = document.createElement("span");
+    bar.className = "bar";
+    bar.style.setProperty("--i", i);
+    bar.style.setProperty("--h", 5 + Math.round(Math.abs(Math.sin(i * .67)) * 32));
+    container.append(bar);
+  }
+}
+function portraitClass(a) { return `portrait${a.robot ? " robot" : ""}`; }
+function portraitStyle(a) { return `--assistant-color:${a.color};--skin:${a.skin || "#d9e3ef"};--hair:${a.hair || "#3b4f66"}`; }
+function miniWave(color) {
+  return `<div class="wave" style="height:20px;justify-content:flex-start;--assistant-color:${color}">${Array.from({ length: 16 }, (_, i) => `<span class="bar" style="--i:${i};--h:${2 + Math.round(Math.abs(Math.sin(i)) * 10)}"></span>`).join("")}</div>`;
+}
+function renderAssistants() {
+  assistantList.replaceChildren(...agents.map((a) => {
+    const button = document.createElement("button");
+    button.className = `assistant-card${selectedAgent && a.id === selectedAgent.id ? " active" : ""}`;
+    button.type = "button";
+    button.innerHTML = `
+      <div class="${portraitClass(a)}" style="${portraitStyle(a)}"></div>
+      <div>
+        <div><strong>${a.name}</strong>${a.popular ? ' <span class="tag">Popular</span>' : ""}</div>
+        <div class="assistant-meta">${a.role}</div>
+        <div class="assistant-meta">${a.trait}</div>
+        ${miniWave(a.color)}
+      </div>
+      <span class="tag">Select</span>`;
+    button.addEventListener("click", () => {
+      if (voice.live) stopVoice();
+      selectedAgent = a;
+      applyAssistant();
+      renderAssistants();
+      addAgentGreeting();
+    });
+    return button;
+  }));
+}
+function applyAssistant() {
+  if (!selectedAgent) return;
+  assistantName.textContent = selectedAgent.name;
+  assistantTrait.textContent = `${selectedAgent.role} · ${selectedAgent.trait}`;
+  assistantPortrait.className = portraitClass(selectedAgent);
+  assistantPortrait.setAttribute("style", portraitStyle(selectedAgent));
+  assistantHalo.style.setProperty("--assistant-color", selectedAgent.color);
+  voiceWave.style.setProperty("--assistant-color", selectedAgent.color);
+}
+function addAgentGreeting() {
+  if (!selectedAgent?.greeting) return;
+  addMessage("assistant", selectedAgent.greeting, selectedAgent.name[0]);
+}
+function agentInitial(name) { return (name || "A").slice(0, 1).toUpperCase(); }
+
+document.querySelectorAll(".tab").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+    button.classList.add("active");
+    topic = button.dataset.topic;
+  });
+});
+voiceToggle.addEventListener("click", () => voice.live ? stopVoice() : startVoice());
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!selectedAgent) {
+    errorBox.textContent = "Select an AI agent first.";
+    return;
+  }
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  errorBox.textContent = "";
+  addMessage("user", text, "C");
+  const payloadHistory = history.slice();
+  history.push({ role: "user", content: text });
+  send.disabled = true;
+  const thinking = addMessage("assistant", "One moment...", agentInitial(selectedAgent.name));
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        agent_id: selectedAgent.id,
+        topic,
+        message: text,
+        history: payloadHistory
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Chat failed");
+    sessionId = data.session_id;
+    sessionEl.textContent = `Call ${sessionId.slice(0, 8)} · ${selectedAgent.name}`;
+    thinking.querySelector(".bubble").textContent = data.reply;
+    history.push({ role: "assistant", content: data.reply });
+  } catch (err) {
+    thinking.remove();
+    history.pop();
+    errorBox.textContent = err.message;
+  } finally {
+    send.disabled = false;
+    input.focus();
+  }
+});
+input.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+
+async function startVoice() {
+  if (voice.live) return;
+  if (!selectedAgent) {
+    errorBox.textContent = "Select an AI agent first.";
+    return;
+  }
+  errorBox.textContent = "";
+  voiceToggle.disabled = true;
+  voiceState.textContent = "Opening microphone...";
+  voiceStartedAt = Date.now();
+  startTimer();
+  try {
+    voice.micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    voice.captureCtx = new AudioContext({ sampleRate: 16000 });
+    voice.playbackCtx = new AudioContext({ sampleRate: 24000 });
+    await Promise.all([voice.captureCtx.audioWorklet.addModule("/recorder.js"), voice.playbackCtx.audioWorklet.addModule("/player.js")]);
+    voice.source = voice.captureCtx.createMediaStreamSource(voice.micStream);
+    voice.recorder = new AudioWorkletNode(voice.captureCtx, "recorder-processor");
+    voice.player = new AudioWorkletNode(voice.playbackCtx, "player-processor");
+    voice.source.connect(voice.recorder);
+    voice.player.connect(voice.playbackCtx.destination);
+    const scheme = location.protocol === "https:" ? "wss" : "ws";
+    voice.ws = new WebSocket(`${scheme}://${location.host}/ws/voice?agent=${encodeURIComponent(selectedAgent.id)}`);
+    voice.ws.addEventListener("open", () => {
+      voice.live = true;
+      voiceToggle.disabled = false;
+      voiceToggle.classList.add("live");
+      voiceToggle.textContent = "End call";
+      voiceState.textContent = `On call with ${selectedAgent.name}.`;
+    });
+    voice.ws.addEventListener("message", (event) => handleVoiceMessage(event.data));
+    voice.ws.addEventListener("close", () => cleanupVoice(false));
+    voice.ws.addEventListener("error", () => { errorBox.textContent = "Voice connection failed."; });
+    voice.recorder.port.onmessage = (event) => {
+      if (!(event.data instanceof Float32Array)) return;
+      if (!voice.ws || voice.ws.readyState !== WebSocket.OPEN) return;
+      voice.ws.send(JSON.stringify({ type: "audio", data: floatToBase64PCM16(event.data) }));
+    };
+  } catch (err) {
+    cleanupVoice(true);
+    errorBox.textContent = err.message;
+  } finally {
+    voiceToggle.disabled = false;
+  }
+}
+function stopVoice() {
+  if (voice.ws && voice.ws.readyState === WebSocket.OPEN) {
+    voice.ws.send(JSON.stringify({ type: "end" }));
+    voice.ws.close();
+  }
+  cleanupVoice(true);
+}
+function cleanupVoice(resetTimer) {
+  voice.live = false;
+  voiceToggle.classList.remove("live");
+  voiceToggle.textContent = "Start call";
+  voiceState.textContent = selectedAgent ? `Ready to call ${selectedAgent.name}.` : "Select an agent, then start an inbound voice call.";
+  if (resetTimer) stopTimer();
+  if (voice.micStream) voice.micStream.getTracks().forEach((track) => track.stop());
+  if (voice.captureCtx) voice.captureCtx.close().catch(() => {});
+  if (voice.playbackCtx) voice.playbackCtx.close().catch(() => {});
+  voice.ws = null; voice.micStream = null; voice.captureCtx = null; voice.playbackCtx = null; voice.source = null; voice.recorder = null; voice.player = null;
+}
+function startTimer() {
+  clearInterval(timerID);
+  updateTimer();
+  timerID = setInterval(updateTimer, 1000);
+}
+function stopTimer() {
+  clearInterval(timerID);
+  voiceTimer.textContent = "00:00:00";
+}
+function updateTimer() {
+  const seconds = Math.floor((Date.now() - voiceStartedAt) / 1000);
+  voiceTimer.textContent = new Date(seconds * 1000).toISOString().slice(11, 19);
+}
+function handleVoiceMessage(raw) {
+  const msg = JSON.parse(raw);
+  if (msg.type === "audio" && msg.data && voice.player) return voice.player.port.postMessage(base64PCM16ToFloat(msg.data));
+  if (msg.type === "interrupted" && voice.player) return voice.player.port.postMessage("flush");
+  if (msg.type === "transcript" && msg.text) {
+    const role = msg.role === "assistant" ? "assistant" : "user";
+    const initial = role === "assistant" ? agentInitial(selectedAgent?.name) : "C";
+    appendOrMergeTranscript(role, msg.text, initial);
+  }
+  if (msg.type === "text" && msg.text) addMessage("assistant", msg.text, agentInitial(selectedAgent?.name));
+  if (msg.type === "error") errorBox.textContent = msg.message || "Voice error.";
+}
+function appendOrMergeTranscript(role, text, initial) {
+  const last = stream.lastElementChild;
+  if (last?.dataset?.voiceRole === role) {
+    last.querySelector(".bubble").textContent = text;
+  } else {
+    const row = addMessage(role, text, initial);
+    row.dataset.voiceRole = role;
+  }
+}
+function addMessage(role, content, initial) {
+  const row = document.createElement("div");
+  row.className = `msg ${role}`;
+  row.innerHTML = `<div class="dot">${initial || (role === "assistant" ? "A" : "C")}</div><div class="bubble ${role === "user" ? "user" : ""}"></div>`;
+  row.querySelector(".bubble").textContent = content;
+  stream.append(row);
+  stream.scrollTop = stream.scrollHeight;
+  return row;
+}
+function floatToBase64PCM16(float32) {
+  const bytes = new Uint8Array(float32.length * 2);
+  const view = new DataView(bytes.buffer);
+  for (let i = 0; i < float32.length; i++) {
+    const sample = Math.max(-1, Math.min(1, float32[i]));
+    view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+  }
+  return bytesToBase64(bytes);
+}
+function base64PCM16ToFloat(base64) {
+  const bytes = base64ToBytes(base64);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out = new Float32Array(bytes.byteLength / 2);
+  for (let i = 0; i < out.length; i++) out[i] = view.getInt16(i * 2, true) / 0x8000;
+  return out;
+}
+function bytesToBase64(bytes) {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(binary);
+}
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+async function loadInfra() {
+  try {
+    const res = await fetch("/api/infra");
+    const data = await res.json();
+    infraEl.textContent = `Postgres ${data.postgres} · Redis ${data.redis} · MinIO ${data.minio}`;
+  } catch {
+    infraEl.textContent = "Infra unavailable";
+  }
+}
+async function loadWorkforce() {
+  const res = await fetch("/api/workforce");
+  const data = await res.json();
+  agents = data.agents || [];
+  selectedAgent = agents.find((a) => a.popular) || agents[0] || null;
+  makeWave(voiceWave);
+  renderAssistants();
+  applyAssistant();
+}
+
+makeWave(voiceWave);
+loadWorkforce().then(() => loadInfra());
+</script>
+</body>
+</html>

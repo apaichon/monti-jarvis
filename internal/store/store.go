@@ -1,0 +1,161 @@
+package store
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/libra/monti-jarvis/internal/env"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/redis/go-redis/v9"
+)
+
+type Store struct {
+	cfg   env.Config
+	pg    *pgxpool.Pool
+	redis *redis.Client
+	minio *minio.Client
+}
+
+type Health struct {
+	Postgres string `json:"postgres"`
+	Redis    string `json:"redis"`
+	Minio    string `json:"minio"`
+}
+
+func Open(ctx context.Context, cfg env.Config) (*Store, []string) {
+	s := &Store{cfg: cfg}
+	var warnings []string
+
+	if cfg.PostgresURL != "" {
+		pool, err := pgxpool.New(ctx, cfg.PostgresURL)
+		if err != nil {
+			warnings = append(warnings, "postgres config: "+err.Error())
+		} else if err := pool.Ping(ctx); err != nil {
+			warnings = append(warnings, "postgres ping: "+err.Error())
+			pool.Close()
+		} else {
+			s.pg = pool
+			if err := s.ensureSchema(ctx); err != nil {
+				warnings = append(warnings, "postgres schema: "+err.Error())
+			}
+		}
+	}
+
+	if cfg.RedisURL != "" {
+		opts, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			warnings = append(warnings, "redis config: "+err.Error())
+		} else {
+			client := redis.NewClient(opts)
+			if err := client.Ping(ctx).Err(); err != nil {
+				warnings = append(warnings, "redis ping: "+err.Error())
+				_ = client.Close()
+			} else {
+				s.redis = client
+			}
+		}
+	}
+
+	if cfg.MinioEndpoint != "" {
+		client, err := minio.New(cfg.MinioEndpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
+			Secure: cfg.MinioUseSSL,
+		})
+		if err != nil {
+			warnings = append(warnings, "minio config: "+err.Error())
+		} else {
+			s.minio = client
+		}
+	}
+
+	return s, warnings
+}
+
+func (s *Store) Close() {
+	if s.pg != nil {
+		s.pg.Close()
+	}
+	if s.redis != nil {
+		_ = s.redis.Close()
+	}
+}
+
+func (s *Store) Health(ctx context.Context) Health {
+	h := Health{Postgres: "disabled", Redis: "disabled", Minio: "disabled"}
+	if s.pg != nil {
+		h.Postgres = "ok"
+		if err := s.pg.Ping(ctx); err != nil {
+			h.Postgres = err.Error()
+		}
+	}
+	if s.redis != nil {
+		h.Redis = "ok"
+		if err := s.redis.Ping(ctx).Err(); err != nil {
+			h.Redis = err.Error()
+		}
+	}
+	if s.minio != nil {
+		h.Minio = "ok"
+		exists, err := s.minio.BucketExists(ctx, s.cfg.MinioBucket)
+		if err != nil {
+			h.Minio = err.Error()
+		} else if !exists {
+			h.Minio = "bucket missing: " + s.cfg.MinioBucket
+		}
+	}
+	return h
+}
+
+func (s *Store) SaveExchange(ctx context.Context, sessionID, agentID, userText, assistantText string) {
+	if s.pg != nil {
+		_, _ = s.pg.Exec(ctx,
+			fmt.Sprintf(`INSERT INTO %s.calls (id, agent_id, updated_at) VALUES ($1, $2, now())
+ON CONFLICT (id) DO UPDATE SET agent_id = EXCLUDED.agent_id, updated_at = now()`, quoteIdent(s.cfg.PostgresSchema)),
+			sessionID, agentID,
+		)
+		_, _ = s.pg.Exec(ctx,
+			fmt.Sprintf(`INSERT INTO %s.messages (call_id, role, content) VALUES ($1, 'caller', $2), ($1, 'agent', $3)`, quoteIdent(s.cfg.PostgresSchema)),
+			sessionID, userText, assistantText,
+		)
+	}
+	if s.redis != nil {
+		key := s.cfg.RedisPrefix + "call:" + sessionID
+		pipe := s.redis.Pipeline()
+		pipe.HSet(ctx, key, "updated_at", time.Now().UTC().Format(time.RFC3339), "agent_id", agentID)
+		pipe.Expire(ctx, key, 24*time.Hour)
+		_, _ = pipe.Exec(ctx)
+	}
+}
+
+func (s *Store) ensureSchema(ctx context.Context) error {
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	_, err := s.pg.Exec(ctx, fmt.Sprintf(`
+CREATE SCHEMA IF NOT EXISTS %s;
+CREATE TABLE IF NOT EXISTS %s.calls (
+  id text PRIMARY KEY,
+  agent_id text NOT NULL DEFAULT 'ava',
+  title text NOT NULL DEFAULT 'Inbound call',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS %s.messages (
+  id bigserial PRIMARY KEY,
+  call_id text NOT NULL REFERENCES %s.calls(id) ON DELETE CASCADE,
+  role text NOT NULL CHECK (role IN ('caller', 'agent')),
+  content text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);`, schema, schema, schema, schema))
+	return err
+}
+
+func quoteIdent(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = "callcenter"
+	}
+	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
+}
