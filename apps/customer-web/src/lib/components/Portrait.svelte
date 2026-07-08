@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Agent } from '$lib/api/workforce';
+  import { lipPresetFor, mouthOpenFromLevel } from '$lib/lipsync/presets';
 
   let {
     agent,
@@ -14,65 +15,93 @@
   } = $props();
 
   const src = $derived(agent.image || `/images/${agent.id}.jpg`);
-  const style = $derived(`--assistant-color:${agent.color}`);
+  const preset = $derived(lipPresetFor(agent.id, agent.robot));
   const mouthOpen = $derived(
-    lipSync ? Math.min(1, Math.max(0, lipLevel * 14)) : 0
+    lipSync && !mini ? mouthOpenFromLevel(lipLevel, preset) : 0
   );
-  const talking = $derived(lipSync && mouthOpen > 0.04);
+  const talking = $derived(mouthOpen > 0.035);
+  const useJawSync = $derived(lipSync && !mini);
+
+  const jawStyle = $derived(
+    [
+      `--mouth-line:${(preset.mouthLine * 100).toFixed(1)}%`,
+      `--mouth-open:${mouthOpen.toFixed(3)}`,
+      `--jaw-drop:${(preset.jawDrop * 100).toFixed(1)}%`,
+      `--jaw-scale:${preset.jawScale}`,
+      `--mouth-width:${1 + mouthOpen * preset.mouthWidth}`,
+      `--assistant-color:${agent.color}`
+    ].join(';')
+  );
 </script>
 
 <div
   class="portrait photo {mini ? 'mini' : ''}"
   class:talking
   class:robot={agent.robot}
-  style="{style};--mouth-open:{mouthOpen}"
+  style={jawStyle}
+  role="img"
+  aria-label={agent.name}
 >
-  <img {src} alt={agent.name} loading="lazy" />
-  {#if lipSync}
-    <div class="lip-sync" aria-hidden="true">
-      <span class="lip-mouth"></span>
+  {#if useJawSync}
+    <div class="face-stack" aria-hidden="true">
+      <div class="face-layer face-upper" style:background-image="url({src})"></div>
+      <div class="face-layer face-lower" style:background-image="url({src})"></div>
     </div>
+  {:else}
+    <img {src} alt={agent.name} loading="lazy" />
   {/if}
 </div>
 
 <style>
+  .portrait {
+    overflow: hidden;
+  }
+
   .portrait.talking {
     animation: none;
   }
 
-  .portrait.talking img {
-    transform-origin: 50% 72%;
-    transition: transform 45ms ease-out;
-    transform: scaleY(calc(1 + var(--mouth-open) * 0.018));
-  }
-
-  .lip-sync {
+  .face-stack {
     position: absolute;
     inset: 0;
-    pointer-events: none;
+    border-radius: inherit;
+    overflow: hidden;
   }
 
-  .lip-mouth {
+  .face-layer {
     position: absolute;
-    left: 36%;
-    right: 36%;
-    bottom: 21%;
-    height: 7%;
-    border-radius: 999px;
-    background: rgb(28 14 18 / 72%);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
-    transform: scaleY(calc(0.25 + var(--mouth-open) * 1.55));
-    transform-origin: center;
-    transition: transform 45ms ease-out;
-    opacity: calc(0.35 + var(--mouth-open) * 0.65);
+    inset: 0;
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+    will-change: transform;
   }
 
-  .portrait.robot .lip-mouth {
-    left: 40%;
-    right: 40%;
-    bottom: 24%;
-    height: 5%;
-    background: rgb(0 168 255 / 55%);
-    box-shadow: 0 0 8px rgb(0 168 255 / 45%);
+  /* Same photo — upper face fixed at the mouth seam */
+  .face-upper {
+    z-index: 2;
+    clip-path: inset(0 0 calc(100% - var(--mouth-line)) 0);
   }
+
+  /* Lower jaw: opens using the real pixels below the mouth line */
+  .face-lower {
+    z-index: 1;
+    clip-path: inset(var(--mouth-line) 0 0 0);
+    transform-origin: 50% 0%;
+    transform: translateY(calc(var(--mouth-open) * var(--jaw-drop)))
+      scale(var(--mouth-width), calc(1 + var(--mouth-open) * var(--jaw-scale)));
+    transition: transform 40ms ease-out;
+  }
+
+  .portrait.robot .face-lower {
+    filter: brightness(calc(1 + var(--mouth-open) * 0.08));
+  }
+
+  .portrait.photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
 </style>

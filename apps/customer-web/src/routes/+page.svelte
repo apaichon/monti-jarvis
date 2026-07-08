@@ -94,7 +94,7 @@
   }
 
   function setAgentLipLevel(level: number) {
-    lipLevel = lipLevel * 0.6 + level * 0.4;
+    lipLevel = lipLevel * 0.55 + level * 0.45;
   }
 
   function resetLipLevel() {
