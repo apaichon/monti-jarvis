@@ -40,5 +40,6 @@ Out:
 ## Links
 
 - Sprint: [SPRINT-005](../03-sprints/SPRINT-005.md)
+- Design: [10-avatars-spec.md](../02-design/10-avatars-spec.md) · [04-api-spec.md](../02-design/04-api-spec.md) · [05-ux-ui.md](../02-design/05-ux-ui.md) § P7–P10
 - Roadmap: Sprint 5 · Phase B
 - Depends on: [FEAT-0003](FEAT-0003-auth-rbac.md), [FEAT-0004](FEAT-0004-packages-entitlements.md)

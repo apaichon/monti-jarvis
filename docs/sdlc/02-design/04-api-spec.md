@@ -3,7 +3,7 @@ id: DES-0004
 title: API Specification
 status: approved
 updated: 2026-07-08
-sprint: SPRINT-004
+sprint: SPRINT-005
 ---
 
 # API Specification — Monti Jarvis
@@ -11,6 +11,7 @@ sprint: SPRINT-004
 **Base URL:** `http://localhost:8091`  
 **Auth:** `AUTH_DISABLED=true` (default) — same as v0.3.0 for customer paths. When `AUTH_DISABLED=false`, use `Authorization: Bearer <access_token>` on protected routes. See [06-auth-spec.md](06-auth-spec.md).  
 **Packages (Sprint 4):** Platform catalog + entitlements require auth on — see [08-packages-spec.md](08-packages-spec.md).  
+**Avatars (Sprint 5):** Platform avatar catalog + tenant assignment — see [10-avatars-spec.md](10-avatars-spec.md).
 **CORS:** `*` — methods `GET, POST, PUT, DELETE, OPTIONS`; headers `Content-Type`, `Authorization`
 
 ## Health & infra
@@ -27,9 +28,10 @@ Liveness + feature flags.
   "livekit": true,
   "nats": true,
   "rag": true,
-  "sprint": "SPRINT-004",
+  "sprint": "SPRINT-005",
   "auth_disabled": true,
-  "customer_web": "apps/customer-web/build"
+  "customer_web": "apps/customer-web/build",
+  "platform_admin_web": "apps/platform-admin-web/build"
 }
 ```
 
@@ -55,6 +57,14 @@ Dependency health.
 
 ### `GET /api/workforce`
 
+**Auth:** Public (no Bearer required). **Tenant resolution (Sprint 5):** `X-Tenant-Id` header, JWT `tenant_id` when Bearer present, else `DEMO_TENANT_ID` (`demo`).
+
+Returns active avatars assigned to the resolved tenant from `ai_avatars` + `tenant_avatar_assignments`. If the tenant has **zero** active assignments, falls back to static `internal/workforce` catalog (backward compatible).
+
+| Header | Type | Description |
+| --- | --- | --- |
+| `X-Tenant-Id` | string | Optional; used when `AUTH_DISABLED=true` or `platform_admin` without tenant in token |
+
 ```json
 {
   "agents": [
@@ -67,11 +77,13 @@ Dependency health.
       "image": "/images/ava.jpg",
       "voice": "Aoede",
       "popular": true,
-      "greeting": "..."
+      "greeting": "Thank you for calling..."
     }
   ]
 }
 ```
+
+DB field `image_url` is exposed as `image` in JSON. Optional `flags` keys (`robot`, `skin`, `hair`) merge into agent objects when set.
 
 ## Chat (text + RAG)
 
@@ -205,9 +217,11 @@ Bearer required → `{id, email, display_name, role, tenant_id}`.
 | `/api/platform/rule-schemas` | `platform_admin` |
 | `/api/platform/packages*` | `platform_admin` |
 | `/api/platform/tenants/{id}/entitlement` | `platform_admin` |
+| `/api/platform/avatars*` | `platform_admin` |
+| `/api/platform/tenants/{id}/avatars*` | `platform_admin` |
 | `GET /api/entitlements/me` | `tenant_admin`, `platform_admin` |
 
-Public unchanged: `/api/chat`, `/ws/voice`, `GET /api/km/*`, `/api/workforce`.
+Public unchanged: `/api/chat`, `/ws/voice`, `GET /api/km/*`, `GET /api/workforce`.
 
 ## Packages & entitlements (Sprint 4)
 
@@ -365,6 +379,125 @@ Revokes any prior `active` row, inserts new `active` entitlement, invalidates Re
 | `409` | Slug conflict, archive blocked, duplicate active entitlement |
 | `503` | Auth not configured (`AUTH_DISABLED` misconfiguration for these routes) |
 
+## Avatars (Sprint 5)
+
+Requires `AUTH_DISABLED=false`. Platform routes: `Authorization: Bearer <access_token>`. See [10-avatars-spec.md](10-avatars-spec.md).
+
+### `GET /api/platform/avatars`
+
+**Role:** `platform_admin`
+
+| Query | Type | Description |
+| --- | --- | --- |
+| `status` | string | Optional: `draft`, `active`, `archived` |
+
+**Response 200:**
+
+```json
+{
+  "avatars": [
+    {
+      "id": "ava",
+      "slug": "ava",
+      "name": "Ava",
+      "role": "General Support",
+      "trait": "Warm & Patient",
+      "color": "#008cff",
+      "voice": "Aoede",
+      "image_url": "/images/ava.jpg",
+      "greeting": "Thank you for calling...",
+      "status": "active",
+      "flags": { "popular": true, "skin": "#f0bd9b", "hair": "#5a3428" }
+    }
+  ]
+}
+```
+
+### `POST /api/platform/avatars`
+
+**Role:** `platform_admin`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `slug` | string | yes | Unique lowercase id |
+| `name` | string | yes | Display name |
+| `role` | string | yes | Role label |
+| `trait` | string | no | Personality |
+| `color` | string | no | Hex accent |
+| `voice` | string | yes | Gemini voice name |
+| `image_url` | string | no | Default `/images/{slug}.jpg` |
+| `greeting` | string | yes | Opening line |
+| `status` | string | no | Default `draft` |
+| `flags` | object | no | `popular`, `robot`, `skin`, `hair` |
+
+**Response 201:** avatar object · **409** slug exists
+
+### `GET /api/platform/avatars/{id}`
+
+**Role:** `platform_admin` · **200** avatar · **404** missing
+
+### `PUT /api/platform/avatars/{id}`
+
+**Role:** `platform_admin` · Partial body · **200** updated · **409** if archived with active tenant assignments
+
+### `DELETE /api/platform/avatars/{id}`
+
+**Role:** `platform_admin` · Soft-archive · **409** if active tenant assignments exist
+
+### `GET /api/platform/tenants/{tenant_id}/avatars`
+
+**Role:** `platform_admin`
+
+**Response 200:**
+
+```json
+{
+  "tenant_id": "demo",
+  "assignments": [
+    {
+      "avatar_id": "ava",
+      "status": "active",
+      "avatar": {
+        "id": "ava",
+        "name": "Ava",
+        "role": "General Support",
+        "status": "active"
+      }
+    }
+  ],
+  "cap": {
+    "max_ai_employees": 2,
+    "active_count": 4
+  }
+}
+```
+
+`cap` is informational for UI; assign still returns `409` when over limit.
+
+### `POST /api/platform/tenants/{tenant_id}/avatars`
+
+**Role:** `platform_admin`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `avatar_id` | string | yes | Target catalog avatar |
+
+**Response 200:** assignment + avatar metadata · **404** unknown tenant/avatar · **409** at `max_ai_employees` cap
+
+### `DELETE /api/platform/tenants/{tenant_id}/avatars/{avatar_id}`
+
+**Role:** `platform_admin` · Sets assignment `disabled` · **404** no assignment
+
+### Avatars error codes
+
+| Code | When |
+| --- | --- |
+| `401` | Missing/invalid Bearer |
+| `403` | Role not allowed |
+| `404` | Avatar, tenant, or assignment not found |
+| `409` | Slug conflict, archive blocked, `max_ai_employees` exceeded |
+| `503` | Auth not configured |
+
 ## Knowledge base (per avatar)
 
 ### `GET /api/km/agents/{agent_id}`
@@ -409,4 +542,4 @@ Platform admin UI calls JSON APIs on same origin (`8091`); tokens in `sessionSto
 {"error": "human-readable message"}
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

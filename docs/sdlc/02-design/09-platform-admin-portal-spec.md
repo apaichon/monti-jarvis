@@ -11,7 +11,8 @@ owner: SA
 
 **Sprint:** SPRINT-004 · **Release target:** v0.5.0  
 **Feature:** [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md)  
-**Depends on:** [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md)
+**Depends on:** [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md)  
+**Sprint 5 extension:** Avatars nav + routes — [10-avatars-spec.md](10-avatars-spec.md), [05-ux-ui.md](05-ux-ui.md) § P7–P10
 
 ## 1. Goals
 

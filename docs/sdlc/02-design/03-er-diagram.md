@@ -3,7 +3,7 @@ id: DES-0003
 title: Entity Relationship Diagram
 status: approved
 updated: 2026-07-08
-sprint: SPRINT-004
+sprint: SPRINT-005
 ---
 
 # ER Diagram — Monti Jarvis
@@ -21,7 +21,7 @@ Every durable Postgres table in `callcenter` carries four audit fields (migratio
 | `created_by` | `text` | Actor user id; default `'system'`; set from JWT via `internal/auditctx` |
 | `updated_by` | `text` | Last mutator user id; default `'system'` |
 
-**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
+**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `tenant_avatar_assignments`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
 
 ClickHouse analytics tables use `created_at`, `updated_at`, `created_by`, `updated_by` (`002_audit_columns_clickhouse` + `EnsureAuthEventsSchema`).
 
@@ -35,6 +35,8 @@ erDiagram
   tenants ||--o{ call_sessions : owns
   tenants ||--o{ knowledge_documents : owns
   tenants ||--o{ tenant_entitlements : entitled
+  tenants ||--o{ tenant_avatar_assignments : assigns
+  ai_avatars ||--o{ tenant_avatar_assignments : enabled_for
   package_rule_schemas ||--o{ package_limits : shapes
   package_rule_schemas ||--o{ tenant_entitlements : snapshot_schema
   packages ||--o{ tenant_entitlements : grants
@@ -275,6 +277,34 @@ erDiagram
     text created_by
     text updated_by
   }
+
+  ai_avatars {
+    text id PK
+    text slug UK
+    text name
+    text role
+    text trait
+    text color
+    text voice
+    text image_url
+    text greeting
+    text status
+    jsonb flags
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_avatar_assignments {
+    text tenant_id FK
+    text avatar_id FK
+    text status
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
 ```
 
 ### Table notes
@@ -299,6 +329,8 @@ erDiagram
 | `packages` | Commercial catalog — Starter/Pro/Enterprise *(Sprint 4)* |
 | `package_limits` | `rules` jsonb per package; shape from `package_rule_schemas` *(Sprint 4)* |
 | `tenant_entitlements` | Assignment + `rules_snapshot` at bind time *(Sprint 4)* |
+| `ai_avatars` | Platform-managed avatar catalog *(Sprint 5)* |
+| `tenant_avatar_assignments` | Which avatars each tenant may use *(Sprint 5)* |
 
 ### Indexes
 
@@ -306,6 +338,7 @@ erDiagram
 - `knowledge_chunks (tenant_id, agent_id, embedding_model_id, index_version)`
 - `knowledge_index_runs (document_id, embedding_model_id, index_version)`
 - `call_sessions (tenant_id, voice_provider_id)` *(planned)*
+- `tenant_avatar_assignments (tenant_id) WHERE status = 'active'` *(Sprint 5)*
 
 ### KM versioning model (planned)
 
@@ -470,9 +503,11 @@ monti-jarvis/
 | `monti_jarvis:call:active:{id}` | 24h | tenant_id, room_name, status, started_at |
 | `monti_jarvis:entitlement:{tenant_id}` | 15m (env) | package slug, status, effective limits JSON *(Sprint 4)* |
 
-## Workforce (in-memory, not DB)
+## Workforce (Sprint 5 — DB + fallback)
 
-Agents `ava`, `max`, `luna`, `neo` defined in `internal/workforce/workforce.go` — Sprint 21 will move to Postgres catalog.
+- **Primary:** `ai_avatars` + `tenant_avatar_assignments` → `GET /api/workforce` per tenant.
+- **Fallback:** `internal/workforce/workforce.go` static catalog when tenant has zero active assignments.
+- **Sprint 21:** `ai_employee_configs` provider bindings; may extend or alias `ai_avatars`.
 
 ## Implementation phases
 
@@ -488,10 +523,11 @@ Agents `ava`, `max`, `luna`, `neo` defined in `internal/workforce/workforce.go` 
 
 | Sprint | Tables |
 | --- | --- |
-| 4 ✅ (v0.5.0 target) | `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements` |
+| 4 ✅ v0.5.0 | `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements` |
+| 5 ✅ v0.6.0 target | `ai_avatars`, `tenant_avatar_assignments` |
 | 6+ | `tenant_registrations`, `brands` |
 | 15 | `km_scope_assignments`, tenant-driven re-index |
-| 21 | `ai_employees`, `ai_employee_configs` (full catalog) |
+| 21 | `ai_employee_configs` provider bindings (extends Sprint 5 catalog) |
 | 22 | `conversation_records` (ClickHouse denorm) |
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.

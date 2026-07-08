@@ -12,7 +12,7 @@
 | Official Sprint 2 | **Shipped v0.3.0** — Customer: KM and Scope (ClickHouse RAG, per-avatar KB, citations) |
 | Official Sprint 3 | **Shipped v0.4.0** — Backend: Auth (JWT, RBAC, Redis cache, NATS events) |
 | Official Sprint 4 | **Shipped v0.5.0** — Platform Admin: Portal + Packages (login, profile, catalog UI) |
-| Official Sprint 5 | **In progress** — Platform Admin: Avatars (catalog + tenant assignment) |
+| Official Sprint 5 | **In progress** — Platform Admin: Avatars (catalog + tenant assignment) · design approved |
 
 ---
 

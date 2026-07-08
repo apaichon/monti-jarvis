@@ -3,7 +3,7 @@ id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
 updated: 2026-07-08
-sprint: SPRINT-004
+sprint: SPRINT-005
 ---
 
 # UX/UI — ASCII Wireframes
@@ -158,6 +158,10 @@ Customer portal `/` unchanged. Requires `AUTH_DISABLED=false` for login.
 | Package edit | `/admin/packages/[id]` | `GET/PUT/DELETE /api/platform/packages/{id}` |
 | Profile | `/admin/profile` | `GET /api/auth/me` |
 | Tenant entitlement | `/admin/tenants/[id]/entitlement` | `GET/POST/DELETE /api/platform/tenants/{id}/entitlement` |
+| Avatars list *(S5)* | `/admin/avatars` | `GET /api/platform/avatars` |
+| Avatar create *(S5)* | `/admin/avatars/new` | `POST /api/platform/avatars` |
+| Avatar edit *(S5)* | `/admin/avatars/[id]` | `GET/PUT/DELETE /api/platform/avatars/{id}` |
+| Tenant avatars *(S5)* | `/admin/tenants/[id]/avatars` | `GET/POST/DELETE /api/platform/tenants/{id}/avatars*` |
 
 ### Design tokens (platform admin)
 
@@ -534,6 +538,126 @@ Flow 4 — Customer portal (unchanged)
 | API clients | `src/lib/api/auth.ts`, `packages.ts` |
 | Styles | `src/app.css` |
 
+---
+
+### Screen P7 — Avatars list (`/admin/avatars`) *(Sprint 5)*
+
+**Purpose:** Browse platform avatar catalog; entry to create, edit, archive, assign to demo tenant.
+
+#### Screen map → API
+
+| Zone | Element | Action | API |
+| --- | --- | --- | --- |
+| P7-H1 | Title | static | "Avatars" |
+| P7-H2 | New avatar | click | `/admin/avatars/new` |
+| P7-F1 | Status filter | change | `GET /api/platform/avatars?status=` |
+| P7-T1 | Table rows | display | `avatars[]` |
+| P7-A1 | Edit link | click | `/admin/avatars/{id}` |
+| P7-A2 | Assign demo | click | `/admin/tenants/demo/avatars` |
+| P7-A3 | Archive | confirm + click | `DELETE /api/platform/avatars/{id}` |
+
+#### Full layout
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  [ App shell P1 — Avatars active ]                                               │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│  Avatars (P7-H1)              Status [ active ▼] P7-F1        [+ New] P7-H2     │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ slug │ name  │ role              │ voice  │ status │ actions               │  │
+│  ├──────┼───────┼───────────────────┼────────┼────────┼───────────────────────┤  │
+│  │ ava  │ Ava   │ General Support   │ Aoede  │ active │ P7-A1 Edit            │  │
+│  │      │       │                   │        │        │ P7-A2 Assign demo     │  │
+│  │      │       │                   │        │        │ P7-A3 Archive         │  │
+│  ├──────┼───────┼───────────────────┼────────┼────────┼───────────────────────┤  │
+│  │ max  │ Max   │ Billing Specialist│ Charon │ active │ …                     │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Screen P8 — Avatar create (`/admin/avatars/new`) *(Sprint 5)*
+
+| Zone | Element | API field |
+| --- | --- | --- |
+| P8-M1 | Slug | `slug` |
+| P8-M2 | Name | `name` |
+| P8-M3 | Role / trait | `role`, `trait` |
+| P8-M4 | Voice / color | `voice`, `color` |
+| P8-M5 | Image URL | `image_url` |
+| P8-M6 | Greeting | `greeting` |
+| P8-M7 | Flags | `flags.popular`, `flags.robot` |
+| P8-B1 | Create | `POST /api/platform/avatars` |
+
+---
+
+### Screen P9 — Avatar edit (`/admin/avatars/[id]`) *(Sprint 5)*
+
+Same fields as P8 prefilled from `GET /api/platform/avatars/{id}`. **Save** → `PUT`. **Archive** → `DELETE` with confirm modal (409 if tenant assignments active).
+
+---
+
+### Screen P10 — Tenant avatars (`/admin/tenants/[id]/avatars`) *(Sprint 5)*
+
+| Zone | Element | API |
+| --- | --- | --- |
+| P10-H1 | Tenant id | route param |
+| P10-C1 | Cap hint | `cap.max_ai_employees` vs `active_count` from GET |
+| P10-C2 | Assigned list | `assignments[]` |
+| P10-S1 | Avatar select | catalog dropdown |
+| P10-B1 | Assign | `POST …/avatars {avatar_id}` |
+| P10-B2 | Disable | `DELETE …/avatars/{avatar_id}` |
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  Tenant avatars — demo (P10-H1)     Cap: 2 max · 4 assigned (warning if over)    │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│  ┌─ Assigned ────────────────────────────────────────────────────────────────┐  │
+│  │ ava  Ava   General Support   [active]   [ Disable ]                         │  │
+│  │ max  Max   Billing          [active]   [ Disable ]                         │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│  ┌─ Assign ──────────────────────────────────────────────────────────────────┐  │
+│  │ Avatar [ luna ▼ ]              [ Assign to tenant ]  P10-B1                 │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Platform admin — Sprint 5 flows
+
+```
+Flow 1 — Manage catalog
+  P7 list → P8 create → P9 edit
+
+Flow 2 — Assign demo tenant
+  P7-A2 or P10 → POST assignment → customer GET /api/workforce reflects list
+
+Flow 3 — Customer portal (UI unchanged)
+  / loads → GET /api/workforce (tenant demo) → same agent cards, DB-backed data
+```
+
+### Platform admin — Sprint 5 component → file
+
+| Component | Path |
+| --- | --- |
+| Avatars list | `src/routes/avatars/+page.svelte` |
+| Avatar form | `src/routes/avatars/new/+page.svelte`, `avatars/[id]/+page.svelte` |
+| Tenant avatars | `src/routes/tenants/[id]/avatars/+page.svelte` |
+| API client | `src/lib/api/avatars.ts` |
+| Shell nav | `src/routes/+layout.svelte` (add Avatars link) |
+
+## Sprint 5 — Avatars (customer UI unchanged)
+
+Customer portal **`/`** layout unchanged. Agent cards still bind to `GET /api/workforce`; Sprint 5 only changes the **data source** when tenant assignments exist.
+
+| Surface | Sprint 5 UX | API |
+| --- | --- | --- |
+| Customer `/` | Same cards/halo/voice | `GET /api/workforce` + `X-Tenant-Id: demo` |
+| Platform `/admin` | New Avatars nav + P7–P10 | `/api/platform/avatars*` |
+| Ops curl | Assign then probe workforce | See [10-avatars-spec.md](10-avatars-spec.md) §7 |
+
 ## Sprint 3 — Auth (no customer UI change)
 
 Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login screen in Sprint 3.
@@ -564,4 +688,4 @@ Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login scre
 | Chat API | `src/lib/api/chat.ts` |
 | Voice | `src/lib/voice/gemini.ts` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

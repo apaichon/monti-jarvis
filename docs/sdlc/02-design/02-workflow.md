@@ -3,7 +3,7 @@ id: DES-0002
 title: Workflows
 status: approved
 updated: 2026-07-07
-sprint: SPRINT-004
+sprint: SPRINT-005
 ---
 
 # Workflows — Monti Jarvis
@@ -295,4 +295,89 @@ sequenceDiagram
   B->>B: navigate /admin/login
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 14. Avatar catalog CRUD (Sprint 5)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant G as Go :8091
+  participant M as auth middleware
+  participant S as internal/store avatars
+  participant DB as Postgres
+
+  Op->>G: POST /api/platform/avatars {slug, name, role, voice, ...}
+  G->>M: validate JWT + platform_admin
+  alt forbidden
+    M-->>Op: 403
+  else ok
+    M->>S: CreateAvatar(ctx, input)
+    S->>DB: INSERT ai_avatars (flags jsonb)
+    G-->>Op: 201 {id, slug, name, status, ...}
+  end
+```
+
+## 15. Assign tenant avatar (Sprint 5)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant G as Go :8091
+  participant E as internal/entitlements
+  participant S as internal/store avatars
+  participant DB as Postgres
+
+  Op->>G: POST /api/platform/tenants/demo/avatars {avatar_id}
+  G->>G: RBAC platform_admin
+  G->>E: GetEffective(demo) → rules.max_ai_employees
+  G->>S: CountActiveAssignments(demo)
+  alt at cap
+    G-->>Op: 409 max_ai_employees exceeded
+  else ok
+    S->>DB: UPSERT tenant_avatar_assignments status=active
+    G-->>Op: 200 {tenant_id, avatar, status}
+  end
+```
+
+## 16. Workforce resolve (Sprint 5)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser (customer /)
+  participant G as Go :8091
+  participant W as internal/workforce
+  participant S as internal/store avatars
+  participant A as internal/auth
+
+  B->>G: GET /api/workforce
+  Note over B,G: Optional X-Tenant-Id or Bearer tenant
+  G->>A: ResolveTenant(ctx, header, authDisabled, demo)
+  G->>S: ListAssignedAvatars(tenant_id, active)
+  alt has assignments
+    S-->>G: ai_avatars rows
+    G->>W: map to Agent JSON (image_url → image)
+  else no assignments
+    G->>W: All() static fallback
+  end
+  G-->>B: 200 {agents: [...]}
+```
+
+## State: avatar (Sprint 5)
+
+| Status | Meaning |
+| --- | --- |
+| `draft` | Not assignable; hidden from default platform list |
+| `active` | Assignable to tenants; eligible for workforce when assigned |
+| `archived` | No new assignments; existing assignments may be disabled by operator |
+
+## State: tenant avatar assignment (Sprint 5)
+
+| Status | Meaning |
+| --- | --- |
+| `active` | Avatar appears in tenant `/api/workforce` list |
+| `disabled` | Assignment revoked; avatar hidden from tenant workforce |
+
+## 17. Customer portal agent pick (unchanged UI, Sprint 5 data)
+
+Customer portal still calls `GET /api/workforce` on load. Sprint 5 only changes **data source** when tenant has assignments; UI components unchanged.
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

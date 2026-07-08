@@ -49,18 +49,16 @@ Move the AI avatar catalog from hardcoded Go into **Postgres**, let **platform a
 
 - [FEAT-0005 — Avatar catalog + tenant assignment](../01-features/FEAT-0005-avatar-catalog.md)
 
-## Design pack (`sprint-tech-specs` — run before build)
+## Design pack (`sprint-tech-specs`)
 
 | Artifact | Path | Status |
 | --- | --- | --- |
-| Avatars deep spec | `10-avatars-spec.md` (new) | `planned` |
-| Workflow | [02-workflow.md](../02-design/02-workflow.md) §14+ | `planned` |
-| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `planned` |
-| API spec | [04-api-spec.md](../02-design/04-api-spec.md) | `planned` |
-| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § P7+ | `planned` |
+| Avatars deep spec | [10-avatars-spec.md](../02-design/10-avatars-spec.md) | `approved` |
+| Workflow | [02-workflow.md](../02-design/02-workflow.md) §14–17 | `approved` |
+| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `approved` |
+| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Avatars | `approved` |
+| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § P7–P10 | `approved` |
 | Portal (prior) | [09-platform-admin-portal-spec.md](../02-design/09-platform-admin-portal-spec.md) | `shipped` |
-
-Run: `/sprint-tech-specs sprint 5`
 
 ## Verification
 
