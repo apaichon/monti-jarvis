@@ -2,7 +2,7 @@
 id: READINESS-RELEASE
 status: active
 updated: 2026-07-07
-current_sprint: SPRINT-005
+current_sprint: SPRINT-006
 release_target: v0.6.0
 ---
 

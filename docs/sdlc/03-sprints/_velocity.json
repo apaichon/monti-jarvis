@@ -31,8 +31,16 @@
       "velocity": 16,
       "closed": "2026-07-07",
       "release": "v0.5.0"
+    },
+    {
+      "id": "SPRINT-005",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-08",
+      "release": "v0.6.0"
     }
   ],
   "average_velocity": 16,
-  "note": "Sprint 4 closed at 100% (stretch 25 pts) — platform admin portal, packages APIs, entitlements cache."
+  "note": "Sprint 5 closed at 100% — avatar catalog, tenant assignment, platform admin avatars UI, MinIO portrait upload."
 }

@@ -1,8 +1,11 @@
 ---
 id: SPRINT-005
-status: in_progress
+status: completed
 start: 2026-07-08
 end: 2026-07-21
+closed: 2026-07-08
+updated: 2026-07-08
+release: v0.6.0
 goal: "Platform Admin: Avatars — catalog CRUD and per-tenant assignment backed by Postgres."
 roadmap_sprint: 5
 platform: Platform Admin
@@ -20,13 +23,22 @@ Move the AI avatar catalog from hardcoded Go into **Postgres**, let **platform a
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| TASK-0020 | 3 | todo | devops | Postgres `ai_avatars` + `ai_avatar_voices` + `tenant_avatar_assignments` + dev seeds |
-| TASK-0021 | 5 | todo | dev | Avatar catalog store + platform CRUD API |
-| TASK-0022 | 3 | todo | dev | Tenant avatar assign/revoke/list + `max_ai_employees` check |
-| TASK-0023 | 2 | todo | dev | DB-backed `GET /api/workforce` tenant resolver |
-| TASK-0024 | 3 | todo | dev | Platform admin portal — avatars + tenant assignment UI |
+| TASK-0020 | 3 | completed | devops | Postgres `ai_avatars` + `ai_avatar_voices` + `tenant_avatar_assignments` + dev seeds |
+| TASK-0021 | 5 | completed | dev | Avatar catalog store + platform CRUD API |
+| TASK-0022 | 3 | completed | dev | Tenant avatar assign/revoke/list + `max_ai_employees` check |
+| TASK-0023 | 2 | completed | dev | DB-backed `GET /api/workforce` tenant resolver |
+| TASK-0024 | 3 | completed | dev | Platform admin portal — avatars + tenant assignment UI |
 
-**Committed:** 16 points · **Completed:** 0 points · **Velocity target:** 16
+**Committed:** 16 points · **Completed:** 16 points · **Velocity:** 16
+
+## Shipped (v0.6.0)
+
+- Postgres: `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments` + seeds (Ava, Max, Luna, Neo → demo tenant)
+- Platform APIs: `/api/platform/avatars*`, `/api/platform/tenants/{id}/avatars*`, `GET /api/assets/avatars/{id}/{file}`
+- `GET /api/workforce` — DB-first per tenant; static fallback when no assignments
+- `apps/platform-admin-web` — `/admin/avatars` list/create/edit, tenant assignment, voice profiles table
+- **Bonus:** MinIO portrait upload (`POST /api/platform/avatars/{id}/image`) + preview in admin UI
+- Build fix: `prebuild: svelte-kit sync`, Makefile retry on stale `.svelte-kit`
 
 ## Scope boundary
 
@@ -41,10 +53,10 @@ Move the AI avatar catalog from hardcoded Go into **Postgres**, let **platform a
 
 **Out** (→ backlog / later sprints)
 - `ai_employee_versions`, languages, tools, guardrails (Sprint 21)
-- MinIO avatar upload (URL field only this sprint)
 - Customer portal workforce UI changes (Sprint 21)
 - Tenant admin portal (Sprint 15+)
 - Live call quota enforcement (Sprint 13)
+- HeyGen / LiveAvatar lip-sync (deferred)
 
 ## Feature
 
@@ -83,4 +95,4 @@ open http://localhost:8091/admin/avatars
 
 ## Definition of done
 
-- Code reviewed · ACs verified by Tester · portal + API UAT · `make build` · tag v0.6.0 at sprint close
+- Code reviewed · ACs verified by Tester · portal + API UAT · `make build` · tag v0.6.0 at sprint close ✅

@@ -1,5 +1,5 @@
 # Feature: Platform Avatar Catalog + Tenant Assignment   (FEAT-0005)
-**Sprint:** SPRINT-005   **Owner:** DEV   **Status:** in_progress
+**Sprint:** SPRINT-005   **Owner:** DEV   **Status:** completed   **Release:** v0.6.0
 
 ## Problem
 
