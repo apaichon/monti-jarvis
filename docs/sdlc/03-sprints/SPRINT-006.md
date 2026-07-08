@@ -54,13 +54,13 @@ Ship a **public tenant registration** flow: a prospect submits company + admin c
 
 | Artifact | Path | Status |
 | --- | --- | --- |
-| Tenant register deep spec | [11-tenant-register-spec.md](../02-design/11-tenant-register-spec.md) | `todo` |
-| Workflow | [02-workflow.md](../02-design/02-workflow.md) §18+ | `todo` |
-| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `todo` |
-| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Tenant register | `todo` |
-| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § T1–T3 | `todo` |
+| Tenant register deep spec | [11-tenant-register-spec.md](../02-design/11-tenant-register-spec.md) | `approved` |
+| Workflow | [02-workflow.md](../02-design/02-workflow.md) §18–21 | `approved` |
+| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `approved` |
+| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Tenant registration | `approved` |
+| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § T1–T3, P11 | `approved` |
 
-> Run **`sprint-tech-specs`** and mark design rows `approved` before starting TASK-0026.
+> Design pack approved — DEV may start **TASK-0025** (schema) then **TASK-0026**.
 
 ## Verification
 

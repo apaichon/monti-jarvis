@@ -16,10 +16,11 @@ System design artifacts for Monti Jarvis.
 | 08 | [08-packages-spec.md](08-packages-spec.md) | 4 | Package catalog + tenant entitlements (jsonb rules) | `approved` |
 | 09 | [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) | 4 | Platform admin portal `/admin` | `shipped` |
 | 10 | [10-avatars-spec.md](10-avatars-spec.md) | 5 | Avatar catalog + tenant assignment | `approved` |
+| 11 | [11-tenant-register-spec.md](11-tenant-register-spec.md) | 6 | Tenant self-registration + pending_kyc | `approved` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
-**Sprint 5 gate:** ✅ Implement TASK-0020+ — APIs per [10-avatars-spec.md](10-avatars-spec.md), portal P7–P10 per [05-ux-ui.md](05-ux-ui.md).
+**Sprint 6 gate:** ✅ Implement TASK-0025+ — APIs per [11-tenant-register-spec.md](11-tenant-register-spec.md), tenant UI T1–T2 per [05-ux-ui.md](05-ux-ui.md).
 
 **Stack:** Go `net/http` · SvelteKit customer portal · Postgres · Redis 8 · MinIO · ClickHouse · NATS · LiveKit · Gemini
 

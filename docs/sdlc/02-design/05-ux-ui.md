@@ -3,12 +3,12 @@ id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
 updated: 2026-07-08
-sprint: SPRINT-005
+sprint: SPRINT-006
 ---
 
 # UX/UI — ASCII Wireframes
 
-**Surfaces:** Customer portal `apps/customer-web` at `/` · Platform admin `apps/platform-admin-web` at `/admin` *(Sprint 4)*.
+**Surfaces:** Customer portal `apps/customer-web` at `/` · Platform admin `apps/platform-admin-web` at `/admin` *(Sprint 4)* · Tenant portal `apps/tenant-web` at `/tenant` *(Sprint 6)*.
 
 ## Customer portal
 
@@ -162,6 +162,7 @@ Customer portal `/` unchanged. Requires `AUTH_DISABLED=false` for login.
 | Avatar create *(S5)* | `/admin/avatars/new` | `POST /api/platform/avatars` |
 | Avatar edit *(S5)* | `/admin/avatars/[id]` | `GET/PUT/DELETE /api/platform/avatars/{id}` |
 | Tenant avatars *(S5)* | `/admin/tenants/[id]/avatars` | `GET/POST/DELETE /api/platform/tenants/{id}/avatars*` |
+| Tenants list *(S6)* | `/admin/tenants` | `GET /api/platform/tenants?status=` |
 
 ### Design tokens (platform admin)
 
@@ -658,6 +659,149 @@ Flow 3 — Customer portal (UI unchanged)
 | API client | `src/lib/api/avatars.ts` |
 | Shell nav | `src/routes/+layout.svelte` (add Avatars link) |
 
+## Tenant Portal (Sprint 6)
+
+**App:** `apps/tenant-web` · **URL:** `http://localhost:8091/tenant`  
+Prospect-facing signup. Customer portal `/` unchanged. Platform admin gains optional tenants list (P11).
+
+### Global screen index (tenant)
+
+| Screen | Route | Primary API |
+| --- | --- | --- |
+| Register | `/tenant/register` | `POST /api/public/tenant/register` |
+| Success | `/tenant/register/success` | (client state + stored tokens) |
+| Login stub | `/tenant/login` | `POST /api/auth/login` *(stub redirect to success/me)* |
+
+### Screen map → API (tenant)
+
+| Zone | Element | Action | API / behavior |
+| --- | --- | --- | --- |
+| T1-H1 | Header | static | Monti logo + “Tenant signup” |
+| T1-F1 | Company name | input | `company_name` |
+| T1-F2 | Workspace slug | input | `slug` (auto-suggest from company name) |
+| T1-F3 | Admin email | input | `admin_email` |
+| T1-F4 | Display name | input | `admin_display_name` |
+| T1-F5 | Password | input | `admin_password` |
+| T1-F6 | Confirm password | input | client-side match check |
+| T1-B1 | Create account | submit | `POST /api/public/tenant/register` |
+| T1-E1 | Error banner | display | API `400`/`409`/`429` |
+| T2-S1 | Success title | static | “Account created — pending verification” |
+| T2-S2 | Tenant id | display | `tenant_id` / slug |
+| T2-L1 | Continue | link | `/tenant/login` stub or profile placeholder |
+| T2-L2 | Customer portal | link | `/` |
+
+### Screen T1 — Register (`/tenant/register`)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  http://localhost:8091/tenant/register                                           │
+│                                                                                  │
+│                         ┌─────────────────────────────┐                          │
+│                         │  ┌──┐  MONTI                │  T1-H1                   │
+│                         │  └──┘  Start your AI call   │                          │
+│                         │        center workspace     │                          │
+│                         │                             │                          │
+│                         │  ┌─ Error (T1-E1) ───────┐ │                          │
+│                         │  │ Slug already taken     │ │                          │
+│                         │  └────────────────────────┘ │                          │
+│                         │                             │                          │
+│                         │  Company name    (T1-F1)    │                          │
+│                         │  [ Acme Corporation    ]  │                          │
+│                         │                             │                          │
+│                         │  Workspace URL   (T1-F2)    │                          │
+│                         │  monti.app/ [ acme       ]  │                          │
+│                         │                             │                          │
+│                         │  Admin email     (T1-F3)    │                          │
+│                         │  [ admin@acme.test     ]    │                          │
+│                         │                             │                          │
+│                         │  Your name       (T1-F4)    │                          │
+│                         │  [ Acme Admin          ]    │                          │
+│                         │                             │                          │
+│                         │  Password        (T1-F5)    │                          │
+│                         │  [ ••••••••••••        ]    │                          │
+│                         │  Confirm         (T1-F6)    │                          │
+│                         │  [ ••••••••••••        ]    │                          │
+│                         │                             │                          │
+│                         │    [ Create account ] T1-B1 │  primary cyan            │
+│                         │                             │                          │
+│                         │  Already have an account?   │                          │
+│                         │  Sign in · Back to caller   │                          │
+│                         │  portal (/)                 │                          │
+│                         └─────────────────────────────┘                          │
+│                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Screen T2 — Success (`/tenant/register/success`)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  http://localhost:8091/tenant/register/success                                   │
+│                                                                                  │
+│                         ┌─────────────────────────────┐                          │
+│                         │  ✓  Account created  T2-S1  │                          │
+│                         │                             │                          │
+│                         │  Workspace: acme   T2-S2    │                          │
+│                         │  Status: Pending verification                          │
+│                         │                             │                          │
+│                         │  We’ll review your signup.  │                          │
+│                         │  You can sign in now; full  │                          │
+│                         │  features unlock after KYC. │                          │
+│                         │                             │                          │
+│                         │  [ Continue ] T2-L1         │                          │
+│                         │  [ Try caller demo → / ]    │  T2-L2                   │
+│                         └─────────────────────────────┘                          │
+│                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Screen P11 — Tenants list (`/admin/tenants`) *(stretch / Sprint 6)*
+
+Minimal table for platform_admin; API required even if UI deferred.
+
+| Zone | Action | API |
+| --- | --- | --- |
+| P11-T1 | Filter status | `GET /api/platform/tenants?status=pending_kyc` |
+| P11-T2 | Row link | future `/admin/tenants/{id}` (Sprint 7 KYC) |
+
+### Flow T-A — Register
+
+```text
+T-A  Open /tenant/register
+  → fill company + slug + admin credentials
+  → POST /api/public/tenant/register
+  → store tokens (sessionStorage, same pattern as platform-admin)
+  → redirect /tenant/register/success
+```
+
+### Flow T-B — Platform ops (curl or P11)
+
+```text
+T-B  platform_admin login
+  → GET /api/platform/tenants?status=pending_kyc
+  → see acme pending (prep Sprint 7 approve)
+```
+
+### Tenant portal — component → file
+
+| Component | Path |
+| --- | --- |
+| Register page | `apps/tenant-web/src/routes/register/+page.svelte` |
+| Success page | `apps/tenant-web/src/routes/register/success/+page.svelte` |
+| Login stub | `apps/tenant-web/src/routes/login/+page.svelte` |
+| API client | `apps/tenant-web/src/lib/api/register.ts` |
+| Session | `apps/tenant-web/src/lib/auth/session.ts` |
+| Styles | `apps/tenant-web/src/app.css` |
+
+## Sprint 6 — Tenant register (customer UI unchanged)
+
+| Surface | Sprint 6 UX | API |
+| --- | --- | --- |
+| Customer `/` | Unchanged | Public chat/voice |
+| Tenant `/tenant` | **New** register + success | `POST /api/public/tenant/register` |
+| Platform `/admin` | Optional P11 tenants table | `GET /api/platform/tenants` |
+| Ops curl | Register + list pending | [11-tenant-register-spec.md](11-tenant-register-spec.md) §10 |
+
 ## Sprint 5 — Avatars (customer UI unchanged)
 
 Customer portal **`/`** layout unchanged. Agent cards still bind to `GET /api/workforce`; Sprint 5 only changes the **data source** when tenant assignments exist.
@@ -698,4 +842,4 @@ Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login scre
 | Chat API | `src/lib/api/chat.ts` |
 | Voice | `src/lib/voice/gemini.ts` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

@@ -3,7 +3,7 @@ id: DES-0003
 title: Entity Relationship Diagram
 status: approved
 updated: 2026-07-08
-sprint: SPRINT-005
+sprint: SPRINT-006
 ---
 
 # ER Diagram — Monti Jarvis
@@ -21,7 +21,7 @@ Every durable Postgres table in `callcenter` carries four audit fields (migratio
 | `created_by` | `text` | Actor user id; default `'system'`; set from JWT via `internal/auditctx` |
 | `updated_by` | `text` | Last mutator user id; default `'system'` |
 
-**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
+**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments`, `tenant_registrations`, `brands`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
 
 ClickHouse analytics tables use `created_at`, `updated_at`, `created_by`, `updated_by` (`002_audit_columns_clickhouse` + `EnsureAuthEventsSchema`).
 
@@ -36,6 +36,8 @@ erDiagram
   tenants ||--o{ knowledge_documents : owns
   tenants ||--o{ tenant_entitlements : entitled
   tenants ||--o{ tenant_avatar_assignments : assigns
+  tenants ||--|| tenant_registrations : registered_via
+  tenants ||--o{ brands : owns
   ai_avatars ||--o{ tenant_avatar_assignments : enabled_for
   ai_avatars ||--o{ ai_avatar_voices : speaks_with
   voice_providers ||--o{ ai_avatar_voices : provides
@@ -54,6 +56,30 @@ erDiagram
   tenants {
     text id PK
     text slug UK
+    text name
+    text status
+    note "pending_kyc active suspended"
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_registrations {
+    text id PK
+    text tenant_id FK UK
+    text company_name
+    text admin_email
+    text status
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  brands {
+    text id PK
+    text tenant_id FK UK
     text name
     text status
     timestamptz created_at
@@ -519,6 +545,7 @@ monti-jarvis/
 | `monti_jarvis:call:{session_id}` | 24h | agent_id, updated_at (legacy chat) |
 | `monti_jarvis:call:active:{id}` | 24h | tenant_id, room_name, status, started_at |
 | `monti_jarvis:entitlement:{tenant_id}` | 15m (env) | package slug, status, effective limits JSON *(Sprint 4)* |
+| `monti_jarvis:register:ip:{ip}` | 1h | registration attempt counter *(Sprint 6)* |
 
 ## Workforce (Sprint 5 — DB + fallback)
 
@@ -541,10 +568,10 @@ monti-jarvis/
 | Sprint | Tables |
 | --- | --- |
 | 4 ✅ v0.5.0 | `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements` |
-| 5 ✅ v0.6.0 target | `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments` |
-| 6+ | `tenant_registrations`, `brands` |
+| 5 ✅ v0.6.0 | `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments` |
+| 6 ✅ v0.7.0 target | `tenant_registrations`, `brands`; `tenants.status` + `pending_kyc` |
 | 15 | `km_scope_assignments`, tenant-driven re-index |
 | 21 | Runtime voice failover + `ai_employee_configs` embedding bindings (voice stays on `ai_avatar_voices`) |
 | 22 | `conversation_records` (ClickHouse denorm) |
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.

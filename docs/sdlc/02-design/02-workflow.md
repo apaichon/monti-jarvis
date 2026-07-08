@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: approved
-updated: 2026-07-07
-sprint: SPRINT-005
+updated: 2026-07-08
+sprint: SPRINT-006
 ---
 
 # Workflows — Monti Jarvis
@@ -389,4 +389,110 @@ sequenceDiagram
 
 Customer portal still calls `GET /api/workforce` on load. Sprint 5 only changes **data source** when tenant has assignments; UI components unchanged.
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 18. Tenant self-registration (Sprint 6)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser (/tenant/register)
+  participant G as Go :8091
+  participant R as Redis (rate limit)
+  participant Reg as internal/tenantregister
+  participant A as internal/auth
+  participant DB as Postgres
+
+  B->>G: POST /api/public/tenant/register {company_name, slug, email, password, display_name}
+  G->>R: INCR monti_jarvis:register:ip:{ip}
+  alt rate exceeded
+    G-->>B: 429 Too many requests
+  else ok
+    G->>Reg: Register(ctx, input)
+    Reg->>DB: BEGIN
+    Reg->>DB: INSERT tenants status=pending_kyc
+    Reg->>DB: INSERT brands (default)
+    Reg->>DB: INSERT users + user_roles tenant_admin
+    Reg->>DB: INSERT tenant_registrations status=submitted
+    Reg->>DB: COMMIT
+    G->>A: IssueTokenPair(new user)
+    A->>DB: INSERT refresh_tokens
+    G-->>B: 201 {tenant_id, registration_id, access_token, refresh_token, user}
+  end
+```
+
+## 19. Registration validation errors (Sprint 6)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant G as Go :8091
+  participant Reg as internal/tenantregister
+  participant DB as Postgres
+
+  B->>G: POST /api/public/tenant/register
+  alt invalid slug or password
+    G-->>B: 400 {error}
+  else slug taken
+    Reg->>DB: SELECT tenants WHERE slug=?
+    G-->>B: 409 slug already taken
+  else email taken
+    Reg->>DB: SELECT users WHERE email=?
+    G-->>B: 409 email already registered
+  else register disabled
+    G-->>B: 503 registration disabled
+  end
+```
+
+## 20. Platform list pending tenants (Sprint 6)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant G as Go :8091
+  participant M as auth middleware
+  participant S as internal/store tenants
+  participant DB as Postgres
+
+  Op->>G: GET /api/platform/tenants?status=pending_kyc
+  G->>M: validate JWT + platform_admin
+  alt forbidden
+    M-->>Op: 403
+  else ok
+    S->>DB: SELECT tenants JOIN tenant_registrations ORDER BY created_at DESC
+    G-->>Op: 200 {tenants[], total, limit, offset}
+  end
+```
+
+## 21. Pending tenant login (Sprint 6)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser (/tenant)
+  participant G as Go :8091
+  participant A as internal/auth
+
+  Note over B,G: After registration, tokens stored client-side (same as /admin)
+
+  B->>G: GET /api/auth/me (Bearer)
+  G->>A: Parse JWT → tenant_admin + tenant_id
+  G-->>B: 200 {role, tenant_id, email}
+
+  B->>G: POST /api/km/agents/ava/documents (pending_kyc)
+  G-->>B: 403 tenant not active
+```
+
+## State: tenant (Sprint 6 extension)
+
+| Status | Meaning |
+| --- | --- |
+| `pending_kyc` | Self-registered; login OK; KM writes blocked; awaits Sprint 7 approval |
+| `active` | Production tenant (seeds, post-KYC) |
+| `suspended` | Operator block |
+
+## State: tenant_registration (Sprint 6)
+
+| Status | Meaning |
+| --- | --- |
+| `submitted` | Signup complete; visible in platform tenant list |
+
+Sprint 7 adds `approved`, `rejected`, reviewer metadata.
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

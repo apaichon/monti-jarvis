@@ -3,7 +3,7 @@ id: DES-0004
 title: API Specification
 status: approved
 updated: 2026-07-08
-sprint: SPRINT-005
+sprint: SPRINT-006
 ---
 
 # API Specification — Monti Jarvis
@@ -11,7 +11,8 @@ sprint: SPRINT-005
 **Base URL:** `http://localhost:8091`  
 **Auth:** `AUTH_DISABLED=true` (default) — same as v0.3.0 for customer paths. When `AUTH_DISABLED=false`, use `Authorization: Bearer <access_token>` on protected routes. See [06-auth-spec.md](06-auth-spec.md).  
 **Packages (Sprint 4):** Platform catalog + entitlements require auth on — see [08-packages-spec.md](08-packages-spec.md).  
-**Avatars (Sprint 5):** Platform avatar catalog + tenant assignment — see [10-avatars-spec.md](10-avatars-spec.md).
+**Avatars (Sprint 5):** Platform avatar catalog + tenant assignment — see [10-avatars-spec.md](10-avatars-spec.md).  
+**Tenant register (Sprint 6):** Public signup + platform tenant list — see [11-tenant-register-spec.md](11-tenant-register-spec.md).
 **CORS:** `*` — methods `GET, POST, PUT, DELETE, OPTIONS`; headers `Content-Type`, `Authorization`
 
 ## Health & infra
@@ -28,10 +29,11 @@ Liveness + feature flags.
   "livekit": true,
   "nats": true,
   "rag": true,
-  "sprint": "SPRINT-005",
+  "sprint": "SPRINT-006",
   "auth_disabled": true,
   "customer_web": "apps/customer-web/build",
-  "platform_admin_web": "apps/platform-admin-web/build"
+  "platform_admin_web": "apps/platform-admin-web/build",
+  "tenant_web": "apps/tenant-web/build"
 }
 ```
 
@@ -519,6 +521,89 @@ Requires `AUTH_DISABLED=false`. Platform routes: `Authorization: Bearer <access_
 | `409` | Slug conflict, archive blocked, `max_ai_employees` exceeded |
 | `503` | Auth not configured |
 
+## Tenant registration (Sprint 6)
+
+Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independent of `AUTH_DISABLED` on customer paths.
+
+### `POST /api/public/tenant/register`
+
+**Auth:** None (public). **Rate limit:** Redis `monti_jarvis:register:ip:{ip}` → `429` when exceeded.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `company_name` | string | yes | Legal/display company name (2–120 chars) |
+| `slug` | string | yes | Tenant id + URL slug; lowercase `a-z0-9-`, 2–32 chars |
+| `admin_email` | string | yes | First tenant_admin email (unique) |
+| `admin_password` | string | yes | min 8 characters |
+| `admin_display_name` | string | yes | Shown in profile (1–80 chars) |
+
+**Response 201:**
+
+```json
+{
+  "tenant_id": "acme",
+  "slug": "acme",
+  "registration_id": "reg_a1b2c3d4e5f67890",
+  "access_token": "eyJ...",
+  "refresh_token": "rt_...",
+  "expires_in": 900,
+  "token_type": "Bearer",
+  "user": {
+    "id": "usr_acme_admin",
+    "email": "admin@acme.test",
+    "display_name": "Acme Admin",
+    "role": "tenant_admin",
+    "tenant_id": "acme"
+  }
+}
+```
+
+**Errors:** `400` validation · `409` slug/email conflict · `429` rate limit · `503` registration disabled or Postgres down
+
+### `GET /api/platform/tenants`
+
+**Role:** `platform_admin`
+
+| Query | Type | Description |
+| --- | --- | --- |
+| `status` | string | Optional filter: `pending_kyc`, `active`, `suspended` |
+| `limit` | int | Default `50`, max `100` |
+| `offset` | int | Pagination offset |
+
+**Response 200:**
+
+```json
+{
+  "tenants": [
+    {
+      "id": "acme",
+      "slug": "acme",
+      "name": "Acme Corp",
+      "status": "pending_kyc",
+      "registration_id": "reg_a1b2c3d4e5f67890",
+      "admin_email": "admin@acme.test",
+      "created_at": "2026-07-08T01:00:00Z"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+### Tenant registration error codes
+
+| Code | When |
+| --- | --- |
+| `400` | Invalid slug, password, reserved slug, missing field |
+| `409` | Slug or email already exists |
+| `429` | IP rate limit exceeded |
+| `503` | `TENANT_REGISTER_ENABLED=false` or store unavailable |
+
+### Pending tenant route policy
+
+`tenant_admin` on `pending_kyc` tenant: login + `/api/auth/me` OK; `POST /api/km/*` writes → `403 tenant not active`. See [11-tenant-register-spec.md](11-tenant-register-spec.md) §7.
+
 ## Knowledge base (per avatar)
 
 ### `GET /api/km/agents/{agent_id}`
@@ -552,6 +637,8 @@ Ingest sample files from `docs/samples/km/{agent}.md` for all four agents.
 | `/` | Svelte customer portal (`apps/customer-web/build`) |
 | `/admin/` | Svelte platform admin portal (`apps/platform-admin-web/build`) *(Sprint 4)* |
 | `/admin/*` | SPA fallback → `index.html` |
+| `/tenant/` | Svelte tenant portal (`apps/tenant-web/build`) *(Sprint 6)* |
+| `/tenant/*` | SPA fallback → `index.html` |
 | `/legacy/` | Legacy HTML UI |
 | `/images/*` | Static assets |
 
@@ -563,4 +650,4 @@ Platform admin UI calls JSON APIs on same origin (`8091`); tokens in `sessionSto
 {"error": "human-readable message"}
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
