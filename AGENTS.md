@@ -55,8 +55,8 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** `SPRINT-005` — Platform Admin: Avatars (v0.6.0) — catalog + tenant assignment
+**Current sprint:** `SPRINT-006` — Tenant: Register (plan with `sprint-plan`)
 
-**Shipped:** v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
+**Shipped:** v0.6.0 `SPRINT-005` · v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
 
 **KM ops:** `docs/KM_SETUP.md` · **API:** `docs/sdlc/02-design/04-api-spec.md` · **Deploy:** `docs/sdlc/07-deployment/LOCAL-DEV.md` · **UAT:** `docs/sdlc/06-manual-tests/`
