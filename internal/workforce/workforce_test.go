@@ -1,6 +1,10 @@
 package workforce
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/libra/monti-jarvis/internal/store"
+)
 
 func TestGetKnownAgent(t *testing.T) {
 	agent, ok := Get("luna")
@@ -30,6 +34,27 @@ func TestSystemPromptIncludesRole(t *testing.T) {
 func TestAllReturnsWorkforce(t *testing.T) {
 	if got, want := len(All()), 4; got != want {
 		t.Fatalf("len(All()) = %d, want %d", got, want)
+	}
+}
+
+func TestFromWorkforceAgent(t *testing.T) {
+	agent := FromWorkforceAgent(store.WorkforceAgent{
+		ID:              "ava",
+		Name:            "Ava",
+		Role:            "General Support",
+		Trait:           "Warm",
+		Color:           "#008cff",
+		Voice:           "Aoede",
+		VoiceProviderID: "voice-gemini-live",
+		VoiceID:         "gemini-model",
+		Image:           "/images/ava.jpg",
+		Greeting:        "Hello",
+		Popular:         true,
+		Skin:            "#f0bd9b",
+		Hair:            "#5a3428",
+	})
+	if agent.ID != "ava" || agent.VoiceProviderID != "voice-gemini-live" || agent.Image != "/images/ava.jpg" || !agent.Popular {
+		t.Fatalf("FromWorkforceAgent() = %#v, want mapped workforce agent", agent)
 	}
 }
 

@@ -3,21 +3,44 @@ package workforce
 import (
 	"fmt"
 	"strings"
+
+	"github.com/libra/monti-jarvis/internal/store"
 )
 
 type Agent struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	Trait    string `json:"trait"`
-	Color    string `json:"color"`
-	Voice    string `json:"voice"`
-	Image    string `json:"image"`
-	Popular  bool   `json:"popular,omitempty"`
-	Robot    bool   `json:"robot,omitempty"`
-	Skin     string `json:"skin,omitempty"`
-	Hair     string `json:"hair,omitempty"`
-	Greeting string `json:"greeting"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Role            string `json:"role"`
+	Trait           string `json:"trait"`
+	Color           string `json:"color"`
+	Voice           string `json:"voice"`
+	VoiceProviderID string `json:"voice_provider_id,omitempty"`
+	VoiceID         string `json:"voice_id,omitempty"`
+	Image           string `json:"image"`
+	Popular         bool   `json:"popular,omitempty"`
+	Robot           bool   `json:"robot,omitempty"`
+	Skin            string `json:"skin,omitempty"`
+	Hair            string `json:"hair,omitempty"`
+	Greeting        string `json:"greeting"`
+}
+
+func FromWorkforceAgent(w store.WorkforceAgent) Agent {
+	return Agent{
+		ID:              w.ID,
+		Name:            w.Name,
+		Role:            w.Role,
+		Trait:           w.Trait,
+		Color:           w.Color,
+		Voice:           w.Voice,
+		VoiceProviderID: w.VoiceProviderID,
+		VoiceID:         w.VoiceID,
+		Image:           w.Image,
+		Greeting:        w.Greeting,
+		Popular:         w.Popular,
+		Robot:           w.Robot,
+		Skin:            w.Skin,
+		Hair:            w.Hair,
+	}
 }
 
 var agents = []Agent{

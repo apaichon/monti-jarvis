@@ -191,6 +191,14 @@ func main() {
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/entitlement", guard.RequirePlatformAdmin(http.HandlerFunc(s.getTenantEntitlement)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/entitlement", guard.RequirePlatformAdmin(http.HandlerFunc(s.assignTenantEntitlement)))
 	mux.Handle("DELETE /api/platform/tenants/{tenant_id}/entitlement", guard.RequirePlatformAdmin(http.HandlerFunc(s.revokeTenantEntitlement)))
+	mux.Handle("GET /api/platform/avatars", guard.RequirePlatformAdmin(http.HandlerFunc(s.listAvatars)))
+	mux.Handle("POST /api/platform/avatars", guard.RequirePlatformAdmin(http.HandlerFunc(s.createAvatar)))
+	mux.Handle("GET /api/platform/avatars/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getAvatar)))
+	mux.Handle("PUT /api/platform/avatars/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.updateAvatar)))
+	mux.Handle("DELETE /api/platform/avatars/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.archiveAvatar)))
+	mux.Handle("GET /api/platform/tenants/{tenant_id}/avatars", guard.RequirePlatformAdmin(http.HandlerFunc(s.listTenantAvatars)))
+	mux.Handle("POST /api/platform/tenants/{tenant_id}/avatars", guard.RequirePlatformAdmin(http.HandlerFunc(s.assignTenantAvatar)))
+	mux.Handle("DELETE /api/platform/tenants/{tenant_id}/avatars/{avatar_id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.revokeTenantAvatar)))
 	mux.Handle("GET /api/entitlements/me", guard.RequireTenantAdminOrPlatform(http.HandlerFunc(s.entitlementMe)))
 	mux.HandleFunc("GET /ws/voice", s.voice.Handler())
 	mux.HandleFunc("GET /legacy", func(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +242,7 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":      s.cfg.LiveKitAPIKey != "",
 		"nats":         s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":            "SPRINT-004",
+		"sprint":            "SPRINT-005",
 		"auth_disabled":     s.cfg.AuthDisabled,
 		"rag":               s.rag != nil && s.rag.Enabled(),
 		"customer_web":      s.cfg.CustomerWebDir,
@@ -281,7 +289,21 @@ func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (s *server) workforce(w http.ResponseWriter, _ *http.Request) {
+func (s *server) workforce(w http.ResponseWriter, r *http.Request) {
+	tenantID := auth.ResolveTenant(r.Context(), r.Header.Get("X-Tenant-Id"), s.cfg.AuthDisabled, s.cfg.DemoTenantID)
+	if s.store != nil && s.store.HasTenantAvatarAssignments(r.Context(), tenantID) {
+		agents, err := s.store.ListWorkforceAgents(r.Context(), tenantID)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		out := make([]workforce.Agent, 0, len(agents))
+		for _, agent := range agents {
+			out = append(out, workforce.FromWorkforceAgent(agent))
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"agents": out})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"agents": workforce.All()})
 }
 

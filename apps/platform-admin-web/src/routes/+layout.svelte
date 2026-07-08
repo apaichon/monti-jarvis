@@ -56,6 +56,13 @@
         </a>
         <a
           class="nav-link"
+          class:active={$page.url.pathname.startsWith(`${base}/avatars`)}
+          href="{base}/avatars"
+        >
+          Avatars
+        </a>
+        <a
+          class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/profile`)}
           href="{base}/profile"
         >

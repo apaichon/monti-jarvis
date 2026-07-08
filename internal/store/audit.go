@@ -29,6 +29,9 @@ var auditableTables = []string{
 	"tenant_entitlements",
 	"embedding_models",
 	"voice_providers",
+	"ai_avatars",
+	"ai_avatar_voices",
+	"tenant_avatar_assignments",
 }
 
 func (s *Store) ensureAuditSchema(ctx context.Context) error {
