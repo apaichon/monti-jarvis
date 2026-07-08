@@ -127,9 +127,11 @@ Use `sprint-plan` skill when opening a new sprint.
 
 **Platform:** Tenant  
 **Feature:** Register  
-**Goal:** Tenant self-registration flow (depends on Sprint 3 auth).
+**Goal:** Public self-signup → `pending_kyc` tenant + tenant_admin JWT + `/tenant/register` UI.
 
-Plan with `sprint-plan` when ready.
+See [SPRINT-006](../03-sprints/SPRINT-006.md) and [FEAT-0006](../01-features/FEAT-0006-tenant-register.md).
+
+**Release target:** v0.7.0
 
 ## Last shipped: SPRINT-005
 
@@ -143,8 +145,8 @@ See [SPRINT-005](../03-sprints/SPRINT-005.md) · [FEAT-0005](../01-features/FEAT
 
 See [SPRINT-004](../03-sprints/SPRINT-004.md) · [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md).
 
-## Next sprint: SPRINT-006
+## Next sprint: SPRINT-007
 
-**Platform:** Tenant  
-**Feature:** Register  
-**Goal:** Tenant self-registration flow (depends on Sprint 3 auth).
+**Platform:** Platform Admin  
+**Feature:** KYC Tenant  
+**Goal:** Review and approve/reject `pending_kyc` registrations (depends on Sprint 6).

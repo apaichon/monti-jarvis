@@ -55,7 +55,7 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** `SPRINT-006` — Tenant: Register (plan with `sprint-plan`)
+**Current sprint:** `SPRINT-006` — Tenant: Register (v0.7.0) — public signup + pending_kyc + `/tenant` UI
 
 **Shipped:** v0.6.0 `SPRINT-005` · v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
 
