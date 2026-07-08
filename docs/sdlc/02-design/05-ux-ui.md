@@ -584,17 +584,27 @@ Flow 4 — Customer portal (unchanged)
 | P8-M1 | Slug | `slug` |
 | P8-M2 | Name | `name` |
 | P8-M3 | Role / trait | `role`, `trait` |
-| P8-M4 | Voice / color | `voice`, `color` |
+| P8-M4 | Color | `color` |
 | P8-M5 | Image URL | `image_url` |
 | P8-M6 | Greeting | `greeting` |
 | P8-M7 | Flags | `flags.popular`, `flags.robot` |
-| P8-B1 | Create | `POST /api/platform/avatars` |
+| P8-V* | Voice profiles table | `voices[]`: `voice_provider_id`, `voice_id`, `voice`, `priority`, `status` |
+| P8-B1 | Create | `POST /api/platform/avatars` (requires ≥1 voice row) |
 
 ---
 
 ### Screen P9 — Avatar edit (`/admin/avatars/[id]`) *(Sprint 5)*
 
-Same fields as P8 prefilled from `GET /api/platform/avatars/{id}`. **Save** → `PUT`. **Archive** → `DELETE` with confirm modal (409 if tenant assignments active).
+Same fields as P8 prefilled from `GET /api/platform/avatars/{id}` including **Voice profiles** table (add row, reorder priority, disable alternate). **Save** → `PUT` with `voices[]`. **Archive** → `DELETE` with confirm modal (409 if tenant assignments active).
+
+```
+┌─ Voice profiles (P8-V*) ─────────────────────────────────────────────────────┐
+│ priority │ provider          │ voice_id                          │ voice   │
+│ 1        │ voice-gemini-live │ gemini-2.5-flash-native-audio-…   │ Aoede   │
+│ 2        │ voice-grok-stub   │ grok-voice-stub                   │ Aoede   │  ← disabled
+│ [ + Add alternate provider ]                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 

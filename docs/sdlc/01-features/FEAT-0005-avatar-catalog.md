@@ -8,7 +8,7 @@ AI avatars (Ava, Max, Luna, Neo) are hardcoded in `internal/workforce/workforce.
 ## Scope
 
 In:
-- Postgres `ai_avatars` (platform catalog) + `tenant_avatar_assignments`
+- Postgres `ai_avatars` (platform catalog) + `ai_avatar_voices` (multi provider/voice_id/voice per avatar, priority failover) + `tenant_avatar_assignments`
 - Dev seeds: migrate four prototype avatars; assign subset to tenant `demo`
 - Platform-admin CRUD API + tenant assign/revoke/list APIs
 - `GET /api/workforce` resolves active avatars for tenant (DB-first, static fallback)
@@ -25,7 +25,7 @@ Out:
 
 ## Acceptance criteria
 
-1. `ensureSchema` creates `ai_avatars` and `tenant_avatar_assignments` with audit columns; seeds four avatars matching current workforce metadata.
+1. `ensureSchema` creates `ai_avatars` (no `voice` column), `ai_avatar_voices` (`voice_provider_id`, `voice_id`, `voice`, `priority`), and `tenant_avatar_assignments` with audit columns; seeds four avatars + priority-1 voice profiles matching current workforce metadata.
 2. `platform_admin` CRUD avatars via `/api/platform/avatars*`; `tenant_admin` receives `403` on platform routes.
 3. `platform_admin` assign/revoke/list tenant avatars; assign blocked when count exceeds entitlement `max_ai_employees`.
 4. `GET /api/workforce` returns DB-assigned active avatars for resolved tenant; falls back to static catalog when none assigned.

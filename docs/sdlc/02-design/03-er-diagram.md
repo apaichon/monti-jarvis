@@ -21,7 +21,7 @@ Every durable Postgres table in `callcenter` carries four audit fields (migratio
 | `created_by` | `text` | Actor user id; default `'system'`; set from JWT via `internal/auditctx` |
 | `updated_by` | `text` | Last mutator user id; default `'system'` |
 
-**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `tenant_avatar_assignments`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
+**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
 
 ClickHouse analytics tables use `created_at`, `updated_at`, `created_by`, `updated_by` (`002_audit_columns_clickhouse` + `EnsureAuthEventsSchema`).
 
@@ -37,6 +37,8 @@ erDiagram
   tenants ||--o{ tenant_entitlements : entitled
   tenants ||--o{ tenant_avatar_assignments : assigns
   ai_avatars ||--o{ tenant_avatar_assignments : enabled_for
+  ai_avatars ||--o{ ai_avatar_voices : speaks_with
+  voice_providers ||--o{ ai_avatar_voices : provides
   package_rule_schemas ||--o{ package_limits : shapes
   package_rule_schemas ||--o{ tenant_entitlements : snapshot_schema
   packages ||--o{ tenant_entitlements : grants
@@ -285,11 +287,24 @@ erDiagram
     text role
     text trait
     text color
-    text voice
     text image_url
     text greeting
     text status
     jsonb flags
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  ai_avatar_voices {
+    text id PK
+    text avatar_id FK
+    text voice_provider_id FK
+    text voice_id
+    text voice
+    int priority
+    text status
     timestamptz created_at
     timestamptz updated_at
     text created_by
@@ -330,6 +345,7 @@ erDiagram
 | `package_limits` | `rules` jsonb per package; shape from `package_rule_schemas` *(Sprint 4)* |
 | `tenant_entitlements` | Assignment + `rules_snapshot` at bind time *(Sprint 4)* |
 | `ai_avatars` | Platform-managed avatar catalog *(Sprint 5)* |
+| `ai_avatar_voices` | Ordered voice profiles per avatar (`voice_provider_id`, `voice_id`, `voice`, `priority`) *(Sprint 5)* |
 | `tenant_avatar_assignments` | Which avatars each tenant may use *(Sprint 5)* |
 
 ### Indexes
@@ -339,6 +355,7 @@ erDiagram
 - `knowledge_index_runs (document_id, embedding_model_id, index_version)`
 - `call_sessions (tenant_id, voice_provider_id)` *(planned)*
 - `tenant_avatar_assignments (tenant_id) WHERE status = 'active'` *(Sprint 5)*
+- `ai_avatar_voices (avatar_id, priority) WHERE status = 'active'` *(Sprint 5)*
 
 ### KM versioning model (planned)
 
@@ -524,10 +541,10 @@ monti-jarvis/
 | Sprint | Tables |
 | --- | --- |
 | 4 ✅ v0.5.0 | `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements` |
-| 5 ✅ v0.6.0 target | `ai_avatars`, `tenant_avatar_assignments` |
+| 5 ✅ v0.6.0 target | `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments` |
 | 6+ | `tenant_registrations`, `brands` |
 | 15 | `km_scope_assignments`, tenant-driven re-index |
-| 21 | `ai_employee_configs` provider bindings (extends Sprint 5 catalog) |
+| 21 | Runtime voice failover + `ai_employee_configs` embedding bindings (voice stays on `ai_avatar_voices`) |
 | 22 | `conversation_records` (ClickHouse denorm) |
 
 See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.

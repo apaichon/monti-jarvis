@@ -353,8 +353,8 @@ sequenceDiagram
   G->>A: ResolveTenant(ctx, header, authDisabled, demo)
   G->>S: ListAssignedAvatars(tenant_id, active)
   alt has assignments
-    S-->>G: ai_avatars rows
-    G->>W: map to Agent JSON (image_url → image)
+    S-->>G: ai_avatars + primary ai_avatar_voices row
+    G->>W: map to Agent JSON (image_url → image, voice from priority 1)
   else no assignments
     G->>W: All() static fallback
   end
@@ -375,6 +375,15 @@ sequenceDiagram
 | --- | --- |
 | `active` | Avatar appears in tenant `/api/workforce` list |
 | `disabled` | Assignment revoked; avatar hidden from tenant workforce |
+
+## State: avatar voice profile (Sprint 5)
+
+| Status | Meaning |
+| --- | --- |
+| `active` | Eligible for primary selection or failover (by `priority`) |
+| `disabled` | Skipped by resolver; kept for audit / future enable |
+
+**Failover order:** ascending `priority` among `active` rows for the same `avatar_id`. Sprint 21 applies this during live calls.
 
 ## 17. Customer portal agent pick (unchanged UI, Sprint 5 data)
 

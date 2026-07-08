@@ -20,7 +20,7 @@ Move the AI avatar catalog from hardcoded Go into **Postgres**, let **platform a
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| TASK-0020 | 3 | todo | devops | Postgres `ai_avatars` + `tenant_avatar_assignments` + dev seeds |
+| TASK-0020 | 3 | todo | devops | Postgres `ai_avatars` + `ai_avatar_voices` + `tenant_avatar_assignments` + dev seeds |
 | TASK-0021 | 5 | todo | dev | Avatar catalog store + platform CRUD API |
 | TASK-0022 | 3 | todo | dev | Tenant avatar assign/revoke/list + `max_ai_employees` check |
 | TASK-0023 | 2 | todo | dev | DB-backed `GET /api/workforce` tenant resolver |
@@ -31,7 +31,8 @@ Move the AI avatar catalog from hardcoded Go into **Postgres**, let **platform a
 ## Scope boundary
 
 **In**
-- `ai_avatars` platform catalog (metadata from current Ava/Max/Luna/Neo)
+- `ai_avatars` platform catalog (metadata from current Ava/Max/Luna/Neo; no single `voice` column)
+- `ai_avatar_voices` — ordered voice profiles per avatar (`voice_provider_id`, `voice_id`, `voice`, `priority`)
 - `tenant_avatar_assignments` — enable/disable avatars per tenant
 - Platform APIs under `/api/platform/avatars*`, `/api/platform/tenants/{id}/avatars*`
 - Extend `apps/platform-admin-web` — avatars screens + tenant assignment

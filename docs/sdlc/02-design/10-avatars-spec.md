@@ -2,7 +2,7 @@
 id: DES-0010
 title: Avatar Catalog and Tenant Assignment Specification
 status: approved
-updated: 2026-07-08
+updated: 2026-07-09
 sprint: SPRINT-005
 owner: SA
 ---
@@ -26,7 +26,7 @@ owner: SA
 - MinIO upload pipeline for avatar images (`image_url` text field only).
 - Customer portal Svelte changes (still consumes `/api/workforce`).
 - Tenant self-service avatar admin (Sprint 15+).
-- Runtime voice-provider binding per avatar (`ai_employee_configs` — Sprint 21).
+- Runtime **live failover** during an active call (updates `call_sessions.voice_provider_id` — Sprint 21+); Sprint 5 stores the **ordered voice profile catalog** only.
 
 ## 3. Data model (Postgres `callcenter`)
 
@@ -40,18 +40,47 @@ owner: SA
 | `role` | text | e.g. `General Support` |
 | `trait` | text | Personality label for system prompt |
 | `color` | text | Hex accent `#008cff` |
-| `voice` | text | Gemini Live voice name `Aoede`, `Charon`, … |
 | `image_url` | text | Public path `/images/ava.jpg` or absolute URL |
 | `greeting` | text | Opening line for voice/chat |
 | `status` | text | `draft`, `active`, `archived` |
 | `flags` | jsonb | Optional UI fields: `popular`, `robot`, `skin`, `hair` |
 | audit cols | | |
 
+**Voice is not a single column on `ai_avatars`.** Each avatar has **one or more rows** in `ai_avatar_voices` (provider + voice id + persona voice name), ordered by `priority` for reliability failover.
+
 **`flags` example (Ava):**
 
 ```json
 { "popular": true, "skin": "#f0bd9b", "hair": "#5a3428" }
 ```
+
+### `ai_avatar_voices`
+
+One avatar → many voice profiles (primary + alternates). References catalog `voice_providers` from Sprint 4.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | text PK | e.g. `avvoice_ava_gemini` |
+| `avatar_id` | text FK | → `ai_avatars.id` ON DELETE CASCADE |
+| `voice_provider_id` | text FK | → `voice_providers.id` (e.g. `voice-gemini-live`) |
+| `voice_id` | text | Provider-specific voice/model identifier (e.g. `gemini-2.5-flash-native-audio-latest` or vendor voice key) |
+| `voice` | text | Persona voice name passed to Live API — `Aoede`, `Charon`, `Kore`, `Puck` |
+| `priority` | int | **Lower = preferred**; runtime failover tries next `active` row by ascending priority |
+| `status` | text | `active`, `disabled` |
+| audit cols | | |
+
+**Index:** `(avatar_id, priority)` where `status = 'active'`.
+
+**Resolver rule:** `PrimaryVoice(avatar)` = lowest `priority` among `active` rows. Voice relay / call start uses primary; on provider error, advance to next profile (Sprint 21 wires live switch; Sprint 5 persists catalog).
+
+**Example (Ava — primary Gemini, optional alternate stub):**
+
+| id | avatar_id | voice_provider_id | voice_id | voice | priority | status |
+| --- | --- | --- | --- | --- | ---: | --- |
+| `avvoice_ava_gemini` | `ava` | `voice-gemini-live` | `gemini-2.5-flash-native-audio-latest` | `Aoede` | 1 | `active` |
+| `avvoice_ava_alt` | `ava` | `voice-grok-stub` | `grok-voice-stub` | `Aoede` | 2 | `disabled` |
+
+Sprint 5 seeds **priority 1** rows only for all four avatars; alternate rows optional `disabled` placeholders for ops documentation.
 
 ### `tenant_avatar_assignments`
 
@@ -68,12 +97,14 @@ owner: SA
 
 ### Dev seeds
 
-| Avatar | id | voice | image_url |
-| --- | --- | --- | --- |
-| Ava | `ava` | Aoede | `/images/ava.jpg` |
-| Max | `max` | Charon | `/images/max.jpg` |
-| Luna | `luna` | Kore | `/images/luna.jpg` |
-| Neo | `neo` | Puck | `/images/neo.jpg` |
+**`ai_avatars` + `ai_avatar_voices` (priority 1, `voice-gemini-live`):**
+
+| Avatar | id | voice | voice_id | image_url |
+| --- | --- | --- | --- | --- |
+| Ava | `ava` | Aoede | `gemini-2.5-flash-native-audio-latest` | `/images/ava.jpg` |
+| Max | `max` | Charon | `gemini-2.5-flash-native-audio-latest` | `/images/max.jpg` |
+| Luna | `luna` | Kore | `gemini-2.5-flash-native-audio-latest` | `/images/luna.jpg` |
+| Neo | `neo` | Puck | `gemini-2.5-flash-native-audio-latest` | `/images/neo.jpg` |
 
 Assign all four to tenant `demo` (`active`).
 
@@ -106,7 +137,7 @@ All `/api/platform/avatars*` routes: `platform_admin` + Bearer. See [04-api-spec
 
 ## 6. Workforce JSON shape
 
-Response field `image` maps from DB `image_url` for backward compatibility with customer portal.
+Response field `image` maps from DB `image_url`. Field `voice` is the **primary** profile's `voice` (lowest `priority` active row). Customer portal unchanged.
 
 ```json
 {
@@ -118,6 +149,8 @@ Response field `image` maps from DB `image_url` for backward compatibility with 
       "trait": "Warm & Patient",
       "color": "#008cff",
       "voice": "Aoede",
+      "voice_provider_id": "voice-gemini-live",
+      "voice_id": "gemini-2.5-flash-native-audio-latest",
       "image": "/images/ava.jpg",
       "popular": true,
       "greeting": "Thank you for calling..."
@@ -126,7 +159,7 @@ Response field `image` maps from DB `image_url` for backward compatibility with 
 }
 ```
 
-`internal/workforce.SystemPrompt` continues to use resolved `Agent` struct for chat/voice.
+**Platform admin avatar detail** includes full `voices[]` array (all profiles). `internal/workforce.SystemPrompt` continues to use resolved `Agent` struct for chat/voice.
 
 ## 7. Verification
 
@@ -143,8 +176,16 @@ curl -sS -H "X-Tenant-Id: demo" http://localhost:8091/api/workforce | jq '.agent
 open http://localhost:8091/admin/avatars
 ```
 
-## 8. Sprint 21 migration note
+## 8. Voice failover (phased)
 
-Sprint 5 table `ai_avatars` is the **platform catalog MVP**. Sprint 21 may introduce `ai_employees` + `ai_employee_configs` for provider bindings; migration path: rename/extend `ai_avatars` or add view — document in ER at Sprint 21 open.
+| Phase | Behavior |
+| --- | --- |
+| **Sprint 5** | Persist ordered `ai_avatar_voices`; expose primary + alternates in admin API/UI |
+| **Sprint 21** | Live call path selects primary; on provider error, retry next profile and log `call_provider_events` |
+| **Later** | Tenant-level override via `ai_employee_configs` (embedding + voice defaults) |
+
+## 9. Sprint 21 migration note
+
+Sprint 5 `ai_avatars` + `ai_avatar_voices` is the **platform catalog MVP**. Sprint 21 adds runtime failover and may extend with `ai_employee_configs` for embedding bindings — voice profiles remain on `ai_avatar_voices`.
 
 See [02-workflow.md](02-workflow.md) §14–17 · [03-er-diagram.md](03-er-diagram.md) · [05-ux-ui.md](05-ux-ui.md) § P7–P10 · [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md).

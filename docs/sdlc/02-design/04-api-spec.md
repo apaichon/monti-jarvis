@@ -76,6 +76,8 @@ Returns active avatars assigned to the resolved tenant from `ai_avatars` + `tena
       "color": "#008cff",
       "image": "/images/ava.jpg",
       "voice": "Aoede",
+      "voice_provider_id": "voice-gemini-live",
+      "voice_id": "gemini-2.5-flash-native-audio-latest",
       "popular": true,
       "greeting": "Thank you for calling..."
     }
@@ -83,7 +85,7 @@ Returns active avatars assigned to the resolved tenant from `ai_avatars` + `tena
 }
 ```
 
-DB field `image_url` is exposed as `image` in JSON. Optional `flags` keys (`robot`, `skin`, `hair`) merge into agent objects when set.
+DB field `image_url` is exposed as `image`. `voice`, `voice_provider_id`, `voice_id` come from the **primary** `ai_avatar_voices` row (lowest `priority` among `active`). Optional `flags` keys (`robot`, `skin`, `hair`) merge into agent objects when set.
 
 ## Chat (text + RAG)
 
@@ -391,7 +393,7 @@ Requires `AUTH_DISABLED=false`. Platform routes: `Authorization: Bearer <access_
 | --- | --- | --- |
 | `status` | string | Optional: `draft`, `active`, `archived` |
 
-**Response 200:**
+**Response 200:** each avatar includes `voices[]` (ordered by `priority`).
 
 ```json
 {
@@ -403,11 +405,20 @@ Requires `AUTH_DISABLED=false`. Platform routes: `Authorization: Bearer <access_
       "role": "General Support",
       "trait": "Warm & Patient",
       "color": "#008cff",
-      "voice": "Aoede",
       "image_url": "/images/ava.jpg",
       "greeting": "Thank you for calling...",
       "status": "active",
-      "flags": { "popular": true, "skin": "#f0bd9b", "hair": "#5a3428" }
+      "flags": { "popular": true, "skin": "#f0bd9b", "hair": "#5a3428" },
+      "voices": [
+        {
+          "id": "avvoice_ava_gemini",
+          "voice_provider_id": "voice-gemini-live",
+          "voice_id": "gemini-2.5-flash-native-audio-latest",
+          "voice": "Aoede",
+          "priority": 1,
+          "status": "active"
+        }
+      ]
     }
   ]
 }
@@ -424,21 +435,31 @@ Requires `AUTH_DISABLED=false`. Platform routes: `Authorization: Bearer <access_
 | `role` | string | yes | Role label |
 | `trait` | string | no | Personality |
 | `color` | string | no | Hex accent |
-| `voice` | string | yes | Gemini voice name |
 | `image_url` | string | no | Default `/images/{slug}.jpg` |
 | `greeting` | string | yes | Opening line |
 | `status` | string | no | Default `draft` |
 | `flags` | object | no | `popular`, `robot`, `skin`, `hair` |
+| `voices` | array | yes | ≥1 voice profile (see below) |
 
-**Response 201:** avatar object · **409** slug exists
+**Voice profile object (`voices[]`):**
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `voice_provider_id` | string | yes | FK → `voice_providers.id` |
+| `voice_id` | string | yes | Provider model/voice key |
+| `voice` | string | yes | Persona name (`Aoede`, `Charon`, …) |
+| `priority` | int | no | Default next integer; **lower = preferred** |
+| `status` | string | no | Default `active` |
+
+**Response 201:** avatar object with `voices[]` · **400** no voices / invalid provider · **409** slug exists
 
 ### `GET /api/platform/avatars/{id}`
 
-**Role:** `platform_admin` · **200** avatar · **404** missing
+**Role:** `platform_admin` · **200** avatar + `voices[]` · **404** missing
 
 ### `PUT /api/platform/avatars/{id}`
 
-**Role:** `platform_admin` · Partial body · **200** updated · **409** if archived with active tenant assignments
+**Role:** `platform_admin` · Partial metadata + optional full `voices[]` replace · **200** updated · **409** if archived with active tenant assignments · **400** if `voices` empty when provided
 
 ### `DELETE /api/platform/avatars/{id}`
 
