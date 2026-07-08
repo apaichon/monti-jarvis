@@ -8,7 +8,7 @@ PLATFORM_ADMIN_WEB_DIR := apps/platform-admin-web
 COMPOSE_FILE := infra/docker-compose.yml
 
 .PHONY: help build run start stop restart status logs test \
-	customer-web customer-dev platform-admin-web platform-admin-dev clean km-seed db-migrate \
+	customer-web customer-dev platform-admin-web platform-admin-dev clean-web clean km-seed db-migrate \
 	infra-check infra-up infra-down infra-init infra-destroy infra-reset up down
 
 help:
@@ -38,16 +38,20 @@ help:
 	@printf "  make infra-check    health check all services\n"
 
 customer-web:
-	@cd $(CUSTOMER_WEB_DIR) && npm install && npm run build
+	@cd $(CUSTOMER_WEB_DIR) && npm install && (npm run build || (rm -rf .svelte-kit && npm run build))
 
 customer-dev:
 	@cd $(CUSTOMER_WEB_DIR) && npm install && npm run dev
 
 platform-admin-web:
-	@cd $(PLATFORM_ADMIN_WEB_DIR) && npm install && npm run build
+	@cd $(PLATFORM_ADMIN_WEB_DIR) && npm install && (npm run build || (rm -rf .svelte-kit && npm run build))
 
 platform-admin-dev:
 	@cd $(PLATFORM_ADMIN_WEB_DIR) && npm install && npm run dev
+
+clean-web:
+	rm -rf $(CUSTOMER_WEB_DIR)/.svelte-kit $(CUSTOMER_WEB_DIR)/build
+	rm -rf $(PLATFORM_ADMIN_WEB_DIR)/.svelte-kit $(PLATFORM_ADMIN_WEB_DIR)/build
 
 build: customer-web platform-admin-web
 	go build -o $(BINARY) ./cmd/server
