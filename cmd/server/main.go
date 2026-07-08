@@ -199,6 +199,8 @@ func main() {
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/avatars", guard.RequirePlatformAdmin(http.HandlerFunc(s.listTenantAvatars)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/avatars", guard.RequirePlatformAdmin(http.HandlerFunc(s.assignTenantAvatar)))
 	mux.Handle("DELETE /api/platform/tenants/{tenant_id}/avatars/{avatar_id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.revokeTenantAvatar)))
+	mux.Handle("POST /api/platform/avatars/{id}/image", guard.RequirePlatformAdmin(http.HandlerFunc(s.uploadAvatarImage)))
+	mux.HandleFunc("GET /api/assets/avatars/{id}/{file}", s.serveAvatarAsset)
 	mux.Handle("GET /api/entitlements/me", guard.RequireTenantAdminOrPlatform(http.HandlerFunc(s.entitlementMe)))
 	mux.HandleFunc("GET /ws/voice", s.voice.Handler())
 	mux.HandleFunc("GET /legacy", func(w http.ResponseWriter, r *http.Request) {

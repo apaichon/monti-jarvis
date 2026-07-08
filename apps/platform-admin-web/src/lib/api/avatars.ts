@@ -1,4 +1,5 @@
-import { apiFetch } from './http';
+import { getAccessToken } from '$lib/auth/session';
+import { apiFetch, ApiError } from './http';
 
 export type AvatarVoice = {
   id?: string;
@@ -101,6 +102,36 @@ export function revokeTenantAvatar(tenantId: string, avatarId: string) {
     `/api/platform/tenants/${tenantId}/avatars/${avatarId}`,
     { method: 'DELETE' }
   );
+}
+
+export type AvatarImageUploadResponse = {
+  image_url: string;
+  status: 'uploaded' | 'uploaded_and_saved';
+  avatar?: Avatar;
+};
+
+export async function uploadAvatarImage(avatarId: string, file: File): Promise<AvatarImageUploadResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const headers = new Headers();
+  const token = getAccessToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  const res = await fetch(`/api/platform/avatars/${encodeURIComponent(avatarId)}/image`, {
+    method: 'POST',
+    headers,
+    body: form
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch {
+      // ignore
+    }
+    throw new ApiError(res.status, message);
+  }
+  return (await res.json()) as AvatarImageUploadResponse;
 }
 
 export function defaultVoiceRow(priority = 1): AvatarVoice {

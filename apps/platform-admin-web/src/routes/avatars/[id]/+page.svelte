@@ -3,6 +3,8 @@
   import { base } from '$app/paths';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import AvatarImageField from '$lib/components/AvatarImageField.svelte';
+  import StatusMessage from '$lib/components/StatusMessage.svelte';
   import VoiceProfilesForm from '$lib/components/VoiceProfilesForm.svelte';
   import {
     archiveAvatar,
@@ -24,7 +26,9 @@
   let skin = $state('');
   let hair = $state('');
   let error = $state('');
+  let success = $state('');
   let saving = $state(false);
+  let successTimer: ReturnType<typeof setTimeout> | undefined;
   let showArchive = $state(false);
   let archiving = $state(false);
 
@@ -76,6 +80,8 @@
     }
     saving = true;
     error = '';
+    success = '';
+    if (successTimer) clearTimeout(successTimer);
     try {
       avatar = await updateAvatar(avatar.id, {
         slug: avatar.slug,
@@ -91,6 +97,10 @@
       });
       voices = avatar.voices.map((v) => ({ ...v }));
       applyFlags(avatar.flags);
+      success = `Saved — ${avatar.name} is now ${avatar.status}.`;
+      successTimer = setTimeout(() => {
+        success = '';
+      }, 4000);
     } catch (err) {
       error = handleError(err, 'Save failed');
     } finally {
@@ -121,9 +131,8 @@
   <h1 style="margin:8px 0 20px;font-size:24px">Edit avatar</h1>
 {/if}
 
-{#if error}
-  <p class="error" style="margin-bottom:12px">{error}</p>
-{/if}
+<StatusMessage message={success} variant="success" />
+<StatusMessage message={error} variant="error" />
 
 {#if avatar}
   <form onsubmit={save}>
@@ -161,10 +170,14 @@
           </select>
         </div>
       </div>
-      <div class="field">
-        <label for="image_url">Image URL</label>
-        <input id="image_url" bind:value={avatar.image_url} />
-      </div>
+      <AvatarImageField
+        avatarId={avatar.id}
+        bind:imageUrl={avatar.image_url}
+        onError={(msg) => {
+          error = msg;
+          success = '';
+        }}
+      />
       <div class="field">
         <label for="greeting">Greeting</label>
         <textarea id="greeting" rows="3" bind:value={avatar.greeting} required></textarea>

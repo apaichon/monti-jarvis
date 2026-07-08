@@ -201,6 +201,36 @@ button {
   font-size: 13px;
 }
 
+.success {
+  color: var(--success);
+  font-size: 13px;
+}
+
+.status-message {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.status-message.success {
+  color: var(--success);
+  background: rgb(61 214 140 / 12%);
+  border: 1px solid rgb(61 214 140 / 28%);
+}
+
+.status-message.error {
+  color: var(--danger);
+  background: rgb(255 92 122 / 10%);
+  border: 1px solid rgb(255 92 122 / 28%);
+}
+
+.status-message.info {
+  color: var(--cyan);
+  background: rgb(0 183 255 / 10%);
+  border: 1px solid rgb(0 183 255 / 22%);
+}
+
 .login-wrap {
   min-height: 100vh;
   display: grid;

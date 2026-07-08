@@ -2,6 +2,8 @@
   import { base } from '$app/paths';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import AvatarImageField from '$lib/components/AvatarImageField.svelte';
+  import StatusMessage from '$lib/components/StatusMessage.svelte';
   import VoiceProfilesForm from '$lib/components/VoiceProfilesForm.svelte';
   import {
     createAvatar,
@@ -82,9 +84,7 @@
 <p><a class="link" href="{base}/avatars">← Avatars</a></p>
 <h1 style="margin:8px 0 20px;font-size:24px">New avatar</h1>
 
-{#if error}
-  <p class="error" style="margin-bottom:12px">{error}</p>
-{/if}
+<StatusMessage message={error} variant="error" />
 
 <form onsubmit={submit}>
   <div class="card" style="margin-bottom:16px">
@@ -120,10 +120,13 @@
         </select>
       </div>
     </div>
-    <div class="field">
-      <label for="image_url">Image URL</label>
-      <input id="image_url" bind:value={imageUrl} placeholder="/images/{slug || 'slug'}.jpg" />
-    </div>
+    <AvatarImageField
+      avatarId={slug}
+      bind:imageUrl={imageUrl}
+      onError={(msg) => {
+        error = msg;
+      }}
+    />
     <div class="field">
       <label for="greeting">Greeting *</label>
       <textarea id="greeting" rows="3" bind:value={greeting} required></textarea>
