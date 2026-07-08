@@ -9,7 +9,6 @@ type VoiceMsg = {
 export type VoiceCallbacks = {
   onLive?: (live: boolean) => void;
   onTranscript?: (role: 'caller' | 'agent', text: string) => void;
-  onAgentAudioLevel?: (level: number) => void;
   onError?: (message: string) => void;
 };
 
@@ -37,12 +36,6 @@ export class GeminiVoice {
     this.player = new AudioWorkletNode(this.playbackCtx, 'player-processor');
     this.source.connect(this.recorder);
     this.player.connect(this.playbackCtx.destination);
-    this.player.port.onmessage = (event) => {
-      const data = event.data;
-      if (data && typeof data === 'object' && data.type === 'level' && typeof data.value === 'number') {
-        callbacks.onAgentAudioLevel?.(data.value);
-      }
-    };
 
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
     const params = new URLSearchParams({ agent: agentId, topic: topic || 'general' });
@@ -96,9 +89,6 @@ export class GeminiVoice {
   }
 
   private async cleanup() {
-    if (this.player) {
-      this.player.port.onmessage = null;
-    }
     this.micStream?.getTracks().forEach((t) => t.stop());
     await this.captureCtx?.close().catch(() => {});
     await this.playbackCtx?.close().catch(() => {});
@@ -119,7 +109,6 @@ export class GeminiVoice {
     }
     if (msg.type === 'interrupted' && this.player) {
       this.player.port.postMessage('flush');
-      callbacks.onAgentAudioLevel?.(0);
       return;
     }
     if (msg.type === 'transcript' && msg.text) {

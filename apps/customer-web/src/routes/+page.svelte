@@ -53,7 +53,6 @@
   ]);
   let input = $state('');
   let infraStatus = $state('checking infra');
-  let lipLevel = $state(0);
   let chatEl: HTMLElement | undefined = $state();
 
   let startedAt = 0;
@@ -91,14 +90,6 @@
   function stopTimer() {
     clearInterval(timerId);
     timer = '00:00:00';
-  }
-
-  function setAgentLipLevel(level: number) {
-    lipLevel = lipLevel * 0.55 + level * 0.45;
-  }
-
-  function resetLipLevel() {
-    lipLevel = 0;
   }
 
   async function scrollChat() {
@@ -170,14 +161,12 @@
         gemini.start(selectedAgent.id, topic, {
           onLive: (v) => {
             live = v;
-            if (!v) resetLipLevel();
             voiceState = v ? `On call with ${selectedAgent?.name}.` : `Ready to call ${selectedAgent?.name}.`;
           },
           onTranscript: (role, text) => {
             upsertVoiceTurn(role, text);
             if (session) void persistTurn(session.id, role, text);
           },
-          onAgentAudioLevel: setAgentLipLevel,
           onError: (message) => {
             error = message;
           }
@@ -218,7 +207,6 @@
 
   async function cleanup(resetSession: boolean) {
     live = false;
-    resetLipLevel();
     stopTimer();
     unsubscribe?.();
     unsubscribe = undefined;
@@ -305,14 +293,14 @@
 
     {#if selectedAgent}
       <section class="assistant-orb">
-        <div class="halo" class:on-call={live} style="--assistant-color:{selectedAgent.color}">
-          <Portrait agent={selectedAgent} lipSync={live} {lipLevel} />
+        <div class="halo" style="--assistant-color:{selectedAgent.color}">
+          <Portrait agent={selectedAgent} />
         </div>
         <div class="assistant-name">
           <h2>{selectedAgent.name}</h2>
           <p>{selectedAgent.role} · {selectedAgent.trait}</p>
         </div>
-        <Waveform color={selectedAgent.color} active={live} level={lipLevel} />
+        <Waveform color={selectedAgent.color} />
       </section>
     {/if}
 
