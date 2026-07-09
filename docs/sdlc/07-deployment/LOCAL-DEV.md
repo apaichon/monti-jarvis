@@ -89,6 +89,15 @@ make up
 | `JWT_REFRESH_TTL` | No | `168h` (7 days) |
 | `NATS_URL` | No | Optional lifecycle events |
 | `LIVEKIT_*` | No | Optional token API |
+| `CHILLPAY_MERCHANT_CODE` | Sprint 8+ | ChillPay sandbox merchant code |
+| `CHILLPAY_API_KEY` | Sprint 8+ | Overrides DB-stored API key |
+| `CHILLPAY_MD5_KEY` | Sprint 8+ | MD5 secret for checksums |
+| `CHILLPAY_BASE_URL` | No | Default sandbox payment init URL |
+| `CHILLPAY_ROUTE_NO` | No | `1` |
+| `CHILLPAY_CURRENCY` | No | `764` (THB numeric) |
+| `CHILLPAY_CALLBACK_URL` | No | Public URL for `POST /api/callbacks/chillpay` (ngrok) |
+| `CHILLPAY_RETURN_URL` | No | Browser return after ChillPay payment |
+| `PAYMENT_CALLBACK_DEV_BYPASS` | No | `false` — skip callback checksum locally |
 
 See `infra/.env.example` for the full list.
 

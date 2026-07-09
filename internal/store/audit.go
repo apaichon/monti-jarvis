@@ -32,6 +32,8 @@ var auditableTables = []string{
 	"ai_avatars",
 	"ai_avatar_voices",
 	"tenant_avatar_assignments",
+	"payment_gateway_configs",
+	"payment_callback_events",
 }
 
 func (s *Store) ensureAuditSchema(ctx context.Context) error {

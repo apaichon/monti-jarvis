@@ -45,6 +45,8 @@ func Open(ctx context.Context, cfg env.Config) (*Store, []string) {
 			s.pg = pool
 			if err := s.ensureSchema(ctx); err != nil {
 				warnings = append(warnings, "postgres schema: "+err.Error())
+			} else if err := s.SeedPaymentGatewayFromEnv(ctx); err != nil {
+				warnings = append(warnings, "payment gateway seed: "+err.Error())
 			}
 		}
 	}
@@ -220,6 +222,9 @@ CREATE INDEX IF NOT EXISTS knowledge_chunks_agent_idx ON %s.knowledge_chunks (te
 		return err
 	}
 	if err := s.ensureTenantKYCSchema(ctx); err != nil {
+		return err
+	}
+	if err := s.ensurePaymentSchema(ctx); err != nil {
 		return err
 	}
 	return s.ensureAuditSchema(ctx)

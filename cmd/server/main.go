@@ -28,6 +28,7 @@ import (
 	"github.com/libra/monti-jarvis/internal/live"
 	"github.com/libra/monti-jarvis/internal/lktoken"
 	"github.com/libra/monti-jarvis/internal/natsbus"
+	"github.com/libra/monti-jarvis/internal/payment"
 	"github.com/libra/monti-jarvis/internal/rag"
 	"github.com/libra/monti-jarvis/internal/store"
 	"github.com/libra/monti-jarvis/internal/web"
@@ -238,6 +239,10 @@ func main() {
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/avatars", guard.RequirePlatformAdmin(http.HandlerFunc(s.listTenantAvatars)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/avatars", guard.RequirePlatformAdmin(http.HandlerFunc(s.assignTenantAvatar)))
 	mux.Handle("DELETE /api/platform/tenants/{tenant_id}/avatars/{avatar_id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.revokeTenantAvatar)))
+	mux.Handle("GET /api/platform/payment-gateway", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPaymentGateway)))
+	mux.Handle("PUT /api/platform/payment-gateway", guard.RequirePlatformAdmin(http.HandlerFunc(s.putPaymentGateway)))
+	mux.Handle("POST /api/platform/payment-gateway/test", guard.RequirePlatformAdmin(http.HandlerFunc(s.testPaymentGateway)))
+	mux.HandleFunc("POST /api/callbacks/chillpay", s.chillpayCallback)
 	mux.Handle("POST /api/platform/avatars/{id}/image", guard.RequirePlatformAdmin(http.HandlerFunc(s.uploadAvatarImage)))
 	mux.HandleFunc("GET /api/assets/avatars/{id}/{file}", s.serveAvatarAsset)
 	mux.Handle("GET /api/entitlements/me", guard.RequireTenantAdminOrPlatform(http.HandlerFunc(s.entitlementMe)))
@@ -287,7 +292,7 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":      s.cfg.LiveKitAPIKey != "",
 		"nats":         s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":              "SPRINT-007",
+		"sprint":              "SPRINT-008",
 		"auth_disabled":       s.cfg.AuthDisabled,
 		"tenant_register":     s.cfg.TenantRegisterEnabled,
 		"rag":                 s.rag != nil && s.rag.Enabled(),
@@ -332,6 +337,18 @@ func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.entitlements != nil {
 		out["entitlement_cache"] = s.entitlements.CacheStatus()
+	}
+	if s.store != nil {
+		if row, err := s.store.GetPaymentGatewayConfig(ctx); err == nil {
+			gw := payment.NewGateway(s.cfg, s.store)
+			resolved := gw.Resolve(row)
+			out["payment_gateway"] = map[string]any{
+				"configured": strings.TrimSpace(resolved.Provider) != "" && resolved.Status == "active",
+				"provider":   resolved.Provider,
+				"mode":       resolved.Mode,
+				"status":     resolved.Status,
+			}
+		}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
