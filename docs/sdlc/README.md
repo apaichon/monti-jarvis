@@ -16,8 +16,8 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** [`SPRINT-007`](03-sprints/SPRINT-007.md) — Platform Admin: KYC Tenant · target **v0.8.0**
+**Current sprint:** [`SPRINT-008`](03-sprints/SPRINT-008.md) — Platform Admin: Payment Gateway · target **v0.9.0** *(not yet opened)*
 
-**Shipped:** v0.7.0 [`SPRINT-006`](03-sprints/SPRINT-006.md) · v0.6.0 [`SPRINT-005`](03-sprints/SPRINT-005.md) · v0.5.0 [`SPRINT-004`](03-sprints/SPRINT-004.md) · v0.4.0 [`SPRINT-003`](03-sprints/SPRINT-003.md) · v0.3.0 [`SPRINT-002`](03-sprints/SPRINT-002.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
+**Shipped:** v0.8.0 [`SPRINT-007`](03-sprints/SPRINT-007.md) · v0.7.0 [`SPRINT-006`](03-sprints/SPRINT-006.md) · v0.6.0 [`SPRINT-005`](03-sprints/SPRINT-005.md) · v0.5.0 [`SPRINT-004`](03-sprints/SPRINT-004.md) · v0.4.0 [`SPRINT-003`](03-sprints/SPRINT-003.md) · v0.3.0 [`SPRINT-002`](03-sprints/SPRINT-002.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
 
 **Ops:** [`docs/KM_SETUP.md`](../KM_SETUP.md) · **Deploy:** [`07-deployment/LOCAL-DEV.md`](07-deployment/LOCAL-DEV.md) · **UAT:** [`06-manual-tests/SPRINT-002-manual.md`](06-manual-tests/SPRINT-002-manual.md)

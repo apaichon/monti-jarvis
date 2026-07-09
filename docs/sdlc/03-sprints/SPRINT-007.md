@@ -1,8 +1,11 @@
 ---
 id: SPRINT-007
-status: in_progress
+status: completed
 start: 2026-07-09
 end: 2026-07-22
+closed: 2026-07-09
+updated: 2026-07-09
+release: v0.8.0
 goal: "Platform Admin: KYC Tenant — review submitted packages and approve or reject pending_kyc tenants."
 roadmap_sprint: 7
 platform: Platform Admin
@@ -28,13 +31,25 @@ Let **platform admins** review tenant KYC packages submitted in Sprint 6, **appr
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| TASK-0030 | 3 | todo | devops | KYC review schema — `tenant_kyc_profiles` review columns + registration reviewer fields |
-| TASK-0031 | 5 | todo | dev | Platform KYC APIs — `GET /api/platform/tenants/{id}/kyc`, approve, reject |
-| TASK-0032 | 3 | todo | dev | Lifecycle — atomic approve/reject; `tenants.status` transition; KM write unblock |
-| TASK-0033 | 2 | todo | dev | Resend email to tenant admin on approve/reject |
-| TASK-0034 | 3 | todo | dev | Platform admin UI — `/admin/tenants/{id}/kyc` review screen |
+| TASK-0030 | 3 | completed | devops | KYC review schema — `tenant_kyc_profiles` review columns + registration reviewer fields |
+| TASK-0031 | 5 | completed | dev | Platform KYC APIs — `GET /api/platform/tenants/{id}/kyc`, approve, reject |
+| TASK-0032 | 3 | completed | dev | Lifecycle — atomic approve/reject; `tenants.status` transition; KM write unblock |
+| TASK-0033 | 2 | completed | dev | Resend email to tenant admin on approve/reject |
+| TASK-0034 | 3 | completed | dev | Platform admin UI — `/admin/tenants/{id}/kyc` review screen |
 
-**Committed:** 16 points · **Completed:** 0 points · **Velocity target:** 16
+**Committed:** 16 points · **Completed:** 16 points · **Velocity:** 16
+
+## Shipped (v0.8.0)
+
+- Schema: `tenant_kyc_profiles` review columns (`reviewed_at`, `reviewed_by`, `rejection_reason`); status `approved` | `rejected`
+- Platform APIs: `GET /api/platform/tenants/{id}/kyc`, `POST .../approve`, `POST .../reject` (`platform_admin` only)
+- Lifecycle: single Postgres transaction on approve (`pending_kyc` → `active`, registration + profile `approved`); reject keeps tenant `pending_kyc`
+- KM writes unblock for `tenant_admin` after approve (`RequireKMWrite` passes on `active` tenant)
+- `GET /api/platform/tenants?kyc_status=submitted` filter; tenants list KYC column + link to review
+- Platform admin UI: `/admin/tenants/{id}/kyc` — contact, photo, documents, approve/reject with feedback dialog
+- Resend decision emails to tenant admin on approve/reject (no-op when `RESEND_API_KEY` unset)
+- Tenant resubmit: rejected KYC resets to `submitted` on backoffice re-submit
+- E2E: `e2e/tests/platform-kyc.spec.ts`
 
 ## Scope boundary
 
@@ -96,4 +111,4 @@ curl -H "Authorization: Bearer $TENANT_TOKEN" -X POST http://localhost:8091/api/
 
 ## Definition of done
 
-- Design pack approved · code reviewed · ACs verified by Tester · `make build` · tag **v0.8.0** at sprint close
+- Design pack approved · code reviewed · ACs verified · `make build` · tag **v0.8.0** at sprint close ✅

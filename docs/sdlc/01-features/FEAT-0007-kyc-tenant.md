@@ -1,5 +1,5 @@
 # Feature: Platform KYC Tenant Review   (FEAT-0007)
-**Sprint:** SPRINT-007   **Owner:** DEV   **Status:** in_progress   **Release target:** v0.8.0
+**Sprint:** SPRINT-007   **Owner:** DEV   **Status:** shipped   **Release:** v0.8.0
 
 ## Problem
 

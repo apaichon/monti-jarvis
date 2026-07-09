@@ -1,7 +1,7 @@
 ---
 id: DES-0012
 title: Platform KYC Tenant Review Specification
-status: approved
+status: shipped
 updated: 2026-07-09
 sprint: SPRINT-007
 owner: SA

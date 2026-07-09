@@ -14,6 +14,7 @@
 | Official Sprint 4 | **Shipped v0.5.0** — Platform Admin: Portal + Packages (login, profile, catalog UI) |
 | Official Sprint 5 | **Shipped v0.6.0** — Platform Admin: Avatars (catalog + tenant assignment + portrait upload) |
 | Official Sprint 6 | **Shipped v0.7.0** — Tenant: Register (public signup, OAuth, email verify, KYC backoffice; no HeyGen) |
+| Official Sprint 7 | **Shipped v0.8.0** — Platform Admin: KYC Tenant (review queue, approve/reject, tenant activation) |
 
 ---
 
@@ -27,7 +28,7 @@
 | 4 | Platform Admin | Packages | B | 3 ✅ v0.5.0 |
 | 5 | Platform Admin | Avatars | B | 3, 4 ✅ v0.6.0 |
 | 6 | Tenant | Register | C | 3 ✅ v0.7.0 |
-| 7 | Platform Admin | KYC Tenant | C | 6 🔄 v0.8.0 |
+| 7 | Platform Admin | KYC Tenant | C | 6 ✅ v0.8.0 |
 | 8 | Platform Admin | Payment Gateway | C | 3 |
 | 9 | Tenant | Buy Package | C | 4, 6, 8 |
 | 10 | Platform Admin | Billing | C | 9 |
@@ -124,15 +125,21 @@ docs/sdlc/04-tasks/TASK-NNNN.md
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Current sprint: SPRINT-007
+## Current sprint: SPRINT-008
 
 **Platform:** Platform Admin  
-**Feature:** KYC Tenant  
-**Goal:** Review and approve/reject `pending_kyc` registrations (depends on Sprint 6).
+**Feature:** Payment Gateway  
+**Goal:** Payment provider integration for tenant commerce (depends on Sprint 3).
 
-**Release target:** v0.8.0
+**Release target:** v0.9.0
 
-## Last shipped: SPRINT-006
+## Last shipped: SPRINT-007
+
+**Platform:** Platform Admin · **Feature:** KYC Tenant · **v0.8.0**
+
+See [SPRINT-007](../03-sprints/SPRINT-007.md) · [FEAT-0007](../01-features/FEAT-0007-kyc-tenant.md).
+
+## Prior: SPRINT-006
 
 **Platform:** Tenant · **Feature:** Register · **v0.7.0**
 
@@ -150,8 +157,8 @@ See [SPRINT-005](../03-sprints/SPRINT-005.md) · [FEAT-0005](../01-features/FEAT
 
 See [SPRINT-004](../03-sprints/SPRINT-004.md) · [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md).
 
-## Next sprint: SPRINT-008
+## Next sprint: SPRINT-009
 
-**Platform:** Platform Admin  
-**Feature:** Payment Gateway  
-**Goal:** Payment provider integration for tenant commerce (depends on Sprint 3).
+**Platform:** Tenant  
+**Feature:** Buy Package  
+**Goal:** Tenant purchases a commercial package after KYC approval (depends on Sprints 4, 6, 8).
