@@ -21,7 +21,22 @@ type TenantKYCProfile struct {
 	BusinessDocKeys  []string
 	Status           string
 	SubmittedAt      *time.Time
+	ReviewedAt       *time.Time
+	ReviewedBy       string
+	RejectionReason  string
 	UpdatedAt        time.Time
+}
+
+type PlatformKYCDecisionResult struct {
+	TenantID           string
+	TenantStatus       string
+	RegistrationStatus string
+	KYCStatus          string
+	RejectionReason    string
+	ReviewedAt         time.Time
+	ReviewedBy         string
+	AdminEmail         string
+	CompanyName        string
 }
 
 func (s *Store) ensureTenantKYCSchema(ctx context.Context) error {
@@ -40,7 +55,26 @@ func (s *Store) ensureTenantKYCSchema(ctx context.Context) error {
   submitted_at timestamptz,%s
 )`, schema, schema, auditColumnsDDL)
 	_, err := s.pg.Exec(ctx, stmt)
-	return err
+	if err != nil {
+		return err
+	}
+	migrations := []string{
+		fmt.Sprintf(`ALTER TABLE %s.tenant_kyc_profiles
+  ADD COLUMN IF NOT EXISTS reviewed_at timestamptz`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.tenant_kyc_profiles
+  ADD COLUMN IF NOT EXISTS reviewed_by text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.tenant_kyc_profiles
+  ADD COLUMN IF NOT EXISTS rejection_reason text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.tenant_kyc_profiles DROP CONSTRAINT IF EXISTS tenant_kyc_profiles_status_check`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.tenant_kyc_profiles ADD CONSTRAINT tenant_kyc_profiles_status_check
+  CHECK (status IN ('draft', 'submitted', 'approved', 'rejected'))`, schema),
+	}
+	for _, m := range migrations {
+		if _, err := s.pg.Exec(ctx, m); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) GetTenantKYCProfile(ctx context.Context, tenantID string) (TenantKYCProfile, error) {
@@ -50,12 +84,13 @@ func (s *Store) GetTenantKYCProfile(ctx context.Context, tenantID string) (Tenan
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	row := s.pg.QueryRow(ctx, fmt.Sprintf(`
 SELECT tenant_id, contact_name, contact_phone, contact_address, photo_object_key,
-       business_doc_keys, status, submitted_at, updated_at
+       business_doc_keys, status, submitted_at, reviewed_at, reviewed_by, rejection_reason, updated_at
 FROM %s.tenant_kyc_profiles WHERE tenant_id = $1`, schema), tenantID)
 	var profile TenantKYCProfile
 	var docsRaw []byte
 	if err := row.Scan(&profile.TenantID, &profile.ContactName, &profile.ContactPhone, &profile.ContactAddress,
-		&profile.PhotoObjectKey, &docsRaw, &profile.Status, &profile.SubmittedAt, &profile.UpdatedAt); err != nil {
+		&profile.PhotoObjectKey, &docsRaw, &profile.Status, &profile.SubmittedAt,
+		&profile.ReviewedAt, &profile.ReviewedBy, &profile.RejectionReason, &profile.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return TenantKYCProfile{TenantID: tenantID, Status: "draft", BusinessDocKeys: []string{}}, nil
 		}
@@ -133,10 +168,21 @@ func (s *Store) SubmitTenantKYC(ctx context.Context, tenantID string) (TenantKYC
 	_, err := s.pg.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s.tenant_kyc_profiles (tenant_id, status, submitted_at, created_by, updated_by)
 VALUES ($1, 'submitted', now(), $2, $2)
-ON CONFLICT (tenant_id) DO UPDATE SET status = 'submitted', submitted_at = now(), updated_by = EXCLUDED.updated_by, updated_at = now()`, schema),
+ON CONFLICT (tenant_id) DO UPDATE SET
+  status = 'submitted',
+  submitted_at = now(),
+  reviewed_at = NULL,
+  reviewed_by = '',
+  rejection_reason = '',
+  updated_by = EXCLUDED.updated_by,
+  updated_at = now()`, schema),
 		tenantID, actor)
 	if err != nil {
 		return TenantKYCProfile{}, err
 	}
+	_, _ = s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.tenant_registrations
+SET status = 'submitted', rejection_reason = '', reviewed_at = NULL, reviewed_by = '', updated_by = $2, updated_at = now()
+WHERE tenant_id = $1`, schema), tenantID, actor)
 	return s.GetTenantKYCProfile(ctx, tenantID)
 }

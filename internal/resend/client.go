@@ -84,6 +84,35 @@ func VerificationEmail(verifyURL, displayName string) (string, string) {
 	return subject, html
 }
 
+func KYCApprovedEmail(loginURL, companyName string) (string, string) {
+	company := strings.TrimSpace(companyName)
+	if company == "" {
+		company = "your workspace"
+	}
+	subject := "Your Monti workspace is now active"
+	html := fmt.Sprintf(`<p>Good news — <strong>%s</strong> has passed platform verification.</p>
+<p>Your tenant account is <strong>active</strong>. You can sign in and start configuring knowledge base content for your AI agents.</p>
+<p><a href="%s">Sign in to Monti</a></p>`, company, loginURL)
+	return subject, html
+}
+
+func KYCRejectedEmail(backofficeURL, companyName, reason string) (string, string) {
+	company := strings.TrimSpace(companyName)
+	if company == "" {
+		company = "your workspace"
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "Additional information is required."
+	}
+	subject := "Action required — Monti KYC review update"
+	html := fmt.Sprintf(`<p>We reviewed the verification package for <strong>%s</strong> and could not approve it yet.</p>
+<p><strong>Reason:</strong> %s</p>
+<p>Please update your documents in the tenant backoffice and submit again for review.</p>
+<p><a href="%s">Open tenant backoffice</a></p>`, company, reason, backofficeURL)
+	return subject, html
+}
+
 func RegistrationCompleteEmail(loginURL, tenantID, displayName string) (string, string) {
 	name := strings.TrimSpace(displayName)
 	if name == "" {

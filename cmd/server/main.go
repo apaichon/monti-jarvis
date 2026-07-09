@@ -208,6 +208,9 @@ func main() {
 	mux.HandleFunc("GET /api/public/tenant/register/oauth/{provider}/callback", s.tenantOAuthCallback)
 	mux.HandleFunc("POST /api/public/tenant/register/oauth/complete", s.completeTenantOAuth)
 	mux.Handle("GET /api/platform/tenants", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformTenants)))
+	mux.Handle("GET /api/platform/tenants/{tenant_id}/kyc", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantKYC)))
+	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/approve", guard.RequirePlatformAdmin(http.HandlerFunc(s.approvePlatformTenantKYC)))
+	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))
 	mux.HandleFunc("GET /api/tenant/kyc", s.getTenantKYC)
 	mux.HandleFunc("PUT /api/tenant/kyc", s.updateTenantKYC)
 	mux.HandleFunc("POST /api/tenant/kyc/photo", s.uploadTenantKYCPhoto)
@@ -284,7 +287,7 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":      s.cfg.LiveKitAPIKey != "",
 		"nats":         s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":              "SPRINT-006",
+		"sprint":              "SPRINT-007",
 		"auth_disabled":       s.cfg.AuthDisabled,
 		"tenant_register":     s.cfg.TenantRegisterEnabled,
 		"rag":                 s.rag != nil && s.rag.Enabled(),

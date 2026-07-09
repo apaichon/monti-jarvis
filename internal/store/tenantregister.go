@@ -15,7 +15,8 @@ import (
 var (
 	ErrTenantSlugTaken       = errors.New("slug already taken")
 	ErrTenantEmailRegistered = errors.New("email already registered")
-	ErrTenantNotActive       = errors.New("tenant not active")
+	ErrTenantNotActive   = errors.New("tenant not active")
+	ErrKYCReviewConflict = errors.New("kyc review conflict")
 )
 
 type TenantRegistration struct {
@@ -34,7 +35,16 @@ type TenantListItem struct {
 	Status         string
 	RegistrationID string
 	AdminEmail     string
+	KYCStatus      string
 	CreatedAt      time.Time
+}
+
+type TenantSummary struct {
+	ID        string
+	Slug      string
+	Name      string
+	Status    string
+	CreatedAt time.Time
 }
 
 type RegisterTenantInput struct {
@@ -85,6 +95,12 @@ func (s *Store) ensureTenantRegisterSchema(ctx context.Context) error {
 )`, schema, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS tenant_registrations_tenant_idx
 ON %s.tenant_registrations (tenant_id)`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.tenant_registrations
+  ADD COLUMN IF NOT EXISTS rejection_reason text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.tenant_registrations
+  ADD COLUMN IF NOT EXISTS reviewed_at timestamptz`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.tenant_registrations
+  ADD COLUMN IF NOT EXISTS reviewed_by text NOT NULL DEFAULT ''`, schema),
 	}
 	for _, stmt := range stmts {
 		if _, err := s.pg.Exec(ctx, stmt); err != nil {
@@ -92,6 +108,43 @@ ON %s.tenant_registrations (tenant_id)`, schema),
 		}
 	}
 	return nil
+}
+
+func (s *Store) GetTenant(ctx context.Context, tenantID string) (TenantSummary, error) {
+	if s.pg == nil {
+		return TenantSummary{}, fmt.Errorf("postgres unavailable")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var t TenantSummary
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT id, slug, name, status, created_at
+FROM %s.tenants WHERE id = $1`, schema), tenantID).Scan(&t.ID, &t.Slug, &t.Name, &t.Status, &t.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return TenantSummary{}, ErrTenantNotFound
+		}
+		return TenantSummary{}, err
+	}
+	return t, nil
+}
+
+func (s *Store) GetTenantRegistration(ctx context.Context, tenantID string) (TenantRegistration, error) {
+	if s.pg == nil {
+		return TenantRegistration{}, fmt.Errorf("postgres unavailable")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var reg TenantRegistration
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT id, tenant_id, company_name, admin_email, status, created_at
+FROM %s.tenant_registrations WHERE tenant_id = $1`, schema), tenantID).Scan(
+		&reg.ID, &reg.TenantID, &reg.CompanyName, &reg.AdminEmail, &reg.Status, &reg.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return TenantRegistration{}, ErrTenantNotFound
+		}
+		return TenantRegistration{}, err
+	}
+	return reg, nil
 }
 
 func (s *Store) TenantSlugExists(ctx context.Context, slug string) (bool, error) {
@@ -261,7 +314,7 @@ VALUES ($1, $2, $3, $4, $5, $5)`, schema),
 	}, nil
 }
 
-func (s *Store) ListTenants(ctx context.Context, status string, limit, offset int) ([]TenantListItem, int, error) {
+func (s *Store) ListTenants(ctx context.Context, status, kycStatus string, limit, offset int) ([]TenantListItem, int, error) {
 	if s.pg == nil {
 		return nil, 0, fmt.Errorf("postgres unavailable")
 	}
@@ -277,28 +330,38 @@ func (s *Store) ListTenants(ctx context.Context, status string, limit, offset in
 
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	status = strings.TrimSpace(status)
+	kycStatus = strings.TrimSpace(kycStatus)
+
+	where := make([]string, 0, 2)
+	args := []any{}
+	if status != "" {
+		args = append(args, status)
+		where = append(where, fmt.Sprintf("t.status = $%d", len(args)))
+	}
+	if kycStatus != "" {
+		args = append(args, kycStatus)
+		where = append(where, fmt.Sprintf("COALESCE(k.status, 'draft') = $%d", len(args)))
+	}
+	whereSQL := ""
+	if len(where) > 0 {
+		whereSQL = " WHERE " + strings.Join(where, " AND ")
+	}
+
+	fromJoin := fmt.Sprintf(`FROM %s.tenants t
+LEFT JOIN %s.tenant_registrations tr ON tr.tenant_id = t.id
+LEFT JOIN %s.tenant_kyc_profiles k ON k.tenant_id = t.id`, schema, schema, schema)
 
 	var total int
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %s.tenants t`, schema)
-	countArgs := []any{}
-	if status != "" {
-		countQuery += ` WHERE t.status = $1`
-		countArgs = append(countArgs, status)
-	}
-	if err := s.pg.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+	countQuery := "SELECT COUNT(*) " + fromJoin + whereSQL
+	if err := s.pg.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
 	query := fmt.Sprintf(`
-SELECT t.id, t.slug, t.name, t.status, COALESCE(tr.id, ''), COALESCE(tr.admin_email, ''), t.created_at
-FROM %s.tenants t
-LEFT JOIN %s.tenant_registrations tr ON tr.tenant_id = t.id`, schema, schema)
-	args := []any{}
-	if status != "" {
-		query += ` WHERE t.status = $1`
-		args = append(args, status)
-	}
-	query += fmt.Sprintf(` ORDER BY t.created_at DESC LIMIT $%d OFFSET $%d`, len(args)+1, len(args)+2)
+SELECT t.id, t.slug, t.name, t.status, COALESCE(tr.id, ''), COALESCE(tr.admin_email, ''),
+       COALESCE(k.status, 'draft'), t.created_at
+%s%s ORDER BY t.created_at DESC LIMIT $%d OFFSET $%d`,
+		fromJoin, whereSQL, len(args)+1, len(args)+2)
 	args = append(args, limit, offset)
 
 	rows, err := s.pg.Query(ctx, query, args...)
@@ -310,7 +373,7 @@ LEFT JOIN %s.tenant_registrations tr ON tr.tenant_id = t.id`, schema, schema)
 	out := make([]TenantListItem, 0)
 	for rows.Next() {
 		var item TenantListItem
-		if err := rows.Scan(&item.ID, &item.Slug, &item.Name, &item.Status, &item.RegistrationID, &item.AdminEmail, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Slug, &item.Name, &item.Status, &item.RegistrationID, &item.AdminEmail, &item.KYCStatus, &item.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		out = append(out, item)

@@ -198,5 +198,14 @@ func kycProfileJSON(profile store.TenantKYCProfile) map[string]any {
 	if profile.SubmittedAt != nil {
 		out["submitted_at"] = profile.SubmittedAt.UTC().Format(time.RFC3339)
 	}
+	if profile.ReviewedAt != nil {
+		out["reviewed_at"] = profile.ReviewedAt.UTC().Format(time.RFC3339)
+	}
+	if profile.ReviewedBy != "" {
+		out["reviewed_by"] = profile.ReviewedBy
+	}
+	if profile.RejectionReason != "" {
+		out["rejection_reason"] = profile.RejectionReason
+	}
 	return out
 }

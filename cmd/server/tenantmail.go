@@ -22,6 +22,38 @@ func (s *server) sendVerificationEmail(ctx context.Context, user store.AuthUser,
 	}
 }
 
+func (s *server) sendKYCApprovedEmail(ctx context.Context, result store.PlatformKYCDecisionResult) {
+	if s.mailer == nil || !s.mailer.Enabled() {
+		log.Printf("mailer warning: KYC approved email skipped for %s", result.AdminEmail)
+		return
+	}
+	if strings.TrimSpace(result.AdminEmail) == "" {
+		return
+	}
+	base := strings.TrimRight(s.cfg.PublicBaseURL, "/")
+	loginURL := base + "/tenant/login"
+	subject, html := resend.KYCApprovedEmail(loginURL, result.CompanyName)
+	if err := s.mailer.Send(ctx, result.AdminEmail, subject, html); err != nil {
+		log.Printf("mailer warning: KYC approved email: %v", err)
+	}
+}
+
+func (s *server) sendKYCRejectedEmail(ctx context.Context, result store.PlatformKYCDecisionResult) {
+	if s.mailer == nil || !s.mailer.Enabled() {
+		log.Printf("mailer warning: KYC rejected email skipped for %s", result.AdminEmail)
+		return
+	}
+	if strings.TrimSpace(result.AdminEmail) == "" {
+		return
+	}
+	base := strings.TrimRight(s.cfg.PublicBaseURL, "/")
+	backofficeURL := base + "/tenant/backoffice"
+	subject, html := resend.KYCRejectedEmail(backofficeURL, result.CompanyName, result.RejectionReason)
+	if err := s.mailer.Send(ctx, result.AdminEmail, subject, html); err != nil {
+		log.Printf("mailer warning: KYC rejected email: %v", err)
+	}
+}
+
 func (s *server) sendRegistrationCompleteEmail(ctx context.Context, user store.AuthUser, tenantID string) {
 	if s.mailer == nil || !s.mailer.Enabled() {
 		log.Printf("mailer warning: welcome email skipped for %s", user.Email)

@@ -167,10 +167,11 @@ func (s *server) verifyTenantEmail(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) listPlatformTenants(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
+	kycStatus := r.URL.Query().Get("kyc_status")
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 
-	items, total, err := s.store.ListTenants(r.Context(), status, limit, offset)
+	items, total, err := s.store.ListTenants(r.Context(), status, kycStatus, limit, offset)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -188,6 +189,7 @@ func (s *server) listPlatformTenants(w http.ResponseWriter, r *http.Request) {
 			"status":          item.Status,
 			"registration_id": item.RegistrationID,
 			"admin_email":     item.AdminEmail,
+			"kyc_status":      item.KYCStatus,
 			"created_at":      item.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
