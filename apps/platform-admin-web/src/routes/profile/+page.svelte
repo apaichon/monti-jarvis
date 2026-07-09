@@ -5,15 +5,15 @@
   import { me } from '$lib/api/auth';
   import type { UserProfile } from '$lib/auth/session';
   import { clearSession } from '$lib/auth/session';
+  import { feedback } from '$lib/feedback.svelte';
 
   let profile = $state<UserProfile | null>(null);
-  let error = $state('');
 
   onMount(async () => {
     try {
       profile = await me();
     } catch {
-      error = 'Failed to load profile';
+      feedback.error('Failed to load profile');
       clearSession();
       goto(`${base}/login`);
     }
@@ -22,9 +22,7 @@
 
 <h1 style="margin:0 0 20px;font-size:24px">Profile</h1>
 
-{#if error}
-  <p class="error">{error}</p>
-{:else if profile}
+{#if profile}
   <div class="card">
     <h2 style="margin:0 0 16px;font-size:16px">Account</h2>
     <div class="field">

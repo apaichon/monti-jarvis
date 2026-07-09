@@ -22,7 +22,7 @@ type logoutRequest struct {
 }
 
 func (s *server) login(w http.ResponseWriter, r *http.Request) {
-	if s.auth == nil || !s.auth.Enabled() {
+	if s.auth == nil || !s.auth.TokensEnabled() {
 		writeError(w, http.StatusServiceUnavailable, "auth is not configured")
 		return
 	}
@@ -41,7 +41,7 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) refreshToken(w http.ResponseWriter, r *http.Request) {
-	if s.auth == nil || !s.auth.Enabled() {
+	if s.auth == nil || !s.auth.TokensEnabled() {
 		writeError(w, http.StatusServiceUnavailable, "auth is not configured")
 		return
 	}
@@ -60,7 +60,7 @@ func (s *server) refreshToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
-	if s.auth == nil || !s.auth.Enabled() {
+	if s.auth == nil || !s.auth.TokensEnabled() {
 		writeError(w, http.StatusServiceUnavailable, "auth is not configured")
 		return
 	}
@@ -72,7 +72,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) me(w http.ResponseWriter, r *http.Request) {
-	if s.auth == nil || !s.auth.Enabled() {
+	if s.auth == nil || !s.auth.TokensEnabled() {
 		writeError(w, http.StatusServiceUnavailable, "auth is not configured")
 		return
 	}
@@ -93,6 +93,8 @@ func writeAuthHandlerError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, auth.ErrInvalidCredentials):
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
+	case errors.Is(err, auth.ErrEmailNotVerified):
+		writeError(w, http.StatusForbidden, "email not verified")
 	case errors.Is(err, auth.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 	case errors.Is(err, auth.ErrForbidden):

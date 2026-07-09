@@ -1,18 +1,24 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/libra/monti-jarvis/internal/auditctx"
 )
 
+type TenantStatusChecker interface {
+	IsTenantActive(ctx context.Context, tenantID string) (bool, error)
+}
+
 type HTTPGuard struct {
 	svc          *Service
+	tenants      TenantStatusChecker
 	authDisabled bool
 }
 
-func NewHTTPGuard(svc *Service, authDisabled bool) *HTTPGuard {
-	return &HTTPGuard{svc: svc, authDisabled: authDisabled}
+func NewHTTPGuard(svc *Service, tenants TenantStatusChecker, authDisabled bool) *HTTPGuard {
+	return &HTTPGuard{svc: svc, tenants: tenants, authDisabled: authDisabled}
 }
 
 func (g *HTTPGuard) OptionalBearer(next http.Handler) http.Handler {
@@ -67,6 +73,17 @@ func (g *HTTPGuard) RequireKMWrite(next http.Handler) http.Handler {
 		if !CanWriteKM(ac.Role) {
 			writeAuthError(w, ErrForbidden)
 			return
+		}
+		if ac.Role == RoleTenantAdmin && g.tenants != nil && ac.TenantID != "" {
+			active, err := g.tenants.IsTenantActive(r.Context(), ac.TenantID)
+			if err != nil {
+				writeAuthError(w, ErrNotConfigured)
+				return
+			}
+			if !active {
+				writeAuthError(w, ErrForbidden)
+				return
+			}
 		}
 		ctx := auditctx.WithActor(WithContext(r.Context(), ac), ac.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))

@@ -3,22 +3,21 @@
   import { base } from '$app/paths';
   import { archivePackage, listPackages, type Package } from '$lib/api/packages';
   import { ApiError } from '$lib/api/http';
+  import { feedback } from '$lib/feedback.svelte';
 
   let packages = $state<Package[]>([]);
   let statusFilter = $state('active');
-  let error = $state('');
   let loading = $state(true);
   let archiveTarget = $state<Package | null>(null);
   let archiving = $state(false);
 
   async function load() {
     loading = true;
-    error = '';
     try {
       const res = await listPackages(statusFilter);
       packages = res.packages;
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Failed to load packages';
+      feedback.error(err instanceof ApiError ? err.message : 'Failed to load packages');
     } finally {
       loading = false;
     }
@@ -34,7 +33,7 @@
       archiveTarget = null;
       await load();
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Archive failed';
+      feedback.error(err instanceof ApiError ? err.message : 'Archive failed');
     } finally {
       archiving = false;
     }
@@ -61,10 +60,6 @@
     <a class="btn" href="{base}/packages/new">+ New</a>
   </div>
 </div>
-
-{#if error}
-  <p class="error" style="margin-bottom:12px">{error}</p>
-{/if}
 
 <div class="card">
   {#if loading}

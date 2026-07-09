@@ -53,7 +53,7 @@ func NewService(deps Dependencies) (*Service, error) {
 	cfg := deps.Cfg
 	var issuer *TokenIssuer
 	var err error
-	if !cfg.AuthDisabled {
+	if cfg.JWTSecret != "" {
 		issuer, err = NewTokenIssuer(cfg.JWTSecret, cfg.AccessTTL)
 		if err != nil {
 			return nil, err
@@ -79,8 +79,12 @@ func (s *Service) Enabled() bool {
 	return s != nil && !s.authDisabled && s.issuer != nil
 }
 
+func (s *Service) TokensEnabled() bool {
+	return s != nil && s.issuer != nil
+}
+
 func (s *Service) Configured() bool {
-	return s.Enabled()
+	return s.TokensEnabled()
 }
 
 func (s *Service) Start(ctx context.Context) {
@@ -115,7 +119,7 @@ func (s *Service) WriteBehindLag(ctx context.Context) int64 {
 }
 
 func (s *Service) Login(ctx context.Context, email, password string) (TokenPair, error) {
-	if !s.Enabled() {
+	if !s.TokensEnabled() {
 		return TokenPair{}, ErrNotConfigured
 	}
 	email = normalizeEmail(email)
@@ -147,6 +151,10 @@ func (s *Service) Login(ctx context.Context, email, password string) (TokenPair,
 		s.events.PublishFailure(ctx, email, meta)
 		return TokenPair{}, ErrInvalidCredentials
 	}
+	if !userEmailVerified(user) {
+		s.events.PublishFailure(ctx, email, meta)
+		return TokenPair{}, ErrEmailNotVerified
+	}
 	pair, err := s.issueForUser(ctx, user)
 	if err != nil {
 		return TokenPair{}, err
@@ -164,7 +172,7 @@ func (s *Service) RefreshWithAccess(ctx context.Context, rawRefresh, accessHeade
 }
 
 func (s *Service) refresh(ctx context.Context, rawRefresh, accessHeader string) (TokenPair, error) {
-	if !s.Enabled() {
+	if !s.TokensEnabled() {
 		return TokenPair{}, ErrNotConfigured
 	}
 	if err := ValidateRefreshToken(rawRefresh); err != nil {
@@ -198,7 +206,7 @@ func (s *Service) refresh(ctx context.Context, rawRefresh, accessHeader string) 
 }
 
 func (s *Service) Logout(ctx context.Context, rawRefresh, accessHeader string) error {
-	if !s.Enabled() {
+	if !s.TokensEnabled() {
 		return ErrNotConfigured
 	}
 	meta := RequestMetaFrom(ctx)
@@ -222,8 +230,15 @@ func (s *Service) Logout(ctx context.Context, rawRefresh, accessHeader string) e
 	return nil
 }
 
+func (s *Service) IssueTokenPairForUser(ctx context.Context, user store.AuthUser) (TokenPair, error) {
+	if !s.TokensEnabled() {
+		return TokenPair{}, ErrNotConfigured
+	}
+	return s.issueForUser(ctx, cachedFromStore(user, false))
+}
+
 func (s *Service) Me(ctx context.Context, userID string) (UserProfile, error) {
-	if !s.Enabled() {
+	if !s.TokensEnabled() {
 		return UserProfile{}, ErrNotConfigured
 	}
 	user, err := s.loadUserByID(ctx, userID)
@@ -234,7 +249,7 @@ func (s *Service) Me(ctx context.Context, userID string) (UserProfile, error) {
 }
 
 func (s *Service) ParseBearer(authHeader string) (AuthContext, error) {
-	if !s.Enabled() {
+	if !s.TokensEnabled() {
 		return AuthContext{}, ErrNotConfigured
 	}
 	token, ok := bearerToken(authHeader)

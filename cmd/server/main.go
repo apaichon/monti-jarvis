@@ -18,8 +18,12 @@ import (
 	"github.com/libra/monti-jarvis/internal/customerweb"
 	"github.com/libra/monti-jarvis/internal/entitlements"
 	"github.com/libra/monti-jarvis/internal/env"
-	"github.com/libra/monti-jarvis/internal/platformweb"
 	"github.com/libra/monti-jarvis/internal/gemini"
+	"github.com/libra/monti-jarvis/internal/platformweb"
+	"github.com/libra/monti-jarvis/internal/resend"
+	"github.com/libra/monti-jarvis/internal/tenantregister"
+	"github.com/libra/monti-jarvis/internal/tenantoauth"
+	"github.com/libra/monti-jarvis/internal/tenantweb"
 	"github.com/libra/monti-jarvis/internal/km"
 	"github.com/libra/monti-jarvis/internal/live"
 	"github.com/libra/monti-jarvis/internal/lktoken"
@@ -43,9 +47,13 @@ type server struct {
 	auth         *auth.Service
 	guard        *auth.HTTPGuard
 	entitlements *entitlements.Service
-	static       http.Handler
-	platform     http.Handler
-	legacy       http.Handler
+	static          http.Handler
+	platform        http.Handler
+	tenant          http.Handler
+	legacy          http.Handler
+	registerLimiter *tenantregister.RateLimiter
+	mailer          *resend.Client
+	tenantOAuth     *tenantoauth.Service
 }
 
 type chatRequest struct {
@@ -106,7 +114,7 @@ func main() {
 	kmSvc := km.NewService(st, ch, ai, cfg.DemoTenantID)
 
 	var authSvc *auth.Service
-	if !cfg.AuthDisabled {
+	if cfg.JWTSecret != "" {
 		var err error
 		authSvc, err = auth.NewService(auth.Dependencies{
 			Store: st,
@@ -140,7 +148,17 @@ func main() {
 			log.Printf("infra warning: clickhouse auth_events: %v", err)
 		}
 	}
-	guard := auth.NewHTTPGuard(authSvc, cfg.AuthDisabled)
+	guard := auth.NewHTTPGuard(authSvc, st, cfg.AuthDisabled)
+	registerLimiter := tenantregister.NewRateLimiter(st.Redis(), cfg.RedisPrefix, cfg.TenantRegisterRateLimit)
+	mailer := resend.New(cfg.ResendAPIKey, cfg.ResendFromEmail)
+	tenantOAuth := tenantoauth.New(st.Redis(), tenantoauth.Config{
+		PublicBaseURL:      cfg.PublicBaseURL,
+		GoogleClientID:     cfg.GoogleOAuthClientID,
+		GoogleClientSecret: cfg.GoogleOAuthClientSecret,
+		GitHubClientID:     cfg.GitHubOAuthClientID,
+		GitHubClientSecret: cfg.GitHubOAuthClientSecret,
+		RedisPrefix:        cfg.RedisPrefix,
+	})
 
 	s := &server{
 		cfg:          cfg,
@@ -155,9 +173,13 @@ func main() {
 		auth:         authSvc,
 		guard:        guard,
 		entitlements: entitlements.New(st, cfg),
-		static:       customerweb.Handler(cfg.CustomerWebDir),
-		platform:     platformweb.Handler(cfg.PlatformAdminWebDir),
-		legacy:       web.Handler(),
+		static:          customerweb.Handler(cfg.CustomerWebDir),
+		platform:        platformweb.Handler(cfg.PlatformAdminWebDir),
+		tenant:          tenantweb.Handler(cfg.TenantWebDir),
+		legacy:          web.Handler(),
+		registerLimiter: registerLimiter,
+		mailer:          mailer,
+		tenantOAuth:     tenantOAuth,
 	}
 
 	mux := http.NewServeMux()
@@ -178,6 +200,20 @@ func main() {
 	mux.Handle("POST /api/km/agents/{agent_id}/documents", guard.RequireKMWrite(http.HandlerFunc(s.uploadAgentDocument)))
 	mux.Handle("POST /api/km/agents/{agent_id}/reset", guard.RequireKMWrite(http.HandlerFunc(s.resetAgentKnowledge)))
 	mux.Handle("POST /api/km/seed", guard.RequirePlatformAdmin(http.HandlerFunc(s.seedKnowledge)))
+	mux.HandleFunc("POST /api/public/tenant/register", s.registerTenant)
+	mux.HandleFunc("GET /api/public/tenant/verify-email", s.verifyTenantEmail)
+	mux.HandleFunc("POST /api/public/tenant/verify-email", s.verifyTenantEmail)
+	mux.HandleFunc("GET /api/public/tenant/register/oauth/providers", s.oauthProviders)
+	mux.HandleFunc("GET /api/public/tenant/register/oauth/{provider}", s.startTenantOAuth)
+	mux.HandleFunc("GET /api/public/tenant/register/oauth/{provider}/callback", s.tenantOAuthCallback)
+	mux.HandleFunc("POST /api/public/tenant/register/oauth/complete", s.completeTenantOAuth)
+	mux.Handle("GET /api/platform/tenants", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformTenants)))
+	mux.HandleFunc("GET /api/tenant/kyc", s.getTenantKYC)
+	mux.HandleFunc("PUT /api/tenant/kyc", s.updateTenantKYC)
+	mux.HandleFunc("POST /api/tenant/kyc/photo", s.uploadTenantKYCPhoto)
+	mux.HandleFunc("POST /api/tenant/kyc/documents", s.uploadTenantKYCDocument)
+	mux.HandleFunc("POST /api/tenant/kyc/submit", s.submitTenantKYC)
+	mux.HandleFunc("GET /api/assets/kyc/{tenant_id}/{kind}/{file}", s.serveKYCAsset)
 	mux.HandleFunc("POST /api/auth/login", s.login)
 	mux.HandleFunc("POST /api/auth/refresh", s.refreshToken)
 	mux.HandleFunc("POST /api/auth/logout", s.logout)
@@ -211,6 +247,10 @@ func main() {
 		http.Redirect(w, r, "/admin/", http.StatusFound)
 	})
 	mux.Handle("/admin/", s.platform)
+	mux.HandleFunc("GET /tenant", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/tenant/", http.StatusFound)
+	})
+	mux.Handle("/tenant/", s.tenant)
 
 	mux.Handle("/", s.static)
 
@@ -222,8 +262,8 @@ func main() {
 
 	go func() {
 		health := st.Health(context.Background())
-		log.Printf("monti-jarvis listening on :%s customer_web=%s platform_admin=%s auth_disabled=%t livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
-			cfg.Port, cfg.CustomerWebDir, cfg.PlatformAdminWebDir, cfg.AuthDisabled, lk.Enabled(), bus != nil && bus.Enabled(),
+		log.Printf("monti-jarvis listening on :%s customer_web=%s platform_admin=%s tenant_web=%s auth_disabled=%t livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
+			cfg.Port, cfg.CustomerWebDir, cfg.PlatformAdminWebDir, cfg.TenantWebDir, cfg.AuthDisabled, lk.Enabled(), bus != nil && bus.Enabled(),
 			health.Postgres, health.Redis, cfg.LegacyUIEnabled)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
@@ -244,11 +284,13 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":      s.cfg.LiveKitAPIKey != "",
 		"nats":         s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":            "SPRINT-005",
-		"auth_disabled":     s.cfg.AuthDisabled,
-		"rag":               s.rag != nil && s.rag.Enabled(),
-		"customer_web":      s.cfg.CustomerWebDir,
-		"platform_admin_web": s.cfg.PlatformAdminWebDir,
+		"sprint":              "SPRINT-006",
+		"auth_disabled":       s.cfg.AuthDisabled,
+		"tenant_register":     s.cfg.TenantRegisterEnabled,
+		"rag":                 s.rag != nil && s.rag.Enabled(),
+		"customer_web":        s.cfg.CustomerWebDir,
+		"platform_admin_web":  s.cfg.PlatformAdminWebDir,
+		"tenant_web":          s.cfg.TenantWebDir,
 	})
 }
 
@@ -403,11 +445,8 @@ func withCommonHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func withCORS(authDisabled bool, next http.Handler) http.Handler {
-	allowHeaders := "Content-Type, X-Tenant-Id"
-	if !authDisabled {
-		allowHeaders += ", Authorization"
-	}
+func withCORS(_ bool, next http.Handler) http.Handler {
+	allowHeaders := "Content-Type, X-Tenant-Id, Authorization"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")

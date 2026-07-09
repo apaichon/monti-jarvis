@@ -14,13 +14,13 @@
   } from '$lib/api/avatars';
   import { ApiError } from '$lib/api/http';
   import { clearSession, loginPath } from '$lib/auth/session';
+  import { feedback } from '$lib/feedback.svelte';
 
   const tenantId = $derived($page.params.id);
 
   let data = $state<TenantAssignmentsResponse | null>(null);
   let catalog = $state<Avatar[]>([]);
   let selectedAvatar = $state('');
-  let error = $state('');
   let loading = $state(true);
   let assigning = $state(false);
   let revokingId = $state<string | null>(null);
@@ -50,9 +50,13 @@
     return fallback;
   }
 
+  function showError(err: unknown, fallback: string) {
+    const msg = handleError(err, fallback);
+    if (msg) feedback.error(msg);
+  }
+
   async function load() {
     loading = true;
-    error = '';
     try {
       const [tenantRes, catalogRes] = await Promise.all([
         listTenantAvatars(tenantId),
@@ -62,7 +66,7 @@
       catalog = catalogRes.avatars;
       if (!selectedAvatar && assignableAvatars[0]) selectedAvatar = assignableAvatars[0].id;
     } catch (err) {
-      error = handleError(err, 'Failed to load tenant avatars');
+      showError(err, 'Failed to load tenant avatars');
     } finally {
       loading = false;
     }
@@ -73,13 +77,13 @@
   async function assign() {
     if (!selectedAvatar) return;
     assigning = true;
-    error = '';
     try {
       await assignTenantAvatar(tenantId, selectedAvatar);
       selectedAvatar = '';
       await load();
+      feedback.success('Avatar assigned to tenant');
     } catch (err) {
-      error = handleError(err, 'Assign failed');
+      showError(err, 'Assign failed');
     } finally {
       assigning = false;
     }
@@ -88,13 +92,13 @@
   async function revoke() {
     if (!revokeTarget) return;
     revokingId = revokeTarget.avatar_id;
-    error = '';
     try {
       await revokeTenantAvatar(tenantId, revokeTarget.avatar_id);
       revokeTarget = null;
       await load();
+      feedback.success('Avatar assignment revoked');
     } catch (err) {
-      error = handleError(err, 'Revoke failed');
+      showError(err, 'Revoke failed');
     } finally {
       revokingId = null;
     }
@@ -103,10 +107,6 @@
 
 <p><a class="link" href="{base}/avatars">← Avatars</a></p>
 <h1 style="margin:0 0 20px;font-size:24px">Tenant avatars — {tenantId}</h1>
-
-{#if error}
-  <p class="error" style="margin-bottom:12px">{error}</p>
-{/if}
 
 {#if loading}
   <p style="color:var(--muted)">Loading…</p>

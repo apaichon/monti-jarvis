@@ -3,8 +3,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import AvatarImageField from '$lib/components/AvatarImageField.svelte';
-  import StatusMessage from '$lib/components/StatusMessage.svelte';
   import VoiceProfilesForm from '$lib/components/VoiceProfilesForm.svelte';
+  import { feedback } from '$lib/feedback.svelte';
   import {
     createAvatar,
     defaultVoiceRow,
@@ -27,7 +27,6 @@
   let skin = $state('');
   let hair = $state('');
   let voices = $state<AvatarVoice[]>([defaultVoiceRow()]);
-  let error = $state('');
   let saving = $state(false);
 
   function handleError(err: unknown, fallback: string) {
@@ -54,10 +53,9 @@
   async function submit(e: Event) {
     e.preventDefault();
     if (voices.length === 0) {
-      error = 'At least one voice profile is required';
+      feedback.error('At least one voice profile is required');
       return;
     }
-    error = '';
     saving = true;
     try {
       const created = await createAvatar({
@@ -74,7 +72,8 @@
       });
       goto(`${base}/avatars/${created.id}`);
     } catch (err) {
-      error = handleError(err, 'Create failed');
+      const msg = handleError(err, 'Create failed');
+      if (msg) feedback.error(msg);
     } finally {
       saving = false;
     }
@@ -83,8 +82,6 @@
 
 <p><a class="link" href="{base}/avatars">← Avatars</a></p>
 <h1 style="margin:8px 0 20px;font-size:24px">New avatar</h1>
-
-<StatusMessage message={error} variant="error" />
 
 <form onsubmit={submit}>
   <div class="card" style="margin-bottom:16px">
@@ -120,13 +117,7 @@
         </select>
       </div>
     </div>
-    <AvatarImageField
-      avatarId={slug}
-      bind:imageUrl={imageUrl}
-      onError={(msg) => {
-        error = msg;
-      }}
-    />
+    <AvatarImageField avatarId={slug} bind:imageUrl={imageUrl} />
     <div class="field">
       <label for="greeting">Greeting *</label>
       <textarea id="greeting" rows="3" bind:value={greeting} required></textarea>

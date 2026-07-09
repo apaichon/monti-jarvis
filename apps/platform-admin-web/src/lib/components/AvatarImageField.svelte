@@ -1,19 +1,17 @@
 <script lang="ts">
   import { uploadAvatarImage } from '$lib/api/avatars';
   import { ApiError } from '$lib/api/http';
+  import { feedback } from '$lib/feedback.svelte';
 
   let {
     avatarId,
-    imageUrl = $bindable(''),
-    onError = (_message: string) => {}
+    imageUrl = $bindable('')
   }: {
     avatarId: string;
     imageUrl?: string;
-    onError?: (message: string) => void;
   } = $props();
 
   let uploading = $state(false);
-  let uploadStatus = $state('');
   let previewSrc = $derived(imageUrl || '');
 
   async function onFileChange(e: Event) {
@@ -23,18 +21,16 @@
     if (!file || !avatarId) return;
 
     uploading = true;
-    uploadStatus = '';
     try {
       const res = await uploadAvatarImage(avatarId, file);
       imageUrl = res.image_url;
-      uploadStatus =
+      feedback.success(
         res.status === 'uploaded_and_saved'
           ? 'Image uploaded to MinIO and saved.'
-          : 'Image uploaded to MinIO.';
+          : 'Image uploaded to MinIO.'
+      );
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : 'Image upload failed';
-      onError(msg);
-      uploadStatus = '';
+      feedback.error(err instanceof ApiError ? err.message : 'Image upload failed');
     } finally {
       uploading = false;
     }
@@ -67,8 +63,6 @@
       <p class="hint">Upload stores to MinIO and sets the public asset URL. JPEG, PNG, WebP, or GIF up to 4MB.</p>
       {#if uploading}
         <p class="hint">Uploading…</p>
-      {:else if uploadStatus}
-        <p class="hint success-text">{uploadStatus}</p>
       {/if}
     </div>
   </div>
@@ -134,7 +128,4 @@
     color: var(--muted);
   }
 
-  .success-text {
-    color: var(--success);
-  }
 </style>

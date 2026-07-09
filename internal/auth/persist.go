@@ -136,14 +136,23 @@ func (s *Service) persistRefreshRevoke(ctx context.Context, hash string) error {
 	return s.store.RevokeRefreshToken(ctx, hash)
 }
 
+func userEmailVerified(user CachedUser) bool {
+	if user.AuthProvider != "" && user.AuthProvider != "email" {
+		return true
+	}
+	return user.EmailVerified
+}
+
 func cachedFromStore(user store.AuthUser, includeHash bool) CachedUser {
 	cu := CachedUser{
-		ID:          user.ID,
-		Email:       user.Email,
-		DisplayName: user.DisplayName,
-		Status:      user.Status,
-		Role:        user.Role,
-		TenantID:    user.TenantID,
+		ID:            user.ID,
+		Email:         user.Email,
+		DisplayName:   user.DisplayName,
+		Status:        user.Status,
+		Role:          user.Role,
+		TenantID:      user.TenantID,
+		AuthProvider:  user.AuthProvider,
+		EmailVerified: user.EmailVerifiedAt != nil,
 	}
 	if includeHash {
 		cu.PasswordHash = user.PasswordHash

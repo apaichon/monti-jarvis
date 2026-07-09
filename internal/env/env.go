@@ -47,6 +47,16 @@ type Config struct {
 	AuthUserCacheTTL         time.Duration
 	EntitlementCacheEnabled  bool
 	EntitlementCacheTTL      time.Duration
+	TenantRegisterEnabled    bool
+	TenantRegisterRateLimit  int
+	TenantWebDir             string
+	PublicBaseURL            string
+	ResendAPIKey             string
+	ResendFromEmail          string
+	GoogleOAuthClientID      string
+	GoogleOAuthClientSecret  string
+	GitHubOAuthClientID      string
+	GitHubOAuthClientSecret  string
 }
 
 func Load() Config {
@@ -98,7 +108,29 @@ func Load() Config {
 		AuthUserCacheTTL:        envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
 		EntitlementCacheEnabled: envBool("ENTITLEMENT_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
 		EntitlementCacheTTL:     envDuration("ENTITLEMENT_CACHE_TTL", 15*time.Minute),
+		TenantRegisterEnabled:   envBool("TENANT_REGISTER_ENABLED", true),
+		TenantRegisterRateLimit: envInt("TENANT_REGISTER_RATE_LIMIT", 5),
+		TenantWebDir:            envOr("TENANT_WEB_DIR", "apps/tenant-web/build"),
+		PublicBaseURL:           envOr("APP_PUBLIC_URL", "http://localhost:8091"),
+		ResendAPIKey:            os.Getenv("RESEND_API_KEY"),
+		ResendFromEmail:         envOr("RESEND_FROM_EMAIL", "Monti <onboarding@monti.local>"),
+		GoogleOAuthClientID:     os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
+		GoogleOAuthClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+		GitHubOAuthClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
+		GitHubOAuthClientSecret: os.Getenv("GITHUB_OAUTH_CLIENT_SECRET"),
 	}
+}
+
+func envInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func envDuration(key string, fallback time.Duration) time.Duration {

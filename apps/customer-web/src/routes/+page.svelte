@@ -11,6 +11,7 @@
   } from '$lib/api/calls';
   import { sendChat, type ChatMessage as ChatHistoryEntry, type ChatSource } from '$lib/api/chat';
   import { formatInfra, loadInfra } from '$lib/api/infra';
+  import { classifyTone } from '$lib/tone';
   import { loadWorkforce, type Agent } from '$lib/api/workforce';
   import { GeminiVoice } from '$lib/voice/gemini';
 
@@ -55,6 +56,9 @@
   let infraStatus = $state('checking infra');
   let chatEl: HTMLElement | undefined = $state();
 
+  let tone = $state('');
+  let toneTimer: ReturnType<typeof setTimeout> | undefined;
+
   let startedAt = 0;
   let timerId: ReturnType<typeof setInterval> | undefined;
   let unsubscribe: (() => void) | undefined;
@@ -97,6 +101,16 @@
     if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
   }
 
+  // Match the portrait's expression to the tone of the assistant's reply,
+  // then fall back to the neutral talking loop / still image.
+  function showTone(text: string) {
+    const detected = classifyTone(text);
+    if (!detected) return;
+    tone = detected;
+    clearTimeout(toneTimer);
+    toneTimer = setTimeout(() => (tone = ''), 4200);
+  }
+
   function addMessage(role: 'assistant' | 'user', content: string, initial: string) {
     const msg: UiMessage = {
       id: `${Date.now()}-${Math.random()}`,
@@ -125,7 +139,10 @@
   async function selectAgent(agent: Agent) {
     if (live) await hangUp();
     selectedAgent = agent;
-    if (agent.greeting) addMessage('assistant', agent.greeting, agentInitial(agent.name));
+    if (agent.greeting) {
+      addMessage('assistant', agent.greeting, agentInitial(agent.name));
+      showTone(agent.greeting);
+    }
   }
 
   async function persistTurn(callId: string, role: string, content: string) {
@@ -143,6 +160,7 @@
     const uiRole = role === 'caller' ? 'user' : 'assistant';
     const initial = uiRole === 'assistant' ? agentInitial(selectedAgent?.name) : 'C';
     appendOrMergeTranscript(uiRole, content, initial);
+    if (uiRole === 'assistant') showTone(content);
   }
 
   async function startCall() {
@@ -255,6 +273,7 @@
           : m
       );
       chatHistory = [...chatHistory, { role: 'assistant', content: data.reply }];
+      showTone(data.reply);
     } catch (err) {
       messages = messages.filter((m) => m.id !== thinking.id);
       chatHistory = chatHistory.slice(0, -1);
@@ -294,7 +313,7 @@
     {#if selectedAgent}
       <section class="assistant-orb">
         <div class="halo" style="--assistant-color:{selectedAgent.color}">
-          <Portrait agent={selectedAgent} />
+          <Portrait agent={selectedAgent} speaking={live} {tone} />
         </div>
         <div class="assistant-name">
           <h2>{selectedAgent.name}</h2>

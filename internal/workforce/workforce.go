@@ -17,7 +17,11 @@ type Agent struct {
 	VoiceProviderID string `json:"voice_provider_id,omitempty"`
 	VoiceID         string `json:"voice_id,omitempty"`
 	Image           string `json:"image"`
-	Popular         bool   `json:"popular,omitempty"`
+	SpeakingImage   string `json:"speaking_image,omitempty"`
+	// Expressions maps a response tone (hello, happy, sorry, cheer,
+	// goodbye) to a talking-loop GIF rendered with that feeling.
+	Expressions map[string]string `json:"expressions,omitempty"`
+	Popular     bool              `json:"popular,omitempty"`
 	Robot           bool   `json:"robot,omitempty"`
 	Skin            string `json:"skin,omitempty"`
 	Hair            string `json:"hair,omitempty"`
@@ -25,7 +29,7 @@ type Agent struct {
 }
 
 func FromWorkforceAgent(w store.WorkforceAgent) Agent {
-	return Agent{
+	a := Agent{
 		ID:              w.ID,
 		Name:            w.Name,
 		Role:            w.Role,
@@ -41,30 +45,57 @@ func FromWorkforceAgent(w store.WorkforceAgent) Agent {
 		Skin:            w.Skin,
 		Hair:            w.Hair,
 	}
+	// The pre-rendered loops only match the built-in portrait;
+	// tenant-uploaded portraits keep a static image until they get their
+	// own generated loops.
+	if built, ok := Get(w.ID); ok && built.Image == w.Image {
+		a.SpeakingImage = built.SpeakingImage
+		a.Expressions = built.Expressions
+	}
+	return a
+}
+
+// ExpressionTones is the set of response tones with pre-rendered loops.
+var ExpressionTones = []string{"hello", "happy", "sorry", "cheer", "goodbye"}
+
+func expressionSet(id string) map[string]string {
+	m := make(map[string]string, len(ExpressionTones))
+	for _, tone := range ExpressionTones {
+		m[tone] = "/images/speaking/" + id + "-" + tone + ".gif"
+	}
+	return m
 }
 
 var agents = []Agent{
 	{
 		ID: "ava", Name: "Ava", Role: "General Support", Trait: "Warm & Patient",
-		Color: "#008cff", Voice: "Aoede", Image: "/images/ava.jpg", Popular: true,
+		Color: "#008cff", Voice: "Aoede", Image: "/images/ava.jpg",
+		SpeakingImage: "/images/speaking/ava-speaking.gif",
+		Expressions:   expressionSet("ava"), Popular: true,
 		Skin: "#f0bd9b", Hair: "#5a3428",
 		Greeting: "Thank you for calling. I'm Ava from general support. How can I help you today?",
 	},
 	{
 		ID: "max", Name: "Max", Role: "Billing Specialist", Trait: "Calm & Precise",
 		Color: "#0076ff", Voice: "Charon", Image: "/images/max.jpg",
+		SpeakingImage: "/images/speaking/max-speaking.gif",
+		Expressions:   expressionSet("max"),
 		Skin: "#e8ad88", Hair: "#2d221f",
 		Greeting: "Hi, this is Max from billing. I can help with invoices, payments, and account questions.",
 	},
 	{
 		ID: "luna", Name: "Luna", Role: "Technical Support", Trait: "Clear & Helpful",
 		Color: "#b14dff", Voice: "Kore", Image: "/images/luna.jpg",
+		SpeakingImage: "/images/speaking/luna-speaking.gif",
+		Expressions:   expressionSet("luna"),
 		Skin: "#efc0a1", Hair: "#7c52c8",
 		Greeting: "Hello, Luna here from technical support. Tell me what's going on and we'll troubleshoot it together.",
 	},
 	{
 		ID: "neo", Name: "Neo", Role: "Triage Bot", Trait: "Fast & Neutral", Robot: true,
 		Color: "#00a8ff", Voice: "Puck", Image: "/images/neo.jpg",
+		SpeakingImage: "/images/speaking/neo-speaking.gif",
+		Expressions:   expressionSet("neo"),
 		Greeting: "Neo triage online. Share your issue in one sentence and I'll route you to the right specialist.",
 	},
 }

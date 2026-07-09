@@ -5,6 +5,8 @@ export type Agent = {
   trait: string;
   color: string;
   image: string;
+  speaking_image?: string;
+  expressions?: Record<string, string>;
   popular?: boolean;
   greeting?: string;
   robot?: boolean;

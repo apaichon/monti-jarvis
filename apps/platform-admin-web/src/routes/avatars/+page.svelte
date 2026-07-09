@@ -6,10 +6,10 @@
   import { archiveAvatar, listAvatars, type Avatar } from '$lib/api/avatars';
   import { ApiError } from '$lib/api/http';
   import { clearSession, loginPath } from '$lib/auth/session';
+  import { feedback } from '$lib/feedback.svelte';
 
   let avatars = $state<Avatar[]>([]);
   let statusFilter = $state('active');
-  let error = $state('');
   let loading = $state(true);
   let archiveTarget = $state<Avatar | null>(null);
   let archiving = $state(false);
@@ -26,14 +26,18 @@
     return fallback;
   }
 
+  function showError(err: unknown, fallback: string) {
+    const msg = handleError(err, fallback);
+    if (msg) feedback.error(msg);
+  }
+
   async function load() {
     loading = true;
-    error = '';
     try {
       const res = await listAvatars(statusFilter);
       avatars = res.avatars;
     } catch (err) {
-      error = handleError(err, 'Failed to load avatars');
+      showError(err, 'Failed to load avatars');
     } finally {
       loading = false;
     }
@@ -49,7 +53,7 @@
       archiveTarget = null;
       await load();
     } catch (err) {
-      error = handleError(err, 'Archive failed');
+      showError(err, 'Archive failed');
     } finally {
       archiving = false;
     }
@@ -71,10 +75,6 @@
     <a class="btn" href="{base}/avatars/new">+ New</a>
   </div>
 </div>
-
-{#if error}
-  <p class="error" style="margin-bottom:12px">{error}</p>
-{/if}
 
 <div class="card">
   {#if loading}

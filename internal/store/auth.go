@@ -13,13 +13,15 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 
 type AuthUser struct {
-	ID           string
-	Email        string
-	PasswordHash string
-	DisplayName  string
-	Status       string
-	Role         string
-	TenantID     string
+	ID              string
+	Email           string
+	PasswordHash    string
+	DisplayName     string
+	Status          string
+	Role            string
+	TenantID        string
+	AuthProvider    string
+	EmailVerifiedAt *time.Time
 }
 
 type RefreshTokenRow struct {
@@ -127,8 +129,9 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, err
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	row := s.pg.QueryRow(ctx, fmt.Sprintf(`
-SELECT u.id, u.email, u.password_hash, u.display_name, u.status,
-       COALESCE(r.role, ''), COALESCE(r.tenant_id, '')
+SELECT u.id, u.email, COALESCE(u.password_hash, ''), u.display_name, u.status,
+       COALESCE(r.role, ''), COALESCE(r.tenant_id, ''),
+       COALESCE(u.auth_provider, 'email'), u.email_verified_at
 FROM %s.users u
 LEFT JOIN %s.user_roles r ON r.user_id = u.id
 WHERE lower(u.email) = lower($1)
@@ -140,7 +143,7 @@ END
 LIMIT 1`, schema, schema), email)
 
 	var user AuthUser
-	if err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName, &user.Status, &user.Role, &user.TenantID); err != nil {
+	if err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName, &user.Status, &user.Role, &user.TenantID, &user.AuthProvider, &user.EmailVerifiedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return AuthUser{}, ErrUserNotFound
 		}
@@ -155,8 +158,9 @@ func (s *Store) GetUserByID(ctx context.Context, userID string) (AuthUser, error
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	row := s.pg.QueryRow(ctx, fmt.Sprintf(`
-SELECT u.id, u.email, u.password_hash, u.display_name, u.status,
-       COALESCE(r.role, ''), COALESCE(r.tenant_id, '')
+SELECT u.id, u.email, COALESCE(u.password_hash, ''), u.display_name, u.status,
+       COALESCE(r.role, ''), COALESCE(r.tenant_id, ''),
+       COALESCE(u.auth_provider, 'email'), u.email_verified_at
 FROM %s.users u
 LEFT JOIN %s.user_roles r ON r.user_id = u.id
 WHERE u.id = $1
@@ -168,7 +172,7 @@ END
 LIMIT 1`, schema, schema), userID)
 
 	var user AuthUser
-	if err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName, &user.Status, &user.Role, &user.TenantID); err != nil {
+	if err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName, &user.Status, &user.Role, &user.TenantID, &user.AuthProvider, &user.EmailVerifiedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return AuthUser{}, ErrUserNotFound
 		}

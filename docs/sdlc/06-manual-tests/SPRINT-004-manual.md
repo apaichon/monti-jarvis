@@ -29,33 +29,33 @@ TOKEN=$(curl -sS -X POST http://localhost:8091/api/auth/login \
   -d '{"email":"platform@monti.local","password":"monti-platform"}' | jq -r .access_token)
 ```
 
-- [ ] `GET /api/platform/packages` with Bearer → 200, starter/pro/enterprise
-- [ ] `GET /api/platform/rule-schemas` → `rules-v1`
-- [ ] `GET /api/platform/tenants/demo/entitlement` → active Starter
-- [ ] Login `admin@demo.local` / `demo-admin` → `GET /api/platform/packages` → 403
-- [ ] Tenant admin `GET /api/entitlements/me` → 200 with demo entitlement
+- [X] `GET /api/platform/packages` with Bearer → 200, starter/pro/enterprise
+- [X] `GET /api/platform/rule-schemas` → `rules-v1`
+- [X] `GET /api/platform/tenants/demo/entitlement` → active Starter
+- [X] Login `admin@demo.local` / `demo-admin` → `GET /api/platform/packages` → 403
+- [X] Tenant admin `GET /api/entitlements/me` → 200 with demo entitlement
 
 ## S3 — Portal UI (`/admin`)
 
 Open `http://localhost:8091/admin/login`
 
-- [ ] Login `platform@monti.local` / `monti-platform` → redirects to `/admin/packages`
-- [ ] Packages table shows starter, pro, enterprise
-- [ ] Profile → email, role `platform_admin`, user id
-- [ ] Assign demo → `/admin/tenants/demo/entitlement` shows current package
-- [ ] Logout → returns to login; packages page requires re-auth
-- [ ] `admin@demo.local` login → rejected (tenant admin not allowed on portal)
+- [X] Login `platform@monti.local` / `monti-platform` → redirects to `/admin/packages`
+- [X] Packages table shows starter, pro, enterprise
+- [X] Profile → email, role `platform_admin`, user id
+- [X] Assign demo → `/admin/tenants/demo/entitlement` shows current package
+- [X] Logout → returns to login; packages page requires re-auth
+- [X] `admin@demo.local` login → rejected (tenant admin not allowed on portal)
 
 ## S4 — Customer portal regression
 
 Set `AUTH_DISABLED=true`, restart.
 
-- [ ] `http://localhost:8091/` loads customer portal without login
-- [ ] `POST /api/chat` works without Bearer
+- [X] `http://localhost:8091/` loads customer portal without login
+- [X] `POST /api/chat` works without Bearer
 
 ## Sign-off
 
 | Role | Date | Result |
 | --- | --- | --- |
 | Dev | 2026-07-07 | Pass (v0.5.0) |
-| Tester | | |
+| Tester | 2026-07-10| Pass (v0.6.0)|

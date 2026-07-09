@@ -10,13 +10,13 @@
     type Package
   } from '$lib/api/packages';
   import { ApiError } from '$lib/api/http';
+  import { feedback } from '$lib/feedback.svelte';
 
   const tenantId = $derived($page.params.id);
 
   let entitlement = $state<Entitlement | null>(null);
   let packages = $state<Package[]>([]);
   let selectedPackage = $state('');
-  let error = $state('');
   let loading = $state(true);
   let assigning = $state(false);
   let revoking = $state(false);
@@ -25,7 +25,6 @@
 
   async function load() {
     loading = true;
-    error = '';
     noEntitlement = false;
     try {
       const pkgRes = await listPackages('active');
@@ -36,7 +35,7 @@
       if (err instanceof ApiError && err.status === 404) {
         noEntitlement = true;
       } else {
-        error = err instanceof ApiError ? err.message : 'Failed to load entitlement';
+        feedback.error(err instanceof ApiError ? err.message : 'Failed to load entitlement');
       }
     } finally {
       loading = false;
@@ -48,12 +47,12 @@
   async function assign() {
     if (!selectedPackage) return;
     assigning = true;
-    error = '';
     try {
       entitlement = await assignTenantEntitlement(tenantId, selectedPackage);
       noEntitlement = false;
+      feedback.success('Package assigned to tenant');
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Assign failed';
+      feedback.error(err instanceof ApiError ? err.message : 'Assign failed');
     } finally {
       assigning = false;
     }
@@ -61,14 +60,14 @@
 
   async function revoke() {
     revoking = true;
-    error = '';
     try {
       await revokeTenantEntitlement(tenantId);
       entitlement = null;
       noEntitlement = true;
       showRevoke = false;
+      feedback.success('Entitlement revoked');
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Revoke failed';
+      feedback.error(err instanceof ApiError ? err.message : 'Revoke failed');
     } finally {
       revoking = false;
     }
@@ -82,10 +81,6 @@
 </script>
 
 <h1 style="margin:0 0 20px;font-size:24px">Tenant entitlement — {tenantId}</h1>
-
-{#if error}
-  <p class="error" style="margin-bottom:12px">{error}</p>
-{/if}
 
 {#if loading}
   <p style="color:var(--muted)">Loading…</p>

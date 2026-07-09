@@ -6,10 +6,10 @@
   import { isPlatformAdmin, saveSession } from '$lib/auth/session';
   import { login } from '$lib/api/auth';
   import { ApiError } from '$lib/api/http';
+  import { feedback } from '$lib/feedback.svelte';
 
   let email = $state('platform@monti.local');
   let password = $state('');
-  let error = $state('');
   let loading = $state(false);
 
   onMount(() => {
@@ -20,23 +20,22 @@
 
   async function submit(e: Event) {
     e.preventDefault();
-    error = '';
     if (!email.includes('@') || !password) {
-      error = 'Email and password are required';
+      feedback.error('Email and password are required');
       return;
     }
     loading = true;
     try {
       const pair = await login(email.trim(), password);
       if (pair.user.role !== 'platform_admin') {
-        error = 'This portal is for platform administrators only';
+        feedback.error('This portal is for platform administrators only');
         return;
       }
       saveSession(pair);
       const next = $page.url.searchParams.get('next');
       goto(next && next.startsWith(base) ? next : `${base}/packages`);
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Sign in failed';
+      feedback.error(err instanceof ApiError ? err.message : 'Sign in failed');
     } finally {
       loading = false;
     }
@@ -55,9 +54,6 @@
     <p style="color:var(--muted);font-size:14px;margin:0 0 20px">
       Sign in to manage packages and tenant entitlements.
     </p>
-    {#if error}
-      <p class="error" style="margin-bottom:12px">{error}</p>
-    {/if}
     <form onsubmit={submit}>
       <div class="field">
         <label for="email">Email</label>

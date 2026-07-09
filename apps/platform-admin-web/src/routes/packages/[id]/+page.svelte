@@ -13,6 +13,7 @@
     type RuleSchema
   } from '$lib/api/packages';
   import { ApiError } from '$lib/api/http';
+  import { feedback } from '$lib/feedback.svelte';
 
   const id = $derived($page.params.id);
 
@@ -20,7 +21,6 @@
   let schemas = $state<RuleSchema[]>([]);
   let fields = $state<RuleSchema['fields']>({});
   let rules = $state<Record<string, boolean | number>>({});
-  let error = $state('');
   let saving = $state(false);
   let showArchive = $state(false);
   let archiving = $state(false);
@@ -34,7 +34,7 @@
       const schema = schemas.find((s) => s.id === p.rules_schema_id) ?? schemas[0];
       if (schema) fields = schema.fields;
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Failed to load package';
+      feedback.error(err instanceof ApiError ? err.message : 'Failed to load package');
     }
   });
 
@@ -42,7 +42,6 @@
     e.preventDefault();
     if (!pkg) return;
     saving = true;
-    error = '';
     try {
       pkg = await updatePackage(pkg.id, {
         slug: pkg.slug,
@@ -56,8 +55,9 @@
         rules
       });
       rules = { ...pkg.rules };
+      feedback.success('Package saved');
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Save failed';
+      feedback.error(err instanceof ApiError ? err.message : 'Save failed');
     } finally {
       saving = false;
     }
@@ -70,7 +70,7 @@
       await archivePackage(pkg.id);
       goto(`${base}/packages`);
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Archive failed';
+      feedback.error(err instanceof ApiError ? err.message : 'Archive failed');
       showArchive = false;
     } finally {
       archiving = false;
@@ -84,10 +84,6 @@
   <h1 style="margin:8px 0 20px;font-size:24px">Edit: {pkg.name}</h1>
 {:else}
   <h1 style="margin:8px 0 20px;font-size:24px">Edit package</h1>
-{/if}
-
-{#if error}
-  <p class="error" style="margin-bottom:12px">{error}</p>
 {/if}
 
 {#if pkg}

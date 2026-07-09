@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { feedback } from '$lib/feedback.svelte';
+
   let {
     message = '',
     variant = 'success' as 'success' | 'error' | 'info'
@@ -6,8 +8,9 @@
     message?: string;
     variant?: 'success' | 'error' | 'info';
   } = $props();
-</script>
 
-{#if message}
-  <p class="status-message {variant}" role="status">{message}</p>
-{/if}
+  $effect(() => {
+    if (!message) return;
+    feedback[variant](message);
+  });
+</script>

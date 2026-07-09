@@ -1,5 +1,5 @@
 # Feature: Tenant Self-Registration   (FEAT-0006)
-**Sprint:** SPRINT-006   **Owner:** DEV   **Status:** in_progress   **Release target:** v0.7.0
+**Sprint:** SPRINT-006   **Owner:** DEV   **Status:** shipped   **Release:** v0.7.0
 
 ## Problem
 

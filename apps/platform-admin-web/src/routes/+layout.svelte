@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -37,6 +38,8 @@
   }
 </script>
 
+<FeedbackDialog />
+
 {#if onLoginPage}
   {@render children()}
 {:else}
@@ -53,6 +56,13 @@
           href="{base}/packages"
         >
           Packages
+        </a>
+        <a
+          class="nav-link"
+          class:active={$page.url.pathname.startsWith(`${base}/tenants`) && !$page.url.pathname.includes('/avatars') && !$page.url.pathname.includes('/entitlement')}
+          href="{base}/tenants"
+        >
+          Tenants
         </a>
         <a
           class="nav-link"

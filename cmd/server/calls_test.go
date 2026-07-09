@@ -32,7 +32,7 @@ func TestHealthIncludesSprint004(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if payload["sprint"] != "SPRINT-005" {
+	if payload["sprint"] != "SPRINT-006" {
 		t.Fatalf("sprint = %v", payload["sprint"])
 	}
 	if payload["auth_disabled"] != true {

@@ -5,6 +5,7 @@
   import RulesForm from '$lib/components/RulesForm.svelte';
   import { createPackage, listRuleSchemas, type RuleSchema } from '$lib/api/packages';
   import { ApiError } from '$lib/api/http';
+  import { feedback } from '$lib/feedback.svelte';
 
   let schemas = $state<RuleSchema[]>([]);
   let schemaId = $state('rules-v1');
@@ -17,7 +18,6 @@
   let priceCents = $state(0);
   let currency = $state('USD');
   let billingPeriod = $state('monthly');
-  let error = $state('');
   let saving = $state(false);
 
   onMount(async () => {
@@ -36,7 +36,6 @@
 
   async function submit(e: Event) {
     e.preventDefault();
-    error = '';
     saving = true;
     try {
       const created = await createPackage({
@@ -52,7 +51,7 @@
       });
       goto(`${base}/packages/${created.id}`);
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Create failed';
+      feedback.error(err instanceof ApiError ? err.message : 'Create failed');
     } finally {
       saving = false;
     }
@@ -61,10 +60,6 @@
 
 <p><a class="link" href="{base}/packages">← Packages</a></p>
 <h1 style="margin:8px 0 20px;font-size:24px">New package</h1>
-
-{#if error}
-  <p class="error" style="margin-bottom:12px">{error}</p>
-{/if}
 
 <form onsubmit={submit}>
   <div class="card" style="margin-bottom:16px">

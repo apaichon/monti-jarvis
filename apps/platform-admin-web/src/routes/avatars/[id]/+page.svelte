@@ -4,8 +4,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import AvatarImageField from '$lib/components/AvatarImageField.svelte';
-  import StatusMessage from '$lib/components/StatusMessage.svelte';
   import VoiceProfilesForm from '$lib/components/VoiceProfilesForm.svelte';
+  import { feedback } from '$lib/feedback.svelte';
   import {
     archiveAvatar,
     getAvatar,
@@ -25,10 +25,7 @@
   let robot = $state(false);
   let skin = $state('');
   let hair = $state('');
-  let error = $state('');
-  let success = $state('');
   let saving = $state(false);
-  let successTimer: ReturnType<typeof setTimeout> | undefined;
   let showArchive = $state(false);
   let archiving = $state(false);
 
@@ -67,7 +64,8 @@
       voices = av.voices.map((v) => ({ ...v }));
       applyFlags(av.flags);
     } catch (err) {
-      error = handleError(err, 'Failed to load avatar');
+      const msg = handleError(err, 'Failed to load avatar');
+      if (msg) feedback.error(msg);
     }
   });
 
@@ -75,13 +73,10 @@
     e.preventDefault();
     if (!avatar) return;
     if (voices.length === 0) {
-      error = 'At least one voice profile is required';
+      feedback.error('At least one voice profile is required');
       return;
     }
     saving = true;
-    error = '';
-    success = '';
-    if (successTimer) clearTimeout(successTimer);
     try {
       avatar = await updateAvatar(avatar.id, {
         slug: avatar.slug,
@@ -97,12 +92,10 @@
       });
       voices = avatar.voices.map((v) => ({ ...v }));
       applyFlags(avatar.flags);
-      success = `Saved — ${avatar.name} is now ${avatar.status}.`;
-      successTimer = setTimeout(() => {
-        success = '';
-      }, 4000);
+      feedback.success(`Saved — ${avatar.name} is now ${avatar.status}.`);
     } catch (err) {
-      error = handleError(err, 'Save failed');
+      const msg = handleError(err, 'Save failed');
+      if (msg) feedback.error(msg);
     } finally {
       saving = false;
     }
@@ -115,7 +108,8 @@
       await archiveAvatar(avatar.id);
       goto(`${base}/avatars`);
     } catch (err) {
-      error = handleError(err, 'Archive failed');
+      const msg = handleError(err, 'Archive failed');
+      if (msg) feedback.error(msg);
       showArchive = false;
     } finally {
       archiving = false;
@@ -130,9 +124,6 @@
 {:else}
   <h1 style="margin:8px 0 20px;font-size:24px">Edit avatar</h1>
 {/if}
-
-<StatusMessage message={success} variant="success" />
-<StatusMessage message={error} variant="error" />
 
 {#if avatar}
   <form onsubmit={save}>
@@ -170,14 +161,7 @@
           </select>
         </div>
       </div>
-      <AvatarImageField
-        avatarId={avatar.id}
-        bind:imageUrl={avatar.image_url}
-        onError={(msg) => {
-          error = msg;
-          success = '';
-        }}
-      />
+      <AvatarImageField avatarId={avatar.id} bind:imageUrl={avatar.image_url} />
       <div class="field">
         <label for="greeting">Greeting</label>
         <textarea id="greeting" rows="3" bind:value={avatar.greeting} required></textarea>

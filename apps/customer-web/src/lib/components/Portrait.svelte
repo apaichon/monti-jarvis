@@ -3,13 +3,19 @@
 
   let {
     agent,
-    mini = false
+    mini = false,
+    speaking = false,
+    tone = ''
   }: {
     agent: Agent;
     mini?: boolean;
+    speaking?: boolean;
+    tone?: string;
   } = $props();
 
-  const src = $derived(agent.image || `/images/${agent.id}.jpg`);
+  const still = $derived(agent.image || `/images/${agent.id}.jpg`);
+  const toned = $derived((tone && agent.expressions?.[tone]) || '');
+  const src = $derived(toned || (speaking && agent.speaking_image ? agent.speaking_image : still));
   const style = $derived(`--assistant-color:${agent.color}`);
 </script>
 

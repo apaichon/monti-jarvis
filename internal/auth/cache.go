@@ -11,13 +11,15 @@ import (
 )
 
 type CachedUser struct {
-	ID           string `json:"id"`
-	Email        string `json:"email"`
-	DisplayName  string `json:"display_name"`
-	Status       string `json:"status"`
-	Role         string `json:"role"`
-	TenantID     string `json:"tenant_id"`
-	PasswordHash string `json:"password_hash,omitempty"`
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	DisplayName   string `json:"display_name"`
+	Status        string `json:"status"`
+	Role          string `json:"role"`
+	TenantID      string `json:"tenant_id"`
+	AuthProvider  string `json:"auth_provider,omitempty"`
+	EmailVerified bool   `json:"email_verified,omitempty"`
+	PasswordHash  string `json:"password_hash,omitempty"`
 }
 
 type CachedRefresh struct {
