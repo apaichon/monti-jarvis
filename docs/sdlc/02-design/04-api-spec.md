@@ -2,8 +2,8 @@
 id: DES-0004
 title: API Specification
 status: approved
-updated: 2026-07-08
-sprint: SPRINT-006
+updated: 2026-07-09
+sprint: SPRINT-008
 ---
 
 # API Specification — Monti Jarvis
@@ -29,7 +29,7 @@ Liveness + feature flags.
   "livekit": true,
   "nats": true,
   "rag": true,
-  "sprint": "SPRINT-006",
+  "sprint": "SPRINT-008",
   "auth_disabled": true,
   "customer_web": "apps/customer-web/build",
   "platform_admin_web": "apps/platform-admin-web/build",
@@ -49,11 +49,18 @@ Dependency health.
   "clickhouse": "ok",
   "nats": "ok",
   "livekit": "configured",
-  "entitlement_cache": "ok"
+  "entitlement_cache": "ok",
+  "payment_gateway": {
+    "configured": true,
+    "provider": "chillpay",
+    "mode": "test",
+    "status": "active"
+  }
 }
 ```
 
-`entitlement_cache`: `ok` | `disabled` | `unavailable` *(Sprint 4, when `ENTITLEMENT_CACHE_ENABLED`)*
+`entitlement_cache`: `ok` | `disabled` | `unavailable` *(Sprint 4, when `ENTITLEMENT_CACHE_ENABLED`)*  
+`payment_gateway`: *(Sprint 8)* `configured` bool · `provider` `chillpay`|`mock` · `mode` `test`|`live` · `status` `inactive`|`active`
 
 ## Workforce
 
@@ -719,6 +726,108 @@ No body. Atomically activates tenant.
 ### Pending tenant route policy
 
 `tenant_admin` on `pending_kyc` tenant: login + `/api/auth/me` OK; `POST /api/km/*` writes → `403 tenant not active`. After Sprint 7 approve → `active` → KM writes OK. See [11-tenant-register-spec.md](11-tenant-register-spec.md) §7 · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md).
+
+## Payment Gateway (Sprint 8)
+
+**Role:** `platform_admin` on config routes; callback is **public** (ChillPay server POST).
+
+See [13-payment-gateway-spec.md](13-payment-gateway-spec.md) for ChillPay checksum rules.
+
+### `GET /api/platform/payment-gateway`
+
+Returns singleton platform gateway config. Secrets masked.
+
+**Response 200:**
+
+```json
+{
+  "provider": "chillpay",
+  "mode": "test",
+  "status": "active",
+  "merchant_code": "M123456",
+  "api_key_masked": "****abcd",
+  "md5_key_set": true,
+  "base_url": "https://sandbox-api.chillpay.co/api/v2/Payment/",
+  "route_no": 1,
+  "currency": "THB",
+  "callback_url": "http://localhost:8091/api/callbacks/chillpay",
+  "return_url": "http://localhost:8091/tenant/billing/return",
+  "connection_status": "unknown",
+  "last_callback_at": null
+}
+```
+
+When no row exists: `200` with `provider: ""`, `status: "inactive"`, `configured: false`.
+
+**Errors:** `401` · `403`
+
+### `PUT /api/platform/payment-gateway`
+
+**Body:**
+
+```json
+{
+  "provider": "chillpay",
+  "mode": "test",
+  "merchant_code": "M123456",
+  "api_key": "cp_live_xxx",
+  "md5_key": "secret-md5-key",
+  "base_url": "https://sandbox-api.chillpay.co/api/v2/Payment/",
+  "route_no": 1,
+  "currency": "THB",
+  "return_url": "http://localhost:8091/tenant/billing/return"
+}
+```
+
+Omit `api_key` / `md5_key` to keep existing values. Env `CHILLPAY_API_KEY` / `CHILLPAY_MD5_KEY` override at runtime when set.
+
+`callback_url` is server-derived from `APP_PUBLIC_URL`; not writable by client.
+
+**Response 200:** same shape as GET (masked).
+
+**Errors:** `400` invalid provider/mode · `401` · `403`
+
+### `POST /api/platform/payment-gateway/test`
+
+No body. Runs provider `Ping`.
+
+**Response 200:**
+
+```json
+{ "ok": true, "provider": "chillpay", "message": "credentials valid" }
+```
+
+**Response 502:**
+
+```json
+{ "ok": false, "provider": "chillpay", "message": "chillpay status HTTP 401: ..." }
+```
+
+**Errors:** `401` · `403` · `503` gateway not configured
+
+### `POST /api/callbacks/chillpay`
+
+**Auth:** None. ChillPay posts `application/x-www-form-urlencoded`.
+
+**Form fields:** `OrderNo`, `Amount`, `TransactionId`, `CustomerId`, `CustomerName`, `BankCode`, `PaymentDate`, `PaymentStatus`, `PaymentDescription`, `BankRefCode`, `Currency`, `CreditCardToken`, `CurrentDate`, `CurrentTime`, `CheckSum`
+
+**PaymentStatus:** `0` success · `1` pending · `2` failed
+
+**Response 200:** empty body (ack)
+
+**Errors:** `400` invalid/missing `CheckSum` · `503` gateway not configured
+
+**Dev:** `PAYMENT_CALLBACK_DEV_BYPASS=true` skips checksum (local only).
+
+### Payment Gateway error codes
+
+| Code | When |
+| --- | --- |
+| `400` | Callback checksum invalid |
+| `502` | Test connection — ChillPay rejected credentials |
+| `503` | Gateway not configured / inactive |
+
+Sprint 8 callback handler **logs only** — no order fulfillment. Sprint 9 consumes `payment_status = 0`.
 
 ## Knowledge base (per avatar)
 

@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: approved
-updated: 2026-07-08
-sprint: SPRINT-006
+updated: 2026-07-09
+sprint: SPRINT-008
 ---
 
 # Workflows — Monti Jarvis
@@ -592,4 +592,102 @@ sequenceDiagram
 | `approved` | KYC approved; tenant `active` |
 | `rejected` | KYC rejected; `rejection_reason` set |
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 25. Platform configure ChillPay gateway (Sprint 8)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant B as Browser (/admin)
+  participant G as Go :8091
+  participant M as auth middleware
+  participant S as internal/store
+  participant DB as Postgres
+
+  Op->>B: Open /admin/settings/payment
+  B->>G: GET /api/platform/payment-gateway
+  G->>M: validate JWT + platform_admin
+  alt forbidden
+    M-->>B: 403
+  else ok
+    S->>DB: SELECT payment_gateway_configs WHERE id=default
+    G-->>B: 200 {provider, merchant_code, api_key_masked, md5_key_set, callback_url, ...}
+    Op->>B: Edit merchant code, API key, MD5 key, base URL, return URL
+    B->>G: PUT /api/platform/payment-gateway {provider: chillpay, ...}
+    G->>S: UpsertPaymentGatewayConfig
+    S->>DB: INSERT/UPDATE payment_gateway_configs
+    G-->>B: 200 updated config (secrets masked)
+    B-->>Op: FeedbackDialog success
+  end
+```
+
+## 26. Test ChillPay connection (Sprint 8)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant G as Go :8091
+  participant P as internal/payment/chillpay
+  participant CP as ChillPay API
+
+  Op->>G: POST /api/platform/payment-gateway/test
+  alt provider = mock
+    G-->>Op: 200 {ok: true, provider: mock}
+  else provider = chillpay
+    G->>P: Ping(ctx) — checksum self-test + optional InquiryPaymentStatus
+    alt credentials invalid
+      P-->>G: error
+      G-->>Op: 502 {ok: false, message}
+    else ok
+      P->>CP: POST /api/v2/PaymentStatus/ (optional probe)
+      G-->>Op: 200 {ok: true}
+    end
+  end
+```
+
+## 27. ChillPay payment callback (Sprint 8)
+
+```mermaid
+sequenceDiagram
+  participant CP as ChillPay
+  participant G as Go :8091
+  participant P as internal/payment/chillpay
+  participant S as internal/store
+  participant DB as Postgres
+
+  CP->>G: POST /api/callbacks/chillpay (form-urlencoded)
+  G->>G: Parse ChillPayCallbackForm
+  alt PAYMENT_CALLBACK_DEV_BYPASS
+    Note over G: skip verify (local only)
+  else verify
+    G->>P: VerifyCallback(form)
+    alt bad CheckSum
+      P-->>G: false
+      G-->>CP: 400
+    end
+  end
+  G->>S: InsertPaymentCallbackEvent(transaction_id, ...)
+  alt duplicate transaction_id
+    S->>DB: ON CONFLICT DO NOTHING
+  else new
+    S->>DB: INSERT payment_callback_events
+  end
+  Note over G: No entitlement update (Sprint 9)
+  G-->>CP: 200
+```
+
+## State: payment_gateway_configs (Sprint 8)
+
+| Status | Meaning |
+| --- | --- |
+| `inactive` | Not configured or disabled |
+| `active` | Operator saved valid config; callbacks accepted |
+
+## State: payment_callback_events (Sprint 8)
+
+| payment_status | Meaning |
+| --- | --- |
+| `0` | Success — Sprint 9 will fulfill order |
+| `1` | Pending |
+| `2` | Failed |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

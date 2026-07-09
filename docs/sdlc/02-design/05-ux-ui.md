@@ -2,8 +2,8 @@
 id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
-updated: 2026-07-08
-sprint: SPRINT-006
+updated: 2026-07-09
+sprint: SPRINT-008
 ---
 
 # UX/UI — ASCII Wireframes
@@ -851,6 +851,98 @@ P-D  /admin/tenants/{id}/kyc
 | KYC API client | `apps/platform-admin-web/src/lib/api/kyc.ts` |
 | Feedback dialog | `apps/platform-admin-web/src/lib/components/FeedbackDialog.svelte` |
 
+### Screen P13 — Payment gateway settings (`/admin/settings/payment`) *(Sprint 8)*
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  MONTI ADMIN   Packages · Tenants · Avatars · Settings · Profile    Logout       │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│  Settings › Payment                                         P13-H1               │
+│                                                                                  │
+│  Payment gateway (ChillPay)                                                      │
+│  Configure platform-wide payment provider for tenant checkout (Sprint 9).        │
+│                                                                                  │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Provider        [ chillpay ▼ ]              P13-F1   mock | chillpay       │  │
+│  │ Mode            [ test ▼ ]                  P13-F2   test | live           │  │
+│  │ Merchant code   [ M123456                    ]  P13-F3                     │  │
+│  │ API key         [ ••••••••••••abcd          ]  P13-F4   password input     │  │
+│  │ MD5 secret key  [ ••••••••••••••••          ]  P13-F5   password input     │  │
+│  │ Base URL        [ https://sandbox-api…/Payment/ ]  P13-F6                │  │
+│  │ Route no        [ 1 ]                       P13-F7                       │  │
+│  │ Currency        [ THB ]                     P13-F8                       │  │
+│  │ Return URL      [ http://localhost:8091/tenant/billing/return ]  P13-F9  │  │
+│  │ Callback URL    http://localhost:8091/api/callbacks/chillpay   P13-R1   │  │
+│  │                 (read-only — derived from APP_PUBLIC_URL)                │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                  │
+│  Connection: unknown · Last callback: —                    P13-S1                │
+│                                                                                  │
+│         [ Test connection ]  P13-B1 outline        [ Save ]  P13-B2 primary      │
+│                                                                                  │
+│  Success/error → shadcn-style FeedbackDialog (not inline banners)                │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Zone | Action | API |
+| --- | --- | --- |
+| P13-H1 | Page load | `GET /api/platform/payment-gateway` |
+| P13-F1–F9 | Edit fields | local state |
+| P13-R1 | Callback URL preview | from GET response `callback_url` |
+| P13-B2 | Save | `PUT /api/platform/payment-gateway` |
+| P13-B1 | Test connection | `POST /api/platform/payment-gateway/test` |
+| P13-S1 | Status line | `connection_status`, `last_callback_at` from GET |
+
+### Flow P-E — Configure ChillPay
+
+```text
+P-E  platform_admin login
+  → /admin/settings/payment
+  → select provider chillpay (or mock for dev)
+  → fill merchant code, API key, MD5 key, base URL, return URL
+  → Save → PUT /api/platform/payment-gateway
+  → feedback dialog "Payment gateway saved"
+```
+
+### Flow P-F — Test connection + callback ops
+
+```text
+P-F  /admin/settings/payment
+  → Test connection → POST .../test
+  → feedback dialog success or error message from 502 body
+
+Ops (curl):
+  → POST /api/callbacks/chillpay with form body + valid CheckSum
+  → or PAYMENT_CALLBACK_DEV_BYPASS=true for local smoke
+  → verify row in payment_callback_events
+```
+
+### Platform admin — component → file (Sprint 8)
+
+| Component | Path |
+| --- | --- |
+| Payment settings page | `apps/platform-admin-web/src/routes/settings/payment/+page.svelte` |
+| Payment API client | `apps/platform-admin-web/src/lib/api/payment.ts` |
+| Shell nav (Settings link) | `apps/platform-admin-web/src/routes/+layout.svelte` |
+
+## Sprint 8 — Payment Gateway (customer + tenant UI unchanged)
+
+| Surface | Sprint 8 UX | API |
+| --- | --- | --- |
+| Customer `/` | Unchanged | Public chat/voice |
+| Tenant `/tenant` | Unchanged | No checkout yet |
+| Platform `/admin` | **New** P13 payment settings | `/api/platform/payment-gateway*` |
+| Ops curl | Callback simulate | `POST /api/callbacks/chillpay` |
+
+```text
+┌─────────────────────────────────────────┐
+│  Ops / Tester (terminal)                │
+│  curl -X POST .../callbacks/chillpay    │
+│  -H Content-Type: application/x-www-... │
+│  -d TransactionId=...&CheckSum=...      │
+└─────────────────────────────────────────┘
+```
+
 ## Sprint 7 — Platform KYC (customer + tenant UI unchanged)
 
 | Surface | Sprint 7 UX | API |
@@ -938,4 +1030,4 @@ Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login scre
 | Chat API | `src/lib/api/chat.ts` |
 | Voice | `src/lib/voice/gemini.ts` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

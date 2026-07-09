@@ -66,6 +66,6 @@ Callback `PaymentStatus`: `"0"` success · `"1"` pending · `"2"` failed.
 - Sprint: [SPRINT-008](../03-sprints/SPRINT-008.md)
 - Depends on: [FEAT-0003](FEAT-0003-auth-rbac.md) (platform_admin RBAC)
 - Prior commerce: [FEAT-0004](FEAT-0004-packages-entitlements.md)
-- Design: `13-payment-gateway-spec.md` (pending) · [04-api-spec.md](../02-design/04-api-spec.md) § Payment Gateway · [05-ux-ui.md](../02-design/05-ux-ui.md) § P13
+- Design: [13-payment-gateway-spec.md](../02-design/13-payment-gateway-spec.md) · [04-api-spec.md](../02-design/04-api-spec.md) § Payment Gateway · [05-ux-ui.md](../02-design/05-ux-ui.md) § P13 · [02-workflow.md](../02-design/02-workflow.md) §25–27
 - Roadmap: Sprint 8 · Phase C
 - Next: Sprint 9 Buy Package

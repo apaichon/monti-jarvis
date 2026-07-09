@@ -66,13 +66,13 @@ Let **platform admins** connect **ChillPay** (Thailand payment gateway) or local
 
 | Artifact | Path | Status |
 | --- | --- | --- |
-| Payment gateway deep spec | [13-payment-gateway-spec.md](../02-design/13-payment-gateway-spec.md) | `pending` |
-| Workflow | [02-workflow.md](../02-design/02-workflow.md) §25–27 | `pending` |
-| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `pending` |
-| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Payment Gateway | `pending` |
-| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § P13 | `pending` |
+| Payment gateway deep spec | [13-payment-gateway-spec.md](../02-design/13-payment-gateway-spec.md) | `approved` |
+| Workflow | [02-workflow.md](../02-design/02-workflow.md) §25–27 | `approved` |
+| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `approved` |
+| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Payment Gateway | `approved` |
+| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § P13 | `approved` |
 
-> Run **`/sprint-tech-specs`** before DEV starts **TASK-0035** (schema) / **TASK-0036** (APIs).
+> Design pack approved — DEV may start **TASK-0035** (schema) then **TASK-0036** (APIs).
 
 ## Verification
 
