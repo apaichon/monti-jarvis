@@ -2,8 +2,8 @@
 id: DES-0003
 title: Entity Relationship Diagram
 status: approved
-updated: 2026-07-08
-sprint: SPRINT-006
+updated: 2026-07-09
+sprint: SPRINT-007
 ---
 
 # ER Diagram — Monti Jarvis
@@ -21,7 +21,7 @@ Every durable Postgres table in `callcenter` carries four audit fields (migratio
 | `created_by` | `text` | Actor user id; default `'system'`; set from JWT via `internal/auditctx` |
 | `updated_by` | `text` | Last mutator user id; default `'system'` |
 
-**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments`, `tenant_registrations`, `brands`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
+**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments`, `tenant_registrations`, `brands`, `tenant_kyc_profiles`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
 
 ClickHouse analytics tables use `created_at`, `updated_at`, `created_by`, `updated_by` (`002_audit_columns_clickhouse` + `EnsureAuthEventsSchema`).
 
@@ -37,6 +37,7 @@ erDiagram
   tenants ||--o{ tenant_entitlements : entitled
   tenants ||--o{ tenant_avatar_assignments : assigns
   tenants ||--|| tenant_registrations : registered_via
+  tenants ||--|| tenant_kyc_profiles : kyc_package
   tenants ||--o{ brands : owns
   ai_avatars ||--o{ tenant_avatar_assignments : enabled_for
   ai_avatars ||--o{ ai_avatar_voices : speaks_with
@@ -71,6 +72,27 @@ erDiagram
     text company_name
     text admin_email
     text status
+    text rejection_reason
+    timestamptz reviewed_at
+    text reviewed_by
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_kyc_profiles {
+    text tenant_id PK FK
+    text contact_name
+    text contact_phone
+    text contact_address
+    text photo_object_key
+    jsonb business_doc_keys
+    text status
+    timestamptz submitted_at
+    timestamptz reviewed_at
+    text reviewed_by
+    text rejection_reason
     timestamptz created_at
     timestamptz updated_at
     text created_by
@@ -536,6 +558,9 @@ Voice path (Gemini → Grok failover) updates `call_sessions.voice_provider_id` 
 monti-jarvis/
   calls/                    # future recordings
   km/{tenant_id}/{agent_id}/{doc_id}/original/{filename}
+  kyc/{tenant_id}/          # Sprint 6 — photo + docs (see internal/store/tenantkyc_assets.go)
+    photo.{ext}
+    docs/{filename}
 ```
 
 ## Redis (ephemeral)
@@ -569,9 +594,10 @@ monti-jarvis/
 | --- | --- |
 | 4 ✅ v0.5.0 | `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements` |
 | 5 ✅ v0.6.0 | `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments` |
-| 6 ✅ v0.7.0 target | `tenant_registrations`, `brands`; `tenants.status` + `pending_kyc` |
+| 6 ✅ v0.7.0 | `tenant_registrations`, `brands`, `tenant_kyc_profiles`; `tenants.status` + `pending_kyc` |
+| 7 🔄 v0.8.0 | KYC review columns on `tenant_kyc_profiles` + `tenant_registrations`; approve/reject lifecycle |
 | 15 | `km_scope_assignments`, tenant-driven re-index |
 | 21 | Runtime voice failover + `ai_employee_configs` embedding bindings (voice stays on `ai_avatar_voices`) |
 | 22 | `conversation_records` (ClickHouse denorm) |
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains.

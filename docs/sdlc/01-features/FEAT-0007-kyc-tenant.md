@@ -46,6 +46,6 @@ Out:
 
 - Sprint: [SPRINT-007](../03-sprints/SPRINT-007.md)
 - Depends on: [FEAT-0006](FEAT-0006-tenant-register.md)
-- Design: [12-kyc-tenant-spec.md](../02-design/12-kyc-tenant-spec.md) *(pending)* · [04-api-spec.md](../02-design/04-api-spec.md) · [05-ux-ui.md](../02-design/05-ux-ui.md) § P12
+- Design: [12-kyc-tenant-spec.md](../02-design/12-kyc-tenant-spec.md) · [04-api-spec.md](../02-design/04-api-spec.md) § Platform KYC · [05-ux-ui.md](../02-design/05-ux-ui.md) § P12 · [02-workflow.md](../02-design/02-workflow.md) §22–24
 - Roadmap: Sprint 7 · Phase C
 - Next: Sprint 8 Payment Gateway

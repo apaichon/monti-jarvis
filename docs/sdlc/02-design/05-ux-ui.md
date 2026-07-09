@@ -163,6 +163,7 @@ Customer portal `/` unchanged. Requires `AUTH_DISABLED=false` for login.
 | Avatar edit *(S5)* | `/admin/avatars/[id]` | `GET/PUT/DELETE /api/platform/avatars/{id}` |
 | Tenant avatars *(S5)* | `/admin/tenants/[id]/avatars` | `GET/POST/DELETE /api/platform/tenants/{id}/avatars*` |
 | Tenants list *(S6)* | `/admin/tenants` | `GET /api/platform/tenants?status=` |
+| Tenant KYC review *(S7)* | `/admin/tenants/[id]/kyc` | `GET/POST /api/platform/tenants/{id}/kyc*` |
 
 ### Design tokens (platform admin)
 
@@ -762,7 +763,102 @@ Minimal table for platform_admin; API required even if UI deferred.
 | Zone | Action | API |
 | --- | --- | --- |
 | P11-T1 | Filter status | `GET /api/platform/tenants?status=pending_kyc` |
-| P11-T2 | Row link | future `/admin/tenants/{id}` (Sprint 7 KYC) |
+| P11-T2 | Row link → KYC review | `/admin/tenants/{id}/kyc` |
+| P11-T3 | Filter KYC queue | `GET /api/platform/tenants?kyc_status=submitted` |
+
+### Screen P12 — Tenant KYC review (`/admin/tenants/{id}/kyc`) *(Sprint 7)*
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  MONTI ADMIN   Packages · Tenants · Avatars · Profile          platform@… Logout │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│  ← Tenants   P12-L1                                                              │
+│                                                                                  │
+│  KYC review — acme (Acme Corp)                              P12-H1               │
+│  Tenant status: pending_kyc   ·   KYC: submitted   ·   Reg: submitted            │
+│                                                                                  │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Registration                                                               │  │
+│  │  Company     Acme Corp                              P12-R1                 │  │
+│  │  Workspace   monti.app/acme                         P12-R2                 │  │
+│  │  Admin email admin@acme.test                        P12-R3                 │  │
+│  │  Submitted   2026-07-09 08:00                       P12-R4                 │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                  │
+│  ┌──────────────────────────┐  ┌────────────────────────────────────────────┐  │
+│  │ Photo  P12-P1              │  │ Contact  P12-C1                            │  │
+│  │ ┌────────────┐           │  │  Name     Jane Doe                         │  │
+│  │ │  portrait  │           │  │  Phone    +66 2 000 0000                   │  │
+│  │ │  preview   │           │  │  Address  Bangkok, TH                      │  │
+│  │ └────────────┘           │  └────────────────────────────────────────────┘  │
+│  └──────────────────────────┘                                                  │
+│                                                                                  │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Documents  P12-D1                                                          │  │
+│  │  • license.pdf   [ Open ]  → GET /api/assets/kyc/acme/docs/license.pdf     │  │
+│  │  • tax-id.png    [ Open ]                                                  │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                  │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Reject reason (required for reject)  P12-F1                                │  │
+│  │  [ Document is illegible — please re-upload a clearer scan.            ]   │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                  │
+│         [ Reject ]  P12-B2 danger          [ Approve ]  P12-B1 primary cyan      │
+│                                                                                  │
+│  Success/error → shadcn-style FeedbackDialog (not inline banners)                │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Zone | Action | API |
+| --- | --- | --- |
+| P12-L1 | Back to tenants list | navigate `/admin/tenants` |
+| P12-H1 | Page load | `GET /api/platform/tenants/{id}/kyc` |
+| P12-P1 | Photo preview | `GET /api/assets/kyc/{id}/photo/{file}` |
+| P12-D1 | Open document | `GET /api/assets/kyc/{id}/docs/{file}` |
+| P12-B1 | Approve | `POST /api/platform/tenants/{id}/kyc/approve` |
+| P12-B2 | Reject | `POST /api/platform/tenants/{id}/kyc/reject` `{reason}` |
+| P12-F1 | Reject reason field | required before reject; `400` if empty |
+
+### Flow P-C — KYC review queue
+
+```text
+P-C  platform_admin login
+  → /admin/tenants?status=pending_kyc&kyc_status=submitted
+  → click workspace row → /admin/tenants/{id}/kyc
+  → review photo + documents + contact
+  → Approve → feedback dialog "Tenant activated"
+  → tenant removed from pending_kyc filter
+```
+
+### Flow P-D — Reject with reason
+
+```text
+P-D  /admin/tenants/{id}/kyc
+  → enter rejection reason in P12-F1
+  → Reject → POST .../kyc/reject
+  → feedback dialog success
+  → Resend email to admin@acme.test (when configured)
+  → tenant stays pending_kyc; registration rejected
+```
+
+### Platform admin — component → file (Sprint 7)
+
+| Component | Path |
+| --- | --- |
+| Tenants list (link column) | `apps/platform-admin-web/src/routes/tenants/+page.svelte` |
+| KYC review page | `apps/platform-admin-web/src/routes/tenants/[id]/kyc/+page.svelte` |
+| KYC API client | `apps/platform-admin-web/src/lib/api/kyc.ts` |
+| Feedback dialog | `apps/platform-admin-web/src/lib/components/FeedbackDialog.svelte` |
+
+## Sprint 7 — Platform KYC (customer + tenant UI unchanged)
+
+| Surface | Sprint 7 UX | API |
+| --- | --- | --- |
+| Customer `/` | Unchanged | Public chat/voice |
+| Tenant `/tenant` | Unchanged backoffice submit | `POST /api/tenant/kyc/submit` |
+| Platform `/admin` | **New** P12 KYC review + P11 link | `/api/platform/tenants/{id}/kyc*` |
+| Ops curl | Approve/reject pending tenant | [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) §9 |
 
 ### Flow T-A — Register
 
@@ -842,4 +938,4 @@ Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login scre
 | Chat API | `src/lib/api/chat.ts` |
 | Voice | `src/lib/voice/gemini.ts` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

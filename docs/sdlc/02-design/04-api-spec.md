@@ -223,6 +223,8 @@ Bearer required → `{id, email, display_name, role, tenant_id}`.
 | `/api/platform/tenants/{id}/entitlement` | `platform_admin` |
 | `/api/platform/avatars*` | `platform_admin` |
 | `/api/platform/tenants/{id}/avatars*` | `platform_admin` |
+| `/api/platform/tenants/{id}/kyc*` | `platform_admin` |
+| `/api/tenant/kyc*` | `tenant_admin` |
 | `GET /api/entitlements/me` | `tenant_admin`, `platform_admin` |
 
 Public unchanged: `/api/chat`, `/ws/voice`, `GET /api/km/*`, `GET /api/workforce`.
@@ -567,6 +569,7 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
 | Query | Type | Description |
 | --- | --- | --- |
 | `status` | string | Optional filter: `pending_kyc`, `active`, `suspended` |
+| `kyc_status` | string | Optional filter: `draft`, `submitted`, `approved`, `rejected` (joins `tenant_kyc_profiles`) *(Sprint 7)* |
 | `limit` | int | Default `50`, max `100` |
 | `offset` | int | Pagination offset |
 
@@ -582,6 +585,7 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
       "status": "pending_kyc",
       "registration_id": "reg_a1b2c3d4e5f67890",
       "admin_email": "admin@acme.test",
+      "kyc_status": "submitted",
       "created_at": "2026-07-08T01:00:00Z"
     }
   ],
@@ -590,6 +594,118 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
   "offset": 0
 }
 ```
+
+## Tenant KYC — tenant portal (Sprint 6, shipped v0.7.0)
+
+**Role:** `tenant_admin` on own tenant. Routes under `guard.RequireBearer` + tenant scope.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/tenant/kyc` | Current KYC profile + asset URLs |
+| `PUT` | `/api/tenant/kyc` | Update contact fields |
+| `POST` | `/api/tenant/kyc/photo` | Upload portrait (multipart `file`) |
+| `POST` | `/api/tenant/kyc/documents` | Upload business document (multipart `file`) |
+| `POST` | `/api/tenant/kyc/submit` | Set status `submitted` |
+
+**Assets:** `GET /api/assets/kyc/{tenant_id}/{kind}/{file}` — `kind` = `photo` | `docs`.
+
+## Platform KYC review (Sprint 7)
+
+**Role:** `platform_admin` on all routes below.
+
+### `GET /api/platform/tenants/{tenant_id}/kyc`
+
+Returns tenant metadata, registration row, and KYC package for review.
+
+**Response 200:**
+
+```json
+{
+  "tenant": {
+    "id": "acme",
+    "slug": "acme",
+    "name": "Acme Corp",
+    "status": "pending_kyc",
+    "created_at": "2026-07-08T01:00:00Z"
+  },
+  "registration": {
+    "id": "reg_a1b2c3d4e5f67890",
+    "company_name": "Acme Corp",
+    "admin_email": "admin@acme.test",
+    "status": "submitted"
+  },
+  "kyc": {
+    "status": "submitted",
+    "contact_name": "Jane Doe",
+    "contact_phone": "+66 2 000 0000",
+    "contact_address": "Bangkok, TH",
+    "photo_url": "/api/assets/kyc/acme/photo/photo.jpg",
+    "documents": [
+      { "object_key": "kyc/acme/docs/license.pdf", "url": "/api/assets/kyc/acme/docs/license.pdf" }
+    ],
+    "submitted_at": "2026-07-09T08:00:00Z",
+    "reviewed_at": null,
+    "reviewed_by": "",
+    "rejection_reason": ""
+  }
+}
+```
+
+**Errors:** `401` · `403` · `404` tenant not found
+
+### `POST /api/platform/tenants/{tenant_id}/kyc/approve`
+
+No body. Atomically activates tenant.
+
+**Response 200:**
+
+```json
+{
+  "tenant_id": "acme",
+  "tenant_status": "active",
+  "registration_status": "approved",
+  "kyc_status": "approved",
+  "reviewed_at": "2026-07-09T09:00:00Z",
+  "reviewed_by": "usr_platform_admin"
+}
+```
+
+**Errors:** `401` · `403` · `404` · `409` tenant not `pending_kyc` or KYC not `submitted`
+
+### `POST /api/platform/tenants/{tenant_id}/kyc/reject`
+
+**Body:**
+
+```json
+{ "reason": "Business license document is illegible. Please re-upload." }
+```
+
+**Response 200:**
+
+```json
+{
+  "tenant_id": "acme",
+  "tenant_status": "pending_kyc",
+  "registration_status": "rejected",
+  "kyc_status": "rejected",
+  "rejection_reason": "Business license document is illegible. Please re-upload.",
+  "reviewed_at": "2026-07-09T09:05:00Z",
+  "reviewed_by": "usr_platform_admin"
+}
+```
+
+**Errors:** `400` missing/empty `reason` · `401` · `403` · `404` · `409` KYC not `submitted`
+
+### Platform KYC error codes
+
+| Code | When |
+| --- | --- |
+| `400` | Reject without `reason` |
+| `409` | Approve/reject when prerequisites not met (wrong tenant/KYC status) |
+
+### Post-approve route policy
+
+`tenant_admin` on `active` tenant: `POST /api/km/*` writes allowed (`RequireKMWrite` passes `IsTenantActive`). See [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) §6.
 
 ### Tenant registration error codes
 
@@ -602,7 +718,7 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
 
 ### Pending tenant route policy
 
-`tenant_admin` on `pending_kyc` tenant: login + `/api/auth/me` OK; `POST /api/km/*` writes → `403 tenant not active`. See [11-tenant-register-spec.md](11-tenant-register-spec.md) §7.
+`tenant_admin` on `pending_kyc` tenant: login + `/api/auth/me` OK; `POST /api/km/*` writes → `403 tenant not active`. After Sprint 7 approve → `active` → KM writes OK. See [11-tenant-register-spec.md](11-tenant-register-spec.md) §7 · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md).
 
 ## Knowledge base (per avatar)
 

@@ -495,4 +495,101 @@ sequenceDiagram
 
 Sprint 7 adds `approved`, `rejected`, reviewer metadata.
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 22. Platform review KYC package (Sprint 7)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant B as Browser (/admin)
+  participant G as Go :8091
+  participant M as auth middleware
+  participant S as internal/store
+  participant DB as Postgres
+
+  Op->>B: Open /admin/tenants/{id}/kyc
+  B->>G: GET /api/platform/tenants/{tenant_id}/kyc
+  G->>M: validate JWT + platform_admin
+  alt forbidden
+    M-->>B: 403
+  else ok
+    S->>DB: SELECT tenants, tenant_registrations, tenant_kyc_profiles
+    G-->>B: 200 {tenant, registration, kyc, photo_url, documents[]}
+    B->>G: GET /api/assets/kyc/{tenant_id}/photo/...
+    G-->>B: image bytes (preview)
+  end
+```
+
+## 23. Approve KYC (Sprint 7)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant G as Go :8091
+  participant S as internal/store
+  participant DB as Postgres
+  participant R as internal/resend
+
+  Op->>G: POST /api/platform/tenants/{tenant_id}/kyc/approve
+  G->>S: ApproveTenantKYC(ctx, tenant_id, reviewer_id)
+  alt tenant not pending_kyc or kyc not submitted
+    S-->>G: conflict
+    G-->>Op: 409
+  else ok
+    S->>DB: BEGIN
+    S->>DB: UPDATE tenants SET status=active
+    S->>DB: UPDATE tenant_registrations SET status=approved, reviewed_*
+    S->>DB: UPDATE tenant_kyc_profiles SET status=approved, reviewed_*
+    S->>DB: COMMIT
+    G->>R: SendKYCApprovedEmail(admin_email) (async, best-effort)
+    G-->>Op: 200 {tenant_id, status: active, kyc_status: approved}
+  end
+```
+
+## 24. Reject KYC (Sprint 7)
+
+```mermaid
+sequenceDiagram
+  participant Op as Operator (platform_admin)
+  participant G as Go :8091
+  participant S as internal/store
+  participant DB as Postgres
+  participant R as internal/resend
+
+  Op->>G: POST /api/platform/tenants/{tenant_id}/kyc/reject {reason}
+  alt missing reason
+    G-->>Op: 400
+  else ok
+    G->>S: RejectTenantKYC(ctx, tenant_id, reviewer_id, reason)
+    alt kyc not submitted
+      S-->>G: conflict
+      G-->>Op: 409
+    else ok
+      S->>DB: BEGIN
+      S->>DB: UPDATE tenant_registrations SET status=rejected, rejection_reason
+      S->>DB: UPDATE tenant_kyc_profiles SET status=rejected, reviewed_*
+      Note over DB: tenants.status stays pending_kyc
+      S->>DB: COMMIT
+      G->>R: SendKYCRejectedEmail(admin_email, reason)
+      G-->>Op: 200 {tenant_id, registration_status: rejected}
+    end
+  end
+```
+
+## State: tenant_kyc_profiles (Sprint 6–7)
+
+| Status | Meaning |
+| --- | --- |
+| `draft` | Tenant editing contact/photo/docs |
+| `submitted` | Awaiting platform review |
+| `approved` | Platform approved; tenant is `active` |
+| `rejected` | Platform rejected; tenant may resubmit (stretch) |
+
+## State: tenant_registration (Sprint 7)
+
+| Status | Meaning |
+| --- | --- |
+| `submitted` | Signup complete |
+| `approved` | KYC approved; tenant `active` |
+| `rejected` | KYC rejected; `rejection_reason` set |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

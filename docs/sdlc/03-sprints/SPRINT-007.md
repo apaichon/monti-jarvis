@@ -63,13 +63,13 @@ Let **platform admins** review tenant KYC packages submitted in Sprint 6, **appr
 
 | Artifact | Path | Status |
 | --- | --- | --- |
-| KYC tenant deep spec | [12-kyc-tenant-spec.md](../02-design/12-kyc-tenant-spec.md) | `review_pending` |
-| Workflow | [02-workflow.md](../02-design/02-workflow.md) §22–24 | `review_pending` |
-| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `review_pending` |
-| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Platform KYC | `review_pending` |
-| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § P12–P13 | `review_pending` |
+| KYC tenant deep spec | [12-kyc-tenant-spec.md](../02-design/12-kyc-tenant-spec.md) | `approved` |
+| Workflow | [02-workflow.md](../02-design/02-workflow.md) §22–24 | `approved` |
+| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `approved` |
+| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Platform KYC | `approved` |
+| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § P12, flows P-C/P-D | `approved` |
 
-> Run **`sprint-tech-specs`** and get PM/SA sign-off before DEV starts **TASK-0031**.
+> Design pack approved — DEV may start **TASK-0030** (schema) then **TASK-0031**.
 
 ## Verification
 
