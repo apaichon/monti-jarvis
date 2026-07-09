@@ -57,6 +57,15 @@ type Config struct {
 	GoogleOAuthClientSecret  string
 	GitHubOAuthClientID      string
 	GitHubOAuthClientSecret  string
+	ChillPayMerchantCode     string
+	ChillPayAPIKey           string
+	ChillPayMD5Key           string
+	ChillPayBaseURL          string
+	ChillPayRouteNo          int
+	ChillPayCurrency         string
+	ChillPayCallbackURL      string
+	ChillPayReturnURL        string
+	PaymentCallbackDevBypass bool
 }
 
 func Load() Config {
@@ -118,6 +127,15 @@ func Load() Config {
 		GoogleOAuthClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
 		GitHubOAuthClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
 		GitHubOAuthClientSecret: os.Getenv("GITHUB_OAUTH_CLIENT_SECRET"),
+		ChillPayMerchantCode:     os.Getenv("CHILLPAY_MERCHANT_CODE"),
+		ChillPayAPIKey:           os.Getenv("CHILLPAY_API_KEY"),
+		ChillPayMD5Key:           os.Getenv("CHILLPAY_MD5_KEY"),
+		ChillPayBaseURL:          envOr("CHILLPAY_BASE_URL", "https://sandbox-appsrv2.chillpay.co/api/v2/Payment"),
+		ChillPayRouteNo:          envInt("CHILLPAY_ROUTE_NO", 1),
+		ChillPayCurrency:         envOr("CHILLPAY_CURRENCY", "764"),
+		ChillPayCallbackURL:      os.Getenv("CHILLPAY_CALLBACK_URL"),
+		ChillPayReturnURL:        os.Getenv("CHILLPAY_RETURN_URL"),
+		PaymentCallbackDevBypass: envBool("PAYMENT_CALLBACK_DEV_BYPASS", false),
 	}
 }
 
