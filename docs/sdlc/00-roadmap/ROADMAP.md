@@ -27,7 +27,7 @@
 | 4 | Platform Admin | Packages | B | 3 ✅ v0.5.0 |
 | 5 | Platform Admin | Avatars | B | 3, 4 ✅ v0.6.0 |
 | 6 | Tenant | Register | C | 3 ✅ v0.7.0 |
-| 7 | Platform Admin | KYC Tenant | C | 6 |
+| 7 | Platform Admin | KYC Tenant | C | 6 🔄 v0.8.0 |
 | 8 | Platform Admin | Payment Gateway | C | 3 |
 | 9 | Tenant | Buy Package | C | 4, 6, 8 |
 | 10 | Platform Admin | Billing | C | 9 |

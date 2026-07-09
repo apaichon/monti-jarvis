@@ -49,4 +49,4 @@ Out:
 - Design: [11-tenant-register-spec.md](../02-design/11-tenant-register-spec.md) · [04-api-spec.md](../02-design/04-api-spec.md) · [05-ux-ui.md](../02-design/05-ux-ui.md) § T1–T3
 - Depends on: [FEAT-0003](FEAT-0003-auth-rbac.md)
 - Roadmap: Sprint 6 · Phase C
-- Next: Sprint 7 KYC Tenant
+- Shipped v0.7.0 · Next: [FEAT-0007](FEAT-0007-kyc-tenant.md) Sprint 7 KYC Tenant
