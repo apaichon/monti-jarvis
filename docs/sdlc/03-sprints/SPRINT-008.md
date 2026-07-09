@@ -29,11 +29,11 @@ Let **platform admins** connect **ChillPay** (Thailand payment gateway) or local
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| TASK-0035 | 3 | todo | devops | Payment gateway schema — `payment_gateway_configs` + `payment_callback_events` |
-| TASK-0036 | 5 | todo | dev | Provider abstraction — ChillPay + mock adapters; platform config GET/PUT/test APIs |
-| TASK-0037 | 3 | todo | dev | ChillPay callback receiver — MD5 verify + idempotent event log |
-| TASK-0038 | 3 | todo | dev | Platform admin UI — `/admin/settings/payment` configure + test connection |
-| TASK-0039 | 2 | todo | dev | Infra status, env docs, E2E smoke |
+| TASK-0035 | 3 | completed | devops | Payment gateway schema — `payment_gateway_configs` + `payment_callback_events` |
+| TASK-0036 | 5 | completed | dev | Provider abstraction — ChillPay + mock adapters; platform config GET/PUT/test APIs |
+| TASK-0037 | 3 | completed | dev | ChillPay callback receiver — MD5 verify + idempotent event log |
+| TASK-0038 | 3 | completed | dev | Platform admin UI — `/admin/settings/payment` configure + test connection |
+| TASK-0039 | 2 | completed | dev | Infra status, env docs, E2E smoke |
 
 **Committed:** 16 points · **Target velocity:** 16 (avg from Sprints 1–7)
 
@@ -87,8 +87,8 @@ curl -X POST http://localhost:8091/api/callbacks/chillpay \
   -d "TransactionId=123&Amount=10000&OrderNo=ord-1&PaymentStatus=0&CheckSum=..."
 ```
 
-- Manual: `docs/sdlc/06-manual-tests/SPRINT-008-manual.md` (Tester, at VERIFY)
-- E2E: `e2e/tests/platform-payment-gateway.spec.ts`
+- Manual: deferred — **combined with** `SPRINT-009-manual.md` §0 Gateway (Tester, at Sprint 9 VERIFY)
+- E2E: `e2e/tests/platform-payment-gateway.spec.ts` (regression in Sprint 9)
 
 ## Risks
 

@@ -68,4 +68,4 @@ Callback `PaymentStatus`: `"0"` success · `"1"` pending · `"2"` failed.
 - Prior commerce: [FEAT-0004](FEAT-0004-packages-entitlements.md)
 - Design: [13-payment-gateway-spec.md](../02-design/13-payment-gateway-spec.md) · [04-api-spec.md](../02-design/04-api-spec.md) § Payment Gateway · [05-ux-ui.md](../02-design/05-ux-ui.md) § P13 · [02-workflow.md](../02-design/02-workflow.md) §25–27
 - Roadmap: Sprint 8 · Phase C
-- Next: Sprint 9 Buy Package
+- Next: [FEAT-0009 Buy Package](FEAT-0009-buy-package.md) — combined E2E verify

@@ -55,7 +55,7 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** `SPRINT-008` — Platform Admin: Payment Gateway (v0.9.0)
+**Current sprint:** `SPRINT-009` — Tenant: Buy Package (v1.0.0) · SPRINT-008 gateway VERIFY combined in Sprint 9 E2E
 
 **Shipped:** v0.8.0 `SPRINT-007` · v0.7.0 `SPRINT-006` · v0.6.0 `SPRINT-005` · v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype `SPRINT-000-prototype.md`
 

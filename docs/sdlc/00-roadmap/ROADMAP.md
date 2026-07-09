@@ -30,8 +30,8 @@
 | 5 | Platform Admin | Avatars | B | 3, 4 ✅ v0.6.0 |
 | 6 | Tenant | Register | C | 3 ✅ v0.7.0 |
 | 7 | Platform Admin | KYC Tenant | C | 6 ✅ v0.8.0 |
-| 8 | Platform Admin | Payment Gateway | C | 3 🔄 |
-| 9 | Tenant | Buy Package | C | 4, 6, 8 |
+| 8 | Platform Admin | Payment Gateway | C | 3 ✅ *(code shipped; VERIFY with Sprint 9)* |
+| 9 | Tenant | Buy Package | C | 4, 6, 8 🔄 |
 | 10 | Platform Admin | Billing | C | 9 |
 | 11 | Platform Admin | Receipt | C | 10 |
 | 12 | Tenant | Tax Invoice | C | 10, 11 |
@@ -126,13 +126,19 @@ docs/sdlc/04-tasks/TASK-NNNN.md
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Current sprint: SPRINT-008 *(in progress)*
+## Current sprint: SPRINT-009 *(in progress)*
 
-**Platform:** Platform Admin  
-**Feature:** Payment Gateway  
-**Goal:** Configure ChillPay (or mock), test connection, receive MD5-verified callbacks — unblocks Sprint 9 checkout.
+**Platform:** Tenant  
+**Feature:** Buy Package  
+**Goal:** Tenant ChillPay checkout, callback fulfillment, entitlement — **combined E2E verify with SPRINT-008 gateway**.
 
-**Release target:** v0.9.0
+**Release target:** v1.0.0
+
+See [SPRINT-009](../03-sprints/SPRINT-009.md) · [FEAT-0009](../01-features/FEAT-0009-buy-package.md).
+
+## Prior: SPRINT-008 *(code shipped; UAT with Sprint 9)*
+
+**Platform:** Platform Admin · **Feature:** Payment Gateway · **v0.9.0** *(tag at combined close)*
 
 See [SPRINT-008](../03-sprints/SPRINT-008.md) · [FEAT-0008](../01-features/FEAT-0008-payment-gateway.md).
 
@@ -160,8 +166,8 @@ See [SPRINT-005](../03-sprints/SPRINT-005.md) · [FEAT-0005](../01-features/FEAT
 
 See [SPRINT-004](../03-sprints/SPRINT-004.md) · [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md).
 
-## Next sprint: SPRINT-009
+## Next sprint: SPRINT-010
 
-**Platform:** Tenant  
-**Feature:** Buy Package  
-**Goal:** Tenant purchases a commercial package after KYC approval (depends on Sprints 4, 6, 8).
+**Platform:** Platform Admin  
+**Feature:** Billing  
+**Goal:** Billing records and usage metering after package purchase (depends on Sprint 9).

@@ -16,7 +16,9 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** [`SPRINT-008`](03-sprints/SPRINT-008.md) — Platform Admin: Payment Gateway · target **v0.9.0**
+**Current sprint:** [`SPRINT-009`](03-sprints/SPRINT-009.md) — Tenant: Buy Package · target **v1.0.0** *(combined E2E with SPRINT-008 gateway)*
+
+**Prior (code shipped):** [`SPRINT-008`](03-sprints/SPRINT-008.md) — Payment Gateway · **v0.9.0** *(VERIFY in Sprint 9)*
 
 **Shipped:** v0.8.0 [`SPRINT-007`](03-sprints/SPRINT-007.md) · v0.7.0 [`SPRINT-006`](03-sprints/SPRINT-006.md) · v0.6.0 [`SPRINT-005`](03-sprints/SPRINT-005.md) · v0.5.0 [`SPRINT-004`](03-sprints/SPRINT-004.md) · v0.4.0 [`SPRINT-003`](03-sprints/SPRINT-003.md) · v0.3.0 [`SPRINT-002`](03-sprints/SPRINT-002.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
 
