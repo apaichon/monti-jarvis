@@ -3,7 +3,7 @@ id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
 updated: 2026-07-09
-sprint: SPRINT-008
+sprint: SPRINT-009
 ---
 
 # UX/UI — ASCII Wireframes
@@ -925,6 +925,141 @@ Ops (curl):
 | Payment API client | `apps/platform-admin-web/src/lib/api/payment.ts` |
 | Shell nav (Settings link) | `apps/platform-admin-web/src/routes/+layout.svelte` |
 
+### Screen T4 — Billing catalog (`/tenant/billing`) *(Sprint 9)*
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  http://localhost:8091/tenant/billing                                            │
+│                                                                                  │
+│  ┌──┐  MONTI TENANT     Backoffice · Billing · Profile              Logout       │
+│                                                                                  │
+│  Billing & packages                                           T4-H1              │
+│                                                                                  │
+│  ┌────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Current plan  T4-C1                                                        │  │
+│  │  Starter (active) · assigned 2026-07-01                                    │  │
+│  │  max_ai_employees: 2 · max_monthly_call_minutes: 500                       │  │
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                  │
+│  Available packages                                                              │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐       │
+│  │ Starter      T4-P1  │  │ Pro          T4-P2  │  │ Enterprise   T4-P3  │       │
+│  │ ฿0 / mo             │  │ ฿2,990 / mo         │  │ Contact sales       │       │
+│  │ 2 avatars           │  │ 5 avatars           │  │ …                   │       │
+│  │ [ Current ]         │  │ [ Buy Pro ]  T4-B1  │  │ [ Buy ]      T4-B2  │       │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘       │
+│                                                                                  │
+│  Success/error → FeedbackDialog (not inline banners)                             │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Zone | Action | API |
+| --- | --- | --- |
+| T4-H1 | Page load | `GET /api/tenant/packages` + `GET /api/entitlements/me` |
+| T4-C1 | Current plan card | from `current_entitlement` in packages response |
+| T4-B1/B2 | Buy | `POST /api/tenant/checkout` → redirect `payment_url` |
+| T4-P1–P3 | Package cards | catalog row; disable Buy on current package |
+
+### Screen T5 — Payment return (`/tenant/billing/return`) *(Sprint 9)*
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  http://localhost:8091/tenant/billing/return?order_id=ord_…                      │
+│                                                                                  │
+│                         ┌─────────────────────────────┐                          │
+│                         │  Payment status      T5-H1    │                          │
+│                         │                             │                          │
+│                         │  ⏳ Processing…             │  pending — poll T5-P1    │
+│                         │  ✓ Payment successful       │  paid                    │
+│                         │  ✗ Payment failed           │  failed                  │
+│                         │                             │                          │
+│                         │  Package: Pro               │                          │
+│                         │  Order: mj_demo_x7k2m9       │                          │
+│                         │                             │                          │
+│                         │  [ Back to billing ] T5-L1  │                          │
+│                         └─────────────────────────────┘                          │
+│                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Zone | Action | API |
+| --- | --- | --- |
+| T5-H1 | Page load | `GET /api/tenant/orders/{id}` (poll every 2s while `pending`) |
+| T5-P1 | Spinner | stops when `paid` or `failed` |
+| T5-L1 | Back | navigate `/tenant/billing` |
+
+Query: `order_id` from ChillPay `ReturnUrl` or checkout response stored in sessionStorage.
+
+### Screen T6 — Mock pay (`/tenant/billing/mock-pay`) *(Sprint 9 dev)*
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  Mock payment (dev only)                                      T6-H1              │
+│                                                                                  │
+│  Order ord_a1b2c3d4 · Pro · ฿2,990                                               │
+│                                                                                  │
+│         [ Complete mock payment ]  T6-B1 primary                                 │
+│                                                                                  │
+│  Calls POST /api/dev/mock-pay/{order_id} then redirects to T5 return page        │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Zone | Action | API |
+| --- | --- | --- |
+| T6-B1 | Complete | `POST /api/dev/mock-pay/{order_id}` → redirect T5 |
+
+### Flow T-C — Buy package (ChillPay)
+
+```text
+T-C  tenant_admin login (active tenant)
+  → /tenant/billing
+  → Buy Pro → POST /api/tenant/checkout
+  → redirect ChillPay PaymentUrl
+  → pay in sandbox
+  → ChillPay POST /api/callbacks/chillpay (server)
+  → browser ReturnUrl /tenant/billing/return?order_id=...
+  → poll order paid → entitlement shows Pro
+```
+
+### Flow T-D — Mock checkout (CI / local)
+
+```text
+T-D  platform sets gateway provider=mock
+  → tenant /tenant/billing → Buy
+  → /tenant/billing/mock-pay?order_id=...
+  → Complete mock payment
+  → /tenant/billing/return → paid
+  → GET /api/entitlements/me → Pro
+```
+
+### Flow T-E — Combined E2E with Sprint 8 (manual §0+§1)
+
+```text
+T-E  §0 platform /admin/settings/payment — chillpay sandbox + test connection
+  → §1 tenant /tenant/billing — real InitPayment
+  → ngrok callback to /api/callbacks/chillpay
+  → verify entitlement + payment_callback_events + payment_orders paid
+```
+
+### Tenant portal — component → file (Sprint 9)
+
+| Component | Path |
+| --- | --- |
+| Billing catalog | `apps/tenant-web/src/routes/billing/+page.svelte` |
+| Return page | `apps/tenant-web/src/routes/billing/return/+page.svelte` |
+| Mock pay | `apps/tenant-web/src/routes/billing/mock-pay/+page.svelte` |
+| Billing API client | `apps/tenant-web/src/lib/api/billing.ts` |
+| Shell nav | `apps/tenant-web/src/routes/+layout.svelte` |
+
+## Sprint 9 — Buy Package (customer + platform admin unchanged)
+
+| Surface | Sprint 9 UX | API |
+| --- | --- | --- |
+| Customer `/` | Unchanged | Public chat/voice |
+| Tenant `/tenant` | **New** T4 billing, T5 return, T6 mock | `/api/tenant/packages`, `checkout`, `orders` |
+| Platform `/admin` | Unchanged (P13 gateway from Sprint 8) | `/api/platform/payment-gateway*` |
+| Combined UAT | §0 gateway + §1 checkout | [14-buy-package-spec.md](14-buy-package-spec.md) §11 |
+
 ## Sprint 8 — Payment Gateway (customer + tenant UI unchanged)
 
 | Surface | Sprint 8 UX | API |
@@ -1030,4 +1165,4 @@ Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login scre
 | Chat API | `src/lib/api/chat.ts` |
 | Voice | `src/lib/voice/gemini.ts` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

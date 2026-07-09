@@ -3,7 +3,7 @@ id: DES-0003
 title: Entity Relationship Diagram
 status: approved
 updated: 2026-07-09
-sprint: SPRINT-008
+sprint: SPRINT-009
 ---
 
 # ER Diagram — Monti Jarvis
@@ -21,7 +21,7 @@ Every durable Postgres table in `callcenter` carries four audit fields (migratio
 | `created_by` | `text` | Actor user id; default `'system'`; set from JWT via `internal/auditctx` |
 | `updated_by` | `text` | Last mutator user id; default `'system'` |
 
-**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments`, `tenant_registrations`, `brands`, `tenant_kyc_profiles`, `payment_gateway_configs`, `payment_callback_events`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
+**Audited tables today:** `calls`, `messages`, `call_sessions`, `call_turns`, `knowledge_documents`, `knowledge_chunks`, `tenants`, `users`, `user_roles`, `refresh_tokens`, `package_rule_schemas`, `packages`, `package_limits`, `tenant_entitlements`, `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments`, `tenant_registrations`, `brands`, `tenant_kyc_profiles`, `payment_gateway_configs`, `payment_callback_events`, `payment_orders`. Provider catalog tables (`embedding_models`, `voice_providers`) follow the same pattern when created.
 
 ClickHouse analytics tables use `created_at`, `updated_at`, `created_by`, `updated_by` (`002_audit_columns_clickhouse` + `EnsureAuthEventsSchema`).
 
@@ -403,6 +403,27 @@ erDiagram
     text created_by
     text updated_by
   }
+
+  payment_orders {
+    text id PK
+    text tenant_id FK
+    text package_id FK
+    text order_no UK
+    int amount_cents
+    text currency
+    text status
+    text provider
+    text transaction_id
+    text payment_url
+    timestamptz paid_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenants ||--o{ payment_orders : places
+  packages ||--o{ payment_orders : purchased_as
 ```
 
 ### Table notes
@@ -432,6 +453,7 @@ erDiagram
 | `tenant_avatar_assignments` | Which avatars each tenant may use *(Sprint 5)* |
 | `payment_gateway_configs` | Singleton platform ChillPay/mock gateway settings *(Sprint 8)* |
 | `payment_callback_events` | Idempotent ChillPay callback audit log *(Sprint 8)* |
+| `payment_orders` | Tenant checkout orders; ChillPay `order_no` + fulfillment *(Sprint 9)* |
 
 ### Indexes
 
@@ -441,6 +463,8 @@ erDiagram
 - `call_sessions (tenant_id, voice_provider_id)` *(planned)*
 - `tenant_avatar_assignments (tenant_id) WHERE status = 'active'` *(Sprint 5)*
 - `ai_avatar_voices (avatar_id, priority) WHERE status = 'active'` *(Sprint 5)*
+- `payment_orders (tenant_id, status)` *(Sprint 9)*
+- `payment_orders (order_no)` unique *(Sprint 9)*
 
 ### KM versioning model (planned)
 
@@ -633,10 +657,10 @@ monti-jarvis/
 | 5 ✅ v0.6.0 | `ai_avatars`, `ai_avatar_voices`, `tenant_avatar_assignments` |
 | 6 ✅ v0.7.0 | `tenant_registrations`, `brands`, `tenant_kyc_profiles`; `tenants.status` + `pending_kyc` |
 | 7 ✅ v0.8.0 | KYC review columns on `tenant_kyc_profiles` + `tenant_registrations`; approve/reject lifecycle |
-| 8 🔄 v0.9.0 | `payment_gateway_configs`, `payment_callback_events` |
-| 9 | `payment_orders`, `payment_intents` (checkout — Sprint 9) |
+| 8 ✅ v0.9.0 | `payment_gateway_configs`, `payment_callback_events` |
+| 9 🔄 v1.0.0 | `payment_orders` (checkout + fulfillment) |
 | 15 | `km_scope_assignments`, tenant-driven re-index |
 | 21 | Runtime voice failover + `ai_employee_configs` embedding bindings (voice stays on `ai_avatar_voices`) |
 | 22 | `conversation_records` (ClickHouse denorm) |
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.

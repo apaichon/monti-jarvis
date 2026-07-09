@@ -3,7 +3,7 @@ id: DES-0002
 title: Workflows
 status: approved
 updated: 2026-07-09
-sprint: SPRINT-008
+sprint: SPRINT-009
 ---
 
 # Workflows — Monti Jarvis
@@ -690,4 +690,122 @@ sequenceDiagram
 | `1` | Pending |
 | `2` | Failed |
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 28. Tenant browse packages + start checkout (Sprint 9)
+
+```mermaid
+sequenceDiagram
+  participant U as Tenant admin
+  participant B as Browser (/tenant/billing)
+  participant G as Go :8091
+  participant M as auth middleware
+  participant S as internal/store
+  participant DB as Postgres
+
+  U->>B: Open /tenant/billing
+  B->>G: GET /api/tenant/packages
+  B->>G: GET /api/entitlements/me
+  G->>M: JWT + tenant_admin + active tenant
+  alt tenant not active
+    M-->>B: 403
+  else ok
+    S->>DB: SELECT packages WHERE status=active
+    G-->>B: 200 packages[] + current entitlement
+    U->>B: Click Buy on Pro
+    B->>G: POST /api/tenant/checkout {package_id}
+    S->>DB: INSERT payment_orders pending
+    G-->>B: 200 {order_id, payment_url}
+    B->>B: window.location = payment_url
+  end
+```
+
+## 29. ChillPay InitPayment redirect (Sprint 9)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant G as Go :8091
+  participant CP as internal/payment/chillpay
+  participant CH as ChillPay API
+  participant S as internal/store
+
+  B->>G: POST /api/tenant/checkout
+  G->>S: Load gateway config + package price
+  G->>CP: InitPayment(order_no, amount, customer_id, ...)
+  CP->>CH: POST form-urlencoded + CheckSum
+  CH-->>CP: JSON {PaymentUrl, TransactionId}
+  CP-->>G: payment_url, transaction_id
+  G->>S: UPDATE payment_orders SET payment_url, transaction_id
+  G-->>B: {payment_url}
+  B->>CH: Redirect to PaymentUrl (hosted pay page)
+  Note over CH: Customer completes payment on ChillPay
+  CH->>G: POST /api/callbacks/chillpay (async)
+  CH-->>B: Redirect to ReturnUrl (/tenant/billing/return)
+```
+
+## 30. Callback fulfillment + entitlement (Sprint 9)
+
+```mermaid
+sequenceDiagram
+  participant CP as ChillPay
+  participant G as Go :8091
+  participant P as internal/payment
+  participant S as internal/store
+  participant E as internal/entitlements
+  participant DB as Postgres
+  participant R as Redis
+
+  CP->>G: POST /api/callbacks/chillpay (PaymentStatus=0)
+  G->>P: VerifyCallback(form)
+  G->>S: InsertPaymentCallbackEvent (idempotent)
+  G->>S: GetPaymentOrderByOrderNo(OrderNo)
+  alt order already paid
+    G-->>CP: 200 ack
+  else PaymentStatus = 0
+    S->>DB: BEGIN
+    S->>DB: UPDATE payment_orders SET status=paid, paid_at
+    S->>DB: UPDATE tenant_entitlements SET status=revoked WHERE active
+    S->>DB: INSERT tenant_entitlements active (package snapshot)
+    S->>DB: COMMIT
+    G->>E: InvalidateCache(tenant_id)
+    E->>R: DEL monti_jarvis:entitlement:{tenant_id}
+    G-->>CP: 200
+  else PaymentStatus = 2
+    S->>DB: UPDATE payment_orders SET status=failed
+    G-->>CP: 200
+  end
+```
+
+## 31. Mock checkout path (Sprint 9)
+
+```mermaid
+sequenceDiagram
+  participant U as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant S as internal/store
+
+  U->>B: POST /api/tenant/checkout (gateway provider=mock)
+  G-->>B: payment_url = /tenant/billing/mock-pay?order_id=...
+  B->>B: Open mock-pay page
+  alt PAYMENT_MOCK_AUTO_FULFILL
+    B->>G: POST /api/dev/mock-pay/{order_id}
+  else manual
+    U->>B: Click Complete mock payment
+    B->>G: POST /api/dev/mock-pay/{order_id}
+  end
+  G->>S: FulfillOrder (same as callback success path)
+  G-->>B: 200 {status: paid}
+  B->>G: GET /api/entitlements/me
+  G-->>B: new package entitlement
+```
+
+## State: payment_orders (Sprint 9)
+
+| Status | Meaning |
+| --- | --- |
+| `pending` | Awaiting ChillPay callback |
+| `paid` | Success; entitlement assigned |
+| `failed` | ChillPay reported failure |
+| `cancelled` | Abandoned (future ops) |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

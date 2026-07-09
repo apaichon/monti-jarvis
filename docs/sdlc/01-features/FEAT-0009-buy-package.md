@@ -50,6 +50,6 @@ Out:
 - Sprint: [SPRINT-009](../03-sprints/SPRINT-009.md)
 - Depends on: [FEAT-0004](FEAT-0004-packages-entitlements.md), [FEAT-0006](FEAT-0006-tenant-register.md), [FEAT-0008](FEAT-0008-payment-gateway.md)
 - Prior: [13-payment-gateway-spec.md](../02-design/13-payment-gateway-spec.md)
-- Design: `14-buy-package-spec.md` (pending) · [08-packages-spec.md](../02-design/08-packages-spec.md)
+- Design: [14-buy-package-spec.md](../02-design/14-buy-package-spec.md) · [04-api-spec.md](../02-design/04-api-spec.md) § Tenant Checkout · [05-ux-ui.md](../02-design/05-ux-ui.md) § T4–T6 · [02-workflow.md](../02-design/02-workflow.md) §28–31
 - Roadmap: Sprint 9 · Phase C
 - Next: Sprint 10 Billing

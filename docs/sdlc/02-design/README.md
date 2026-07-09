@@ -19,10 +19,13 @@ System design artifacts for Monti Jarvis.
 | 11 | [11-tenant-register-spec.md](11-tenant-register-spec.md) | 6 | Tenant self-registration + pending_kyc | `approved` |
 | 12 | [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) | 7 | Platform KYC review + approve/reject | `shipped` |
 | 13 | [13-payment-gateway-spec.md](13-payment-gateway-spec.md) | 8 | ChillPay gateway config + callbacks | `approved` |
+| 14 | [14-buy-package-spec.md](14-buy-package-spec.md) | 9 | Tenant checkout + callback fulfillment | `approved` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
-**Sprint 8 gate:** ✅ Design pack approved — implement TASK-0035+ per [13-payment-gateway-spec.md](13-payment-gateway-spec.md), P13 per [05-ux-ui.md](05-ux-ui.md).
+**Sprint 9 gate:** ✅ Design pack approved — implement TASK-0040+ per [14-buy-package-spec.md](14-buy-package-spec.md), T4–T6 per [05-ux-ui.md](05-ux-ui.md). Combined E2E with Sprint 8 gateway.
+
+**Sprint 8:** ✅ Code shipped — [13-payment-gateway-spec.md](13-payment-gateway-spec.md), P13 per [05-ux-ui.md](05-ux-ui.md).
 
 **Sprint 7:** ✅ Shipped v0.8.0 — [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), P12 per [05-ux-ui.md](05-ux-ui.md).
 

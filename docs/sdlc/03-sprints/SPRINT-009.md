@@ -66,13 +66,13 @@ Let **active tenants** browse the package catalog, **checkout via ChillPay** (`I
 
 | Artifact | Path | Status |
 | --- | --- | --- |
-| Buy package deep spec | [14-buy-package-spec.md](../02-design/14-buy-package-spec.md) | `pending` |
-| Workflow | [02-workflow.md](../02-design/02-workflow.md) §28–31 | `pending` |
-| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `pending` |
-| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Tenant Checkout | `pending` |
-| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § T4–T6 | `pending` |
+| Buy package deep spec | [14-buy-package-spec.md](../02-design/14-buy-package-spec.md) | `approved` |
+| Workflow | [02-workflow.md](../02-design/02-workflow.md) §28–31 | `approved` |
+| ER diagram | [03-er-diagram.md](../02-design/03-er-diagram.md) | `approved` |
+| API spec | [04-api-spec.md](../02-design/04-api-spec.md) § Tenant Checkout | `approved` |
+| UX/UI ASCII | [05-ux-ui.md](../02-design/05-ux-ui.md) § T4–T6 | `approved` |
 
-> Run **`/sprint-tech-specs`** before DEV starts **TASK-0040** / **TASK-0041**.
+> Design pack approved — DEV may start **TASK-0040** (schema) then **TASK-0041** (checkout APIs).
 
 ## Verification (combined SPRINT-008 + SPRINT-009)
 

@@ -3,7 +3,7 @@ id: DES-0004
 title: API Specification
 status: approved
 updated: 2026-07-09
-sprint: SPRINT-008
+sprint: SPRINT-009
 ---
 
 # API Specification — Monti Jarvis
@@ -29,7 +29,7 @@ Liveness + feature flags.
   "livekit": true,
   "nats": true,
   "rag": true,
-  "sprint": "SPRINT-008",
+  "sprint": "SPRINT-009",
   "auth_disabled": true,
   "customer_web": "apps/customer-web/build",
   "platform_admin_web": "apps/platform-admin-web/build",
@@ -827,7 +827,130 @@ No body. Runs provider `Ping`.
 | `502` | Test connection — ChillPay rejected credentials |
 | `503` | Gateway not configured / inactive |
 
-Sprint 8 callback handler **logs only** — no order fulfillment. Sprint 9 consumes `payment_status = 0`.
+**Sprint 9 fulfillment:** On `PaymentStatus=0`, lookup `payment_orders` by `OrderNo`, mark `paid`, assign entitlement. See § Tenant Checkout.
+
+## Tenant Checkout (Sprint 9)
+
+**Role:** `tenant_admin` on **`active`** tenant only. Depends on SPRINT-008 gateway configured.
+
+See [14-buy-package-spec.md](14-buy-package-spec.md).
+
+### `GET /api/tenant/packages`
+
+Returns active commercial packages available for purchase.
+
+**Response 200:**
+
+```json
+{
+  "packages": [
+    {
+      "id": "pkg-pro",
+      "slug": "pro",
+      "name": "Pro",
+      "description": "Growing teams",
+      "price_cents": 299000,
+      "currency": "764",
+      "billing_period": "monthly",
+      "rules_summary": {
+        "max_ai_employees": 5,
+        "max_monthly_call_minutes": 2000
+      }
+    }
+  ],
+  "current_entitlement": {
+    "package_id": "pkg-starter",
+    "package_name": "Starter",
+    "status": "active"
+  }
+}
+```
+
+`current_entitlement` is `null` when tenant has no active entitlement.
+
+**Errors:** `401` · `403` (not `tenant_admin` or tenant not `active`)
+
+### `POST /api/tenant/checkout`
+
+**Body:**
+
+```json
+{ "package_id": "pkg-pro" }
+```
+
+Creates `pending` order and starts payment.
+
+**Response 200:**
+
+```json
+{
+  "order_id": "ord_a1b2c3d4",
+  "order_no": "mj_demo_x7k2m9",
+  "package_id": "pkg-pro",
+  "amount_cents": 299000,
+  "currency": "764",
+  "status": "pending",
+  "payment_url": "https://sandbox-appsrv2.chillpay.co/pay/...",
+  "provider": "chillpay"
+}
+```
+
+Mock provider `payment_url` example: `http://localhost:8091/tenant/billing/mock-pay?order_id=ord_a1b2c3d4`
+
+**Errors:** `400` missing `package_id` · `401` · `403` · `404` package not found · `409` package not active / tenant not active · `503` gateway not configured
+
+### `GET /api/tenant/orders/{id}`
+
+Poll checkout status (own tenant only).
+
+**Response 200:**
+
+```json
+{
+  "id": "ord_a1b2c3d4",
+  "order_no": "mj_demo_x7k2m9",
+  "package_id": "pkg-pro",
+  "status": "paid",
+  "amount_cents": 299000,
+  "transaction_id": "123456789",
+  "paid_at": "2026-07-09T10:00:00Z",
+  "created_at": "2026-07-09T09:55:00Z"
+}
+```
+
+**Errors:** `401` · `403` · `404`
+
+### `POST /api/callbacks/chillpay` *(Sprint 9 upgrade)*
+
+In addition to SPRINT-008 event log:
+
+| `PaymentStatus` | Order action | Entitlement |
+| --- | --- | --- |
+| `0` | `pending` → `paid` | Revoke prior active; assign purchased package |
+| `1` | unchanged `pending` | none |
+| `2` | `pending` → `failed` | none |
+
+Idempotent: replay on already-`paid` order returns `200` without duplicate entitlement.
+
+### `POST /api/dev/mock-pay/{order_id}` *(dev / mock only)*
+
+**Auth:** `tenant_admin` Bearer; order must belong to caller's tenant.
+
+Triggers same fulfillment as successful callback. Disabled when `APP_ENV=prod`.
+
+**Response 200:**
+
+```json
+{ "order_id": "ord_a1b2c3d4", "status": "paid" }
+```
+
+### Tenant Checkout error codes
+
+| Code | When |
+| --- | --- |
+| `403` | Not `tenant_admin`, tenant `pending_kyc`, or wrong tenant on order |
+| `409` | Package archived or tenant not `active` |
+| `503` | Payment gateway not configured |
 
 ## Knowledge base (per avatar)
 
