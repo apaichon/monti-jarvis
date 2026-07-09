@@ -15,7 +15,7 @@
 | Official Sprint 5 | **Shipped v0.6.0** — Platform Admin: Avatars (catalog + tenant assignment + portrait upload) |
 | Official Sprint 6 | **Shipped v0.7.0** — Tenant: Register (public signup, OAuth, email verify, KYC backoffice; no HeyGen) |
 | Official Sprint 7 | **Shipped v0.8.0** — Platform Admin: KYC Tenant (review queue, approve/reject, tenant activation) |
-| Official Sprint 8 | **In progress** — Platform Admin: Payment Gateway (Stripe/mock config, webhooks) |
+| Official Sprint 8 | **In progress** — Platform Admin: Payment Gateway (ChillPay/mock config, callbacks) |
 
 ---
 
@@ -130,7 +130,7 @@ Use `sprint-plan` skill when opening a new sprint.
 
 **Platform:** Platform Admin  
 **Feature:** Payment Gateway  
-**Goal:** Configure Stripe (or mock), test connection, receive signed webhooks — unblocks Sprint 9 checkout.
+**Goal:** Configure ChillPay (or mock), test connection, receive MD5-verified callbacks — unblocks Sprint 9 checkout.
 
 **Release target:** v0.9.0
 
