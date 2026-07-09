@@ -15,6 +15,7 @@
 | Official Sprint 5 | **Shipped v0.6.0** — Platform Admin: Avatars (catalog + tenant assignment + portrait upload) |
 | Official Sprint 6 | **Shipped v0.7.0** — Tenant: Register (public signup, OAuth, email verify, KYC backoffice; no HeyGen) |
 | Official Sprint 7 | **Shipped v0.8.0** — Platform Admin: KYC Tenant (review queue, approve/reject, tenant activation) |
+| Official Sprint 8 | **In progress** — Platform Admin: Payment Gateway (Stripe/mock config, webhooks) |
 
 ---
 
@@ -29,7 +30,7 @@
 | 5 | Platform Admin | Avatars | B | 3, 4 ✅ v0.6.0 |
 | 6 | Tenant | Register | C | 3 ✅ v0.7.0 |
 | 7 | Platform Admin | KYC Tenant | C | 6 ✅ v0.8.0 |
-| 8 | Platform Admin | Payment Gateway | C | 3 |
+| 8 | Platform Admin | Payment Gateway | C | 3 🔄 |
 | 9 | Tenant | Buy Package | C | 4, 6, 8 |
 | 10 | Platform Admin | Billing | C | 9 |
 | 11 | Platform Admin | Receipt | C | 10 |
@@ -125,13 +126,15 @@ docs/sdlc/04-tasks/TASK-NNNN.md
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Current sprint: SPRINT-008
+## Current sprint: SPRINT-008 *(in progress)*
 
 **Platform:** Platform Admin  
 **Feature:** Payment Gateway  
-**Goal:** Payment provider integration for tenant commerce (depends on Sprint 3).
+**Goal:** Configure Stripe (or mock), test connection, receive signed webhooks — unblocks Sprint 9 checkout.
 
 **Release target:** v0.9.0
+
+See [SPRINT-008](../03-sprints/SPRINT-008.md) · [FEAT-0008](../01-features/FEAT-0008-payment-gateway.md).
 
 ## Last shipped: SPRINT-007
 
