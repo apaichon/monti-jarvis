@@ -33,8 +33,16 @@
     if (!canDecide) return;
     approving = true;
     try {
-      await approveTenantKYC(tenantId);
-      feedback.success('Tenant activated — KYC approved');
+      const res = await approveTenantKYC(tenantId);
+      if (res.email_sent && res.email_to) {
+        feedback.success(`Tenant activated — approval email sent to ${res.email_to}`);
+      } else if (res.email_error) {
+        feedback.success(`Tenant activated — email failed: ${res.email_error}`);
+      } else if (res.email_to) {
+        feedback.success(`Tenant activated — email not sent (check Resend config; to=${res.email_to})`);
+      } else {
+        feedback.success('Tenant activated — KYC approved (no admin email on file)');
+      }
       await load();
     } catch (err) {
       feedback.error(err instanceof ApiError ? err.message : 'Approve failed');
@@ -52,8 +60,14 @@
     }
     rejecting = true;
     try {
-      await rejectTenantKYC(tenantId, reason);
-      feedback.success('KYC rejected — tenant notified');
+      const res = await rejectTenantKYC(tenantId, reason);
+      if (res.email_sent && res.email_to) {
+        feedback.success(`KYC rejected — email sent to ${res.email_to}`);
+      } else if (res.email_error) {
+        feedback.success(`KYC rejected — email failed: ${res.email_error}`);
+      } else {
+        feedback.success('KYC rejected — tenant not emailed (no address or Resend disabled)');
+      }
       await load();
     } catch (err) {
       feedback.error(err instanceof ApiError ? err.message : 'Reject failed');

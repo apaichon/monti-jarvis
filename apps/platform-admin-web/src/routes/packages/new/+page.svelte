@@ -92,6 +92,10 @@
         <label for="currency">Currency</label>
         <select id="currency" bind:value={currency}>
           <option value="USD">USD</option>
+          <option value="THB">THB</option>
+          <option value="JPY">JPY (Yen)</option>
+          <option value="KRW">KRW (Won)</option>
+          <option value="CNY">CNY (Yuan)</option>
         </select>
       </div>
       <div class="field">

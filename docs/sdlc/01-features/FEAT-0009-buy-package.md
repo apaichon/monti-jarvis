@@ -19,13 +19,17 @@ In:
 - Combined **E2E + manual UAT** proving SPRINT-008 gateway + SPRINT-009 checkout (user request)
 - Design pack via `sprint-tech-specs` (`14-buy-package-spec.md`)
 
-Out:
-- Invoices, receipts, tax invoices (Sprints 10–12)
-- Subscription renewals, proration, coupons (Sprint 10+)
+Out (re-scoped 2026-07-11 — see [15-commerce-chain-plan.md](../02-design/15-commerce-chain-plan.md)):
+- Platform billing ledger / metering (**Sprint 10**)
+- Platform receipt ops: void, reissue, branding (**Sprint 11**)
+- Tenant tax compliance: buyer tax ID, RD fields, document vault polish (**Sprint 12**)
+- Subscription renewals, proration, coupons
 - Platform-admin purchase on behalf of tenant (manual assign stays in Sprint 4)
 - Partial payments, installments
 - Auto-assign Starter on KYC approve without payment (explicit buy required)
 - Quota enforcement on live paths (Sprint 13)
+
+**In (added vs original FEAT):** payment method select (card / QR PromptPay); **MVP** auto-issue receipt + tax invoice on paid (HTML/JSON) — hardened in S11–S12.
 
 ## Acceptance criteria
 

@@ -15,7 +15,8 @@
 | Official Sprint 5 | **Shipped v0.6.0** — Platform Admin: Avatars (catalog + tenant assignment + portrait upload) |
 | Official Sprint 6 | **Shipped v0.7.0** — Tenant: Register (public signup, OAuth, email verify, KYC backoffice; no HeyGen) |
 | Official Sprint 7 | **Shipped v0.8.0** — Platform Admin: KYC Tenant (review queue, approve/reject, tenant activation) |
-| Official Sprint 8 | **In progress** — Platform Admin: Payment Gateway (ChillPay/mock config, callbacks) |
+| Official Sprint 8 | **Code shipped** — Payment Gateway (VERIFY with S9) |
+| Official Sprint 9–12 | **Commerce chain built** — Buy Package → Billing ledger → Receipt ops → Tax compliance |
 
 ---
 
@@ -31,10 +32,10 @@
 | 6 | Tenant | Register | C | 3 ✅ v0.7.0 |
 | 7 | Platform Admin | KYC Tenant | C | 6 ✅ v0.8.0 |
 | 8 | Platform Admin | Payment Gateway | C | 3 ✅ *(code shipped; VERIFY with Sprint 9)* |
-| 9 | Tenant | Buy Package | C | 4, 6, 8 🔄 |
-| 10 | Platform Admin | Billing | C | 9 |
-| 11 | Platform Admin | Receipt | C | 10 |
-| 12 | Tenant | Tax Invoice | C | 10, 11 |
+| 9 | Tenant | Buy Package (+ MVP receipt/tax) | C | 4, 6, 8 🔄 |
+| 10 | Platform Admin | Billing ledger | C | 9 |
+| 11 | Platform Admin | Receipt ops | C | 10 *(hardens S9 receipt)* |
+| 12 | Tenant | Tax Invoice compliance | C | 10, 11 *(hardens S9 tax doc)* |
 | 13 | Platform Admin | Quota, Rate Limit | B | 3, 4 |
 | 14 | Tenant | Embed to Web | D | 1, 6 |
 | 15 | Tenant | Set Scope and KM | D | 2, 6 |
@@ -81,9 +82,9 @@ Multi-tenant SaaS skeleton.
 
 ### Phase C — Tenant commerce (6–12)
 
-Onboarding and monetization.
+Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02-design/15-commerce-chain-plan.md)).
 
-- Tenant registration → KYC → payment gateway → package purchase → billing → receipt → tax invoice
+- Tenant registration → KYC → payment gateway → **buy package** (method → ChillPay → status → entitlement → **MVP receipt/tax**) → **platform billing** → **receipt ops** → **tax invoice compliance**
 
 ### Phase D — Tenant go-live (14–18)
 
@@ -126,48 +127,20 @@ docs/sdlc/04-tasks/TASK-NNNN.md
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Current sprint: SPRINT-009 *(in progress)*
+## Current sprint: SPRINT-012 *(commerce chain complete — VERIFY)*
 
-**Platform:** Tenant  
-**Feature:** Buy Package  
-**Goal:** Tenant ChillPay checkout, callback fulfillment, entitlement — **combined E2E verify with SPRINT-008 gateway**.
+**Phase C commerce (S8–S12) implemented.** Combined UAT recommended.
 
-**Release target:** v1.0.0
+| Sprint | Feature | UI / API highlights |
+| ---: | --- | --- |
+| 8 | Payment Gateway | `/admin/settings/payment` |
+| 9 | Buy Package | `/tenant/billing` method → pay → return + MVP docs |
+| 10 | Billing ledger | `/admin/billing` · `GET /api/platform/billing/orders` |
+| 11 | Receipt ops | `/admin/billing/receipts` · void/reissue · seller branding |
+| 12 | Tax compliance | `/tenant/billing/tax` · `/tenant/billing/documents` |
 
-See [SPRINT-009](../03-sprints/SPRINT-009.md) · [FEAT-0009](../01-features/FEAT-0009-buy-package.md).
+Plan: [15-commerce-chain-plan.md](../02-design/15-commerce-chain-plan.md)
 
-## Prior: SPRINT-008 *(code shipped; UAT with Sprint 9)*
+## Next sprint: SPRINT-013
 
-**Platform:** Platform Admin · **Feature:** Payment Gateway · **v0.9.0** *(tag at combined close)*
-
-See [SPRINT-008](../03-sprints/SPRINT-008.md) · [FEAT-0008](../01-features/FEAT-0008-payment-gateway.md).
-
-## Last shipped: SPRINT-007
-
-**Platform:** Platform Admin · **Feature:** KYC Tenant · **v0.8.0**
-
-See [SPRINT-007](../03-sprints/SPRINT-007.md) · [FEAT-0007](../01-features/FEAT-0007-kyc-tenant.md).
-
-## Prior: SPRINT-006
-
-**Platform:** Tenant · **Feature:** Register · **v0.7.0**
-
-See [SPRINT-006](../03-sprints/SPRINT-006.md) · [FEAT-0006](../01-features/FEAT-0006-tenant-register.md).
-
-## Prior: SPRINT-005
-
-**Platform:** Platform Admin · **Feature:** Avatars · **v0.6.0**
-
-See [SPRINT-005](../03-sprints/SPRINT-005.md) · [FEAT-0005](../01-features/FEAT-0005-avatar-catalog.md).
-
-## Prior: SPRINT-004
-
-**Platform:** Platform Admin · **Feature:** Portal + Packages · **v0.5.0**
-
-See [SPRINT-004](../03-sprints/SPRINT-004.md) · [FEAT-0004](../01-features/FEAT-0004-packages-entitlements.md).
-
-## Next sprint: SPRINT-010
-
-**Platform:** Platform Admin  
-**Feature:** Billing  
-**Goal:** Billing records and usage metering after package purchase (depends on Sprint 9).
+**Platform:** Platform Admin · **Feature:** Quota, Rate Limit · **Depends:** 3, 4

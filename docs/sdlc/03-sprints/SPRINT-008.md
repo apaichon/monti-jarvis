@@ -1,10 +1,11 @@
 ---
 id: SPRINT-008
-status: in_progress
+status: completed
 start: 2026-07-09
-end: 2026-07-23
-updated: 2026-07-09
-release_target: v0.9.0
+end: 2026-07-11
+updated: 2026-07-11
+release_target: v1.3.0
+release: v1.3.0
 goal: "Platform Admin: Payment Gateway — configure ChillPay (or mock), test connection, and receive MD5-verified callbacks for Sprint 9 checkout."
 roadmap_sprint: 8
 platform: Platform Admin

@@ -84,15 +84,20 @@ func VerificationEmail(verifyURL, displayName string) (string, string) {
 	return subject, html
 }
 
-func KYCApprovedEmail(loginURL, companyName string) (string, string) {
+func KYCApprovedEmail(loginURL, billingURL, companyName string) (string, string) {
 	company := strings.TrimSpace(companyName)
 	if company == "" {
 		company = "your workspace"
 	}
+	if strings.TrimSpace(billingURL) == "" {
+		billingURL = loginURL
+	}
 	subject := "Your Monti workspace is now active"
-	html := fmt.Sprintf(`<p>Good news — <strong>%s</strong> has passed platform verification.</p>
-<p>Your tenant account is <strong>active</strong>. You can sign in and start configuring knowledge base content for your AI agents.</p>
-<p><a href="%s">Sign in to Monti</a></p>`, company, loginURL)
+	html := fmt.Sprintf(`<p>Good news — <strong>%s</strong> has passed platform verification (KYC approved).</p>
+<p>Your tenant account is <strong>active</strong>. You can sign in and purchase a package to start using Monti AI agents.</p>
+<p><a href="%s">Sign in to Monti</a></p>
+<p><a href="%s">Go to Billing &amp; packages</a></p>
+<p style="color:#666;font-size:13px">If the buttons do not work, open: %s</p>`, company, loginURL, billingURL, loginURL)
 	return subject, html
 }
 

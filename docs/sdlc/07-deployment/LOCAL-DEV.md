@@ -32,7 +32,7 @@ Monti compose (infra/docker-compose.yml):
 
 | Tool | Version |
 | --- | --- |
-| Go | 1.22+ |
+| Go | 1.21+ host (auto-downloads toolchain go1.26.5 per `go.mod`) |
 | Node | 20+ |
 | Docker | Desktop or engine with compose |
 | curl | any |

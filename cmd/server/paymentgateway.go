@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -188,6 +189,18 @@ func (s *server) chillpayCallback(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+
+	if strings.TrimSpace(form.OrderNo) != "" {
+		result, fulfillErr := s.store.FulfillPaymentOrder(r.Context(), form.OrderNo, form.TransactionId, form.PaymentStatus)
+		if fulfillErr != nil && !errors.Is(fulfillErr, store.ErrPaymentOrderNotFound) {
+			writeError(w, http.StatusBadGateway, fulfillErr.Error())
+			return
+		}
+		if fulfillErr == nil && result.EntitlementChanged {
+			s.entitlements.Invalidate(r.Context(), result.Order.TenantID)
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 

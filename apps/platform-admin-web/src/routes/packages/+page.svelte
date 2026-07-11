@@ -41,7 +41,23 @@
 
   function formatPrice(pkg: Package) {
     if (!pkg.price_cents) return '—';
-    return `$${(pkg.price_cents / 100).toFixed(0)}/${pkg.billing_period === 'monthly' ? 'mo' : pkg.billing_period}`;
+    const amount = (pkg.price_cents / 100).toFixed(0);
+    const period = pkg.billing_period === 'monthly' ? 'mo' : pkg.billing_period;
+    switch (pkg.currency) {
+      case 'THB':
+      case '764':
+        return `฿${amount}/${period}`;
+      case 'USD':
+        return `$${amount}/${period}`;
+      case 'JPY':
+        return `¥${amount}/${period}`;
+      case 'KRW':
+        return `₩${amount}/${period}`;
+      case 'CNY':
+        return `¥${amount}/${period}`;
+      default:
+        return `${amount} ${pkg.currency}/${period}`;
+    }
   }
 </script>
 

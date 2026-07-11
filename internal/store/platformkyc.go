@@ -127,5 +127,35 @@ WHERE tenant_id = $1`, schema), tenantID, reason, now, reviewer)
 	if err := tx.Commit(ctx); err != nil {
 		return PlatformKYCDecisionResult{}, err
 	}
+
+	// Prefer registration admin_email; fall back to tenant_admin user email.
+	if strings.TrimSpace(out.AdminEmail) == "" {
+		if email, emailErr := s.GetTenantAdminEmail(ctx, tenantID); emailErr == nil {
+			out.AdminEmail = email
+		}
+	}
 	return out, nil
+}
+
+// GetTenantAdminEmail returns the primary tenant_admin user's email for notifications.
+func (s *Store) GetTenantAdminEmail(ctx context.Context, tenantID string) (string, error) {
+	if s.pg == nil {
+		return "", fmt.Errorf("postgres unavailable")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var email string
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT u.email
+FROM %s.users u
+JOIN %s.user_roles r ON r.user_id = u.id
+WHERE r.role = 'tenant_admin' AND r.tenant_id = $1
+ORDER BY u.created_at ASC
+LIMIT 1`, schema, schema), tenantID).Scan(&email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", ErrUserNotFound
+		}
+		return "", err
+	}
+	return strings.TrimSpace(email), nil
 }

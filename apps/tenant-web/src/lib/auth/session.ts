@@ -55,3 +55,12 @@ export function getStoredUser(): UserProfile | null {
 export function hasRegistrationSession(): boolean {
   return !!getAccessToken();
 }
+
+export function clearSession() {
+  if (!browser) return;
+  sessionStorage.removeItem(ACCESS_KEY);
+  sessionStorage.removeItem(REFRESH_KEY);
+  sessionStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TENANT_KEY);
+  sessionStorage.removeItem(REG_KEY);
+}

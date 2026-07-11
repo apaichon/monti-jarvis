@@ -73,6 +73,13 @@
         </a>
         <a
           class="nav-link"
+          class:active={$page.url.pathname.startsWith(`${base}/billing`)}
+          href="{base}/billing"
+        >
+          Billing
+        </a>
+        <a
+          class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/settings`)}
           href="{base}/settings/payment"
         >

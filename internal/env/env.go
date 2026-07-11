@@ -1,8 +1,10 @@
 package env
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -66,6 +68,8 @@ type Config struct {
 	ChillPayCallbackURL      string
 	ChillPayReturnURL        string
 	PaymentCallbackDevBypass bool
+	PaymentMockAutoFulfill   bool
+	AppEnv                   string
 }
 
 func Load() Config {
@@ -121,8 +125,8 @@ func Load() Config {
 		TenantRegisterRateLimit: envInt("TENANT_REGISTER_RATE_LIMIT", 5),
 		TenantWebDir:            envOr("TENANT_WEB_DIR", "apps/tenant-web/build"),
 		PublicBaseURL:           envOr("APP_PUBLIC_URL", "http://localhost:8091"),
-		ResendAPIKey:            os.Getenv("RESEND_API_KEY"),
-		ResendFromEmail:         envOr("RESEND_FROM_EMAIL", "Monti <onboarding@monti.local>"),
+		ResendAPIKey:            resolveResendAPIKey(),
+		ResendFromEmail:         resolveResendFrom(),
 		GoogleOAuthClientID:     os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
 		GoogleOAuthClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
 		GitHubOAuthClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
@@ -136,6 +140,8 @@ func Load() Config {
 		ChillPayCallbackURL:      os.Getenv("CHILLPAY_CALLBACK_URL"),
 		ChillPayReturnURL:        os.Getenv("CHILLPAY_RETURN_URL"),
 		PaymentCallbackDevBypass: envBool("PAYMENT_CALLBACK_DEV_BYPASS", false),
+		PaymentMockAutoFulfill:   envBool("PAYMENT_MOCK_AUTO_FULFILL", false),
+		AppEnv:                   appEnv,
 	}
 }
 
@@ -180,4 +186,38 @@ func envBool(key string, fallback bool) bool {
 		return fallback
 	}
 	return parsed
+}
+
+// resolveResendAPIKey respects RESEND_ENABLED=false to force-disable mailer.
+func resolveResendAPIKey() string {
+	if !envBool("RESEND_ENABLED", true) {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv("RESEND_API_KEY"))
+}
+
+// resolveResendFrom builds the Resend "from" header.
+// Priority:
+//  1. RESEND_FROM_EMAIL — full "Name <addr@domain>" or bare address
+//  2. RESEND_FROM_ADDR (+ optional RESEND_FROM_NAME) — matches common Resend env naming
+//  3. empty — mailer disabled until a verified domain sender is configured
+//
+// Never default to @monti.local: Resend rejects unverified domains with HTTP 403.
+func resolveResendFrom() string {
+	if from := strings.TrimSpace(os.Getenv("RESEND_FROM_EMAIL")); from != "" {
+		return from
+	}
+	addr := strings.TrimSpace(os.Getenv("RESEND_FROM_ADDR"))
+	if addr == "" {
+		// Legacy alias used in some env files
+		addr = strings.TrimSpace(os.Getenv("RESEND_FROM"))
+	}
+	if addr == "" {
+		return ""
+	}
+	name := strings.TrimSpace(os.Getenv("RESEND_FROM_NAME"))
+	if name == "" {
+		return addr
+	}
+	return fmt.Sprintf("%s <%s>", name, addr)
 }

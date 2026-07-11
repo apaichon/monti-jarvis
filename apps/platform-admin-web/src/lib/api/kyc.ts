@@ -47,6 +47,9 @@ export type KYCDecisionResult = {
   rejection_reason?: string;
   reviewed_at: string;
   reviewed_by: string;
+  email_sent?: boolean;
+  email_to?: string;
+  email_error?: string;
 };
 
 export function getTenantKYC(tenantId: string) {

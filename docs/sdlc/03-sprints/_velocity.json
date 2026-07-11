@@ -55,8 +55,48 @@
       "velocity": 16,
       "closed": "2026-07-09",
       "release": "v0.8.0"
+    },
+    {
+      "id": "SPRINT-008",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-11",
+      "release": "v1.3.0"
+    },
+    {
+      "id": "SPRINT-009",
+      "committed_points": 18,
+      "completed_points": 18,
+      "velocity": 18,
+      "closed": "2026-07-11",
+      "release": "v1.3.0"
+    },
+    {
+      "id": "SPRINT-010",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-11",
+      "release": "v1.3.0"
+    },
+    {
+      "id": "SPRINT-011",
+      "committed_points": 14,
+      "completed_points": 14,
+      "velocity": 14,
+      "closed": "2026-07-11",
+      "release": "v1.3.0"
+    },
+    {
+      "id": "SPRINT-012",
+      "committed_points": 14,
+      "completed_points": 14,
+      "velocity": 14,
+      "closed": "2026-07-11",
+      "release": "v1.3.0"
     }
   ],
   "average_velocity": 16,
-  "note": "Sprint 7 closed at 100% — platform KYC review, approve/reject, tenant activation, KM write unblock, decision emails."
+  "note": "S8–S12 commerce chain closed together at v1.3.0 — gateway, buy package, billing ledger, receipt ops, tax compliance."
 }

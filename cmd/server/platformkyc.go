@@ -78,8 +78,14 @@ func (s *server) approvePlatformTenantKYC(w http.ResponseWriter, r *http.Request
 		writePlatformKYCError(w, err)
 		return
 	}
-	s.sendKYCApprovedEmail(r.Context(), result)
-	writeJSON(w, http.StatusOK, platformKYCDecisionJSON(result))
+	sent, to, mailErr := s.sendKYCApprovedEmail(r.Context(), result)
+	out := platformKYCDecisionJSON(result)
+	out["email_sent"] = sent
+	out["email_to"] = to
+	if mailErr != nil {
+		out["email_error"] = mailErr.Error()
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *server) rejectPlatformTenantKYC(w http.ResponseWriter, r *http.Request) {
@@ -104,8 +110,14 @@ func (s *server) rejectPlatformTenantKYC(w http.ResponseWriter, r *http.Request)
 		writePlatformKYCError(w, err)
 		return
 	}
-	s.sendKYCRejectedEmail(r.Context(), result)
-	writeJSON(w, http.StatusOK, platformKYCDecisionJSON(result))
+	sent, to, mailErr := s.sendKYCRejectedEmail(r.Context(), result)
+	out := platformKYCDecisionJSON(result)
+	out["email_sent"] = sent
+	out["email_to"] = to
+	if mailErr != nil {
+		out["email_error"] = mailErr.Error()
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func writePlatformKYCError(w http.ResponseWriter, err error) {

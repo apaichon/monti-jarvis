@@ -152,6 +152,11 @@ func main() {
 	guard := auth.NewHTTPGuard(authSvc, st, cfg.AuthDisabled)
 	registerLimiter := tenantregister.NewRateLimiter(st.Redis(), cfg.RedisPrefix, cfg.TenantRegisterRateLimit)
 	mailer := resend.New(cfg.ResendAPIKey, cfg.ResendFromEmail)
+	if mailer.Enabled() {
+		log.Printf("mailer: resend enabled from=%s", cfg.ResendFromEmail)
+	} else {
+		log.Printf("mailer: resend disabled (set RESEND_API_KEY + RESEND_FROM_EMAIL or RESEND_FROM_ADDR with a verified domain)")
+	}
 	tenantOAuth := tenantoauth.New(st.Redis(), tenantoauth.Config{
 		PublicBaseURL:      cfg.PublicBaseURL,
 		GoogleClientID:     cfg.GoogleOAuthClientID,
@@ -242,7 +247,26 @@ func main() {
 	mux.Handle("GET /api/platform/payment-gateway", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPaymentGateway)))
 	mux.Handle("PUT /api/platform/payment-gateway", guard.RequirePlatformAdmin(http.HandlerFunc(s.putPaymentGateway)))
 	mux.Handle("POST /api/platform/payment-gateway/test", guard.RequirePlatformAdmin(http.HandlerFunc(s.testPaymentGateway)))
+	// Sprint 10–11: platform billing ledger + receipt ops
+	mux.Handle("GET /api/platform/billing/orders", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformBillingOrders)))
+	mux.Handle("GET /api/platform/billing/orders/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformBillingOrder)))
+	mux.Handle("GET /api/platform/billing/documents", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformBillingDocuments)))
+	mux.Handle("GET /api/platform/billing/documents/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformBillingDocument)))
+	mux.Handle("POST /api/platform/billing/documents/{id}/void", guard.RequirePlatformAdmin(http.HandlerFunc(s.voidPlatformBillingDocument)))
+	mux.Handle("POST /api/platform/billing/documents/{id}/reissue", guard.RequirePlatformAdmin(http.HandlerFunc(s.reissuePlatformBillingDocument)))
+	mux.Handle("GET /api/platform/billing/seller-branding", guard.RequirePlatformAdmin(http.HandlerFunc(s.getSellerBranding)))
+	mux.Handle("PUT /api/platform/billing/seller-branding", guard.RequirePlatformAdmin(http.HandlerFunc(s.putSellerBranding)))
 	mux.HandleFunc("POST /api/callbacks/chillpay", s.chillpayCallback)
+	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
+	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
+	mux.Handle("GET /api/tenant/orders/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrder)))
+	mux.Handle("GET /api/tenant/orders/{id}/documents/{doc_type}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrderDocument)))
+	// Sprint 12: tax profile + document vault
+	mux.Handle("GET /api/tenant/tax-profile", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantTaxProfile)))
+	mux.Handle("PUT /api/tenant/tax-profile", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantTaxProfile)))
+	mux.Handle("GET /api/tenant/billing/documents", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantBillingDocuments)))
+	mux.Handle("GET /api/tenant/billing/documents/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantBillingDocument)))
+	mux.Handle("POST /api/dev/mock-pay/{order_id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.mockPayOrder)))
 	mux.Handle("POST /api/platform/avatars/{id}/image", guard.RequirePlatformAdmin(http.HandlerFunc(s.uploadAvatarImage)))
 	mux.HandleFunc("GET /api/assets/avatars/{id}/{file}", s.serveAvatarAsset)
 	mux.Handle("GET /api/entitlements/me", guard.RequireTenantAdminOrPlatform(http.HandlerFunc(s.entitlementMe)))
@@ -292,7 +316,7 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":      s.cfg.LiveKitAPIKey != "",
 		"nats":         s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":              "SPRINT-008",
+		"sprint":              "SPRINT-009",
 		"auth_disabled":       s.cfg.AuthDisabled,
 		"tenant_register":     s.cfg.TenantRegisterEnabled,
 		"rag":                 s.rag != nil && s.rag.Enabled(),
