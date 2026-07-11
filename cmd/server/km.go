@@ -11,6 +11,7 @@ import (
 
 	"github.com/libra/monti-jarvis/internal/auth"
 	"github.com/libra/monti-jarvis/internal/km"
+	"github.com/libra/monti-jarvis/internal/quota"
 	"github.com/libra/monti-jarvis/internal/scope"
 )
 
@@ -82,6 +83,17 @@ func (s *server) uploadAgentDocument(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
+	tenantID := s.resolvedTenant(r)
+	if s.quota != nil {
+		if err := s.quota.AllowRate(ctx, tenantID, quota.BucketKM); err != nil {
+			writeQuotaError(w, err)
+			return
+		}
+		if err := s.quota.CheckKMDocument(ctx, tenantID); err != nil {
+			writeQuotaError(w, err)
+			return
+		}
+	}
 	doc, err := s.kmFor(r).Ingest(ctx, agentID, header.Filename, data, kmScope)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())

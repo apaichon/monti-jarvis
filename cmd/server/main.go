@@ -19,18 +19,19 @@ import (
 	"github.com/libra/monti-jarvis/internal/entitlements"
 	"github.com/libra/monti-jarvis/internal/env"
 	"github.com/libra/monti-jarvis/internal/gemini"
-	"github.com/libra/monti-jarvis/internal/platformweb"
-	"github.com/libra/monti-jarvis/internal/resend"
-	"github.com/libra/monti-jarvis/internal/tenantregister"
-	"github.com/libra/monti-jarvis/internal/tenantoauth"
-	"github.com/libra/monti-jarvis/internal/tenantweb"
 	"github.com/libra/monti-jarvis/internal/km"
 	"github.com/libra/monti-jarvis/internal/live"
 	"github.com/libra/monti-jarvis/internal/lktoken"
 	"github.com/libra/monti-jarvis/internal/natsbus"
 	"github.com/libra/monti-jarvis/internal/payment"
+	"github.com/libra/monti-jarvis/internal/platformweb"
+	"github.com/libra/monti-jarvis/internal/quota"
 	"github.com/libra/monti-jarvis/internal/rag"
+	"github.com/libra/monti-jarvis/internal/resend"
 	"github.com/libra/monti-jarvis/internal/store"
+	"github.com/libra/monti-jarvis/internal/tenantoauth"
+	"github.com/libra/monti-jarvis/internal/tenantregister"
+	"github.com/libra/monti-jarvis/internal/tenantweb"
 	"github.com/libra/monti-jarvis/internal/web"
 	"github.com/libra/monti-jarvis/internal/workforce"
 )
@@ -47,7 +48,8 @@ type server struct {
 	bus    *natsbus.Bus
 	auth         *auth.Service
 	guard        *auth.HTTPGuard
-	entitlements *entitlements.Service
+	entitlements    *entitlements.Service
+	quota           *quota.Service
 	static          http.Handler
 	platform        http.Handler
 	tenant          http.Handler
@@ -166,19 +168,23 @@ func main() {
 		RedisPrefix:        cfg.RedisPrefix,
 	})
 
+	entSvc := entitlements.New(st, cfg)
+	quotaSvc := quota.New(entSvc, st, cfg)
+
 	s := &server{
-		cfg:          cfg,
-		ai:           ai,
-		voice:        live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}, ragSvc),
-		calls:        calls.New(st, bus, lk, cfg.DemoTenantID),
-		store:        st,
-		km:           kmSvc,
-		rag:          ragSvc,
-		ch:           ch,
-		bus:          bus,
-		auth:         authSvc,
-		guard:        guard,
-		entitlements: entitlements.New(st, cfg),
+		cfg:             cfg,
+		ai:              ai,
+		voice:           live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}, ragSvc),
+		calls:           calls.New(st, bus, lk, cfg.DemoTenantID),
+		store:           st,
+		km:              kmSvc,
+		rag:             ragSvc,
+		ch:              ch,
+		bus:             bus,
+		auth:            authSvc,
+		guard:           guard,
+		entitlements:    entSvc,
+		quota:           quotaSvc,
 		static:          customerweb.Handler(cfg.CustomerWebDir),
 		platform:        platformweb.Handler(cfg.PlatformAdminWebDir),
 		tenant:          tenantweb.Handler(cfg.TenantWebDir),
@@ -276,7 +282,8 @@ func main() {
 	mux.Handle("POST /api/platform/avatars/{id}/image", guard.RequirePlatformAdmin(http.HandlerFunc(s.uploadAvatarImage)))
 	mux.HandleFunc("GET /api/assets/avatars/{id}/{file}", s.serveAvatarAsset)
 	mux.Handle("GET /api/entitlements/me", guard.RequireTenantAdminOrPlatform(http.HandlerFunc(s.entitlementMe)))
-	mux.HandleFunc("GET /ws/voice", s.voice.Handler())
+	mux.Handle("GET /api/platform/tenants/{tenant_id}/usage", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantUsage)))
+	mux.HandleFunc("GET /ws/voice", s.voiceWS)
 	mux.HandleFunc("GET /legacy", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/legacy/", http.StatusFound)
 	})
@@ -368,6 +375,13 @@ func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 	if s.entitlements != nil {
 		out["entitlement_cache"] = s.entitlements.CacheStatus()
 	}
+	if s.quota != nil {
+		out["quota"] = s.quota.Status(ctx)
+		out["rate_limit"] = s.quota.RateLimitStatus(ctx)
+	} else {
+		out["quota"] = "disabled"
+		out["rate_limit"] = "disabled"
+	}
 	if s.store != nil {
 		if row, err := s.store.GetPaymentGatewayConfig(ctx); err == nil {
 			gw := payment.NewGateway(s.cfg, s.store)
@@ -428,9 +442,30 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 50*time.Second)
 	defer cancel()
 
+	tenantID := s.quotaTenant(r)
+	if s.quota != nil {
+		if err := s.quota.AllowRate(ctx, tenantID, quota.BucketChat); err != nil {
+			writeQuotaError(w, err)
+			return
+		}
+	}
+
 	topic := strings.TrimSpace(req.Topic)
-	ragResult, _ := s.rag.Retrieve(ctx, agent.ID, topic, req.Message)
-	prompt := s.rag.AugmentPrompt(workforce.SystemPrompt(agent), agent.ID, topic, req.Message, ragResult)
+	var ragResult rag.Result
+	useRAG := true
+	if s.quota != nil {
+		if err := s.quota.CheckFeature(ctx, tenantID, quota.DimRAGEnabled); err != nil {
+			// Soft skip RAG when package disables it (chat still works).
+			useRAG = false
+		}
+	}
+	if useRAG && s.rag != nil {
+		ragResult, _ = s.rag.Retrieve(ctx, agent.ID, topic, req.Message)
+	}
+	prompt := workforce.SystemPrompt(agent)
+	if useRAG && s.rag != nil {
+		prompt = s.rag.AugmentPrompt(prompt, agent.ID, topic, req.Message, ragResult)
+	}
 
 	reply, err := s.ai.Reply(ctx, prompt, history)
 	if err != nil {

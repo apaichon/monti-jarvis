@@ -2,8 +2,8 @@
 id: DES-0003
 title: Entity Relationship Diagram
 status: approved
-updated: 2026-07-09
-sprint: SPRINT-009
+updated: 2026-07-11
+sprint: SPRINT-013
 ---
 
 # ER Diagram — Monti Jarvis
@@ -658,9 +658,41 @@ monti-jarvis/
 | 6 ✅ v0.7.0 | `tenant_registrations`, `brands`, `tenant_kyc_profiles`; `tenants.status` + `pending_kyc` |
 | 7 ✅ v0.8.0 | KYC review columns on `tenant_kyc_profiles` + `tenant_registrations`; approve/reject lifecycle |
 | 8 ✅ v0.9.0 | `payment_gateway_configs`, `payment_callback_events` |
-| 9 🔄 v1.0.0 | `payment_orders` (checkout + fulfillment) |
+| 9–12 ✅ v1.3.0 | `payment_orders`, `payment_documents`, `tenant_tax_profiles`, billing ops |
+| 13 🔄 v1.4.0 | **No required Postgres DDL** — Redis quota/rate-limit keys only (see below) |
 | 15 | `km_scope_assignments`, tenant-driven re-index |
+| 16 | Tenant-facing limit/settings (reads S13 counters) |
 | 21 | Runtime voice failover + `ai_employee_configs` embedding bindings (voice stays on `ai_avatar_voices`) |
 | 22 | `conversation_records` (ClickHouse denorm) |
+| backlog | optional `quota_usage_events` audit (not in S13 commitment) |
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
+## Sprint 13 — Quota (Redis + existing Postgres reads)
+
+**Decision:** MVP ships **without** new Postgres tables. Limits come from existing `tenant_entitlements` / `package_limits`; KM and avatar usage from existing tables; concurrent/minutes/rate from Redis.
+
+### Existing entities used for usage (no schema change)
+
+| Entity | Usage dimension |
+| --- | --- |
+| `tenant_entitlements` + `package_limits.rules` | All limit ceilings |
+| KM document store (existing ingest tables) | `max_km_documents` |
+| `tenant_avatar_assignments` | `max_ai_employees` |
+
+### Redis entities — Sprint 13
+
+| Key pattern | Type | TTL | Purpose |
+| --- | --- | --- | --- |
+| `{prefix}quota:{tenant}:concurrent` | string/int | `QUOTA_CONCURRENT_TTL` | Active call slots |
+| `{prefix}quota:{tenant}:minutes:{YYYYMM}` | string/int | none (month key) | Monthly voice minutes (UTC) |
+| `{prefix}rl:{tenant}:chat:{YYYYMMDDHHMM}` | string/int | ~2m | Chat rate window |
+| `{prefix}rl:{tenant}:km:{YYYYMMDDHHMM}` | string/int | ~2m | KM write rate window |
+| `{prefix}rl:{tenant}:voice:{YYYYMMDDHHMM}` | string/int | ~2m | Voice open rate window |
+| `{prefix}entitlement:{tenant}` | JSON | existing | Entitlement cache (S4) |
+
+`prefix` = `REDIS_PREFIX` default `monti_jarvis:`.
+
+### Explicit non-goal table (do not create in S13)
+
+`quota_usage_events` deferred — would need full audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) if added later.
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.

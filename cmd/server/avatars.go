@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/libra/monti-jarvis/internal/quota"
 	"github.com/libra/monti-jarvis/internal/store"
 )
 
@@ -230,6 +231,13 @@ func (s *server) checkAvatarAssignCap(ctx context.Context, tenantID, avatarID st
 	count, err := s.store.CountActiveTenantAssignments(ctx, tenantID)
 	if err != nil {
 		return err
+	}
+	// SPRINT-013: prefer quota service (structured 429).
+	if s.quota != nil {
+		if err := s.quota.CheckAIEmployees(ctx, tenantID, count+1); err != nil {
+			return err
+		}
+		return nil
 	}
 	maxAI := 0
 	eff, err := s.entitlements.GetEffective(ctx, tenantID)
@@ -498,6 +506,11 @@ func writeAvatarValidationError(w http.ResponseWriter, err error) {
 }
 
 func writeAvatarError(w http.ResponseWriter, err error) {
+	var qe *quota.Error
+	if errors.As(err, &qe) || errors.Is(err, quota.ErrLimitExceeded) {
+		writeQuotaError(w, err)
+		return
+	}
 	switch {
 	case errors.Is(err, store.ErrAvatarNotFound),
 		errors.Is(err, store.ErrTenantNotFound),

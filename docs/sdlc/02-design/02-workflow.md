@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: approved
-updated: 2026-07-09
-sprint: SPRINT-009
+updated: 2026-07-11
+sprint: SPRINT-013
 ---
 
 # Workflows — Monti Jarvis
@@ -808,4 +808,150 @@ sequenceDiagram
 | `failed` | ChillPay reported failure |
 | `cancelled` | Abandoned (future ops) |
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 32. Quota check on KM ingest (Sprint 13)
+
+```mermaid
+sequenceDiagram
+  participant U as Operator / tenant
+  participant G as Go :8091
+  participant E as internal/entitlements
+  participant Q as internal/quota
+  participant R as Redis
+  participant DB as Postgres
+  participant KM as internal/km
+
+  U->>G: POST /api/km/agents/{id}/documents
+  G->>Q: AllowRate(tenant, km)
+  alt rate limited
+    Q-->>G: ErrRateLimited
+    G-->>U: 429 rate_limited
+  end
+  G->>E: GetEffective(tenant)
+  E-->>G: rules incl max_km_documents
+  G->>Q: CheckKMDocument(tenant)
+  Q->>DB: COUNT km documents
+  alt usage >= limit
+    Q-->>G: ErrLimitExceeded
+    G-->>U: 429 quota_exceeded
+  else under limit
+    G->>KM: Ingest(...)
+    KM-->>G: doc
+    G-->>U: 201
+  end
+```
+
+## 33. Concurrent voice slot (Sprint 13)
+
+```mermaid
+sequenceDiagram
+  participant C as Customer browser
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant R as Redis
+  participant V as voice / LiveKit relay
+
+  C->>G: GET /ws/voice (or session start)
+  G->>Q: Check voice_enabled + AcquireConcurrent(tenant)
+  Q->>R: INCR concurrent
+  alt over max_concurrent_calls
+    Q->>R: DECR
+    Q-->>G: ErrLimitExceeded
+    G-->>C: 429 / WS close
+  else ok
+    G->>V: open session
+    Note over C,V: call in progress
+    C-->>G: disconnect
+    G->>Q: release concurrent
+    Q->>R: DECR + optional AddCallMinutes
+  end
+```
+
+## 34. Platform usage snapshot (Sprint 13)
+
+```mermaid
+sequenceDiagram
+  participant A as Platform admin
+  participant B as Browser /admin
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant E as internal/entitlements
+  participant R as Redis
+  participant DB as Postgres
+
+  A->>B: Open tenant usage (P14)
+  B->>G: GET /api/platform/tenants/{id}/usage
+  alt not platform_admin
+    G-->>B: 403
+  end
+  G->>E: GetEffective(tenant)
+  G->>Q: Snapshot(tenant)
+  Q->>R: GET concurrent, minutes
+  Q->>DB: COUNT km docs, avatar assignments
+  Q-->>G: limits + usage
+  G-->>B: 200 JSON
+  B-->>A: bars / table
+```
+
+## 35. Chat rate limit + RAG flag (Sprint 13)
+
+```mermaid
+sequenceDiagram
+  participant C as Customer browser
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant E as internal/entitlements
+  participant R as Redis
+  participant Chat as chat / RAG
+
+  C->>G: POST /api/chat
+  Note over G: tenant = JWT or DEMO_TENANT_ID if AUTH_DISABLED
+  G->>Q: AllowRate(tenant, chat)
+  Q->>R: INCR rl:chat:minute
+  alt count > RATE_LIMIT_CHAT_PER_MIN
+    Q-->>G: ErrRateLimited
+    G-->>C: 429 rate_limited + Retry-After
+  end
+  alt request uses RAG
+    G->>Q: CheckFeature(rag_enabled)
+    alt rag_enabled false
+      Q-->>G: ErrFeatureDisabled
+      G-->>C: 403 feature_disabled
+    end
+  end
+  G->>Chat: handle message
+  Chat-->>C: 200 answer
+```
+
+## 36. Avatar assign vs max_ai_employees (Sprint 13)
+
+```mermaid
+sequenceDiagram
+  participant A as Platform admin
+  participant B as Browser /admin
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant DB as Postgres
+
+  A->>B: Assign avatar to tenant
+  B->>G: POST /api/platform/tenants/{id}/avatars
+  G->>Q: CheckAIEmployees(tenant, count+1)
+  Q->>DB: COUNT active assignments
+  alt count+1 > max_ai_employees
+    Q-->>G: ErrLimitExceeded
+    G-->>B: 429 quota_exceeded
+  else ok
+    G->>DB: INSERT assignment
+    G-->>B: 200/201
+  end
+```
+
+## State notes — quota counters (Sprint 13)
+
+| Key / counter | Lifecycle |
+| --- | --- |
+| `concurrent` | +1 acquire · −1 release / disconnect · TTL safety |
+| `minutes:YYYYMM` | +elapsed on session end · resets by key month |
+| `rl:*:minute` | INCR per request · expires ~2m |
+| KM / avatar usage | Derived from Postgres (not Redis primary) |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

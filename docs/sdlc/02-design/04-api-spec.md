@@ -2,8 +2,8 @@
 id: DES-0004
 title: API Specification
 status: approved
-updated: 2026-07-09
-sprint: SPRINT-009
+updated: 2026-07-11
+sprint: SPRINT-013
 ---
 
 # API Specification — Monti Jarvis
@@ -12,7 +12,8 @@ sprint: SPRINT-009
 **Auth:** `AUTH_DISABLED=true` (default) — same as v0.3.0 for customer paths. When `AUTH_DISABLED=false`, use `Authorization: Bearer <access_token>` on protected routes. See [06-auth-spec.md](06-auth-spec.md).  
 **Packages (Sprint 4):** Platform catalog + entitlements require auth on — see [08-packages-spec.md](08-packages-spec.md).  
 **Avatars (Sprint 5):** Platform avatar catalog + tenant assignment — see [10-avatars-spec.md](10-avatars-spec.md).  
-**Tenant register (Sprint 6):** Public signup + platform tenant list — see [11-tenant-register-spec.md](11-tenant-register-spec.md).
+**Tenant register (Sprint 6):** Public signup + platform tenant list — see [11-tenant-register-spec.md](11-tenant-register-spec.md).  
+**Quota (Sprint 13):** Redis quotas + rate limits on hot paths; platform usage read API — see [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md).  
 **CORS:** `*` — methods `GET, POST, PUT, DELETE, OPTIONS`; headers `Content-Type`, `Authorization`
 
 ## Health & infra
@@ -29,7 +30,7 @@ Liveness + feature flags.
   "livekit": true,
   "nats": true,
   "rag": true,
-  "sprint": "SPRINT-009",
+  "sprint": "SPRINT-013",
   "auth_disabled": true,
   "customer_web": "apps/customer-web/build",
   "platform_admin_web": "apps/platform-admin-web/build",
@@ -992,10 +993,131 @@ Ingest sample files from `docs/samples/km/{agent}.md` for all four agents.
 
 Platform admin UI calls JSON APIs on same origin (`8091`); tokens in `sessionStorage` (see [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md)).
 
+## Quota & rate limit (Sprint 13)
+
+Base: `http://localhost:8091`. Deep spec: [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md).  
+Workflows: [02-workflow.md](02-workflow.md) §32–36 · UX: [05-ux-ui.md](05-ux-ui.md) § P14.
+
+### Platform usage
+
+| Method | Path | Role | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/platform/tenants/{tenant_id}/usage` | `platform_admin` | Effective limits + current usage snapshot |
+
+**Auth:** Bearer required. `tenant_admin` → **403**.
+
+**Path params**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `tenant_id` | string | Existing tenant id (e.g. `demo`) |
+
+**Response 200** — active entitlement
+
+```json
+{
+  "tenant_id": "demo",
+  "package": { "id": "pkg-starter", "slug": "starter", "name": "Starter" },
+  "status": "active",
+  "period": "2026-07",
+  "limits": {
+    "max_ai_employees": 2,
+    "max_monthly_call_minutes": 500,
+    "max_km_documents": 50,
+    "max_concurrent_calls": 2,
+    "voice_enabled": true,
+    "rag_enabled": true
+  },
+  "usage": {
+    "ai_employees": 1,
+    "monthly_call_minutes": 12,
+    "km_documents": 3,
+    "concurrent_calls": 0
+  }
+}
+```
+
+**Response 200** — no entitlement
+
+```json
+{
+  "tenant_id": "acme",
+  "package": null,
+  "status": "none",
+  "period": "2026-07",
+  "limits": null,
+  "usage": {
+    "ai_employees": 0,
+    "monthly_call_minutes": 0,
+    "km_documents": 0,
+    "concurrent_calls": 0
+  }
+}
+```
+
+**Errors**
+
+| Status | When |
+| ---: | --- |
+| `401` | Missing/invalid token |
+| `403` | Not `platform_admin` |
+| `404` | Unknown `tenant_id` (optional; may return `status:none` if tenant exists without package) |
+
+### Enforcement side effects (existing routes)
+
+Tenant for customer paths: JWT tenant, else `DEMO_TENANT_ID` when `AUTH_DISABLED=true`.
+
+| Method | Path | Checks | HTTP / `code` |
+| --- | --- | --- | --- |
+| `POST` | `/api/chat` | rate `chat`; `rag_enabled` if RAG | 429 `rate_limited` · 403 `feature_disabled` |
+| `GET` | `/ws/voice` | rate `voice`; `voice_enabled`; monthly minutes; concurrent slot | 429 `quota_exceeded` / `rate_limited` · 403 `feature_disabled` |
+| `POST` | `/api/km/agents/{agent_id}/documents` | rate `km`; `max_km_documents` | 429 |
+| `POST` | `/api/platform/tenants/{tenant_id}/avatars` | `max_ai_employees` | 429 `quota_exceeded` |
+
+**Error body**
+
+```json
+{
+  "error": "KM document limit exceeded",
+  "code": "quota_exceeded",
+  "dimension": "max_km_documents",
+  "limit": 50,
+  "usage": 50
+}
+```
+
+| `code` | HTTP | Headers |
+| --- | ---: | --- |
+| `quota_exceeded` | 429 | — |
+| `rate_limited` | 429 | `Retry-After: <seconds>` preferred |
+| `feature_disabled` | 403 | — |
+| `no_entitlement` | 403/404 | only if `QUOTA_FAIL_OPEN=false` |
+
+When `QUOTA_ENABLED=false` or (`QUOTA_FAIL_OPEN=true` and Redis error): request proceeds; server logs warning.
+
+### Infra
+
+`GET /api/infra` adds:
+
+```json
+{
+  "quota": "ok",
+  "rate_limit": "ok"
+}
+```
+
+| Value | Meaning |
+| --- | --- |
+| `ok` | Enabled and Redis reachable |
+| `disabled` | Env master switch off |
+| `degraded` | Redis error; fail-open may still serve |
+
 ## Error envelope
 
 ```json
 {"error": "human-readable message"}
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+Sprint 13 quota errors may add `code`, `dimension`, `limit`, `usage` (see above).
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

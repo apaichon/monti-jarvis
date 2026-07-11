@@ -2,8 +2,8 @@
 id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
-updated: 2026-07-09
-sprint: SPRINT-009
+updated: 2026-07-11
+sprint: SPRINT-013
 ---
 
 # UX/UI — ASCII Wireframes
@@ -1165,4 +1165,114 @@ Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login scre
 | Chat API | `src/lib/api/chat.ts` |
 | Voice | `src/lib/voice/gemini.ts` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+## Sprint 13 — Quota & rate limit (P14)
+
+**What changed vs prior sprints**
+
+| Surface | Change |
+| --- | --- |
+| Customer portal `/` | No new layout; optional error toast on 429/403 from chat/voice |
+| Tenant portal `/tenant` | No change (self-service limits → S16) |
+| Platform admin `/admin` | **P14** usage panel on tenant detail (read-only) |
+| Ops / curl | Usage API + enforced error codes on hot paths |
+
+### Screen map → API
+
+| Zone | UI | User action | API / WS |
+| --- | --- | --- | --- |
+| A1 | Nav | Tenants list | existing list tenants |
+| A2 | Tenant header | Open `demo` | existing tenant/KYC routes |
+| **B1** | Usage card header | View package + period | `GET /api/platform/tenants/{id}/usage` |
+| **B2** | Usage bars | Read-only meters | same payload `usage` / `limits` |
+| **B3** | Flags | voice / rag on-off | same `limits.*_enabled` |
+| **B4** | Refresh | Re-fetch | same GET |
+| C1 | Customer chat | Send over rate | `POST /api/chat` → 429 |
+| C2 | Customer voice | Over concurrent | `GET /ws/voice` → 429 |
+| C3 | KM upload | Over doc limit | `POST /api/km/agents/{id}/documents` → 429 |
+| C4 | Avatar assign | Over AI employees | `POST /api/platform/tenants/{id}/avatars` → 429 |
+
+### P14 — Full layout (desktop)
+
+```text
+┌─ /admin ──────────────────────────────────────────────────────────────┐
+│ [Logo] Packages  Avatars  Tenants  Billing  Settings          [user]  │
+├────────────┬──────────────────────────────────────────────────────────┤
+│            │  A2 Tenant: demo                                         │
+│  A1 Nav    │  Status: active · Package: Starter                       │
+│  · Tenants │──────────────────────────────────────────────────────────│
+│  · …       │  B1 Usage · Period 2026-07                    [B4 Refresh]│
+│            │  ┌────────────────────────────────────────────────────┐  │
+│            │  │ B2 Dimension           Usage / Limit               │  │
+│            │  │    AI employees        ████░░░░  1 / 2             │  │
+│            │  │    Call minutes/mo     █░░░░░░░  12 / 500          │  │
+│            │  │    KM documents        ██░░░░░░  3 / 50            │  │
+│            │  │    Concurrent calls    ░░░░░░░░  0 / 2             │  │
+│            │  │ B3 voice_enabled  yes   rag_enabled  yes           │  │
+│            │  └────────────────────────────────────────────────────┘  │
+│            │  Empty: "No active package" when status=none             │
+└────────────┴──────────────────────────────────────────────────────────┘
+```
+
+**Mobile:** single column; nav collapses; bars stack full width; Refresh full-width button.
+
+**Copy (EN primary):** “Usage”, “Limit”, “No active package”, “Refresh”.  
+TH optional: “การใช้งาน”, “ขีดจำกัด”, “ไม่มีแพ็กเกจ”.
+
+### Customer error (optional toast)
+
+```text
+┌─ Customer / chat ─────────────────────┐
+│  …                                    │
+│  ┌──────────────────────────────────┐ │
+│  │ Limit reached. Try again later.  │ │
+│  │ (code: rate_limited)             │ │
+│  └──────────────────────────────────┘ │
+└───────────────────────────────────────┘
+```
+
+### Flow A — KM blocked by quota
+
+```text
+1. Operator has Starter (max_km_documents=50), already 50 docs
+2. POST /api/km/agents/{id}/documents
+3. ← 429 { code: quota_exceeded, dimension: max_km_documents, limit:50, usage:50 }
+4. Document not stored; UI shows error
+```
+
+### Flow B — Platform views usage
+
+```text
+1. Login platform_admin → /admin
+2. Tenants → demo
+3. GET /api/platform/tenants/demo/usage
+4. Fill B1–B3 bars; B4 Refresh re-GETs
+```
+
+### Flow C — Concurrent voice denied
+
+```text
+1. Tenant at max_concurrent_calls
+2. Customer opens GET /ws/voice (or session start)
+3. ← 429 quota_exceeded dimension=max_concurrent_calls
+4. On disconnect of another session, slot frees → retry succeeds
+```
+
+### Component → file (planned)
+
+| Component | Path |
+| --- | --- |
+| Usage panel (B1–B4) | `apps/platform-admin-web/src/routes/tenants/[id]/+page.svelte` section **or** `.../tenants/[id]/usage/+page.svelte` |
+| API client | `apps/platform-admin-web/src/lib/api/usage.ts` |
+| Optional chat toast | `apps/customer-web/src/lib/api/chat.ts` / `+page.svelte` |
+
+### Ops-only (no SPA)
+
+```text
+┌─ REST client ─────────────────────────────────────────────┐
+│  POST /api/auth/login → platform_admin token              │
+│  GET  /api/platform/tenants/demo/usage                    │
+│  GET  /api/infra | jq .quota,.rate_limit                  │
+└───────────────────────────────────────────────────────────┘
+```
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

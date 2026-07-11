@@ -162,6 +162,19 @@ SELECT COUNT(*) FROM %s.knowledge_chunks WHERE tenant_id = $1 AND agent_id = $2`
 	return docs, chunks, err
 }
 
+// CountTenantKnowledgeDocuments returns total KM documents for a tenant (all agents).
+// Used by SPRINT-013 quota for max_km_documents.
+func (s *Store) CountTenantKnowledgeDocuments(ctx context.Context, tenantID string) (int, error) {
+	if s.pg == nil {
+		return 0, fmt.Errorf("postgres is not available")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var n int
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT COUNT(*) FROM %s.knowledge_documents WHERE tenant_id = $1`, schema), tenantID).Scan(&n)
+	return n, err
+}
+
 func (s *Store) PutKMObject(ctx context.Context, objectKey, contentType string, data []byte) error {
 	if s.minio == nil {
 		return fmt.Errorf("minio is not available")

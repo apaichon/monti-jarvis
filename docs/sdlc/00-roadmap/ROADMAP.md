@@ -32,20 +32,20 @@
 | 6 | Tenant | Register | C | 3 ✅ v0.7.0 |
 | 7 | Platform Admin | KYC Tenant | C | 6 ✅ v0.8.0 |
 | 8 | Platform Admin | Payment Gateway | C | 3 ✅ *(code shipped; VERIFY with Sprint 9)* |
-| 9 | Tenant | Buy Package (+ MVP receipt/tax) | C | 4, 6, 8 🔄 |
-| 10 | Platform Admin | Billing ledger | C | 9 |
-| 11 | Platform Admin | Receipt ops | C | 10 *(hardens S9 receipt)* |
-| 12 | Tenant | Tax Invoice compliance | C | 10, 11 *(hardens S9 tax doc)* |
-| 13 | Platform Admin | Quota, Rate Limit | B | 3, 4 |
+| 9 | Tenant | Buy Package (+ MVP receipt/tax) | C | 4, 6, 8 ✅ v1.3.0 |
+| 10 | Platform Admin | Billing ledger | C | 9 ✅ v1.3.0 |
+| 11 | Platform Admin | Receipt ops | C | 10 ✅ v1.3.0 |
+| 12 | Tenant | Tax Invoice compliance | C | 10, 11 ✅ v1.3.0 |
+| 13 | Platform Admin | Quota, Rate Limit | B | 3, 4 ✅ v1.4.0 |
 | 14 | Tenant | Embed to Web | D | 1, 6 |
 | 15 | Tenant | Set Scope and KM | D | 2, 6 |
-| 16 | Tenant | Settings, Locale, Limit, Quota | D | 13, 15 |
+| 16 | Tenant | Settings, Locale, Limit user tier, group, Quota for customer call time per day, call minute per each call | D | 13, 15 |
 | 17 | Tenant | Test and Preview | D | 15, 16 |
 | 18 | Tenant | Customer Tier | D | 16 |
 | 19 | Customer | Register | E | 3 |
 | 20 | Customer | Auth | E | 19 |
 | 21 | Customer | Select AI Workforce to Conversation | A | 1, 5 |
-| 22 | Platform / Tenant | Conversation Records | F | 1, 3 |
+| 22 | Platform / Tenant | Conversation Records, Knowledge Gap | F | 1, 3 |
 | 23 | Tenant | Tickets | F | 22 |
 | 24 | Tenant | Review | F | 22, 23 |
 | 25 | Tenant | Dashboard | F | 22 (ClickHouse) |
@@ -143,6 +143,20 @@ Use `sprint-plan` skill when opening a new sprint.
 
 Plan: [15-commerce-chain-plan.md](../02-design/15-commerce-chain-plan.md)
 
-## Current sprint: SPRINT-013 *(next open)*
+## Shipped: SPRINT-013 — Quota, Rate Limit — v1.4.0
 
-**Platform:** Platform Admin · **Feature:** Quota, Rate Limit · **Depends:** 3, 4
+**Closed 2026-07-11.** Redis quotas + rate limits on chat/voice/KM/avatars; platform usage panel.
+
+| Task | Points | Outcome |
+| --- | ---: | --- |
+| TASK-0057 | 3 | Redis keys, env, `/api/infra` |
+| TASK-0058 | 5 | `internal/quota` service |
+| TASK-0059 | 4 | Enforce chat/voice/KM/avatars |
+| TASK-0060 | 3 | Platform usage API + UI |
+| TASK-0061 | 1 | Manual checklist (full browser UAT deferred) |
+
+Sprint: [SPRINT-013.md](../03-sprints/SPRINT-013.md) · Feature: [FEAT-0013](../01-features/FEAT-0013-quota-rate-limit.md) · Spec: [16-quota-rate-limit-spec.md](../02-design/16-quota-rate-limit-spec.md) · UAT: [SPRINT-013-manual.md](../06-manual-tests/SPRINT-013-manual.md)
+
+## Current sprint: SPRINT-014 *(next open)*
+
+**Platform:** Tenant · **Feature:** Embed to Web · **Depends:** 1, 6

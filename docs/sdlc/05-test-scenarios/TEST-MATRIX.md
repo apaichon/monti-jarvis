@@ -1,8 +1,8 @@
 ---
 id: TEST-MATRIX
 status: active
-updated: 2026-07-07
-sprints: [SPRINT-001, SPRINT-002]
+updated: 2026-07-11
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -62,6 +62,24 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | T2-16 | Safety | RAG does not bypass scope; credential refusal holds | Manual | [S3](../06-manual-tests/SPRINT-002-manual.md#s3--scope-enforcement-feat-0002--ac-2) |
 
 ---
+
+## FEAT-0013 — Quota & Rate Limit (SPRINT-013)
+
+| ID | AC | Scenario | Type | Test / Command |
+| --- | ---: | --- | --- | --- |
+| T13-01 | 1 | KM ingest over `max_km_documents` → 429 | Manual | [S2](../06-manual-tests/SPRINT-013-manual.md#s2--km-document-quota-exceed-task-0059--feat-ac-1) |
+| T13-02 | 1 | Structured error body `code` + `dimension` | Auto | `TestWriteQuotaError_*` · `go test ./cmd/server/ -run Quota` |
+| T13-03 | 2 | Concurrent voice over `max_concurrent_calls` rejected | Manual | [S3](../06-manual-tests/SPRINT-013-manual.md#s3--concurrent-voice-slots-task-0059--feat-ac-2) |
+| T13-04 | 2 | Concurrent acquire/release | Auto | `TestAcquireConcurrent_Release` |
+| T13-05 | 3 | `voice_enabled=false` blocks voice | Manual | [S5](../06-manual-tests/SPRINT-013-manual.md#s5--feature-flags-task-0059--feat-ac-3) |
+| T13-06 | 3 | `rag_enabled=false` skips RAG, chat continues | Manual | [S5](../06-manual-tests/SPRINT-013-manual.md#s5--feature-flags-task-0059--feat-ac-3) |
+| T13-07 | 4 | Redis key shapes + UTC month | Auto + docs | `TestAddCallMinutesAndMonthlyCheck` · LOCAL-DEV |
+| T13-08 | 5 | Platform `GET .../usage` + admin UI | Manual | [S1](../06-manual-tests/SPRINT-013-manual.md#s1--platform-usage-snapshot-task-0060--feat-ac-5) |
+| T13-09 | 6 | Chat rate limit → 429 + Retry-After | Manual / Auto | [S4](../06-manual-tests/SPRINT-013-manual.md#s4--rate-limit-burst-task-0059--feat-ac-6--optional-but-recommended) · `TestAllowRate` |
+| T13-10 | 7 | Fail-open / disabled skips enforcement | Auto | `TestNoEntitlementFailOpen` · `TestDisabledSkipsChecks` |
+| T13-11 | — | `/api/infra` quota + rate_limit | Manual / Smoke | [§1](../06-manual-tests/SPRINT-013-manual.md#1-init-infrastructure) |
+| T13-12 | — | Avatar assign over `max_ai_employees` | Manual | [S6](../06-manual-tests/SPRINT-013-manual.md#s6--avatar-assign-cap-task-0059--feat-ac) |
+| T13-13 | — | Regression login / packages / customer chat | Manual | [S8](../06-manual-tests/SPRINT-013-manual.md#s8--regression-must) |
 
 ## Build & regression gates (all sprints)
 

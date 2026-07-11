@@ -98,8 +98,25 @@ make up
 | `CHILLPAY_CALLBACK_URL` | No | Public URL for `POST /api/callbacks/chillpay` (ngrok) |
 | `CHILLPAY_RETURN_URL` | No | Browser return after ChillPay payment |
 | `PAYMENT_CALLBACK_DEV_BYPASS` | No | `false` — skip callback checksum locally |
+| `QUOTA_ENABLED` | No | `true` when `REDIS_URL` set — package limit enforcement (S13) |
+| `QUOTA_FAIL_OPEN` | No | `true` — on Redis error, allow request (local-friendly) |
+| `QUOTA_CONCURRENT_TTL` | No | `2h` — safety TTL for concurrent call slots |
+| `RATE_LIMIT_ENABLED` | No | `true` when Redis set |
+| `RATE_LIMIT_CHAT_PER_MIN` | No | `60` per tenant (UTC minute window) |
+| `RATE_LIMIT_KM_PER_MIN` | No | `30` |
+| `RATE_LIMIT_VOICE_PER_MIN` | No | `20` |
 
-See `infra/.env.example` for the full list.
+**Quota Redis keys** (prefix `REDIS_PREFIX`, default `monti_jarvis:`):
+
+| Key | Purpose |
+| --- | --- |
+| `…quota:{tenant}:concurrent` | Active voice/call slots |
+| `…quota:{tenant}:minutes:{YYYYMM}` | Monthly call minutes (UTC calendar month) |
+| `…rl:{tenant}:chat\|km\|voice:{YYYYMMDDHHMM}` | Per-minute rate windows (UTC) |
+
+KM document and AI-employee usage are counted from Postgres (not Redis). Month TZ is fixed **UTC** (no `QUOTA_MONTH_TZ`). No `quota_usage_events` table in MVP.
+
+See `infra/.env.dev.example` for the full list.
 
 ## Auth (Sprint 3)
 

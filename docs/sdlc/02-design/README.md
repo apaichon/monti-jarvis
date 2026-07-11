@@ -21,10 +21,13 @@ System design artifacts for Monti Jarvis.
 | 13 | [13-payment-gateway-spec.md](13-payment-gateway-spec.md) | 8 | ChillPay gateway config + callbacks | `approved` |
 | 14 | [14-buy-package-spec.md](14-buy-package-spec.md) | 9 | Tenant checkout + callback fulfillment | `approved` |
 | 15 | [15-commerce-chain-plan.md](15-commerce-chain-plan.md) | 9–12 | Phase C commerce chain re-scope (S8–S12) | `approved` |
+| 16 | [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) | 13 | Redis quotas + rate limits + platform usage | **`shipped`** v1.4.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
-**Sprint 9 gate:** ✅ Design pack approved — TASK-0040+ per [14-buy-package-spec.md](14-buy-package-spec.md) + chain plan [15](15-commerce-chain-plan.md). Combined E2E with Sprint 8; open S10 only after S9 VERIFY.
+**Sprint 13:** ✅ Shipped v1.4.0 — [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md); workflow §32–36; API § Quota; UX P14. [SPRINT-013](../03-sprints/SPRINT-013.md).
+
+**Sprint 9 gate:** ✅ Design pack approved — TASK-0040+ per [14-buy-package-spec.md](14-buy-package-spec.md) + chain plan [15](15-commerce-chain-plan.md). Combined E2E with Sprint 8; Phase C closed v1.3.0.
 
 **Sprint 8:** ✅ Code shipped — [13-payment-gateway-spec.md](13-payment-gateway-spec.md), P13 per [05-ux-ui.md](05-ux-ui.md).
 

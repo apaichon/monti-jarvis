@@ -69,7 +69,15 @@ type Config struct {
 	ChillPayReturnURL        string
 	PaymentCallbackDevBypass bool
 	PaymentMockAutoFulfill   bool
-	AppEnv                   string
+	// Quota / rate limit (SPRINT-013)
+	QuotaEnabled           bool
+	QuotaFailOpen          bool
+	RateLimitEnabled       bool
+	RateLimitChatPerMin    int
+	RateLimitKMPerMin      int
+	RateLimitVoicePerMin   int
+	QuotaConcurrentTTL     time.Duration
+	AppEnv                 string
 }
 
 func Load() Config {
@@ -141,7 +149,15 @@ func Load() Config {
 		ChillPayReturnURL:        os.Getenv("CHILLPAY_RETURN_URL"),
 		PaymentCallbackDevBypass: envBool("PAYMENT_CALLBACK_DEV_BYPASS", false),
 		PaymentMockAutoFulfill:   envBool("PAYMENT_MOCK_AUTO_FULFILL", false),
-		AppEnv:                   appEnv,
+		// Default on when Redis is configured (same pattern as entitlement cache).
+		QuotaEnabled:         envBool("QUOTA_ENABLED", os.Getenv("REDIS_URL") != ""),
+		QuotaFailOpen:        envBool("QUOTA_FAIL_OPEN", true),
+		RateLimitEnabled:     envBool("RATE_LIMIT_ENABLED", os.Getenv("REDIS_URL") != ""),
+		RateLimitChatPerMin:  envInt("RATE_LIMIT_CHAT_PER_MIN", 60),
+		RateLimitKMPerMin:    envInt("RATE_LIMIT_KM_PER_MIN", 30),
+		RateLimitVoicePerMin: envInt("RATE_LIMIT_VOICE_PER_MIN", 20),
+		QuotaConcurrentTTL:   envDuration("QUOTA_CONCURRENT_TTL", 2*time.Hour),
+		AppEnv:               appEnv,
 	}
 }
 

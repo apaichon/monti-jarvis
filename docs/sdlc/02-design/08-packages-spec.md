@@ -209,7 +209,7 @@ Package and entitlement management UI lives in [09-platform-admin-portal-spec.md
 
 ## 9. Out of scope (later sprints)
 
-- Enforcement middleware on `/api/chat`, `/ws/voice`, KM ingest (Sprint 13)
+- Enforcement middleware on `/api/chat`, `/ws/voice`, KM ingest → **SPRINT-013** ([16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md))
 - Proration, trials, coupons (Sprint 9–10)
 - ClickHouse `entitlement_events` (optional analytics)
 

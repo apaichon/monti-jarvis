@@ -95,8 +95,16 @@
       "velocity": 14,
       "closed": "2026-07-11",
       "release": "v1.3.0"
+    },
+    {
+      "id": "SPRINT-013",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-11",
+      "release": "v1.4.0"
     }
   ],
   "average_velocity": 16,
-  "note": "S8\u2013S12 commerce chain closed together at v1.3.0 \u2014 gateway, buy package, billing ledger, receipt ops, tax compliance. v1.3.1 post-ship hardening (ChillPay client, return fulfill, OAuth)."
+  "note": "S13 quota/rate-limit shipped v1.4.0 (unit tests green; partial browser UAT deferred). S8\u2013S12 commerce v1.3.0 + v1.3.1 harden."
 }

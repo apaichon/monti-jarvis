@@ -91,6 +91,8 @@
               <div class="row-actions">
                 <a class="link" href="{base}/tenants/{tenant.id}/kyc">KYC</a>
                 <a class="link" href="{base}/tenants/{tenant.id}/avatars">Avatars</a>
+                <a class="link" href="{base}/tenants/{tenant.id}/usage">Usage</a>
+                <a class="link" href="{base}/tenants/{tenant.id}/entitlement">Entitlement</a>
               </div>
             </td>
           </tr>
