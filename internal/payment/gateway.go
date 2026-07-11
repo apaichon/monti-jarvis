@@ -79,6 +79,9 @@ func (g *Gateway) Resolve(row store.PaymentGatewayConfig) ResolvedConfig {
 	}
 	if v := strings.TrimSpace(g.cfg.ChillPayReturnURL); v != "" {
 		out.ReturnURL = v
+	} else if strings.TrimSpace(out.ReturnURL) == "" {
+		// Default browser return after ChillPay → tenant billing return page.
+		out.ReturnURL = strings.TrimRight(strings.TrimSpace(g.cfg.PublicBaseURL), "/") + "/tenant/billing/return"
 	}
 	if out.RouteNo <= 0 {
 		out.RouteNo = 1

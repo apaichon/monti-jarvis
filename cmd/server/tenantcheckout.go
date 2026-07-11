@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -131,7 +132,11 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	returnURL := checkoutReturnURL(resolved.ReturnURL, s.cfg.PublicBaseURL, order.ID)
+	// SPA page shown to the tenant after payment (order_id for local mock / client).
+	spaReturnURL := tenantSPAReturnURL(resolved.ReturnURL, s.cfg.PublicBaseURL, order.ID, order.OrderNo, "", "")
+	// What ChillPay gets: server bridge with order ref in the *path* (query strings are often dropped).
+	// Handler fulfills paid orders + redirects to /tenant/billing/return?…
+	chillPayReturnURL := chillpayBrowserReturnURL(resolved.ReturnURL, resolved.CallbackURL, s.cfg.PublicBaseURL, order.OrderNo)
 
 	var paymentURL string
 	var transactionID string
@@ -150,7 +155,7 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 				s.entitlements.Invalidate(r.Context(), tenantID)
 			}
 			order = &result.Order
-			paymentURL = returnURL
+			paymentURL = spaReturnURL
 		}
 	default:
 		client := chillpay.NewClient(chillpay.Config{
@@ -161,10 +166,17 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 			RouteNo:      resolved.RouteNo,
 			Currency:     resolved.Currency,
 			CallbackURL:  resolved.CallbackURL,
-			ReturnURL:    returnURL,
+			ReturnURL:    chillPayReturnURL,
 		})
 		amountBaht := float64(pkg.PriceCents) / 100.0
 		clientIP := clientIPFromRequest(r)
+		// ChillPay CustName must be a person name — not an email (error 2032).
+		custName := ""
+		if user, uerr := s.store.GetUserByID(r.Context(), ac.UserID); uerr == nil {
+			custName = user.DisplayName
+		}
+		log.Printf("chillpay checkout tenant=%s order_no=%s return_url=%s callback_url=%s",
+			tenantID, order.OrderNo, chillPayReturnURL, resolved.CallbackURL)
 		paymentURL, transactionID, err = client.InitPayment(chillpay.RequestInfo{
 			OrderNo:     order.OrderNo,
 			CustomerID:  tenantID,
@@ -173,7 +185,7 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 			ChannelCode: payment.ChannelCodeForMethod(method),
 			IPAddress:   clientIP,
 			CustEmail:   ac.Email,
-			CustName:    ac.Email,
+			CustName:    custName,
 		})
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err.Error())
@@ -193,37 +205,198 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"order_id":        order.ID,
-		"order_no":        order.OrderNo,
-		"package_id":      packageID,
-		"amount_cents":    order.AmountCents,
-		"currency":        order.Currency,
-		"status":          order.Status,
-		"payment_url":     paymentURL,
-		"provider":        provider,
-		"payment_method":  method,
-		"return_url":      returnURL,
+		"order_id":           order.ID,
+		"order_no":           order.OrderNo,
+		"package_id":         packageID,
+		"amount_cents":       order.AmountCents,
+		"currency":           order.Currency,
+		"status":             order.Status,
+		"payment_url":        paymentURL,
+		"provider":           provider,
+		"payment_method":     method,
+		"return_url":         spaReturnURL,
+		"chillpay_return_url": chillPayReturnURL,
 	})
 }
 
+// Paths used after ChillPay browser redirect (harvest-style bridge → SPA).
+const (
+	tenantBillingReturnPath   = "/tenant/billing/return"
+	chillpayBrowserReturnPath = "/api/callbacks/chillpay/return"
+)
+
+// chillpayBrowserReturnURL is the ReturnUrl sent to ChillPay.
+// Embed order_no in the path — ChillPay often strips query params and may omit OrderNo in POST.
+func chillpayBrowserReturnURL(configuredReturn, configuredCallback, publicBase, orderNo string) string {
+	base := ""
+	if host := absoluteHostBase(configuredReturn); host != "" {
+		base = host + chillpayBrowserReturnPath
+	} else if host := absoluteHostBase(configuredCallback); host != "" {
+		base = host + chillpayBrowserReturnPath
+	} else {
+		base = strings.TrimRight(fallbackPublicBase(publicBase), "/") + chillpayBrowserReturnPath
+	}
+	orderNo = strings.TrimSpace(orderNo)
+	if orderNo == "" {
+		return base
+	}
+	return base + "/" + url.PathEscape(orderNo)
+}
+
+// tenantSPAReturnURL is the tenant portal page after the server bridge redirect.
+func tenantSPAReturnURL(configuredReturn, publicBase, orderID, orderNo, status, txnID string) string {
+	base := ""
+	if host := absoluteHostBase(configuredReturn); host != "" {
+		base = host + tenantBillingReturnPath
+	} else {
+		base = strings.TrimRight(fallbackPublicBase(publicBase), "/") + tenantBillingReturnPath
+	}
+	q := url.Values{}
+	if strings.TrimSpace(orderID) != "" {
+		q.Set("order_id", strings.TrimSpace(orderID))
+	}
+	if strings.TrimSpace(orderNo) != "" {
+		q.Set("order_no", strings.TrimSpace(orderNo))
+	}
+	if strings.TrimSpace(status) != "" {
+		q.Set("status", strings.TrimSpace(status))
+	}
+	if strings.TrimSpace(txnID) != "" {
+		q.Set("txn_id", strings.TrimSpace(txnID))
+	}
+	if encoded := q.Encode(); encoded != "" {
+		return base + "?" + encoded
+	}
+	return base
+}
+
+// checkoutReturnURL keeps SPA return helper for mock / tests.
 func checkoutReturnURL(configured, publicBase, orderID string) string {
-	base := strings.TrimSpace(configured)
-	if base == "" {
-		base = strings.TrimRight(strings.TrimSpace(publicBase), "/") + "/tenant/billing/return"
+	return tenantSPAReturnURL(configured, publicBase, orderID, "", "", "")
+}
+
+func absoluteHostBase(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
 	}
-	u, err := url.Parse(base)
-	if err != nil || u.Scheme == "" {
-		// relative or invalid — append query naively
-		sep := "?"
-		if strings.Contains(base, "?") {
-			sep = "&"
+	return u.Scheme + "://" + u.Host
+}
+
+func fallbackPublicBase(publicBase string) string {
+	publicBase = strings.TrimRight(strings.TrimSpace(publicBase), "/")
+	if publicBase == "" {
+		return "http://localhost:8091"
+	}
+	return publicBase
+}
+
+// chillpayBrowserReturn receives the browser after ChillPay payment (GET or POST).
+// Fulfills the order when payment succeeded (DB paid + package entitlement/quota),
+// then redirects to /tenant/billing/return with order params.
+func (s *server) chillpayBrowserReturn(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	_ = r.ParseMultipartForm(1 << 20)
+
+	// Log every field ChillPay sent (sandbox field names vary).
+	if len(r.Form) > 0 {
+		log.Printf("chillpay browser return form=%v", r.Form)
+	}
+
+	pathRef := strings.TrimSpace(r.PathValue("ref"))
+	orderNo := firstNonEmpty(
+		pathRef,
+		r.FormValue("OrderNo"),
+		r.FormValue("orderNo"),
+		r.FormValue("orderno"),
+		r.URL.Query().Get("OrderNo"),
+		r.URL.Query().Get("orderNo"),
+		r.FormValue("order_no"),
+		r.URL.Query().Get("order_no"),
+	)
+	statusRaw := firstNonEmpty(
+		r.FormValue("PaymentStatus"),
+		r.FormValue("paymentStatus"),
+		r.FormValue("Status"),
+		r.FormValue("status"),
+		r.URL.Query().Get("PaymentStatus"),
+		r.URL.Query().Get("status"),
+	)
+	txnID := firstNonEmpty(
+		r.FormValue("TransactionId"),
+		r.FormValue("transactionId"),
+		r.FormValue("TransCode"),
+		r.FormValue("transCode"),
+		r.URL.Query().Get("TransactionId"),
+		r.URL.Query().Get("txn_id"),
+	)
+
+	payStatus := normalizeChillPayPaymentStatus(statusRaw)
+	log.Printf("chillpay browser return method=%s path_ref=%s order_no=%s status_raw=%s status=%s txn_id=%s",
+		r.Method, pathRef, orderNo, statusRaw, payStatus, txnID)
+
+	orderID := ""
+	if s.store != nil && orderNo != "" {
+		// Path ref may be order_id (ord_…) or order_no (MJ…).
+		if order, err := s.store.GetPaymentOrderByOrderNo(r.Context(), orderNo); err == nil {
+			orderID = order.ID
+			orderNo = order.OrderNo
+		} else if order, err := s.store.GetPaymentOrderByID(r.Context(), orderNo); err == nil {
+			orderID = order.ID
+			orderNo = order.OrderNo
 		}
-		return base + sep + "order_id=" + url.QueryEscape(orderID)
+
+		// Fulfill when ChillPay reports success (callback may not have reached us).
+		if orderNo != "" && payStatus != "" {
+			result, fulfillErr := s.store.FulfillPaymentOrder(r.Context(), orderNo, txnID, payStatus)
+			if fulfillErr != nil {
+				log.Printf("chillpay browser return fulfill error order_no=%s: %v", orderNo, fulfillErr)
+			} else {
+				orderID = result.Order.ID
+				if result.EntitlementChanged && s.entitlements != nil {
+					s.entitlements.Invalidate(r.Context(), result.Order.TenantID)
+					log.Printf("chillpay browser return fulfilled order_no=%s tenant=%s package=%s paid",
+						orderNo, result.Order.TenantID, result.Order.PackageID)
+				}
+			}
+		}
 	}
-	q := u.Query()
-	q.Set("order_id", orderID)
-	u.RawQuery = q.Encode()
-	return u.String()
+
+	// Prefer public host that ChillPay can reach (ngrok).
+	var resolved payment.ResolvedConfig
+	if s.store != nil {
+		gwRow, _ := s.store.GetPaymentGatewayConfig(r.Context())
+		gw := payment.NewGateway(s.cfg, s.store)
+		resolved = gw.Resolve(gwRow)
+	}
+	dest := tenantSPAReturnURL(resolved.ReturnURL, s.cfg.PublicBaseURL, orderID, orderNo, payStatus, txnID)
+	http.Redirect(w, r, dest, http.StatusFound)
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// normalizeChillPayPaymentStatus maps browser-return status strings to callback codes.
+// Callback uses "0"=success, "1"=pending, "2"=failed. Browser return may send
+// "complete", "success", "Paid", etc. (observed: status=complete with empty OrderNo).
+func normalizeChillPayPaymentStatus(raw string) string {
+	s := strings.TrimSpace(strings.ToLower(raw))
+	switch s {
+	case "0", "success", "successful", "complete", "completed", "paid", "ok", "approve", "approved":
+		return "0"
+	case "2", "fail", "failed", "error", "cancel", "cancelled", "canceled", "reject", "rejected":
+		return "2"
+	case "1", "pending", "wait", "waitauthorize", "processing":
+		return "1"
+	default:
+		return strings.TrimSpace(raw)
+	}
 }
 
 func clientIPFromRequest(r *http.Request) string {

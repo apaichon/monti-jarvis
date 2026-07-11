@@ -1,10 +1,11 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { login } from '$lib/api/auth';
   import { ApiError } from '$lib/api/http';
   import { onMount } from 'svelte';
-  import { getStoredUser, hasRegistrationSession, saveSession } from '$lib/auth/session';
+  import { getStoredUser, hasRegistrationSession, saveSession, type TokenPair } from '$lib/auth/session';
   import { fetchOAuthProviders, oauthStartURL } from '$lib/api/register';
   import OAuthButton from '$lib/components/OAuthButton.svelte';
   import { feedback } from '$lib/feedback.svelte';
@@ -15,7 +16,62 @@
   let user = $state(getStoredUser());
   let providers = $state<string[]>([]);
 
+  function safeNextPath(): string {
+    const next = $page.url.searchParams.get('next') || '';
+    // Only allow relative tenant paths (open redirect guard).
+    if (next.startsWith(`${base}/`) || next.startsWith('/tenant/')) {
+      return next;
+    }
+    return `${base}/backoffice`;
+  }
+
+  function consumeOAuthCallback(): boolean {
+    const params = $page.url.searchParams;
+    const access = params.get('access_token');
+    const refresh = params.get('refresh_token');
+    if (!access || !refresh) {
+      const err = params.get('error');
+      if (err) feedback.error(err);
+      return false;
+    }
+    const tenantId = params.get('tenant_id') ?? undefined;
+    const role = params.get('role') || 'tenant_admin';
+    if (role !== 'tenant_admin') {
+      feedback.error('This portal is for tenant administrators');
+      return true;
+    }
+    const pair: TokenPair = {
+      access_token: access,
+      refresh_token: refresh,
+      expires_in: Number(params.get('expires_in') || 0),
+      token_type: 'Bearer',
+      user: {
+        id: params.get('user_id') || '',
+        email: params.get('email') || '',
+        display_name: params.get('display_name') || '',
+        role,
+        tenant_id: tenantId
+      }
+    };
+    saveSession(pair, tenantId);
+    user = pair.user;
+    const dest = safeNextPath();
+    // Drop tokens from the URL so they are not left in history.
+    history.replaceState({}, '', `${base}/login`);
+    goto(dest);
+    return true;
+  }
+
   onMount(async () => {
+    if (consumeOAuthCallback()) return;
+    // Already signed in + return from payment → continue to next.
+    if (hasRegistrationSession()) {
+      const next = $page.url.searchParams.get('next');
+      if (next) {
+        goto(safeNextPath());
+        return;
+      }
+    }
     try {
       const res = await fetchOAuthProviders();
       providers = res.providers;
@@ -38,7 +94,7 @@
         return;
       }
       saveSession(pair, pair.user.tenant_id);
-      goto(`${base}/backoffice`);
+      goto(safeNextPath());
     } catch (err) {
       feedback.error(err instanceof ApiError ? err.message : 'Sign in failed');
     } finally {

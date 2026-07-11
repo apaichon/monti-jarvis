@@ -36,8 +36,8 @@ help:
 	@printf "  make infra-reset    destroy then init all infra\n"
 	@printf "  make infra-destroy  stop compose, drop DB, flush Redis, remove MinIO bucket\n"
 	@printf "  make infra-init     create DB schema/tables and MinIO bucket\n"
-	@printf "  make infra-up       docker compose up (NATS, LiveKit) + infra-init\n"
-	@printf "  make infra-down     docker compose down (NATS, LiveKit)\n"
+	@printf "  make infra-up       docker compose up (Postgres/Redis/MinIO/NATS/LiveKit/CH) + infra-init\n"
+	@printf "  make infra-down     docker compose down\n"
 	@printf "  make infra-check    health check all services\n"
 	@printf "  make dev-hosts      add monti-jarvis-dev.local -> 127.0.0.1 in /etc/hosts (sudo)\n"
 

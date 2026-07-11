@@ -127,20 +127,22 @@ docs/sdlc/04-tasks/TASK-NNNN.md
 
 Use `sprint-plan` skill when opening a new sprint.
 
-## Current sprint: SPRINT-012 *(commerce chain complete — VERIFY)*
+## Shipped: Phase C commerce (SPRINT-008–012) — v1.3.0 / v1.3.1
 
-**Phase C commerce (S8–S12) implemented.** Combined UAT recommended.
+**Closed 2026-07-11.** Gateway → buy package → billing ledger → receipt ops → tax compliance.
 
-| Sprint | Feature | UI / API highlights |
-| ---: | --- | --- |
-| 8 | Payment Gateway | `/admin/settings/payment` |
-| 9 | Buy Package | `/tenant/billing` method → pay → return + MVP docs |
-| 10 | Billing ledger | `/admin/billing` · `GET /api/platform/billing/orders` |
-| 11 | Receipt ops | `/admin/billing/receipts` · void/reissue · seller branding |
-| 12 | Tax compliance | `/tenant/billing/tax` · `/tenant/billing/documents` |
+| Sprint | Feature | UI / API highlights | Release |
+| ---: | --- | --- | --- |
+| 8 | Payment Gateway | `/admin/settings/payment` | v1.3.0 |
+| 9 | Buy Package | `/tenant/billing` method → pay → return + MVP docs | v1.3.0 |
+| 10 | Billing ledger | `/admin/billing` · `GET /api/platform/billing/orders` | v1.3.0 |
+| 11 | Receipt ops | `/admin/billing/receipts` · void/reissue · seller branding | v1.3.0 |
+| 12 | Tax compliance | `/tenant/billing/tax` · `/tenant/billing/documents` | v1.3.0 |
+
+**v1.3.1** — post-ship hardening: ChillPay OrderNo/CustName, browser return fulfill, OAuth login after KYC, billing package card UI, localStorage session.
 
 Plan: [15-commerce-chain-plan.md](../02-design/15-commerce-chain-plan.md)
 
-## Next sprint: SPRINT-013
+## Current sprint: SPRINT-013 *(next open)*
 
 **Platform:** Platform Admin · **Feature:** Quota, Rate Limit · **Depends:** 3, 4

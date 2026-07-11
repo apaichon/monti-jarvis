@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -70,6 +71,16 @@ func (s *server) tenantOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := strings.TrimRight(s.cfg.PublicBaseURL, "/") + "/tenant"
+
+	// Existing Google/GitHub account → sign in (login page or re-auth after KYC).
+	if pair, ok, err := s.finishOAuthLogin(ctx, identity); err != nil {
+		s.redirectOAuthError(w, r, base, err)
+		return
+	} else if ok {
+		redirectSuccess(w, r, base+"/login", pair)
+		return
+	}
+
 	if payload.CompanyName != "" && payload.Slug != "" {
 		result, user, pair, err := s.finishOAuthRegistration(ctx, identity, payload.CompanyName, payload.Slug)
 		if err != nil {
@@ -81,6 +92,7 @@ func (s *server) tenantOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// New identity without company/slug → collect workspace details.
 	session, err := s.tenantOAuth.CreatePendingSession(ctx, identity)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
@@ -119,6 +131,23 @@ func (s *server) completeTenantOAuth(w http.ResponseWriter, r *http.Request) {
 		Email:          session.Email,
 		DisplayName:    session.DisplayName,
 	}
+	// Race: identity registered while pending session was open → sign in.
+	if pair, ok, err := s.finishOAuthLogin(ctx, identity); err != nil {
+		writeRegisterError(w, err)
+		return
+	} else if ok {
+		s.tenantOAuth.DeletePendingSession(ctx, session.ID)
+		writeJSON(w, http.StatusOK, registerTenantResponse{
+			TenantID:     pair.User.TenantID,
+			Slug:         pair.User.TenantID,
+			AccessToken:  pair.AccessToken,
+			RefreshToken: pair.RefreshToken,
+			ExpiresIn:    pair.ExpiresIn,
+			TokenType:    pair.TokenType,
+			User:         pair.User,
+		})
+		return
+	}
 	result, user, pair, err := s.finishOAuthRegistration(ctx, identity, req.CompanyName, req.Slug)
 	if err != nil {
 		writeRegisterError(w, err)
@@ -136,6 +165,37 @@ func (s *server) completeTenantOAuth(w http.ResponseWriter, r *http.Request) {
 		TokenType:      pair.TokenType,
 		User:           pair.User,
 	})
+}
+
+func (s *server) finishOAuthLogin(ctx context.Context, identity tenantoauth.Identity) (auth.TokenPair, bool, error) {
+	if s.auth == nil || !s.auth.TokensEnabled() {
+		return auth.TokenPair{}, false, auth.ErrNotConfigured
+	}
+	if identity.Provider == "" || identity.ProviderUserID == "" {
+		return auth.TokenPair{}, false, nil
+	}
+	userID, err := s.store.OAuthIdentityUserID(ctx, identity.Provider, identity.ProviderUserID)
+	if err != nil {
+		return auth.TokenPair{}, false, err
+	}
+	if userID == "" {
+		return auth.TokenPair{}, false, nil
+	}
+	user, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		return auth.TokenPair{}, false, err
+	}
+	if user.Status != "active" {
+		return auth.TokenPair{}, false, errOAuthUserInactive
+	}
+	if user.Role != string(auth.RoleTenantAdmin) && user.Role != string(auth.RolePlatformAdmin) {
+		return auth.TokenPair{}, false, errOAuthUserInactive
+	}
+	pair, err := s.auth.IssueTokenPairForUser(ctx, user)
+	if err != nil {
+		return auth.TokenPair{}, false, err
+	}
+	return pair, true, nil
 }
 
 func (s *server) finishOAuthRegistration(ctx context.Context, identity tenantoauth.Identity, companyName, slug string) (*store.RegisterTenantResult, store.AuthUser, auth.TokenPair, error) {
@@ -167,16 +227,26 @@ func (s *server) finishOAuthRegistration(ctx context.Context, identity tenantoau
 	return result, user, pair, nil
 }
 
+var errOAuthUserInactive = errors.New("oauth user inactive")
+
 func redirectSuccess(w http.ResponseWriter, r *http.Request, successPath string, pair auth.TokenPair) {
 	q := url.Values{}
 	q.Set("access_token", pair.AccessToken)
 	q.Set("refresh_token", pair.RefreshToken)
 	q.Set("tenant_id", pair.User.TenantID)
+	q.Set("user_id", pair.User.ID)
+	q.Set("email", pair.User.Email)
+	q.Set("display_name", pair.User.DisplayName)
+	q.Set("role", string(pair.User.Role))
+	if pair.ExpiresIn > 0 {
+		q.Set("expires_in", fmt.Sprintf("%d", pair.ExpiresIn))
+	}
 	http.Redirect(w, r, successPath+"?"+q.Encode(), http.StatusFound)
 }
 
 func (s *server) redirectOAuthError(w http.ResponseWriter, r *http.Request, base string, err error) {
 	msg := "registration failed"
+	dest := base + "/register"
 	switch {
 	case errors.Is(err, store.ErrTenantSlugTaken):
 		msg = "slug already taken"
@@ -184,8 +254,14 @@ func (s *server) redirectOAuthError(w http.ResponseWriter, r *http.Request, base
 		msg = "email already registered"
 	case errors.Is(err, store.ErrOAuthIdentityInUse):
 		msg = "account already linked"
+	case errors.Is(err, errOAuthUserInactive):
+		msg = "account is not active"
+		dest = base + "/login"
+	case errors.Is(err, auth.ErrNotConfigured):
+		msg = "sign-in is not configured"
+		dest = base + "/login"
 	}
-	http.Redirect(w, r, base+"/register?error="+url.QueryEscape(msg), http.StatusFound)
+	http.Redirect(w, r, dest+"?error="+url.QueryEscape(msg), http.StatusFound)
 }
 
 func (s *server) oauthProviders(w http.ResponseWriter, _ *http.Request) {

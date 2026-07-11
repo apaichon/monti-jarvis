@@ -257,6 +257,12 @@ func main() {
 	mux.Handle("GET /api/platform/billing/seller-branding", guard.RequirePlatformAdmin(http.HandlerFunc(s.getSellerBranding)))
 	mux.Handle("PUT /api/platform/billing/seller-branding", guard.RequirePlatformAdmin(http.HandlerFunc(s.putSellerBranding)))
 	mux.HandleFunc("POST /api/callbacks/chillpay", s.chillpayCallback)
+	// Browser return from ChillPay (GET or POST) → fulfill if paid → SPA status page.
+	// Path may include /{orderRef} because ChillPay often strips query strings.
+	mux.HandleFunc("GET /api/callbacks/chillpay/return", s.chillpayBrowserReturn)
+	mux.HandleFunc("POST /api/callbacks/chillpay/return", s.chillpayBrowserReturn)
+	mux.HandleFunc("GET /api/callbacks/chillpay/return/{ref}", s.chillpayBrowserReturn)
+	mux.HandleFunc("POST /api/callbacks/chillpay/return/{ref}", s.chillpayBrowserReturn)
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
 	mux.Handle("GET /api/tenant/orders/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrder)))

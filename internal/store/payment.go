@@ -455,6 +455,10 @@ func (s *Store) SeedPaymentGatewayFromEnv(ctx context.Context) error {
 	if callbackURL == "" {
 		callbackURL = strings.TrimRight(strings.TrimSpace(s.cfg.PublicBaseURL), "/") + "/api/callbacks/chillpay"
 	}
+	returnURL := strings.TrimSpace(s.cfg.ChillPayReturnURL)
+	if returnURL == "" {
+		returnURL = strings.TrimRight(strings.TrimSpace(s.cfg.PublicBaseURL), "/") + "/tenant/billing/return"
+	}
 	_, err = s.UpsertPaymentGatewayConfig(ctx, PaymentGatewayUpsert{
 		Provider:     "chillpay",
 		Mode:         "test",
@@ -466,7 +470,7 @@ func (s *Store) SeedPaymentGatewayFromEnv(ctx context.Context) error {
 		RouteNo:      s.cfg.ChillPayRouteNo,
 		Currency:     s.cfg.ChillPayCurrency,
 		CallbackURL:  callbackURL,
-		ReturnURL:    s.cfg.ChillPayReturnURL,
+		ReturnURL:    returnURL,
 		SetAPIKey:    true,
 		SetMD5Key:    true,
 	})
@@ -477,8 +481,21 @@ func newPaymentOrderID() string {
 	return "ord_" + newStoreID()
 }
 
+// newPaymentOrderNo builds a ChillPay-safe OrderNo.
+// ChillPay Merchant Integration Manual (Table 2.2): OrderNo is max 20 chars,
+// alphanumeric only (A–Z a–z 0–9) — no underscores, hyphens, or other symbols.
+// Format: MJ + 2-char tenant fingerprint + 16-char id = 20 chars.
 func newPaymentOrderNo(tenantID string) string {
-	return fmt.Sprintf("mj_%s_%s", tenantID, newStoreID())
+	id := newStoreID() // 16 hex digits
+	fp := "00"
+	if t := strings.TrimSpace(tenantID); t != "" {
+		var sum uint32
+		for i := 0; i < len(t); i++ {
+			sum = sum*33 + uint32(t[i])
+		}
+		fp = fmt.Sprintf("%02x", sum&0xff)
+	}
+	return "MJ" + fp + id
 }
 
 func (s *Store) CreatePaymentOrder(ctx context.Context, in CreatePaymentOrderInput) (*PaymentOrder, error) {
@@ -642,7 +659,8 @@ func (s *Store) markOrderPaidAndAssignEntitlement(ctx context.Context, order *Pa
 	if err != nil {
 		return false, err
 	}
-	entID := "ent_" + order.TenantID + "_" + order.PackageID
+	// New id each fulfillment so re-buy after revoke does not collide on PK.
+	entID := "ent_" + order.TenantID + "_" + order.PackageID + "_" + newStoreID()
 	txnID := strings.TrimSpace(transactionID)
 
 	tx, err := s.pg.Begin(ctx)
@@ -665,6 +683,7 @@ WHERE id = $1 AND status = 'pending'`, schema), order.ID, actor, txnID)
 		return false, nil
 	}
 
+	// Revoke current active plan, then assign purchased package rules (quota).
 	_, err = tx.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.tenant_entitlements SET status = 'revoked', updated_by = $2
 WHERE tenant_id = $1 AND status = 'active'`, schema), order.TenantID, actor)

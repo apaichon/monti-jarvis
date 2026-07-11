@@ -214,6 +214,8 @@ func writeRegisterError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "email already registered")
 	case errors.Is(err, store.ErrOAuthIdentityInUse):
 		writeError(w, http.StatusConflict, "account already linked")
+	case errors.Is(err, errOAuthUserInactive):
+		writeError(w, http.StatusForbidden, "account is not active")
 	default:
 		writeError(w, http.StatusBadGateway, err.Error())
 	}

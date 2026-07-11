@@ -4,7 +4,11 @@
   import { page } from '$app/stores';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { hasRegistrationSession } from '$lib/auth/session';
+  import {
+    getCheckoutOrderId,
+    getCheckoutOrderNo,
+    hasRegistrationSession
+  } from '$lib/auth/session';
   import { feedback } from '$lib/feedback.svelte';
   import { getPaymentOrder, openDocumentHTML, type PaymentOrder } from '$lib/api/billing';
 
@@ -15,12 +19,24 @@
 
   function orderId(): string {
     const params = get(page).url.searchParams;
-    const fromQuery = params.get('order_id') || params.get('OrderNo') || params.get('order_no');
+    // After ChillPay: server bridge redirects with order_id + order_no (+ status/txn_id).
+    // API accepts either internal id or ChillPay order_no.
+    const fromQuery =
+      params.get('order_id') ||
+      params.get('OrderNo') ||
+      params.get('order_no') ||
+      params.get('orderNo');
     if (fromQuery) return fromQuery;
-    if (typeof sessionStorage !== 'undefined') {
-      return sessionStorage.getItem('monti_checkout_order_id') ?? '';
-    }
-    return '';
+    return getCheckoutOrderId() || getCheckoutOrderNo() || '';
+  }
+
+  function loginNextPath(): string {
+    // Preserve full return query (order_id, order_no, status) across login.
+    const qs = get(page).url.search || '';
+    const id = orderId();
+    if (qs) return `${base}/billing/return${qs}`;
+    if (id) return `${base}/billing/return?order_id=${encodeURIComponent(id)}`;
+    return `${base}/billing/return`;
   }
 
   function formatAmount(cents: number, currency?: string): string {
@@ -61,10 +77,11 @@
 
   onMount(async () => {
     if (!hasRegistrationSession()) {
-      goto(`${base}/login?next=${encodeURIComponent(`${base}/billing/return`)}`);
+      goto(`${base}/login?next=${encodeURIComponent(loginNextPath())}`);
       return;
     }
     await poll();
+    // Poll while pending (callback may lag behind browser return).
     pollTimer = setInterval(poll, 2000);
   });
 

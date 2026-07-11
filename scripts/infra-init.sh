@@ -21,11 +21,19 @@ POSTGRES_URL=${POSTGRES_URL:-postgres://postgres:postgres@localhost:5432/monti_j
 POSTGRES_SCHEMA=${POSTGRES_SCHEMA:-callcenter}
 MINIO_BUCKET=${MINIO_BUCKET:-monti-jarvis}
 
-echo "==> Ensuring shared Postgres (poc-gml-postgres) is reachable..."
-if docker ps --format '{{.Names}}' | grep -qx 'poc-gml-postgres'; then
-  docker exec poc-gml-postgres pg_isready -U postgres -d postgres
+echo "==> Ensuring Postgres is reachable..."
+PG_CONTAINER=""
+for candidate in monti-postgres poc-gml-postgres; do
+  if docker ps --format '{{.Names}}' | grep -qx "$candidate"; then
+    PG_CONTAINER=$candidate
+    break
+  fi
+done
+if [ -n "$PG_CONTAINER" ]; then
+  docker exec "$PG_CONTAINER" pg_isready -U postgres -d postgres
 else
-  echo "note: poc-gml-postgres not running — start shared Postgres or point POSTGRES_URL elsewhere"
+  echo "error: no Postgres container (monti-postgres / poc-gml-postgres) — run 'make infra-up'"
+  exit 1
 fi
 
 echo "==> Ensuring Postgres database monti_jarvis exists..."
@@ -179,9 +187,20 @@ VALUES ('usr_demo_admin', 'tenant_admin', '$DEMO_TENANT_ID')
 ON CONFLICT (user_id, role) DO NOTHING;
 SQL
 
-if docker ps --format '{{.Names}}' | grep -qx 'poc-gml-minio'; then
+MINIO_CONTAINER=""
+for candidate in monti-minio poc-gml-minio; do
+  if docker ps --format '{{.Names}}' | grep -qx "$candidate"; then
+    MINIO_CONTAINER=$candidate
+    break
+  fi
+done
+if [ -n "$MINIO_CONTAINER" ]; then
   echo "==> Ensuring MinIO bucket $MINIO_BUCKET exists..."
-  docker exec poc-gml-minio sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin >/dev/null && mc mb -p local/$MINIO_BUCKET >/dev/null || true"
+  if docker exec "$MINIO_CONTAINER" sh -c 'command -v mc >/dev/null 2>&1'; then
+    docker exec "$MINIO_CONTAINER" sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin >/dev/null && mc mb -p local/$MINIO_BUCKET >/dev/null || true"
+  else
+    echo "note: mc not in $MINIO_CONTAINER — bucket ensured by app/MinIO client on first use"
+  fi
 fi
 
 if docker ps --format '{{.Names}}' | grep -qx 'monti-nats'; then

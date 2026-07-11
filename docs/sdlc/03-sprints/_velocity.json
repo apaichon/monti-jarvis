@@ -98,5 +98,5 @@
     }
   ],
   "average_velocity": 16,
-  "note": "S8–S12 commerce chain closed together at v1.3.0 — gateway, buy package, billing ledger, receipt ops, tax compliance."
+  "note": "S8\u2013S12 commerce chain closed together at v1.3.0 \u2014 gateway, buy package, billing ledger, receipt ops, tax compliance. v1.3.1 post-ship hardening (ChillPay client, return fulfill, OAuth)."
 }

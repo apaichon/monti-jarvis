@@ -48,7 +48,7 @@ Uses SPRINT-008 vars. Additional:
 | `id` | text PK | `ord_` + uuid |
 | `tenant_id` | text FK → `tenants` | |
 | `package_id` | text FK → `packages` | Snapshot target package |
-| `order_no` | text UK | ChillPay `OrderNo`; format `mj_{tenant_id}_{random}` |
+| `order_no` | text UK | ChillPay `OrderNo`; max **20** alphanumeric only (`MJ` + 2-char tenant fingerprint + 16 hex). No `_`/`-` (ChillPay code 1006). |
 | `amount_cents` | int | From `packages.price_cents` at checkout time |
 | `currency` | text | Gateway `currency` (e.g. `764`) |
 | `status` | text | `pending` \| `paid` \| `failed` \| `cancelled` |

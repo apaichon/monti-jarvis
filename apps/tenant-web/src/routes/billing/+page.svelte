@@ -70,13 +70,22 @@
     }
   }
 
-  function ruleLine(summary: Record<string, number | boolean>): string {
+  function ruleLine(summary: Record<string, number | boolean> | undefined): string {
+    if (!summary) return '—';
     const avatars = summary.max_ai_employees;
     const minutes = summary.max_monthly_call_minutes;
     const parts: string[] = [];
     if (typeof avatars === 'number') parts.push(`${avatars} avatars`);
     if (typeof minutes === 'number') parts.push(`${minutes} min/mo`);
     return parts.join(' · ') || '—';
+  }
+
+  /** Avoid showing the same avatar/minutes line twice when description mirrors rules. */
+  function packageBlurb(pkg: PackageSummary): string {
+    const rules = ruleLine(pkg.rules_summary);
+    const desc = (pkg.description || '').trim();
+    if (!desc || desc === rules) return rules;
+    return desc;
   }
 
   function openCheckout(pkg: PackageSummary) {
@@ -95,7 +104,8 @@
     buying = true;
     try {
       const res = await checkoutPackage(checkoutPkg.id, selectedMethod);
-      sessionStorage.setItem('monti_checkout_order_id', res.order_id);
+      const { saveCheckoutOrder } = await import('$lib/auth/session');
+      saveCheckoutOrder(res.order_id, res.order_no);
       window.location.href = res.payment_url;
     } catch (err) {
       feedback.error(err instanceof Error ? err.message : 'Checkout failed');
@@ -141,8 +151,7 @@
           <p style="margin:0 0 8px;color:var(--cyan);font-size:15px">
             {formatPrice(pkg.price_cents, pkg.currency)}
           </p>
-          <p style="margin:0 0 12px;color:var(--muted);font-size:13px">{pkg.description || ruleLine(pkg.rules_summary)}</p>
-          <p style="margin:0 0 16px;font-size:12px;color:var(--muted)">{ruleLine(pkg.rules_summary)}</p>
+          <p style="margin:0 0 16px;color:var(--muted);font-size:13px">{packageBlurb(pkg)}</p>
           {#if current?.package_id === pkg.id}
             <button class="btn ghost" type="button" disabled>Current</button>
           {:else}

@@ -3,22 +3,49 @@ set -eu
 
 echo "Checking shared local infra..."
 
-if docker ps --format '{{.Names}}' | grep -qx 'poc-gml-postgres'; then
-  docker exec poc-gml-postgres pg_isready -U postgres -d postgres
+PG_CONTAINER=""
+for candidate in monti-postgres poc-gml-postgres; do
+  if docker ps --format '{{.Names}}' | grep -qx "$candidate"; then
+    PG_CONTAINER=$candidate
+    break
+  fi
+done
+if [ -n "$PG_CONTAINER" ]; then
+  docker exec "$PG_CONTAINER" pg_isready -U postgres -d postgres
 else
-  echo "postgres container poc-gml-postgres not found"
+  echo "postgres container not found (expected monti-postgres or poc-gml-postgres)"
 fi
 
-if docker ps --format '{{.Names}}' | grep -qx 'poc-gml-redis'; then
-  docker exec poc-gml-redis redis-cli ping
+REDIS_CONTAINER=""
+for candidate in monti-redis poc-gml-redis; do
+  if docker ps --format '{{.Names}}' | grep -qx "$candidate"; then
+    REDIS_CONTAINER=$candidate
+    break
+  fi
+done
+if [ -n "$REDIS_CONTAINER" ]; then
+  docker exec "$REDIS_CONTAINER" redis-cli ping
 else
-  echo "redis container poc-gml-redis not found"
+  echo "redis container not found (expected monti-redis or poc-gml-redis)"
 fi
 
-if docker ps --format '{{.Names}}' | grep -qx 'poc-gml-minio'; then
-  docker exec poc-gml-minio mc ready local
+MINIO_CONTAINER=""
+for candidate in monti-minio poc-gml-minio; do
+  if docker ps --format '{{.Names}}' | grep -qx "$candidate"; then
+    MINIO_CONTAINER=$candidate
+    break
+  fi
+done
+if [ -n "$MINIO_CONTAINER" ]; then
+  if docker exec "$MINIO_CONTAINER" sh -c 'command -v mc >/dev/null 2>&1'; then
+    docker exec "$MINIO_CONTAINER" mc ready local
+  elif curl -fsS http://localhost:9000/minio/health/live >/dev/null 2>&1; then
+    echo "minio ok (localhost:9000)"
+  else
+    echo "minio container $MINIO_CONTAINER found but health check failed"
+  fi
 else
-  echo "minio container poc-gml-minio not found"
+  echo "minio container not found (expected monti-minio or poc-gml-minio)"
 fi
 
 if docker ps --format '{{.Names}}' | grep -Eiq 'monti-nats|^nats$'; then

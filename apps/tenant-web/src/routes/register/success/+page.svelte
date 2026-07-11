@@ -17,13 +17,13 @@
         {
           access_token: access,
           refresh_token: refresh,
-          expires_in: 0,
+          expires_in: Number($page.url.searchParams.get('expires_in') || 0),
           token_type: 'Bearer',
           user: {
-            id: '',
-            email: '',
-            display_name: '',
-            role: 'tenant_admin',
+            id: $page.url.searchParams.get('user_id') || '',
+            email: $page.url.searchParams.get('email') || '',
+            display_name: $page.url.searchParams.get('display_name') || '',
+            role: $page.url.searchParams.get('role') || 'tenant_admin',
             tenant_id: tid ?? undefined
           }
         },

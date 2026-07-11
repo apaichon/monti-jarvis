@@ -57,12 +57,21 @@ fi
 echo "==> Flushing Redis DB for Monti..."
 if command -v redis-cli >/dev/null 2>&1; then
   redis-cli -u "$REDIS_URL" FLUSHDB >/dev/null 2>&1 || echo "warn: could not flush Redis (is Redis up?)"
-elif docker ps --format '{{.Names}}' | grep -qx 'poc-gml-redis'; then
-  DB_INDEX=$(printf '%s' "$REDIS_URL" | sed -n 's|.*/\([0-9][0-9]*\)$|\1|p')
-  DB_INDEX=${DB_INDEX:-4}
-  docker exec poc-gml-redis redis-cli -n "$DB_INDEX" FLUSHDB >/dev/null 2>&1 || echo "warn: could not flush Redis via docker"
 else
-  echo "redis-cli not found — skipping Redis flush"
+  REDIS_CONTAINER=""
+  for candidate in monti-redis poc-gml-redis; do
+    if docker ps --format '{{.Names}}' | grep -qx "$candidate"; then
+      REDIS_CONTAINER=$candidate
+      break
+    fi
+  done
+  if [ -n "$REDIS_CONTAINER" ]; then
+    DB_INDEX=$(printf '%s' "$REDIS_URL" | sed -n 's|.*/\([0-9][0-9]*\)$|\1|p')
+    DB_INDEX=${DB_INDEX:-4}
+    docker exec "$REDIS_CONTAINER" redis-cli -n "$DB_INDEX" FLUSHDB >/dev/null 2>&1 || echo "warn: could not flush Redis via docker"
+  else
+    echo "redis-cli not found — skipping Redis flush"
+  fi
 fi
 
 echo "==> Removing MinIO bucket $MINIO_BUCKET..."

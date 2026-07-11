@@ -1,11 +1,57 @@
-# Monti Jarvis local infra — NATS + LiveKit + ClickHouse (Sprint 1+)
-# Datastores (Postgres/Redis/MinIO) reuse shared poc-gml-* containers when present.
-# ClickHouse uses monti-clickhouse with :8123 published (poc-gml-clickhouse has no host port).
+# Monti Jarvis local infra — datastores + NATS + LiveKit + ClickHouse
+# Also accepts shared poc-chatgpt-* containers if already running on the same ports.
 # Usage: docker compose -f infra/docker-compose.yml up -d
 
 name: monti-jarvis
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: monti-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - monti-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: monti-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - monti-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: monti-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - monti-minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   nats:
     image: nats:2.10-alpine
     container_name: monti-nats
@@ -54,3 +100,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+volumes:
+  monti-pg:
+  monti-redis:
+  monti-minio:
