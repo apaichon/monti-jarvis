@@ -105,3 +105,15 @@ func PerCallLimit(limit, usage int) *Error {
 		cause:     ErrLimitExceeded,
 	}
 }
+
+// PreviewConcurrent soft-cap for S17 tenant preview voice.
+func PreviewConcurrent(limit, usage int) *Error {
+	return &Error{
+		Code:      "preview_concurrent",
+		Dimension: "preview_concurrent",
+		Limit:     limit,
+		Usage:     usage,
+		Message:   fmt.Sprintf("too many concurrent preview voice sessions (%d/%d)", usage, limit),
+		cause:     ErrLimitExceeded,
+	}
+}

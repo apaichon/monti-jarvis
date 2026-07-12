@@ -53,6 +53,7 @@ func (r *Relay) Handler() http.HandlerFunc {
 		agent := workforce.Resolve(req.URL.Query().Get("agent"))
 		topic := strings.TrimSpace(req.URL.Query().Get("topic"))
 		tenantID := strings.TrimSpace(req.URL.Query().Get("tenant_id"))
+		lang := normalizeLang(req.URL.Query().Get("lang"))
 		client, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
 			log.Printf("voice upgrade: %v", err)
@@ -63,6 +64,15 @@ func (r *Relay) Handler() http.HandlerFunc {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 
+		var clientWrite sync.Mutex
+		send := func(msg serverMsg) error {
+			clientWrite.Lock()
+			defer clientWrite.Unlock()
+			return client.WriteJSON(msg)
+		}
+		// Early status so UI can show loading while Gemini connects (often several seconds).
+		_ = send(serverMsg{Type: "status", Message: "Connecting to AI voice…"})
+
 		// Scope voice RAG to the same tenant as chat/embed (query tenant_id).
 		relay := r
 		if tenantID != "" && r.rag != nil {
@@ -70,20 +80,16 @@ func (r *Relay) Handler() http.HandlerFunc {
 			cp.rag = r.rag.WithTenant(tenantID)
 			relay = &cp
 		}
-		gem, err := relay.dial(ctx, agent, topic, tenantID)
+		gem, err := relay.dial(ctx, agent, topic, tenantID, lang, func(msg string) {
+			_ = send(serverMsg{Type: "status", Message: msg})
+		})
 		if err != nil {
 			log.Printf("gemini live dial: %v", err)
-			_ = client.WriteJSON(serverMsg{Type: "error", Message: "Gemini Live connection failed"})
+			_ = send(serverMsg{Type: "error", Message: "Gemini Live connection failed — try again"})
 			return
 		}
 		defer gem.Close()
 
-		var clientWrite sync.Mutex
-		send := func(msg serverMsg) error {
-			clientWrite.Lock()
-			defer clientWrite.Unlock()
-			return client.WriteJSON(msg)
-		}
 		_ = send(serverMsg{
 			Type:      "ready",
 			Model:     normalizeModel(r.cfg.Model),
@@ -91,6 +97,7 @@ func (r *Relay) Handler() http.HandlerFunc {
 			AgentID:   agent.ID,
 			AgentName: agent.Name,
 			StartedAt: time.Now().UnixMilli(),
+			Message:   "Connected — agent is greeting you…",
 		})
 
 		var gemWrite sync.Mutex
@@ -98,6 +105,13 @@ func (r *Relay) Handler() http.HandlerFunc {
 			gemWrite.Lock()
 			defer gemWrite.Unlock()
 			return gem.WriteJSON(value)
+		}
+
+		// Speak first: trigger opening greeting (do not wait for caller).
+		if err := writeGem(openingGreetingContent(agent, lang)); err != nil {
+			log.Printf("voice greeting trigger: %v", err)
+		} else {
+			_ = send(serverMsg{Type: "status", Message: "Agent greeting…"})
 		}
 
 		go func() {
@@ -183,14 +197,21 @@ func (r *Relay) Handler() http.HandlerFunc {
 	}
 }
 
-func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic, tenantID string) (*websocket.Conn, error) {
+func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic, tenantID, lang string, status func(string)) (*websocket.Conn, error) {
 	start := time.Now()
+	if status != nil {
+		status("Preparing agent…")
+	}
 	prompt := workforce.SystemPrompt(agent)
-	if r.LocaleHint != nil && tenantID != "" {
+	// Session language: explicit query lang wins; else tenant settings hint.
+	if instr := languageInstruction(lang); instr != "" {
+		prompt += "\n\n" + instr
+	} else if r.LocaleHint != nil && tenantID != "" {
 		if hint := r.LocaleHint(ctx, tenantID); hint != "" {
 			prompt += "\n\n" + hint
 		}
 	}
+	prompt += "\n\nWhen a call connects, speak first with a short greeting — do not wait for the caller to speak."
 
 	type ragOut struct {
 		result rag.Result
@@ -208,6 +229,9 @@ func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic, tenantID
 		ragCh <- ragOut{result: result, err: err}
 	}()
 
+	if status != nil {
+		status("Opening Gemini Live…")
+	}
 	endpoint := liveURL + "?key=" + url.QueryEscape(r.cfg.APIKey)
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, endpoint, nil)
 	if err != nil {
@@ -225,6 +249,9 @@ func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic, tenantID
 		log.Printf("voice rag preload: timeout after %s (using base prompt)", voiceRAGTimeout)
 	}
 
+	if status != nil {
+		status("Configuring session…")
+	}
 	if err := conn.WriteJSON(r.setupMessage(agent, prompt)); err != nil {
 		_ = conn.Close()
 		return nil, err
@@ -238,8 +265,61 @@ func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic, tenantID
 		_ = conn.Close()
 		return nil, &setupError{Ack: ack}
 	}
-	log.Printf("voice dial agent=%s topic=%s rag+setup=%s", agent.ID, topic, time.Since(start).Round(time.Millisecond))
+	log.Printf("voice dial agent=%s topic=%s lang=%s rag+setup=%s", agent.ID, topic, lang, time.Since(start).Round(time.Millisecond))
 	return conn, nil
+}
+
+func normalizeLang(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	switch v {
+	case "th", "en", "auto":
+		return v
+	default:
+		return ""
+	}
+}
+
+func languageInstruction(lang string) string {
+	switch lang {
+	case "th":
+		return "Speak and reply in Thai (ภาษาไทย) for this call unless the caller clearly switches language. You may use English for brand/product names."
+	case "en":
+		return "Speak and reply in English for this call unless the caller clearly switches language."
+	case "auto":
+		return "Detect the caller's language and reply in that language. You may switch languages if the caller switches. Prefer one language per turn."
+	default:
+		return ""
+	}
+}
+
+// openingGreetingContent asks the model to speak the agent greeting immediately.
+func openingGreetingContent(agent workforce.Agent, lang string) map[string]any {
+	greet := strings.TrimSpace(agent.Greeting)
+	if greet == "" {
+		greet = "Hello, thank you for calling. How can I help you today?"
+	}
+	langHint := ""
+	switch lang {
+	case "th":
+		langHint = " Speak the greeting in Thai."
+		// Prefer a Thai-flavored nudge even if catalog greeting is English.
+		greet = greet + " (Deliver this meaning warmly in Thai.)"
+	case "en":
+		langHint = " Speak the greeting in English."
+	case "auto":
+		langHint = " Prefer Thai if the tenant is Thai-facing; otherwise English. Keep one language."
+	}
+	text := "SYSTEM: The voice call just connected. Speak FIRST now — do not wait for the caller. " +
+		"Deliver a short spoken opening greeting as " + agent.Name + " (" + agent.Role + "). " +
+		"Base it on: «" + greet + "»." + langHint +
+		" One short turn only, then listen."
+	return map[string]any{"clientContent": map[string]any{
+		"turns": []map[string]any{{
+			"role":  "user",
+			"parts": []map[string]any{{"text": text}},
+		}},
+		"turnComplete": true,
+	}}
 }
 
 func (r *Relay) setupMessage(agent workforce.Agent, prompt string) map[string]any {

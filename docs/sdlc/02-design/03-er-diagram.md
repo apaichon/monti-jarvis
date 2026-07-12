@@ -874,4 +874,30 @@ erDiagram
 
 **Redis:** `{prefix}call_daily:{tenant}:{YYYYMMDD}` minutes used (tenant timezone day).
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
+## Sprint 17 — preview sessions
+
+```mermaid
+erDiagram
+  tenants ||--o{ call_sessions : owns
+  call_sessions {
+    text id PK
+    text tenant_id
+    text source "production|preview"
+    text status
+    timestamptz started_at
+    timestamptz ended_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+| Change | Notes |
+| --- | --- |
+| `call_sessions.source` | Default `production`; preview APIs set `preview` |
+| Redis `preview:concurrent:{tenant}` | Soft concurrent voice preview slots |
+
+**No new tables required** if column add on existing `call_sessions` is preferred over separate `preview_sessions`.
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.

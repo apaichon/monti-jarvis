@@ -25,7 +25,7 @@ func writeQuotaError(w http.ResponseWriter, err error) {
 			status = http.StatusForbidden
 		case "no_entitlement":
 			status = http.StatusForbidden
-		case "daily_call_limit", "per_call_limit":
+		case "daily_call_limit", "per_call_limit", "preview_concurrent":
 			status = http.StatusTooManyRequests
 		case "rate_limited":
 			status = http.StatusTooManyRequests
@@ -68,13 +68,22 @@ func (s *server) quotaTenant(r *http.Request) string {
 	return auth.ResolveTenant(r.Context(), hint, s.cfg.AuthDisabled, s.cfg.DemoTenantID)
 }
 
-// voiceWS enforces rate limit, feature flags, concurrent slots, S16 daily/per-call caps, then relays.
+// voiceWS enforces package quotas (rate, concurrent, monthly + S16 daily/per-call), then relays.
 func (s *server) voiceWS(w http.ResponseWriter, r *http.Request) {
-	if s.quota == nil {
-		s.voice.Handler().ServeHTTP(w, r)
+	s.voiceWithPackageQuota(w, r, s.quotaTenant(r))
+}
+
+// voiceWithPackageQuota applies the same package metering as production voice
+// (used by /ws/voice and tenant preview voice — preview also logs source=preview).
+func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, tenantID string) {
+	if s.quota == nil || s.voice == nil {
+		if s.voice != nil {
+			s.voice.Handler().ServeHTTP(w, r)
+		} else {
+			writeError(w, http.StatusServiceUnavailable, "voice not configured")
+		}
 		return
 	}
-	tenantID := s.quotaTenant(r)
 	ctx := r.Context()
 
 	if err := s.quota.AllowRate(ctx, tenantID, quota.BucketVoice); err != nil {

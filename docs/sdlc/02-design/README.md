@@ -24,11 +24,14 @@ System design artifacts for Monti Jarvis.
 | 16 | [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) | 13 | Redis quotas + rate limits + platform usage | **`shipped`** v1.4.0 |
 | 17 | [17-embed-to-web-spec.md](17-embed-to-web-spec.md) | 14 | Tenant web embed widget + public key | **`shipped`** v1.5.0 |
 | 18 | [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) | 15 | Tenant self-service KM + scopes | **`shipped`** v1.6.0 |
-| 19 | [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) | 16 | Settings, locale, call limits | `review_pending` |
+| 19 | [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) | 16 | Settings, locale, call limits | **`shipped`** v1.7.0 |
+| 20 | [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) | 17 | Tenant test/preview sandbox | **`shipped`** v1.8.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
-**Sprint 16 gate:** 🔄 Design pack `review_pending` — [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md); workflow §46–48; API § Settings; UX T9. [SPRINT-016](../03-sprints/SPRINT-016.md). Approve before TASK-0073.
+**Sprint 17:** ✅ Shipped v1.8.0 — [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md); workflow §49–51; API § Preview; UX T10. [SPRINT-017](../03-sprints/SPRINT-017.md).
+
+**Sprint 16:** ✅ Shipped v1.7.0 — [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md); workflow §46–48; API § Settings; UX T9.
 
 **Sprint 15:** ✅ Shipped v1.6.0 — [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md); workflow §40–45; API § Tenant KM; UX T8; `km_gaps`. [SPRINT-015](../03-sprints/SPRINT-015.md).
 

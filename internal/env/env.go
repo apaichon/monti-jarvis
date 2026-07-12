@@ -83,7 +83,9 @@ type Config struct {
 	QuotaConcurrentTTL     time.Duration
 	// Embed (SPRINT-014)
 	EmbedAllowEmptyOrigins bool
-	AppEnv                 string
+	// Preview sandbox (SPRINT-017)
+	PreviewMaxConcurrent int
+	AppEnv               string
 }
 
 func Load() Config {
@@ -172,6 +174,7 @@ func Load() Config {
 		RateLimitVoicePerMin: envInt("RATE_LIMIT_VOICE_PER_MIN", 20),
 		QuotaConcurrentTTL:     envDuration("QUOTA_CONCURRENT_TTL", 2*time.Hour),
 		EmbedAllowEmptyOrigins: envBool("EMBED_ALLOW_EMPTY_ORIGINS", true),
+		PreviewMaxConcurrent:   envInt("PREVIEW_MAX_CONCURRENT", 2),
 		AppEnv:                 appEnv,
 	}
 }

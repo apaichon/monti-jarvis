@@ -20,78 +20,65 @@
 </script>
 
 {#if showShell}
-  <header class="tenant-shell">
-    <div class="tenant-shell-inner">
-      <a class="brand link" href="{base}/billing">
-        <img src="{base}/images/monti-logo.png" alt="Monti" />
-        <span>MONTI TENANT</span>
+  <div class="tenant-app-shell">
+    <aside class="tenant-sidebar">
+      <a class="brand tenant-brand" href="{base}/backoffice">
+        <img src="{base}/images/monti-logo.png" alt="" />
+        <span><strong>MONTI</strong><small>TENANT CONSOLE</small></span>
       </a>
-      <nav class="tenant-nav">
-        <a class="link" href="{base}/backoffice">Backoffice</a>
+      <div class="workspace-switcher"><span class="workspace-avatar">M</span><span><small>Workspace</small><strong>Monti AI</strong></span><b>⌄</b></div>
+      <nav class="tenant-nav" aria-label="Tenant navigation">
+        <a class="nav-link" href="{base}/backoffice" class:active={$page.url.pathname.includes('/backoffice')}><span>⌂</span>Overview</a>
         <a
-          class="link"
+          class="nav-link"
           href="{base}/billing"
           class:active={$page.url.pathname.includes('/billing') &&
             !$page.url.pathname.includes('/documents') &&
-            !$page.url.pathname.includes('/tax')}>Billing</a
+            !$page.url.pathname.includes('/tax')}><span>▣</span>Billing</a
         >
         <a
-          class="link"
+          class="nav-link"
           href="{base}/billing/documents"
-          class:active={$page.url.pathname.includes('/documents')}>Documents</a
+          class:active={$page.url.pathname.includes('/documents')}><span>▤</span>Documents</a
         >
-        <a class="link" href="{base}/billing/tax" class:active={$page.url.pathname.includes('/tax')}
-          >Tax</a
+        <a class="nav-link" href="{base}/billing/tax" class:active={$page.url.pathname.includes('/tax')}
+          ><span>◇</span>Tax</a
         >
         <a
-          class="link"
+          class="nav-link"
           href="{base}/embed"
-          class:active={$page.url.pathname.includes('/embed')}>Embed</a
+          class:active={$page.url.pathname.includes('/embed')}><span>⌘</span>Embed</a
         >
         <a
-          class="link"
+          class="nav-link"
           href="{base}/km"
-          class:active={$page.url.pathname.includes('/km')}>Knowledge</a
+          class:active={$page.url.pathname.includes('/km')}><span>◫</span>Knowledge</a
         >
         <a
-          class="link"
+          class="nav-link"
           href="{base}/settings"
-          class:active={$page.url.pathname.includes('/settings')}>Settings</a
+          class:active={$page.url.pathname.includes('/settings')}><span>⚙</span>Settings</a
         >
-        <a class="link" href="{base}/login">Profile</a>
+        <a
+          class="nav-link"
+          href="{base}/preview"
+          class:active={$page.url.pathname.includes('/preview')}><span>◉</span>Preview <em>LIVE</em></a
+        >
       </nav>
-      <button class="btn ghost" type="button" onclick={logout}>Logout</button>
-    </div>
-  </header>
+      <div class="tenant-sidebar-foot">
+        <div class="plan-card"><small>CURRENT PLAN</small><strong>Enterprise</strong><span><i></i></span><small>68% monthly allowance</small></div>
+        <button class="account-button" type="button" onclick={logout}><span class="workspace-avatar">AD</span><span><strong>Admin</strong><small>Sign out</small></span><b>↗</b></button>
+      </div>
+    </aside>
+    <section class="tenant-workspace">
+      <header class="tenant-topbar">
+        <div><span class="status-dot"></span> All systems operational</div>
+        <div class="topbar-actions"><button aria-label="Search">⌕</button><button aria-label="Notifications">♢</button><a href="{base}/login" aria-label="Profile">AD</a></div>
+      </header>
+      <main class="tenant-main">{@render children()}</main>
+    </section>
+  </div>
+{:else}
+  {@render children()}
 {/if}
-
-{@render children()}
 <FeedbackDialog />
-
-<style>
-  .tenant-shell {
-    border-bottom: 1px solid var(--line);
-    background: rgb(8 14 28 / 92%);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  .tenant-shell-inner {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 12px 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .tenant-nav {
-    display: flex;
-    gap: 16px;
-    flex: 1;
-    font-size: 14px;
-  }
-  .tenant-nav a.active {
-    color: var(--cyan);
-  }
-</style>

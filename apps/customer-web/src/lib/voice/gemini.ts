@@ -19,6 +19,8 @@ export type TranscriptMeta = {
 
 export type VoiceCallbacks = {
   onLive?: (live: boolean) => void;
+  /** Progress while connecting (mic, Gemini setup) — show loading UI. */
+  onStatus?: (message: string) => void;
   /** Live caption updates — `text` is the full turn so far (not a short fragment). */
   onTranscript?: (role: 'caller' | 'agent', text: string, meta?: TranscriptMeta) => void;
   onError?: (message: string) => void;
@@ -65,16 +67,17 @@ export class GeminiVoice {
     agentId: string,
     topic: string,
     callbacks: VoiceCallbacks,
-    opts?: { tenantId?: string; preferredLang?: PreferredLang }
+    opts?: { tenantId?: string; preferredLang?: PreferredLang; lang?: PreferredLang | 'auto' }
   ) {
     const blocked = micAvailabilityError();
     if (blocked) throw new Error(blocked);
 
-    this.preferredLang = opts?.preferredLang || '';
+    this.preferredLang = opts?.preferredLang || (opts?.lang === 'th' || opts?.lang === 'en' ? opts.lang : '');
     this.callerBuf = '';
     this.agentBuf = '';
     this.agentFromTranscript = false;
 
+    callbacks.onStatus?.('Requesting microphone…');
     // Create and resume audio while the Start call click still carries user activation.
     // Waiting for getUserMedia first can leave the playback context suspended in embeds.
     this.captureCtx = new AudioContext({ sampleRate: 16000 });
@@ -106,6 +109,7 @@ export class GeminiVoice {
       await this.cleanup();
       throw new Error(msg);
     }
+    callbacks.onStatus?.('Loading audio…');
     await Promise.all([
       this.captureCtx.audioWorklet.addModule('/recorder.js'),
       this.playbackCtx.audioWorklet.addModule('/player.js')
@@ -116,17 +120,21 @@ export class GeminiVoice {
     this.source.connect(this.recorder);
     this.player.connect(this.playbackCtx.destination);
 
+    callbacks.onStatus?.('Connecting to agent (may take a few seconds)…');
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
     const params = new URLSearchParams({ agent: agentId, topic: topic || 'general' });
     if (opts?.tenantId) params.set('tenant_id', opts.tenantId);
+    const lang = opts?.lang || opts?.preferredLang;
+    if (lang) params.set('lang', lang);
     this.ws = new WebSocket(`${scheme}://${location.host}/ws/voice?${params}`);
 
     let ready = false;
     await new Promise<void>((resolve, reject) => {
       if (!this.ws) return reject(new Error('WebSocket failed'));
+      // Gemini Live setup + RAG can exceed 10s; keep UI status updates alive.
       const timeout = window.setTimeout(
-        () => reject(new Error('Voice connection timed out')),
-        15000
+        () => reject(new Error('Voice connection timed out (AI setup took too long). Try again.')),
+        45000
       );
       const fail = (message: string) => {
         window.clearTimeout(timeout);
@@ -138,9 +146,14 @@ export class GeminiVoice {
       });
       this.ws.addEventListener('message', (event) => {
         const msg: VoiceMsg = JSON.parse(event.data as string);
+        if (msg.type === 'status' && msg.message) {
+          callbacks.onStatus?.(msg.message);
+          return;
+        }
         if (msg.type === 'ready') {
           ready = true;
           window.clearTimeout(timeout);
+          callbacks.onStatus?.(msg.message || 'Connected — agent is greeting you…');
           callbacks.onLive?.(true);
           resolve();
           return;
@@ -197,6 +210,10 @@ export class GeminiVoice {
 
   private handleMessage(raw: string, callbacks: VoiceCallbacks) {
     const msg: VoiceMsg = JSON.parse(raw);
+    if (msg.type === 'status' && msg.message) {
+      callbacks.onStatus?.(msg.message);
+      return;
+    }
     if (msg.type === 'audio' && msg.data && this.player && this.playbackCtx) {
       const samples = base64PCM16ToFloat(msg.data);
       if (this.playbackCtx.state === 'suspended') {

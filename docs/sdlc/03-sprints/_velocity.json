@@ -127,6 +127,14 @@
       "velocity": 16,
       "closed": "2026-07-12",
       "release": "v1.7.0"
+    },
+    {
+      "id": "SPRINT-017",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-12",
+      "release": "v1.8.0"
     }
   ],
   "average_velocity": 16,

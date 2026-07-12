@@ -315,6 +315,11 @@ func main() {
 	mux.Handle("GET /api/tenant/call-limits", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCallLimits)))
 	mux.Handle("PUT /api/tenant/call-limits", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantCallLimits)))
 
+	// SPRINT-017 — tenant test / preview sandbox
+	mux.Handle("GET /api/tenant/preview/scenarios", guard.RequireTenantAdminActive(http.HandlerFunc(s.listPreviewScenarios)))
+	mux.Handle("POST /api/tenant/preview/chat", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantPreviewChat)))
+	mux.HandleFunc("GET /ws/tenant/preview/voice", s.tenantPreviewVoiceWS)
+
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
 	mux.Handle("GET /api/tenant/orders/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrder)))

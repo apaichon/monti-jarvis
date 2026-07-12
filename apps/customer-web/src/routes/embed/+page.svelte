@@ -171,10 +171,13 @@
     error = '';
     busy = true;
     transcriptKeys.clear();
-    voiceState = 'Connecting to agent…';
+    voiceState = 'Connecting…';
     try {
       const topic = agentTopic(selected.id);
       const gemini = new GeminiVoice();
+      if (selected.greeting) {
+        upsertVoiceTurn('agent', selected.greeting);
+      }
       const [created] = await Promise.all([
         createCall({ tenantId }),
         gemini.start(
@@ -183,9 +186,14 @@
           {
             onLive: (v) => {
               live = v;
-              voiceState = v
-                ? `On call with ${selected?.name}. Speak to ask about products or support.`
-                : `Ready to call ${selected?.name}.`;
+              if (v) {
+                voiceState = `On call with ${selected?.name} — listen for the greeting…`;
+              } else {
+                voiceState = `Ready to call ${selected?.name}.`;
+              }
+            },
+            onStatus: (message) => {
+              voiceState = message;
             },
             onTranscript: (role, text, meta) => {
               upsertVoiceTurn(role, text);
@@ -196,7 +204,7 @@
               voiceState = message;
             }
           },
-          { tenantId }
+          { tenantId, lang: 'auto' }
         )
       ]);
       session = created;
@@ -209,7 +217,9 @@
       voice = gemini;
       live = true;
       startTimer();
-      voiceState = `On call with ${selected.name}.`;
+      if (!voiceState.includes('greeting') && !voiceState.includes('Connected')) {
+        voiceState = `On call with ${selected.name} — agent greets first.`;
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Call failed';
       await cleanup(false);
@@ -453,10 +463,14 @@
           onclick={toggleCall}
           title={micBlocked || undefined}
         >
-          {live ? 'End call' : 'Start call'}
+          {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
         </button>
       </div>
-      <div class="voice-state">{voiceState}</div>
+      {#if busy && !live}
+        <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
+      {:else}
+        <div class="voice-state">{voiceState}</div>
+      {/if}
     </section>
 
     <div class="msgs" bind:this={chatEl} aria-live="polite">

@@ -40,9 +40,9 @@
 | 14 | Tenant | Embed to Web (vanilla loader + iframe) | D | 1, 6 ✅ v1.5.0 |
 | 15 | Tenant | Set Scope and KM | D | 2, 6 ✅ v1.6.0 |
 | 16 | Tenant | Settings, Locale, Limit user tier, group, Quota for customer call time per day, call minute per each call | D | 13, 15 ✅ v1.7.0 |
-| 17 | Tenant | Test and Preview | D | 15, 16 |
+| 17 | Tenant | Test and Preview | D | 15, 16 ✅ v1.8.0 |
 | 18 | Tenant | Customer Tier | D | 16 |
-| 19 | Tenant | Customer Account Import, Integration | E | 3 |
+| 19 | Tenant | Customer Account Import, Domain Rules, Integration | E | 3 |
 | 20 | Customer | Auth | E | 19 |
 | 21 | Customer | Select AI Workforce to Conversation | A | 1, 5 |
 | 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt and not), Knowledge Gap | F | 1, 3 |
@@ -228,9 +228,27 @@ Sprint: [SPRINT-016.md](../03-sprints/SPRINT-016.md) · Feature: [FEAT-0016](../
 
 Do **not** open customer production traffic until this gate is signed off (DevOps + Tester).
 
-## Next sprint: SPRINT-017
+## Shipped: SPRINT-017 — Test and Preview — v1.8.0
 
-**Platform:** Tenant · **Feature:** Test and Preview · **Depends:** 15, 16
+**Closed 2026-07-12.** Tenant preview desk (embed-like avatar UI), package-charged chat/voice, scenarios, greeting-first voice + language picker, connecting status UX.
+
+| Task | Points | Outcome |
+| --- | ---: | --- |
+| TASK-0077 | 3 | Preview session `source` + schema |
+| TASK-0078 | 5 | Preview chat/voice APIs (package quotas apply) |
+| TASK-0079 | 4 | `/tenant/preview` embed-like UI |
+| TASK-0080 | 3 | Scenarios, embed link, lang/voice UX |
+| TASK-0081 | 1 | Manual UAT |
+
+Sprint: [SPRINT-017.md](../03-sprints/SPRINT-017.md) · Feature: [FEAT-0019](../01-features/FEAT-0019-tenant-test-preview.md) · Spec: [20-tenant-test-preview-spec.md](../02-design/20-tenant-test-preview-spec.md) · UAT: [SPRINT-017-manual.md](../06-manual-tests/SPRINT-017-manual.md) · Screens: [screenshots/s17](../../screenshots/s17/README.md)
+
+### Production launch gate (still open)
+
+Before **customer production** after tenant **customer-user auth** (S19–20): verify **rate limit + package quota** under multi-user load.
+
+## Next sprint: SPRINT-018
+
+**Platform:** Tenant · **Feature:** Customer Tier · **Depends:** 16
 
 ## Backlog add: SPRINT-036 — Embed Framework SDKs
 

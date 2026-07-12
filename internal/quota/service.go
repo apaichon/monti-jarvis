@@ -26,18 +26,19 @@ type UsageStore interface {
 
 // Service enforces package quotas and API rate limits (SPRINT-013).
 type Service struct {
-	ents           EntitlementReader
-	store          UsageStore
-	rdb            *redis.Client
-	prefix         string
-	enabled        bool
-	rateEnabled    bool
-	failOpen       bool
-	chatPerMin     int
-	kmPerMin       int
-	voicePerMin    int
-	concurrentTTL  time.Duration
-	now            func() time.Time // injectable for tests
+	ents               EntitlementReader
+	store              UsageStore
+	rdb                *redis.Client
+	prefix             string
+	enabled            bool
+	rateEnabled        bool
+	failOpen           bool
+	chatPerMin         int
+	kmPerMin           int
+	voicePerMin        int
+	concurrentTTL      time.Duration
+	previewMaxConcurrent int
+	now                func() time.Time // injectable for tests
 }
 
 // New builds a quota service from app config + store + entitlements.
@@ -75,19 +76,24 @@ func NewWithDeps(ents EntitlementReader, us UsageStore, rdb *redis.Client, cfg e
 	if ttl <= 0 {
 		ttl = 2 * time.Hour
 	}
+	previewMax := cfg.PreviewMaxConcurrent
+	if previewMax <= 0 {
+		previewMax = 2
+	}
 	return &Service{
-		ents:          ents,
-		store:         us,
-		rdb:           rdb,
-		prefix:        prefix,
-		enabled:       cfg.QuotaEnabled && rdb != nil,
-		rateEnabled:   cfg.RateLimitEnabled && rdb != nil,
-		failOpen:      cfg.QuotaFailOpen,
-		chatPerMin:    chat,
-		kmPerMin:      km,
-		voicePerMin:   voice,
-		concurrentTTL: ttl,
-		now:           time.Now,
+		ents:                 ents,
+		store:                us,
+		rdb:                  rdb,
+		prefix:               prefix,
+		enabled:              cfg.QuotaEnabled && rdb != nil,
+		rateEnabled:          cfg.RateLimitEnabled && rdb != nil,
+		failOpen:             cfg.QuotaFailOpen,
+		chatPerMin:           chat,
+		kmPerMin:             km,
+		voicePerMin:          voice,
+		concurrentTTL:        ttl,
+		previewMaxConcurrent: previewMax,
+		now:                  time.Now,
 	}
 }
 
@@ -402,6 +408,53 @@ func (s *Service) AddDailyCallMinutes(ctx context.Context, tenantID, timezone st
 		_ = s.rdb.Expire(ctx, key, 48*time.Hour).Err()
 	}
 	return nil
+}
+
+func (s *Service) previewConcurrentKey(tenantID string) string {
+	return s.prefix + "preview:concurrent:" + tenantID
+}
+
+// AcquirePreviewConcurrent soft-caps concurrent tenant-admin preview voice sessions.
+// Does not use package concurrent slots. Caller must release.
+func (s *Service) AcquirePreviewConcurrent(ctx context.Context, tenantID string) (release func(), err error) {
+	noop := func() {}
+	if s == nil || tenantID == "" {
+		return noop, nil
+	}
+	// When Redis unavailable, allow (fail-open for preview) unless rate system requires redis.
+	if s.rdb == nil {
+		return noop, nil
+	}
+	max := s.previewMaxConcurrent
+	if max <= 0 {
+		max = 2
+	}
+	key := s.previewConcurrentKey(tenantID)
+	n, err := s.rdb.Incr(ctx, key).Result()
+	if err != nil {
+		if e := s.onRedisErr("AcquirePreviewConcurrent", err); e != nil {
+			return noop, e
+		}
+		return noop, nil
+	}
+	_ = s.rdb.Expire(ctx, key, time.Hour).Err()
+	if int(n) > max {
+		_, _ = s.rdb.Decr(ctx, key).Result()
+		return noop, PreviewConcurrent(max, int(n)-1)
+	}
+	released := false
+	return func() {
+		if released || s.rdb == nil {
+			return
+		}
+		released = true
+		rctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		v, err := s.rdb.Decr(rctx, key).Result()
+		if err == nil && v < 0 {
+			_ = s.rdb.Set(rctx, key, 0, time.Hour).Err()
+		}
+	}, nil
 }
 
 // Check is a generic dimension check (convenience for callers).

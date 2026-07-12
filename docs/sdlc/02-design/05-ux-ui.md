@@ -1540,4 +1540,63 @@ Upload a Markdown FAQ (scope general) to ground answers.
 | Settings page | `apps/tenant-web/src/routes/settings/+page.svelte` |
 | API client | `apps/tenant-web/src/lib/api/settings.ts` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+## Sprint 17 — Tenant Preview (T10)
+
+### Screen map → API
+
+| Zone | Action | API |
+| --- | --- | --- |
+| A0 | Nav Preview | — |
+| B1 | Select agent / topic | — |
+| C1 | Send message | `POST /api/tenant/preview/chat` |
+| D1 | Start / end voice | `WS /ws/tenant/preview/voice` |
+| E1 | Suggested question chip | fills input |
+| F1 | Open embed preview | `GET /api/tenant/embed` → open `/embed?key=` |
+
+### T10 ASCII
+
+```
+┌─ Tenant shell … Settings [Preview] ─────────────────────────┐
+│ Preview desk                                                 │
+│ ┌ banner ─────────────────────────────────────────────────┐ │
+│ │ ⚠ Preview mode — does not use package call minutes      │ │
+│ │    Rate limits still apply.                             │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ Agent [Ava ▾]  Topic [General ▾]   [Start voice] [Hang up] │
+│ Suggested: [Greeting] [Billing FAQ] [Tech reset]           │
+│ ┌ chat ───────────────────────────────────────────────────┐ │
+│ │ Ava: …                                                  │ │
+│ │ You: …                                                  │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ [ message input ________________________ ] [Send]          │
+│ [ Open embed preview ]  or  Enable embed → /tenant/embed   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Validate KM
+
+```
+Pick agent Luna + topic technical
+→ chip "How do I reset my password?"
+→ Send
+→ reply + sources from tenant KM
+```
+
+### Flow B — Minutes not consumed
+
+```
+Note Redis monthly minutes
+→ Start voice preview ~1 min
+→ Hang up
+→ monthly + daily counters unchanged
+```
+
+### Components → files
+
+| UI | Path |
+| --- | --- |
+| Preview page | `apps/tenant-web/src/routes/preview/+page.svelte` |
+| API client | `apps/tenant-web/src/lib/api/preview.ts` |
+| Nav | `apps/tenant-web/src/routes/+layout.svelte` |
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

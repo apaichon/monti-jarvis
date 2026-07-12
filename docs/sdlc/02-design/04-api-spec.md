@@ -1414,4 +1414,24 @@ Auth: **Bearer** `tenant_admin` + active. Tenant id from JWT only.
 | 401/403 | not tenant_admin / inactive |
 | 403 | `daily_call_limit` / `per_call_limit` on voice |
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+## Tenant Test & Preview (Sprint 17)
+
+Auth: **Bearer** `tenant_admin` + active. Tenant id from JWT only.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/tenant/preview/chat` | Preview text chat (RAG + locale; **no** minute quota) |
+| `GET` | `/ws/tenant/preview/voice` | Preview voice WS (**no** minute quota; rate limit + concurrent cap) |
+
+**Policy:** rate limits apply; package monthly minutes and S16 daily/per-call **do not** apply. Soft concurrent preview cap (env `PREVIEW_MAX_CONCURRENT`, default 2).
+
+**POST body:** same as public chat (`agent_id`, `topic`, `message`, `history`, optional `session_id`).
+
+**200 response:** public chat shape + `"mode": "preview"`.
+
+| HTTP | code |
+| ---: | --- |
+| 401/403 | not tenant_admin / inactive |
+| 429 | `rate_limited` / `preview_concurrent` |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

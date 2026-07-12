@@ -171,26 +171,42 @@
     error = '';
     busy = true;
     transcriptKeys.clear();
-    voiceState = 'Connecting to agent...';
+    voiceState = 'Connecting…';
     try {
       const gemini = new GeminiVoice();
+      // Show greeting text immediately while audio path connects.
+      if (selectedAgent.greeting) {
+        upsertVoiceTurn('agent', selectedAgent.greeting);
+      }
       const [created] = await Promise.all([
         createCall(),
-        gemini.start(selectedAgent.id, topic, {
-          onLive: (v) => {
-            live = v;
-            voiceState = v ? `On call with ${selectedAgent?.name}.` : `Ready to call ${selectedAgent?.name}.`;
+        gemini.start(
+          selectedAgent.id,
+          topic,
+          {
+            onLive: (v) => {
+              live = v;
+              if (v) {
+                voiceState = `On call with ${selectedAgent?.name} — listen for the greeting…`;
+              } else {
+                voiceState = `Ready to call ${selectedAgent?.name}.`;
+              }
+            },
+            onStatus: (message) => {
+              voiceState = message;
+            },
+            onTranscript: (role, text, meta) => {
+              // Live caption grows as partial ASR chunks merge into full sentences.
+              upsertVoiceTurn(role, text);
+              // Persist only finalized turns (not every short partial fragment).
+              if (meta?.final && session) void persistTurn(session.id, role, text);
+            },
+            onError: (message) => {
+              error = message;
+            }
           },
-          onTranscript: (role, text, meta) => {
-            // Live caption grows as partial ASR chunks merge into full sentences.
-            upsertVoiceTurn(role, text);
-            // Persist only finalized turns (not every short partial fragment).
-            if (meta?.final && session) void persistTurn(session.id, role, text);
-          },
-          onError: (message) => {
-            error = message;
-          }
-        })
+          { lang: 'auto' }
+        )
       ]);
 
       session = created;
@@ -202,7 +218,9 @@
       voice = gemini;
       live = true;
       startTimer();
-      voiceState = `On call with ${selectedAgent.name}.`;
+      if (!voiceState.startsWith('On call')) {
+        voiceState = `On call with ${selectedAgent.name} — agent greets first.`;
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Call failed';
       await cleanup(false);
@@ -335,10 +353,14 @@
           disabled={busy}
           onclick={toggleCall}
         >
-          {live ? 'End call' : 'Start call'}
+          {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
         </button>
       </div>
-      <div class="voice-state">{voiceState}</div>
+      {#if busy && !live}
+        <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
+      {:else}
+        <div class="voice-state">{voiceState}</div>
+      {/if}
     </section>
 
     <section class="assistants" aria-label="Choose AI agent">

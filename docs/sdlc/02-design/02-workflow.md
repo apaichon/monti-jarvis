@@ -1232,4 +1232,60 @@ sequenceDiagram
   end
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 49. Tenant preview chat (Sprint 17)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant Auth as RequireTenantAdminActive
+  participant Q as internal/quota
+  participant RAG as internal/rag
+  participant AI as Gemini
+
+  A->>G: POST /api/tenant/preview/chat
+  G->>Auth: JWT tenant_admin + active
+  G->>Q: AllowRate(chat) only
+  Note over G,Q: Skip monthly minutes check / AddCallMinutes
+  G->>RAG: WithTenant(jwt.tenant_id).Retrieve
+  G->>AI: Reply + locale hint
+  G-->>A: reply + sources + mode=preview
+```
+
+## 50. Tenant preview voice (Sprint 17)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant R as Redis
+  participant Live as Gemini Live
+
+  A->>G: WS preview voice
+  G->>Q: AllowRate(voice)
+  G->>R: INCR preview:concurrent:{tenant}
+  alt concurrent > PREVIEW_MAX
+    G-->>A: 429 preview_concurrent
+  else ok
+    G->>Live: relay (tenant RAG + locale)
+    Note over G: No daily/monthly minute accounting
+    G->>R: DECR concurrent on close
+  end
+```
+
+## 51. Preview vs production quota (Sprint 17)
+
+```mermaid
+flowchart LR
+  subgraph production
+    P1[embed / customer chat-voice] --> Q1[S13 rate + package minutes]
+    Q1 --> Q2[S16 daily/per-call]
+  end
+  subgraph preview
+    V1[tenant /preview] --> R1[S13 rate only]
+    R1 --> R2[preview concurrent soft cap]
+  end
+```
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

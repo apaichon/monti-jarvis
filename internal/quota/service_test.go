@@ -311,3 +311,33 @@ func TestDayKeyTimezone(t *testing.T) {
 		t.Fatalf("utc day %s", got)
 	}
 }
+
+func TestAcquirePreviewConcurrent(t *testing.T) {
+	svc, _ := testSvc(t, starterRules(), nil)
+	svc.previewMaxConcurrent = 2
+	ctx := context.Background()
+
+	r1, err := svc.AcquirePreviewConcurrent(ctx, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2, err := svc.AcquirePreviewConcurrent(ctx, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.AcquirePreviewConcurrent(ctx, "demo")
+	if !errors.Is(err, ErrLimitExceeded) {
+		t.Fatalf("third: %v", err)
+	}
+	var qe *Error
+	if !errors.As(err, &qe) || qe.Code != "preview_concurrent" {
+		t.Fatalf("code %#v", err)
+	}
+	r1()
+	r3, err := svc.AcquirePreviewConcurrent(ctx, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2()
+	r3()
+}

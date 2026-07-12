@@ -87,6 +87,12 @@ export function getAccessToken(): string | null {
   return read(ACCESS_KEY);
 }
 
+/** Write access token only (e.g. bootstrap preview voice on localhost from *.local). */
+export function setAccessToken(token: string) {
+  if (!browser || !token) return;
+  write(ACCESS_KEY, token);
+}
+
 export function getRefreshToken(): string | null {
   return read(REFRESH_KEY);
 }
