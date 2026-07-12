@@ -105,6 +105,7 @@ make up
 | `RATE_LIMIT_CHAT_PER_MIN` | No | `60` per tenant (UTC minute window) |
 | `RATE_LIMIT_KM_PER_MIN` | No | `30` |
 | `RATE_LIMIT_VOICE_PER_MIN` | No | `20` |
+| `EMBED_ALLOW_EMPTY_ORIGINS` | No | `true` — empty tenant allowlist accepts any Origin (dev) |
 
 **Quota Redis keys** (prefix `REDIS_PREFIX`, default `monti_jarvis:`):
 
@@ -117,6 +118,14 @@ make up
 KM document and AI-employee usage are counted from Postgres (not Redis). Month TZ is fixed **UTC** (no `QUOTA_MONTH_TZ`). No `quota_usage_events` table in MVP.
 
 See `infra/.env.dev.example` for the full list.
+
+## Web embed integration (Sprint 14)
+
+Tenant copy-paste widget: script + iframe. Full guide for integrators:
+
+→ **[docs/EMBED_WEB_INTEGRATION.md](../../EMBED_WEB_INTEGRATION.md)**
+
+Local fixture: `docs/fixtures/embed-demo.html` · Tenant UI: `/tenant/embed`
 
 ## Auth (Sprint 3)
 

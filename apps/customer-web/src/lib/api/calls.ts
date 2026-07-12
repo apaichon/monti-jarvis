@@ -23,17 +23,28 @@ export type CallTurn = {
 
 const API = '';
 
-export async function createCall(): Promise<CallSession> {
-  const res = await fetch(`${API}/api/calls`, { method: 'POST' });
+function tenantHeaders(tenantId?: string, json = false): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (json) headers['content-type'] = 'application/json';
+  if (tenantId) headers['X-Tenant-Id'] = tenantId;
+  return headers;
+}
+
+export async function createCall(opts?: { tenantId?: string }): Promise<CallSession> {
+  const res = await fetch(`${API}/api/calls`, {
+    method: 'POST',
+    headers: tenantHeaders(opts?.tenantId, true),
+    body: '{}'
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to create call');
   return data;
 }
 
-export async function issueToken(callId: string): Promise<CallToken> {
+export async function issueToken(callId: string, opts?: { tenantId?: string }): Promise<CallToken> {
   const res = await fetch(`${API}/api/calls/${callId}/token`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: tenantHeaders(opts?.tenantId, true),
     body: JSON.stringify({})
   });
   const data = await res.json();
@@ -41,32 +52,47 @@ export async function issueToken(callId: string): Promise<CallToken> {
   return data;
 }
 
-export async function endCall(callId: string): Promise<CallSession> {
-  const res = await fetch(`${API}/api/calls/${callId}/end`, { method: 'POST' });
+export async function endCall(callId: string, opts?: { tenantId?: string }): Promise<CallSession> {
+  const res = await fetch(`${API}/api/calls/${callId}/end`, {
+    method: 'POST',
+    headers: tenantHeaders(opts?.tenantId)
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to end call');
   return data;
 }
 
-export async function listTurns(callId: string): Promise<CallTurn[]> {
-  const res = await fetch(`${API}/api/calls/${callId}/turns`);
+export async function listTurns(callId: string, opts?: { tenantId?: string }): Promise<CallTurn[]> {
+  const res = await fetch(`${API}/api/calls/${callId}/turns`, {
+    headers: tenantHeaders(opts?.tenantId)
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to load transcript');
   return data.turns ?? [];
 }
 
-export async function addTurn(callId: string, role: string, content: string): Promise<void> {
+export async function addTurn(
+  callId: string,
+  role: string,
+  content: string,
+  opts?: { tenantId?: string }
+): Promise<void> {
   const res = await fetch(`${API}/api/calls/${callId}/turns`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: tenantHeaders(opts?.tenantId, true),
     body: JSON.stringify({ role, content })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to add transcript turn');
 }
 
-export function subscribeTurns(callId: string, onTurn: (turn: CallTurn) => void): () => void {
-  const source = new EventSource(`${API}/api/calls/${callId}/events`);
+export function subscribeTurns(
+  callId: string,
+  onTurn: (turn: CallTurn) => void,
+  opts?: { tenantId?: string }
+): () => void {
+  const qs = opts?.tenantId ? `?tenant_id=${encodeURIComponent(opts.tenantId)}` : '';
+  const source = new EventSource(`${API}/api/calls/${callId}/events${qs}`);
   source.addEventListener('turn', (event) => {
     onTurn(JSON.parse(event.data));
   });

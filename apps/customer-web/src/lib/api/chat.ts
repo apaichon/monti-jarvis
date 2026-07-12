@@ -19,19 +19,24 @@ export type ChatResponse = {
   error?: string;
 };
 
-export async function sendChat(payload: {
-  session_id: string;
-  agent_id: string;
-  topic: string;
-  message: string;
-  history: ChatMessage[];
-}): Promise<ChatResponse> {
+export async function sendChat(
+  payload: {
+    session_id: string;
+    agent_id: string;
+    topic: string;
+    message: string;
+    history: ChatMessage[];
+  },
+  opts?: { tenantId?: string }
+): Promise<ChatResponse> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify(payload)
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Chat failed');
+  if (!res.ok) throw new Error(data.error || data.message || 'Chat failed');
   return data;
 }

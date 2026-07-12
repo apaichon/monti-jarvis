@@ -2,7 +2,7 @@
 id: TEST-MATRIX
 status: active
 updated: 2026-07-11
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013]
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -80,6 +80,20 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | T13-11 | — | `/api/infra` quota + rate_limit | Manual / Smoke | [§1](../06-manual-tests/SPRINT-013-manual.md#1-init-infrastructure) |
 | T13-12 | — | Avatar assign over `max_ai_employees` | Manual | [S6](../06-manual-tests/SPRINT-013-manual.md#s6--avatar-assign-cap-task-0059--feat-ac) |
 | T13-13 | — | Regression login / packages / customer chat | Manual | [S8](../06-manual-tests/SPRINT-013-manual.md#s8--regression-must) |
+
+## FEAT-0014 — Embed to Web (SPRINT-014)
+
+| ID | AC | Scenario | Type | Test / Command |
+| --- | ---: | --- | --- | --- |
+| T14-01 | 1 | Tenant enables embed + copies snippet | Manual | [S1](../06-manual-tests/SPRINT-014-manual.md#s1--tenant-enable-embed--lazy-config-task-0065--feat-ac-1-6) |
+| T14-02 | 2 | Unknown/disabled key → 404 | Manual + Auto | [S2](../06-manual-tests/SPRINT-014-manual.md#s2--public-resolve-api-task-0063--feat-ac-2) · `TestWriteEmbedError_*` |
+| T14-03 | 3 | Origin allowlist deny | Manual + Auto | [S3](../06-manual-tests/SPRINT-014-manual.md#s3--origin-allowlist-deny-task-0063--feat-ac-3) · `TestOriginAllowed` |
+| T14-04 | 1,4 | Loader + iframe chat | Manual | [S4](../06-manual-tests/SPRINT-014-manual.md#s4--loader--iframe-chat-task-0064--feat-ac-1-4-7) |
+| T14-05 | 6 | Rotate key invalidates old | Manual | [S5](../06-manual-tests/SPRINT-014-manual.md#s5--rotate-key-task-0065--feat-ac-6) |
+| T14-06 | 7 | Full portal `/` unchanged | Manual | [S8](../06-manual-tests/SPRINT-014-manual.md#s8--regression-must) |
+| T14-07 | 5 | Quota applies to embed tenant | Manual optional | [S7](../06-manual-tests/SPRINT-014-manual.md#s7--quota-still-applies-on-embed-path-feat-ac-5--optional) |
+| T14-08 | — | Loader asset 200 | Smoke | `curl /embed/monti-embed.js` |
+| T14-09 | — | Origin helpers / key format | Auto | `go test ./internal/store/ -run Embed` |
 
 ## Build & regression gates (all sprints)
 

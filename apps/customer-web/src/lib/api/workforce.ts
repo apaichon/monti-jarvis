@@ -14,8 +14,10 @@ export type Agent = {
   hair?: string;
 };
 
-export async function loadWorkforce(): Promise<Agent[]> {
-  const res = await fetch('/api/workforce');
+export async function loadWorkforce(opts?: { tenantId?: string }): Promise<Agent[]> {
+  const headers: Record<string, string> = {};
+  if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  const res = await fetch('/api/workforce', { headers });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to load workforce');
   return data.agents ?? [];

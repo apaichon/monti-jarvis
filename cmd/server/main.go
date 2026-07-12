@@ -269,6 +269,18 @@ func main() {
 	mux.HandleFunc("POST /api/callbacks/chillpay/return", s.chillpayBrowserReturn)
 	mux.HandleFunc("GET /api/callbacks/chillpay/return/{ref}", s.chillpayBrowserReturn)
 	mux.HandleFunc("POST /api/callbacks/chillpay/return/{ref}", s.chillpayBrowserReturn)
+	// SPRINT-014 embed
+	mux.HandleFunc("GET /api/public/embed/{embed_key}", s.getPublicEmbed)
+	mux.HandleFunc("OPTIONS /api/public/embed/{embed_key}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Tenant-Id, X-Embed-Parent-Origin")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.Handle("GET /api/tenant/embed", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantEmbed)))
+	mux.Handle("PUT /api/tenant/embed", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantEmbed)))
+	mux.Handle("POST /api/tenant/embed/rotate-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.rotateTenantEmbedKey)))
+
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
 	mux.Handle("GET /api/tenant/orders/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrder)))
@@ -526,6 +538,12 @@ func writeError(w http.ResponseWriter, status int, message string) {
 func withCommonHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		// Embed UI is meant to run inside tenant iframes (SPRINT-014).
+		if strings.HasPrefix(r.URL.Path, "/embed") {
+			w.Header().Set("Content-Security-Policy", "frame-ancestors *")
+			// Avoid legacy DENY that would block third-party embedding.
+			w.Header().Del("X-Frame-Options")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

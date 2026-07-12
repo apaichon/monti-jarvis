@@ -58,7 +58,12 @@ func writeQuotaError(w http.ResponseWriter, err error) {
 }
 
 func (s *server) quotaTenant(r *http.Request) string {
-	return auth.ResolveTenant(r.Context(), r.Header.Get("X-Tenant-Id"), s.cfg.AuthDisabled, s.cfg.DemoTenantID)
+	// Prefer header; WebSocket / EventSource clients may pass tenant_id query.
+	hint := r.Header.Get("X-Tenant-Id")
+	if hint == "" {
+		hint = r.URL.Query().Get("tenant_id")
+	}
+	return auth.ResolveTenant(r.Context(), hint, s.cfg.AuthDisabled, s.cfg.DemoTenantID)
 }
 
 // voiceWS enforces rate limit, feature flags, concurrent slots, then relays.

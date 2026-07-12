@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Monti Embed Demo Host Page</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 0 16px;
+        line-height: 1.5;
+      }
+      code {
+        background: #f0f4f8;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Shop demo page</h1>
+    <p>
+      This is a stand-in for a tenant website. Replace <code>YOUR_EMBED_KEY</code> below (or set
+      <code>?key=</code> in the script after enabling embed in the tenant portal).
+    </p>
+    <p>Click the chat bubble (bottom-right) to open Monti.</p>
+
+    <!--
+      After login as tenant admin:
+        open http://localhost:8091/tenant/embed → Enable → Save → Copy key
+      Then replace YOUR_EMBED_KEY, open this file via a static server (e.g. npx serve docs/fixtures)
+      so Origin is http://localhost:xxxx (file:// may fail origin checks when allowlist is set).
+    -->
+    <script
+      src="http://localhost:8091/embed/monti-embed.js"
+      data-embed-key="YOUR_EMBED_KEY"
+      data-position="bottom-right"
+      async
+    ></script>
+  </body>
+</html>

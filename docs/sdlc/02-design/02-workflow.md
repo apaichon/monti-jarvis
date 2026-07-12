@@ -3,7 +3,7 @@ id: DES-0002
 title: Workflows
 status: approved
 updated: 2026-07-11
-sprint: SPRINT-013
+sprint: SPRINT-014
 ---
 
 # Workflows — Monti Jarvis
@@ -954,4 +954,68 @@ sequenceDiagram
 | `rl:*:minute` | INCR per request · expires ~2m |
 | KM / avatar usage | Derived from Postgres (not Redis primary) |
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 37. Tenant configures embed (Sprint 14)
+
+```mermaid
+sequenceDiagram
+  participant A as Tenant admin
+  participant B as Browser /tenant/embed
+  participant G as Go :8091
+  participant DB as Postgres
+
+  A->>B: Open Embed settings
+  B->>G: GET /api/tenant/embed
+  alt no row
+    G->>DB: INSERT tenant_embed_configs (key, enabled=false)
+  end
+  G-->>B: config + embed_key
+  A->>B: Enable + set allowed_origins + Save
+  B->>G: PUT /api/tenant/embed
+  G->>DB: UPDATE
+  G-->>B: 200
+  A->>B: Copy snippet
+```
+
+## 38. Host page loads widget (Sprint 14)
+
+```mermaid
+sequenceDiagram
+  participant V as Visitor browser
+  participant H as Tenant website
+  participant L as monti-embed.js
+  participant G as Go :8091
+  participant E as Embed UI /embed
+  participant Q as internal/quota
+
+  V->>H: Open shop page
+  H->>L: Load script data-embed-key
+  L->>L: Inject launcher + iframe src=/embed?key=
+  E->>G: GET /api/public/embed/{key} Origin host
+  alt disabled or unknown
+    G-->>E: 404
+  else origin not allowed
+    G-->>E: 403 origin_not_allowed
+  else ok
+    G-->>E: tenant_id, agents, default_agent
+    V->>E: Select agent + chat
+    E->>G: POST /api/chat X-Tenant-Id
+    G->>Q: AllowRate + checks
+    G-->>E: reply
+  end
+```
+
+## 39. Rotate embed key (Sprint 14)
+
+```mermaid
+sequenceDiagram
+  participant A as Tenant admin
+  participant G as Go :8091
+  participant DB as Postgres
+
+  A->>G: POST /api/tenant/embed/rotate-key
+  G->>DB: UPDATE embed_key = new
+  G-->>A: new key
+  Note over A: Old key returns 404 on public resolve
+```
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

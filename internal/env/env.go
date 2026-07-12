@@ -77,6 +77,8 @@ type Config struct {
 	RateLimitKMPerMin      int
 	RateLimitVoicePerMin   int
 	QuotaConcurrentTTL     time.Duration
+	// Embed (SPRINT-014)
+	EmbedAllowEmptyOrigins bool
 	AppEnv                 string
 }
 
@@ -156,8 +158,9 @@ func Load() Config {
 		RateLimitChatPerMin:  envInt("RATE_LIMIT_CHAT_PER_MIN", 60),
 		RateLimitKMPerMin:    envInt("RATE_LIMIT_KM_PER_MIN", 30),
 		RateLimitVoicePerMin: envInt("RATE_LIMIT_VOICE_PER_MIN", 20),
-		QuotaConcurrentTTL:   envDuration("QUOTA_CONCURRENT_TTL", 2*time.Hour),
-		AppEnv:               appEnv,
+		QuotaConcurrentTTL:     envDuration("QUOTA_CONCURRENT_TTL", 2*time.Hour),
+		EmbedAllowEmptyOrigins: envBool("EMBED_ALLOW_EMPTY_ORIGINS", true),
+		AppEnv:                 appEnv,
 	}
 }
 

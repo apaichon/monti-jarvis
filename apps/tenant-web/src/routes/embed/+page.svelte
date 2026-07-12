@@ -1,0 +1,199 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { base } from '$app/paths';
+  import { goto } from '$app/navigation';
+  import { hasRegistrationSession } from '$lib/auth/session';
+  import { feedback } from '$lib/feedback.svelte';
+  import { ApiError } from '$lib/api/http';
+  import {
+    getEmbedConfig,
+    putEmbedConfig,
+    rotateEmbedKey,
+    type EmbedConfig
+  } from '$lib/api/embed';
+
+  let cfg = $state<EmbedConfig | null>(null);
+  let enabled = $state(false);
+  let originsText = $state('');
+  let defaultAgent = $state('');
+  let loading = $state(true);
+  let saving = $state(false);
+  let rotating = $state(false);
+
+  onMount(async () => {
+    if (!hasRegistrationSession()) {
+      goto(`${base}/login?next=${encodeURIComponent(`${base}/embed`)}`);
+      return;
+    }
+    await load();
+  });
+
+  async function load() {
+    loading = true;
+    try {
+      cfg = await getEmbedConfig();
+      enabled = cfg.enabled;
+      originsText = (cfg.allowed_origins || []).join('\n');
+      defaultAgent = cfg.default_agent_id || '';
+    } catch (err) {
+      feedback.error(err instanceof ApiError ? err.message : 'Failed to load embed config');
+    } finally {
+      loading = false;
+    }
+  }
+
+  function parseOrigins(): string[] {
+    return originsText
+      .split(/\n|,/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  async function save() {
+    saving = true;
+    try {
+      cfg = await putEmbedConfig({
+        enabled,
+        allowed_origins: parseOrigins(),
+        default_agent_id: defaultAgent.trim()
+      });
+      originsText = (cfg.allowed_origins || []).join('\n');
+      defaultAgent = cfg.default_agent_id || '';
+      enabled = cfg.enabled;
+      feedback.success('Embed settings saved');
+    } catch (err) {
+      feedback.error(err instanceof ApiError ? err.message : 'Save failed');
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function rotate() {
+    if (!confirm('Rotate embed key? Existing snippets will stop working until updated.')) return;
+    rotating = true;
+    try {
+      cfg = await rotateEmbedKey();
+      feedback.success('Embed key rotated — update your website snippet');
+    } catch (err) {
+      feedback.error(err instanceof ApiError ? err.message : 'Rotate failed');
+    } finally {
+      rotating = false;
+    }
+  }
+
+  async function copyText(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      feedback.success(`${label} copied`);
+    } catch {
+      feedback.error('Copy failed — select and copy manually');
+    }
+  }
+</script>
+
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+  <div>
+    <h1 style="margin:0;font-size:24px">Embed to Web</h1>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
+      Add Monti chat to your website with a copy-paste snippet.
+    </p>
+  </div>
+</div>
+
+{#if loading}
+  <p style="color:var(--muted)">Loading…</p>
+{:else if cfg}
+  <div class="card" style="margin-bottom:16px">
+    <h2 style="margin:0 0 16px;font-size:16px">Settings</h2>
+
+    <label class="field-row">
+      <input type="checkbox" bind:checked={enabled} />
+      <span>Enabled</span>
+    </label>
+
+    <div class="field" style="margin-top:16px">
+      <label for="embed-key">Embed key</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <code id="embed-key" style="flex:1;word-break:break-all">{cfg.embed_key}</code>
+        <button class="btn ghost" type="button" onclick={() => copyText(cfg!.embed_key, 'Key')}>
+          Copy key
+        </button>
+        <button class="btn ghost" type="button" onclick={rotate} disabled={rotating}>
+          {rotating ? 'Rotating…' : 'Rotate key'}
+        </button>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:16px">
+      <label for="origins">Allowed origins (one per line)</label>
+      <textarea
+        id="origins"
+        rows="4"
+        bind:value={originsText}
+        placeholder="https://shop.example&#10;http://localhost:5500"
+        style="width:100%;font:inherit;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px"
+      ></textarea>
+      <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">
+        Use full origins like <code>https://example.com</code> (scheme + host + optional port).
+        <strong>Empty list</strong> allows any origin in development — set an allowlist before
+        production.
+      </p>
+    </div>
+
+    <div class="field" style="margin-top:16px">
+      <label for="agent">Default agent id (optional)</label>
+      <input
+        id="agent"
+        type="text"
+        bind:value={defaultAgent}
+        placeholder="ava"
+        style="width:100%;max-width:280px;padding:10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink)"
+      />
+    </div>
+
+    <div style="margin-top:20px">
+      <button class="btn" type="button" onclick={save} disabled={saving}>
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:16px">Snippet</h2>
+    <pre class="snippet">{cfg.snippet}</pre>
+    <button class="btn" type="button" onclick={() => copyText(cfg!.snippet, 'Snippet')}>
+      Copy snippet
+    </button>
+    <p style="margin:16px 0 0;font-size:12px;color:var(--muted)">
+      Paste before <code>&lt;/body&gt;</code> on your site. Enable embed and save first.
+    </p>
+  </div>
+{:else}
+  <p style="color:var(--muted)">Could not load embed configuration.</p>
+{/if}
+
+<style>
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .field label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .snippet {
+    background: rgb(0 0 0 / 35%);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    overflow: auto;
+    font-size: 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>

@@ -3,7 +3,7 @@ id: DES-0004
 title: API Specification
 status: approved
 updated: 2026-07-11
-sprint: SPRINT-013
+sprint: SPRINT-014
 ---
 
 # API Specification — Monti Jarvis
@@ -30,7 +30,7 @@ Liveness + feature flags.
   "livekit": true,
   "nats": true,
   "rag": true,
-  "sprint": "SPRINT-013",
+  "sprint": "SPRINT-014",
   "auth_disabled": true,
   "customer_web": "apps/customer-web/build",
   "platform_admin_web": "apps/platform-admin-web/build",
@@ -1120,4 +1120,61 @@ When `QUOTA_ENABLED=false` or (`QUOTA_FAIL_OPEN=true` and Redis error): request 
 
 Sprint 13 quota errors may add `code`, `dimension`, `limit`, `usage` (see above).
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+## Embed to Web (Sprint 14)
+
+Deep spec: [17-embed-to-web-spec.md](17-embed-to-web-spec.md). Workflows §37–39.
+
+### Public
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/public/embed/{embed_key}` | none | Resolve tenant embed config |
+| `GET` | `/embed/monti-embed.js` | none | Loader script |
+| `GET` | `/embed` | none | Embed SPA (customer compact UI) |
+
+**GET `/api/public/embed/{embed_key}`**
+
+Headers: `Origin` recommended when allowlist set.
+
+**200**
+
+```json
+{
+  "tenant_id": "demo",
+  "slug": "demo",
+  "name": "Demo Workspace",
+  "embed_key": "emb_abc…",
+  "enabled": true,
+  "default_agent_id": "ava",
+  "agents": [{ "id": "ava", "name": "Ava", "role": "Receptionist" }]
+}
+```
+
+| Status | code |
+| ---: | --- |
+| 404 | `embed_not_found` / `embed_disabled` |
+| 403 | `origin_not_allowed` |
+
+Chat/voice from embed: existing `POST /api/chat`, `GET /ws/voice` with `X-Tenant-Id: {tenant_id}` from resolve (quota applies).
+
+### Tenant admin
+
+| Method | Path | Role | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/tenant/embed` | `tenant_admin` active | Get or lazy-create config |
+| `PUT` | `/api/tenant/embed` | `tenant_admin` active | Update enabled, origins, default_agent |
+| `POST` | `/api/tenant/embed/rotate-key` | `tenant_admin` active | New embed_key |
+
+**PUT body**
+
+```json
+{
+  "enabled": true,
+  "allowed_origins": ["https://shop.example", "http://localhost:5500"],
+  "default_agent_id": "ava"
+}
+```
+
+**POST rotate-key 200:** `{ "embed_key": "emb_…", "enabled": true, ... }`
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

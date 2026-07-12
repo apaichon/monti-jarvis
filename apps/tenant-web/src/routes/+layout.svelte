@@ -43,6 +43,11 @@
         <a class="link" href="{base}/billing/tax" class:active={$page.url.pathname.includes('/tax')}
           >Tax</a
         >
+        <a
+          class="link"
+          href="{base}/embed"
+          class:active={$page.url.pathname.includes('/embed')}>Embed</a
+        >
         <a class="link" href="{base}/login">Profile</a>
       </nav>
       <button class="btn ghost" type="button" onclick={logout}>Logout</button>

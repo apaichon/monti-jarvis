@@ -37,7 +37,7 @@
 | 11 | Platform Admin | Receipt ops | C | 10 ✅ v1.3.0 |
 | 12 | Tenant | Tax Invoice compliance | C | 10, 11 ✅ v1.3.0 |
 | 13 | Platform Admin | Quota, Rate Limit | B | 3, 4 ✅ v1.4.0 |
-| 14 | Tenant | Embed to Web | D | 1, 6 |
+| 14 | Tenant | Embed to Web | D | 1, 6 ✅ v1.5.0 |
 | 15 | Tenant | Set Scope and KM | D | 2, 6 |
 | 16 | Tenant | Settings, Locale, Limit user tier, group, Quota for customer call time per day, call minute per each call | D | 13, 15 |
 | 17 | Tenant | Test and Preview | D | 15, 16 |
@@ -157,6 +157,20 @@ Plan: [15-commerce-chain-plan.md](../02-design/15-commerce-chain-plan.md)
 
 Sprint: [SPRINT-013.md](../03-sprints/SPRINT-013.md) · Feature: [FEAT-0013](../01-features/FEAT-0013-quota-rate-limit.md) · Spec: [16-quota-rate-limit-spec.md](../02-design/16-quota-rate-limit-spec.md) · UAT: [SPRINT-013-manual.md](../06-manual-tests/SPRINT-013-manual.md)
 
-## Current sprint: SPRINT-014 *(next open)*
+## Shipped: SPRINT-014 — Embed to Web — v1.5.0
 
-**Platform:** Tenant · **Feature:** Embed to Web · **Depends:** 1, 6
+**Closed 2026-07-12.** Tenant embed key, origin allowlist, loader iframe, portrait/voice/chat embed UI, tenant admin, integrator security guide.
+
+| Task | Points | Outcome |
+| --- | ---: | --- |
+| TASK-0062 | 3 | `tenant_embed_configs` schema |
+| TASK-0063 | 5 | Public resolve + `parent_origin` + tenant APIs |
+| TASK-0064 | 4 | Loader JS + `/embed` portrait/voice/chat |
+| TASK-0065 | 3 | Tenant `/tenant/embed` admin |
+| TASK-0066 | 1 | Manual UAT checklist + unit smoke |
+
+Sprint: [SPRINT-014.md](../03-sprints/SPRINT-014.md) · Feature: [FEAT-0014](../01-features/FEAT-0014-embed-to-web.md) · Spec: [17-embed-to-web-spec.md](../02-design/17-embed-to-web-spec.md) · Guide: [EMBED_WEB_INTEGRATION.md](../../EMBED_WEB_INTEGRATION.md) · UAT: [SPRINT-014-manual.md](../06-manual-tests/SPRINT-014-manual.md)
+
+## Current sprint: SPRINT-015 — Set Scope and KM *(next open)*
+
+**Platform:** Tenant · **Feature:** Set Scope and KM · **Depends:** 2, 6

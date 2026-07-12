@@ -3,7 +3,7 @@ id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
 updated: 2026-07-11
-sprint: SPRINT-013
+sprint: SPRINT-014
 ---
 
 # UX/UI — ASCII Wireframes
@@ -1275,4 +1275,90 @@ TH optional: “การใช้งาน”, “ขีดจำกัด”, 
 └───────────────────────────────────────────────────────────┘
 ```
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+## Sprint 14 — Embed to Web (T7 tenant · E1 widget)
+
+**What changed**
+
+| Surface | Change |
+| --- | --- |
+| Tenant `/tenant/embed` | **T7** config: key, origins, snippet, rotate |
+| Customer `/` | Unchanged demo |
+| Embed `/embed` | **E1** compact chat UI in iframe |
+| Host site | Floating launcher via `monti-embed.js` |
+
+### Screen map → API
+
+| Zone | Action | API |
+| --- | --- | --- |
+| T7 Enable | Toggle + Save | `PUT /api/tenant/embed` |
+| T7 Origins | Edit list + Save | same |
+| T7 Copy | Copy snippet | client-only |
+| T7 Rotate | Confirm rotate | `POST /api/tenant/embed/rotate-key` |
+| T7 Load | Open page | `GET /api/tenant/embed` |
+| E1 Boot | iframe load | `GET /api/public/embed/{key}` |
+| E1 Chat | Send message | `POST /api/chat` + `X-Tenant-Id` |
+| E1 Voice | Optional | `GET /ws/voice` |
+
+### T7 — Tenant embed settings
+
+```text
+┌─ /tenant/embed ───────────────────────────────────────────┐
+│  Embed on your website                                    │
+│  [✓] Enabled                                              │
+│  Embed key  emb_9f3a…              [Copy] [Rotate key]    │
+│  Allowed origins (one per line)                           │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │ https://shop.example                               │   │
+│  │ http://localhost:5500                              │   │
+│  └────────────────────────────────────────────────────┘   │
+│  Empty list = allow any origin (dev only warning)         │
+│  Default agent  [ Ava ▼ ]                                 │
+│  [Save]                                                   │
+│  Snippet                                                  │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │ <script src="…/embed/monti-embed.js"               │   │
+│  │   data-embed-key="emb_…" async></script>           │   │
+│  └────────────────────────────────────────────────────┘   │
+│  [Copy snippet]                                           │
+└───────────────────────────────────────────────────────────┘
+```
+
+### E1 — Embed iframe (compact)
+
+```text
+┌─ Host page ──────────────────────────────┐
+│  … shop content …                        │
+│                         ┌─ Monti ──────┐ │
+│                         │ [Ava ▼]      │ │
+│                         │ chat…        │ │
+│                         │ [Send] [🎤]  │ │
+│                         └──────────────┘ │
+│                              ( ( ) )     │  ← launcher
+└──────────────────────────────────────────┘
+```
+
+### Flow A — First-time enable
+
+```text
+Login tenant → Embed → Enable → Save → Copy snippet → paste on site → open site → chat
+```
+
+### Flow B — Origin denied
+
+```text
+Key enabled, allowlist https://shop.example only
+Site http://evil.test loads snippet
+→ GET /api/public/embed/KEY Origin evil → 403
+→ Widget shows error state
+```
+
+### Component → file (planned)
+
+| Piece | Path |
+| --- | --- |
+| Tenant embed page | `apps/tenant-web/src/routes/embed/+page.svelte` |
+| Tenant API | `apps/tenant-web/src/lib/api/embed.ts` |
+| Loader | static `/embed/monti-embed.js` (server or customer-web static) |
+| Embed UI | `apps/customer-web` embed route or query mode |
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

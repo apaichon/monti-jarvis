@@ -12,6 +12,27 @@ export type VoiceCallbacks = {
   onError?: (message: string) => void;
 };
 
+/** Why getUserMedia is missing (common for embed iframes on http://custom-host). */
+export function micAvailabilityError(): string | null {
+  if (typeof window === 'undefined') return 'Microphone unavailable';
+  if (!window.isSecureContext) {
+    const host = location.hostname || 'this host';
+    return (
+      `Microphone needs a secure context (HTTPS or localhost). ` +
+      `This page is ${location.protocol}//${host} — browsers block mic/audio here. ` +
+      `Use https://… or http://localhost:… for the Monti embed host (not a custom http hostname).`
+    );
+  }
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+    return (
+      'Microphone API unavailable (navigator.mediaDevices missing). ' +
+      'Allow microphone for this site, or open Monti on HTTPS/localhost. ' +
+      'Cross-origin embeds need iframe allow="microphone *".'
+    );
+  }
+  return null;
+}
+
 export class GeminiVoice {
   private ws: WebSocket | null = null;
   private micStream: MediaStream | null = null;
@@ -21,12 +42,46 @@ export class GeminiVoice {
   private recorder: AudioWorkletNode | null = null;
   private player: AudioWorkletNode | null = null;
 
-  async start(agentId: string, topic: string, callbacks: VoiceCallbacks) {
-    this.micStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-    });
+  async start(
+    agentId: string,
+    topic: string,
+    callbacks: VoiceCallbacks,
+    opts?: { tenantId?: string }
+  ) {
+    const blocked = micAvailabilityError();
+    if (blocked) throw new Error(blocked);
+
+    // Create and resume audio while the Start call click still carries user activation.
+    // Waiting for getUserMedia first can leave the playback context suspended in embeds.
     this.captureCtx = new AudioContext({ sampleRate: 16000 });
     this.playbackCtx = new AudioContext({ sampleRate: 24000 });
+    await Promise.all([this.captureCtx.resume(), this.playbackCtx.resume()]);
+
+    try {
+      this.micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : '';
+      const msg = err instanceof Error ? err.message : 'Microphone permission denied';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        await this.cleanup();
+        throw new Error(
+          'Microphone permission denied. Click the lock icon in the address bar and allow mic for this site, then try Start call again.'
+        );
+      }
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        await this.cleanup();
+        throw new Error('No microphone found. Plug in a mic or check system sound settings.');
+      }
+      await this.cleanup();
+      throw new Error(msg);
+    }
     await Promise.all([
       this.captureCtx.audioWorklet.addModule('/recorder.js'),
       this.playbackCtx.audioWorklet.addModule('/player.js')
@@ -39,6 +94,7 @@ export class GeminiVoice {
 
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
     const params = new URLSearchParams({ agent: agentId, topic: topic || 'general' });
+    if (opts?.tenantId) params.set('tenant_id', opts.tenantId);
     this.ws = new WebSocket(`${scheme}://${location.host}/ws/voice?${params}`);
 
     let ready = false;
@@ -103,8 +159,16 @@ export class GeminiVoice {
 
   private handleMessage(raw: string, callbacks: VoiceCallbacks) {
     const msg: VoiceMsg = JSON.parse(raw);
-    if (msg.type === 'audio' && msg.data && this.player) {
-      this.player.port.postMessage(base64PCM16ToFloat(msg.data));
+    if (msg.type === 'audio' && msg.data && this.player && this.playbackCtx) {
+      const samples = base64PCM16ToFloat(msg.data);
+      if (this.playbackCtx.state === 'suspended') {
+        void this.playbackCtx
+          .resume()
+          .then(() => this.player?.port.postMessage(samples))
+          .catch(() => callbacks.onError?.('Audio playback is blocked. Click Start call again.'));
+      } else {
+        this.player.port.postMessage(samples);
+      }
       return;
     }
     if (msg.type === 'interrupted' && this.player) {

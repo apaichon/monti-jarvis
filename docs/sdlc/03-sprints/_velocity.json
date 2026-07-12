@@ -103,8 +103,16 @@
       "velocity": 16,
       "closed": "2026-07-11",
       "release": "v1.4.0"
+    },
+    {
+      "id": "SPRINT-014",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-12",
+      "release": "v1.5.0"
     }
   ],
   "average_velocity": 16,
-  "note": "S13 quota/rate-limit shipped v1.4.0 (unit tests green; partial browser UAT deferred). S8\u2013S12 commerce v1.3.0 + v1.3.1 harden."
+  "note": "S14 embed-to-web shipped v1.5.0. S13 quota v1.4.0. S8\u2013S12 commerce v1.3.0 + v1.3.1 harden."
 }

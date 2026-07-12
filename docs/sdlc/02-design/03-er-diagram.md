@@ -3,7 +3,7 @@ id: DES-0003
 title: Entity Relationship Diagram
 status: approved
 updated: 2026-07-11
-sprint: SPRINT-013
+sprint: SPRINT-014
 ---
 
 # ER Diagram — Monti Jarvis
@@ -659,7 +659,8 @@ monti-jarvis/
 | 7 ✅ v0.8.0 | KYC review columns on `tenant_kyc_profiles` + `tenant_registrations`; approve/reject lifecycle |
 | 8 ✅ v0.9.0 | `payment_gateway_configs`, `payment_callback_events` |
 | 9–12 ✅ v1.3.0 | `payment_orders`, `payment_documents`, `tenant_tax_profiles`, billing ops |
-| 13 🔄 v1.4.0 | **No required Postgres DDL** — Redis quota/rate-limit keys only (see below) |
+| 13 ✅ v1.4.0 | Redis quota/rate-limit keys (no required DDL) |
+| 14 🔄 v1.5.0 | `tenant_embed_configs` |
 | 15 | `km_scope_assignments`, tenant-driven re-index |
 | 16 | Tenant-facing limit/settings (reads S13 counters) |
 | 21 | Runtime voice failover + `ai_employee_configs` embedding bindings (voice stays on `ai_avatar_voices`) |
@@ -695,4 +696,22 @@ monti-jarvis/
 
 `quota_usage_events` deferred — would need full audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) if added later.
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
+## Sprint 14 — tenant_embed_configs
+
+```mermaid
+erDiagram
+  tenants ||--o| tenant_embed_configs : has
+  tenant_embed_configs {
+    text tenant_id PK
+    text embed_key UK
+    boolean enabled
+    jsonb allowed_origins
+    text default_agent_id
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
