@@ -4,7 +4,7 @@
 **Date:** 2026-07-07  
 **Product Direction:** Multi-tenant AI Call Center as a Service  
 **Primary Start Point:** Inbound AI calls for high-value businesses  
-**Official Roadmap:** 35 sprints — see [Section 17](#17-official-35-sprint-roadmap) and `docs/sdlc/00-roadmap/ROADMAP.md`
+**Official Roadmap:** 35 core sprints + S36 embed SDKs + S37 central brand portal — see [Section 17](#17-official-35-sprint-roadmap) and `docs/sdlc/00-roadmap/ROADMAP.md`
 
 ---
 
@@ -1259,7 +1259,7 @@ Sprint planning follows a **customer-first conversation wedge**, then platform f
 | 11 | Platform Admin | Receipt | Commerce |
 | 12 | Tenant | Tax Invoice | Commerce |
 | 13 | Platform Admin | Quota, Rate Limit | Governance |
-| 14 | Tenant | Embed to Web | Distribution |
+| 14 | Tenant | Embed to Web (vanilla loader + iframe) | Distribution |
 | 15 | Tenant | Set Scope and KM | Configuration |
 | 16 | Tenant | Settings, Locale, Limit, Quota | Configuration |
 | 17 | Tenant | Test and Preview | Configuration |
@@ -1281,6 +1281,8 @@ Sprint planning follows a **customer-first conversation wedge**, then platform f
 | 33 | Infra | Scale, Auto Scale | Infra |
 | 34 | Infra | Canary Deployment | Infra |
 | 35 | Infra | Backup Restore Archive | Infra |
+| **36** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **Distribution** |
+| **37** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **Distribution** |
 
 ### 17.2 Phase summary
 

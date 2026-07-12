@@ -1377,4 +1377,41 @@ Do not remove legacy routes in S15.
 | `internal/quota` | KM rate + document limits |
 | `internal/auth` | RequireTenantAdminActive |
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+## Tenant Settings & Call Limits (Sprint 16)
+
+Auth: **Bearer** `tenant_admin` + active. Tenant id from JWT only.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/tenant/settings` | Lazy-create defaults |
+| `PUT` | `/api/tenant/settings` | locale, timezone, display_name, ai_reply_locale, labels |
+| `GET` | `/api/tenant/usage` | Package limits + usage snapshot (own tenant) |
+| `GET` | `/api/tenant/call-limits` | Per-call / daily caps |
+| `PUT` | `/api/tenant/call-limits` | Update caps (`0` = unset) |
+
+**PUT settings body:**
+
+```json
+{
+  "locale": "th",
+  "timezone": "Asia/Bangkok",
+  "display_name": "Libra Support",
+  "ai_reply_locale": "th",
+  "user_tier_label": "",
+  "user_group_label": ""
+}
+```
+
+**PUT call-limits body:**
+
+```json
+{ "max_minutes_per_call": 15, "max_call_minutes_per_day": 120 }
+```
+
+| HTTP | error |
+| ---: | --- |
+| 400 | invalid locale / timezone / negative limits |
+| 401/403 | not tenant_admin / inactive |
+| 403 | `daily_call_limit` / `per_call_limit` on voice |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

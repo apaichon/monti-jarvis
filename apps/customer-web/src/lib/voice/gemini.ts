@@ -1,3 +1,9 @@
+import {
+  mergeTranscriptChunk,
+  preferMainLanguage,
+  type PreferredLang
+} from './transcript';
+
 type VoiceMsg = {
   type: string;
   data?: string;
@@ -6,9 +12,15 @@ type VoiceMsg = {
   message?: string;
 };
 
+export type TranscriptMeta = {
+  /** True when Gemini finished the model turn (or input side should settle). */
+  final?: boolean;
+};
+
 export type VoiceCallbacks = {
   onLive?: (live: boolean) => void;
-  onTranscript?: (role: 'caller' | 'agent', text: string) => void;
+  /** Live caption updates — `text` is the full turn so far (not a short fragment). */
+  onTranscript?: (role: 'caller' | 'agent', text: string, meta?: TranscriptMeta) => void;
   onError?: (message: string) => void;
 };
 
@@ -42,14 +54,26 @@ export class GeminiVoice {
   private recorder: AudioWorkletNode | null = null;
   private player: AudioWorkletNode | null = null;
 
+  /** Accumulators for streamed partial transcripts (one active turn each). */
+  private callerBuf = '';
+  private agentBuf = '';
+  /** Prefer output transcription over modelTurn.text to avoid short dual captions. */
+  private agentFromTranscript = false;
+  private preferredLang: PreferredLang = '';
+
   async start(
     agentId: string,
     topic: string,
     callbacks: VoiceCallbacks,
-    opts?: { tenantId?: string }
+    opts?: { tenantId?: string; preferredLang?: PreferredLang }
   ) {
     const blocked = micAvailabilityError();
     if (blocked) throw new Error(blocked);
+
+    this.preferredLang = opts?.preferredLang || '';
+    this.callerBuf = '';
+    this.agentBuf = '';
+    this.agentFromTranscript = false;
 
     // Create and resume audio while the Start call click still carries user activation.
     // Waiting for getUserMedia first can leave the playback context suspended in embeds.
@@ -155,6 +179,20 @@ export class GeminiVoice {
     this.source = null;
     this.recorder = null;
     this.player = null;
+    this.callerBuf = '';
+    this.agentBuf = '';
+    this.agentFromTranscript = false;
+  }
+
+  private emitTranscript(
+    callbacks: VoiceCallbacks,
+    role: 'caller' | 'agent',
+    text: string,
+    meta?: TranscriptMeta
+  ) {
+    const cleaned = preferMainLanguage(text, this.preferredLang);
+    if (!cleaned) return;
+    callbacks.onTranscript?.(role, cleaned, meta);
   }
 
   private handleMessage(raw: string, callbacks: VoiceCallbacks) {
@@ -173,15 +211,62 @@ export class GeminiVoice {
     }
     if (msg.type === 'interrupted' && this.player) {
       this.player.port.postMessage('flush');
+      // Keep partial agent caption; start fresh on next agent speech.
+      if (this.agentBuf) {
+        this.emitTranscript(callbacks, 'agent', this.agentBuf, { final: true });
+      }
+      this.agentBuf = '';
+      this.agentFromTranscript = false;
       return;
     }
     if (msg.type === 'transcript' && msg.text) {
       const role = msg.role === 'assistant' ? 'agent' : 'caller';
-      callbacks.onTranscript?.(role, msg.text);
+      if (role === 'caller') {
+        // New user speech after agent finished → clear agent buffer for next reply.
+        if (this.agentBuf && this.callerBuf === '') {
+          // already finalized on turn_complete usually
+        }
+        // If agent was speaking and user starts, finalize agent caption first.
+        if (this.agentBuf && !this.callerBuf) {
+          this.emitTranscript(callbacks, 'agent', this.agentBuf, { final: true });
+          this.agentBuf = '';
+          this.agentFromTranscript = false;
+        }
+        this.callerBuf = mergeTranscriptChunk(this.callerBuf, msg.text);
+        this.emitTranscript(callbacks, 'caller', this.callerBuf);
+      } else {
+        // Agent speaking → finalize caller turn once.
+        if (this.callerBuf) {
+          this.emitTranscript(callbacks, 'caller', this.callerBuf, { final: true });
+          this.callerBuf = '';
+        }
+        this.agentFromTranscript = true;
+        this.agentBuf = mergeTranscriptChunk(this.agentBuf, msg.text);
+        this.emitTranscript(callbacks, 'agent', this.agentBuf);
+      }
       return;
     }
+    // modelTurn text: only use if we never got outputAudioTranscription for this turn.
     if (msg.type === 'text' && msg.text) {
-      callbacks.onTranscript?.('agent', msg.text);
+      if (this.agentFromTranscript) return;
+      if (this.callerBuf) {
+        this.emitTranscript(callbacks, 'caller', this.callerBuf, { final: true });
+        this.callerBuf = '';
+      }
+      this.agentBuf = mergeTranscriptChunk(this.agentBuf, msg.text);
+      this.emitTranscript(callbacks, 'agent', this.agentBuf);
+      return;
+    }
+    if (msg.type === 'turn_complete') {
+      if (this.callerBuf) {
+        this.emitTranscript(callbacks, 'caller', this.callerBuf, { final: true });
+        this.callerBuf = '';
+      }
+      if (this.agentBuf) {
+        this.emitTranscript(callbacks, 'agent', this.agentBuf, { final: true });
+        this.agentBuf = '';
+      }
+      this.agentFromTranscript = false;
       return;
     }
     if (msg.type === 'error') {

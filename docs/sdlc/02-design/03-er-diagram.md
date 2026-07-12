@@ -842,4 +842,36 @@ km/{tenant_id}/{agent_id}/{document_id}/original/{filename}
 | `tenant_agent_scope_overrides` | Use hard-map + document scope |
 | `knowledge_folders` | Flat list per agent is enough |
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
+## Sprint 16 — tenant_settings + tenant_call_limits
+
+```mermaid
+erDiagram
+  tenants ||--o| tenant_settings : has
+  tenants ||--o| tenant_call_limits : has
+  tenant_settings {
+    text tenant_id PK
+    text locale
+    text timezone
+    text display_name
+    text ai_reply_locale
+    text user_tier_label
+    text user_group_label
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+  tenant_call_limits {
+    text tenant_id PK
+    int max_minutes_per_call
+    int max_call_minutes_per_day
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+**Redis:** `{prefix}call_daily:{tenant}:{YYYYMMDD}` minutes used (tenant timezone day).
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.

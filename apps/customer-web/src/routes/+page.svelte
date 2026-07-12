@@ -181,9 +181,11 @@
             live = v;
             voiceState = v ? `On call with ${selectedAgent?.name}.` : `Ready to call ${selectedAgent?.name}.`;
           },
-          onTranscript: (role, text) => {
+          onTranscript: (role, text, meta) => {
+            // Live caption grows as partial ASR chunks merge into full sentences.
             upsertVoiceTurn(role, text);
-            if (session) void persistTurn(session.id, role, text);
+            // Persist only finalized turns (not every short partial fragment).
+            if (meta?.final && session) void persistTurn(session.id, role, text);
           },
           onError: (message) => {
             error = message;

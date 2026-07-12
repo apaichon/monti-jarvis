@@ -173,10 +173,19 @@ func main() {
 	entSvc := entitlements.New(st, cfg)
 	quotaSvc := quota.New(entSvc, st, cfg)
 
+	voiceRelay := live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}, ragSvc)
+	// S16: tenant AI reply locale preference in voice system prompt.
+	voiceRelay.LocaleHint = func(ctx context.Context, tenantID string) string {
+		if st == nil {
+			return ""
+		}
+		return st.AIReplyLocaleHint(ctx, tenantID)
+	}
+
 	s := &server{
 		cfg:             cfg,
 		ai:              ai,
-		voice:           live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}, ragSvc),
+		voice:           voiceRelay,
 		calls:           calls.New(st, bus, lk, cfg.DemoTenantID),
 		store:           st,
 		km:              kmSvc,
@@ -298,6 +307,13 @@ func main() {
 	mux.Handle("DELETE /api/tenant/km/documents/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantKMDocument)))
 	mux.Handle("GET /api/tenant/km/gaps", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKMGaps)))
 	mux.Handle("PATCH /api/tenant/km/gaps/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.patchTenantKMGap)))
+
+	// SPRINT-016 — tenant settings, usage, call limits
+	mux.Handle("GET /api/tenant/settings", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantSettings)))
+	mux.Handle("PUT /api/tenant/settings", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantSettings)))
+	mux.Handle("GET /api/tenant/usage", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantUsage)))
+	mux.Handle("GET /api/tenant/call-limits", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCallLimits)))
+	mux.Handle("PUT /api/tenant/call-limits", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantCallLimits)))
 
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
@@ -502,6 +518,11 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	prompt := workforce.SystemPrompt(agent)
+	if s.store != nil && tenantID != "" {
+		if hint := s.store.AIReplyLocaleHint(ctx, tenantID); hint != "" {
+			prompt += "\n\n" + hint
+		}
+	}
 	if useRAG && ragSvc != nil {
 		prompt = ragSvc.AugmentPrompt(prompt, agent.ID, topic, req.Message, ragResult)
 	}

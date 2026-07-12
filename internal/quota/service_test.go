@@ -272,3 +272,42 @@ func TestDisabledSkipsChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDailyCallMinutes(t *testing.T) {
+	svc, _ := testSvc(t, starterRules(), nil)
+	ctx := context.Background()
+	tz := "Asia/Bangkok"
+
+	if err := svc.CheckDailyCallMinutes(ctx, "demo", tz, 0); err != nil {
+		t.Fatalf("unset daily cap: %v", err)
+	}
+	if err := svc.CheckDailyCallMinutes(ctx, "demo", tz, 5); err != nil {
+		t.Fatalf("fresh day: %v", err)
+	}
+	if err := svc.AddDailyCallMinutes(ctx, "demo", tz, 5); err != nil {
+		t.Fatal(err)
+	}
+	n, err := svc.GetDailyCallMinutes(ctx, "demo", tz)
+	if err != nil || n != 5 {
+		t.Fatalf("usage got %d %v", n, err)
+	}
+	err = svc.CheckDailyCallMinutes(ctx, "demo", tz, 5)
+	if !errors.Is(err, ErrLimitExceeded) {
+		t.Fatalf("at daily cap: %v", err)
+	}
+	var qe *Error
+	if !errors.As(err, &qe) || qe.Code != "daily_call_limit" {
+		t.Fatalf("code: %#v", err)
+	}
+}
+
+func TestDayKeyTimezone(t *testing.T) {
+	// 2026-07-11 18:00 UTC = 2026-07-12 01:00 Asia/Bangkok
+	now := time.Date(2026, 7, 11, 18, 0, 0, 0, time.UTC)
+	if got := dayKey(now, "Asia/Bangkok"); got != "20260712" {
+		t.Fatalf("bangkok day %s", got)
+	}
+	if got := dayKey(now, "UTC"); got != "20260711" {
+		t.Fatalf("utc day %s", got)
+	}
+}

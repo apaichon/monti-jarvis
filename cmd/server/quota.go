@@ -25,6 +25,8 @@ func writeQuotaError(w http.ResponseWriter, err error) {
 			status = http.StatusForbidden
 		case "no_entitlement":
 			status = http.StatusForbidden
+		case "daily_call_limit", "per_call_limit":
+			status = http.StatusTooManyRequests
 		case "rate_limited":
 			status = http.StatusTooManyRequests
 			w.Header().Set("Retry-After", "60")
@@ -66,7 +68,7 @@ func (s *server) quotaTenant(r *http.Request) string {
 	return auth.ResolveTenant(r.Context(), hint, s.cfg.AuthDisabled, s.cfg.DemoTenantID)
 }
 
-// voiceWS enforces rate limit, feature flags, concurrent slots, then relays.
+// voiceWS enforces rate limit, feature flags, concurrent slots, S16 daily/per-call caps, then relays.
 func (s *server) voiceWS(w http.ResponseWriter, r *http.Request) {
 	if s.quota == nil {
 		s.voice.Handler().ServeHTTP(w, r)
@@ -87,6 +89,23 @@ func (s *server) voiceWS(w http.ResponseWriter, r *http.Request) {
 		writeQuotaError(w, err)
 		return
 	}
+
+	// S16 operational caps (under package monthly).
+	maxPerCall := 0
+	maxPerDay := 0
+	tz := "Asia/Bangkok"
+	if s.store != nil && tenantID != "" {
+		tz = s.store.TenantTimezone(ctx, tenantID)
+		if lim, err := s.store.GetOrCreateTenantCallLimits(ctx, tenantID); err == nil && lim != nil {
+			maxPerCall = lim.MaxMinutesPerCall
+			maxPerDay = lim.MaxCallMinutesPerDay
+		}
+		if err := s.quota.CheckDailyCallMinutes(ctx, tenantID, tz, maxPerDay); err != nil {
+			writeQuotaError(w, err)
+			return
+		}
+	}
+
 	release, err := s.quota.AcquireConcurrent(ctx, tenantID)
 	if err != nil {
 		writeQuotaError(w, err)
@@ -104,10 +123,21 @@ func (s *server) voiceWS(w http.ResponseWriter, r *http.Request) {
 			mins = 1
 		}
 		if mins > 0 {
-			_ = s.quota.AddCallMinutes(context.Background(), tenantID, mins)
+			bg := context.Background()
+			_ = s.quota.AddCallMinutes(bg, tenantID, mins)
+			_ = s.quota.AddDailyCallMinutes(bg, tenantID, tz, mins)
 		}
 	}()
-	s.voice.Handler().ServeHTTP(w, r)
+
+	// Per-call max: cancel context after N minutes so the relay ends.
+	req := r
+	if maxPerCall > 0 {
+		deadline := time.Duration(maxPerCall) * time.Minute
+		cctx, cancel := context.WithTimeout(ctx, deadline)
+		defer cancel()
+		req = r.WithContext(cctx)
+	}
+	s.voice.Handler().ServeHTTP(w, req)
 }
 
 // getPlatformTenantUsage serves GET /api/platform/tenants/{tenant_id}/usage.

@@ -348,6 +348,62 @@ func (s *Service) AddCallMinutes(ctx context.Context, tenantID string, minutes i
 	return nil
 }
 
+// dayKey returns YYYYMMDD in the given IANA timezone (falls back to UTC).
+func dayKey(now time.Time, timezone string) string {
+	loc := time.UTC
+	if timezone != "" {
+		if l, err := time.LoadLocation(timezone); err == nil {
+			loc = l
+		}
+	}
+	return now.In(loc).Format("20060102")
+}
+
+func (s *Service) dailyKey(tenantID, timezone string) string {
+	return s.prefix + "call_daily:" + tenantID + ":" + dayKey(s.now(), timezone)
+}
+
+// GetDailyCallMinutes returns minutes used today (tenant timezone day boundary).
+func (s *Service) GetDailyCallMinutes(ctx context.Context, tenantID, timezone string) (int, error) {
+	if s == nil || s.rdb == nil || tenantID == "" {
+		return 0, nil
+	}
+	return s.getInt(ctx, s.dailyKey(tenantID, timezone))
+}
+
+// CheckDailyCallMinutes denies when maxPerDay > 0 and usage already at/over the cap.
+// maxPerDay == 0 means unset (no operational daily cap).
+func (s *Service) CheckDailyCallMinutes(ctx context.Context, tenantID, timezone string, maxPerDay int) error {
+	if s == nil || !s.enabled || maxPerDay <= 0 || tenantID == "" {
+		return nil
+	}
+	cur, err := s.GetDailyCallMinutes(ctx, tenantID, timezone)
+	if err != nil {
+		return s.onRedisErr("CheckDailyCallMinutes", err)
+	}
+	if cur >= maxPerDay {
+		return DailyCallLimit(maxPerDay, cur)
+	}
+	return nil
+}
+
+// AddDailyCallMinutes increments the S16 daily call-minutes counter (tenant timezone day).
+func (s *Service) AddDailyCallMinutes(ctx context.Context, tenantID, timezone string, minutes int) error {
+	if s == nil || !s.enabled || minutes <= 0 || tenantID == "" || s.rdb == nil {
+		return nil
+	}
+	key := s.dailyKey(tenantID, timezone)
+	n, err := s.rdb.IncrBy(ctx, key, int64(minutes)).Result()
+	if err != nil {
+		return s.onRedisErr("AddDailyCallMinutes", err)
+	}
+	// ~48h TTL so day keys clean up after the boundary.
+	if n == int64(minutes) {
+		_ = s.rdb.Expire(ctx, key, 48*time.Hour).Err()
+	}
+	return nil
+}
+
 // Check is a generic dimension check (convenience for callers).
 func (s *Service) Check(ctx context.Context, tenantID, dimension string) error {
 	switch dimension {

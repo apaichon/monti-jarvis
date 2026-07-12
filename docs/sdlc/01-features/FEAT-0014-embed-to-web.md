@@ -23,7 +23,8 @@ Active tenants can use Monti conversation only on the hosted customer portal (`/
 - Test & preview sandbox (→ SPRINT-017)
 - Customer register/login (→ SPRINT-019–020)
 - White-label custom domain CNAME
-- Mobile SDK / React package publish to npm (loader is first-party static asset only)
+- Mobile SDK; framework packages (Vue/React/Svelte/Web Component) → **SPRINT-036 / FEAT-0017** (loader remains first-party static asset in S14)
+- Platform multi-brand directory portal → **SPRINT-037 / FEAT-0018** (central hub; embed remains per-tenant site)
 - Billing for embed views
 
 ## Acceptance criteria

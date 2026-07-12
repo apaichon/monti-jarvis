@@ -4,7 +4,7 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 | Prefix | Folder | Contents |
 | --- | --- | --- |
-| `00` | [00-roadmap/](00-roadmap/) | 35-sprint roadmap |
+| `00` | [00-roadmap/](00-roadmap/) | Roadmap (35 core + S36 embed SDKs + S37 central brand portal) |
 | `01` | [01-features/](01-features/) | Feature specs (`FEAT-NNNN`) |
 | `02` | [02-design/](02-design/) | Architecture, workflow, ER, API, UX/UI — use **`sprint-tech-specs`** skill per sprint |
 | `03` | [03-sprints/](03-sprints/) | Sprint plans (`SPRINT-NNN`) |

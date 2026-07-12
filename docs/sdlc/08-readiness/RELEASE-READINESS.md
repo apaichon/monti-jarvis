@@ -1,14 +1,27 @@
 ---
 id: READINESS-RELEASE
 status: active
-updated: 2026-07-07
-current_sprint: SPRINT-006
-release_target: v0.7.0
+updated: 2026-07-12
+current_sprint: SPRINT-017
+release_target: v1.7.0
 ---
 
 # Release Readiness Checklist
 
 Use this checklist before **demo**, **sprint sign-off**, or **`release-cut`** (git tag).
+
+## Production customer launch gate (post S16 / before open traffic)
+
+> After **tenant customer-user authentication** is integrated (SPRINT-019–020), and **before production launch to end customers**, sign off that **rate limit and quota management work** under multi-user load.
+
+- [ ] S13 package quotas enforce (monthly minutes, concurrent, KM, avatars, voice/RAG flags)
+- [ ] S13 rate limits enforce under concurrent chat/voice/KM
+- [ ] S16 daily + per-call operational caps enforce under package ceiling
+- [ ] Tenant isolation: customer of A cannot consume B’s quota
+- [ ] Production `QUOTA_*` / `RATE_LIMIT_*` env flags reviewed (fail-open vs fail-closed)
+- [ ] Load or soak test notes attached (or UAT multi-session evidence)
+
+**Owner:** DevOps + Tester · **Blocked by:** customer auth (S19–20) if not yet shipped · **Recorded in:** [SPRINT-016](../03-sprints/SPRINT-016.md) shipped notes
 
 ## A. Code & build
 

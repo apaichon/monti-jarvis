@@ -1175,4 +1175,61 @@ sequenceDiagram
 
 Tenant later: `GET /api/tenant/km/gaps` → write FAQ doc → `PATCH` gap `status=converted`.
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 46. Tenant updates settings (Sprint 16)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant B as Browser /tenant/settings
+  participant G as Go :8091
+  participant P as Postgres
+
+  A->>B: Edit locale, timezone, Save
+  B->>G: PUT /api/tenant/settings Bearer
+  G->>G: RequireTenantAdminActive
+  G->>P: UPSERT tenant_settings
+  G-->>B: 200 settings
+```
+
+## 47. Tenant views usage (Sprint 16)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant R as Redis
+  participant P as Postgres
+
+  A->>G: GET /api/tenant/usage
+  G->>Q: Snapshot(jwt.tenant_id)
+  Q->>R: monthly minutes, concurrent
+  Q->>P: avatars, km counts
+  G-->>A: package + limits + usage
+```
+
+## 48. Voice open with daily/per-call caps (Sprint 16)
+
+```mermaid
+sequenceDiagram
+  actor C as Caller
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant L as tenant call limits
+  participant R as Redis
+
+  C->>G: WS /ws/voice
+  G->>Q: S13 voice_enabled, concurrent, monthly
+  G->>L: load tenant_call_limits
+  G->>R: GET call_daily:{tenant}:{day}
+  alt daily cap exceeded
+    G-->>C: 403 daily_call_limit
+  else ok
+    G->>G: session start timer
+    Note over G: if elapsed >= max_minutes_per_call → end
+    G->>R: INCR daily on end
+    G->>Q: AddCallMinutes monthly
+  end
+```
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

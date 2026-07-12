@@ -26,9 +26,13 @@ type Config struct {
 	Model  string
 }
 
+// LocaleHintFunc returns an optional system-prompt suffix (e.g. preferred reply language).
+type LocaleHintFunc func(ctx context.Context, tenantID string) string
+
 type Relay struct {
-	cfg Config
-	rag *rag.Service
+	cfg        Config
+	rag        *rag.Service
+	LocaleHint LocaleHintFunc
 }
 
 func New(cfg Config, ragSvc *rag.Service) *Relay {
@@ -66,7 +70,7 @@ func (r *Relay) Handler() http.HandlerFunc {
 			cp.rag = r.rag.WithTenant(tenantID)
 			relay = &cp
 		}
-		gem, err := relay.dial(ctx, agent, topic)
+		gem, err := relay.dial(ctx, agent, topic, tenantID)
 		if err != nil {
 			log.Printf("gemini live dial: %v", err)
 			_ = client.WriteJSON(serverMsg{Type: "error", Message: "Gemini Live connection failed"})
@@ -179,9 +183,14 @@ func (r *Relay) Handler() http.HandlerFunc {
 	}
 }
 
-func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic string) (*websocket.Conn, error) {
+func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic, tenantID string) (*websocket.Conn, error) {
 	start := time.Now()
 	prompt := workforce.SystemPrompt(agent)
+	if r.LocaleHint != nil && tenantID != "" {
+		if hint := r.LocaleHint(ctx, tenantID); hint != "" {
+			prompt += "\n\n" + hint
+		}
+	}
 
 	type ragOut struct {
 		result rag.Result

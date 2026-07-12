@@ -53,6 +53,11 @@
           href="{base}/km"
           class:active={$page.url.pathname.includes('/km')}>Knowledge</a
         >
+        <a
+          class="link"
+          href="{base}/settings"
+          class:active={$page.url.pathname.includes('/settings')}>Settings</a
+        >
         <a class="link" href="{base}/login">Profile</a>
       </nav>
       <button class="btn ghost" type="button" onclick={logout}>Logout</button>

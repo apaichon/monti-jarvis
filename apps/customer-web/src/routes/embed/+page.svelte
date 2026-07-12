@@ -187,9 +187,9 @@
                 ? `On call with ${selected?.name}. Speak to ask about products or support.`
                 : `Ready to call ${selected?.name}.`;
             },
-            onTranscript: (role, text) => {
+            onTranscript: (role, text, meta) => {
               upsertVoiceTurn(role, text);
-              if (session) void persistTurn(session.id, role, text);
+              if (meta?.final && session) void persistTurn(session.id, role, text);
             },
             onError: (message) => {
               error = message;

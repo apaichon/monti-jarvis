@@ -81,3 +81,27 @@ func noEntitlement() *Error {
 		cause:   ErrNoEntitlement,
 	}
 }
+
+// DailyCallLimit exceeded for S16 operational daily minutes.
+func DailyCallLimit(limit, usage int) *Error {
+	return &Error{
+		Code:      "daily_call_limit",
+		Dimension: "max_call_minutes_per_day",
+		Limit:     limit,
+		Usage:     usage,
+		Message:   fmt.Sprintf("daily call minutes limit exceeded (%d/%d)", usage, limit),
+		cause:     ErrLimitExceeded,
+	}
+}
+
+// PerCallLimit exceeded for S16 max minutes per call.
+func PerCallLimit(limit, usage int) *Error {
+	return &Error{
+		Code:      "per_call_limit",
+		Dimension: "max_minutes_per_call",
+		Limit:     limit,
+		Usage:     usage,
+		Message:   fmt.Sprintf("per-call minutes limit exceeded (%d/%d)", usage, limit),
+		cause:     ErrLimitExceeded,
+	}
+}

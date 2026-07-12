@@ -449,7 +449,23 @@ Schema is created automatically: `callcenter.tenant_embed_configs` (on server st
 
 ---
 
-## 10. Related docs
+## 10. Framework SDKs (roadmap)
+
+Today’s path is the **vanilla script** above. Planned packages (**SPRINT-036** / [FEAT-0017](sdlc/01-features/FEAT-0017-embed-framework-sdks.md)):
+
+| Package | Stack |
+| --- | --- |
+| `@monti/embed-vue` | Vue 3 |
+| `@monti/embed-react` | React |
+| `@monti/embed-svelte` | Svelte |
+| `@monti/embed-web-component` | `<monti-embed>` custom element (any host) |
+| `@monti/embed-core` | Shared resolve + iframe lifecycle |
+
+Until those ship, use §3 script tag or mount the iframe yourself (see `poc/monti-embed` for a Vue host example). Roadmap: [ROADMAP.md](sdlc/00-roadmap/ROADMAP.md).
+
+---
+
+## 11. Related docs
 
 | Doc | Purpose |
 | --- | --- |
@@ -459,4 +475,5 @@ Schema is created automatically: `callcenter.tenant_embed_configs` (on server st
 | [embed-demo.html](fixtures/embed-demo.html) | Sample host page |
 | [b-quik-tyre-embed-demo.html](fixtures/b-quik-tyre-embed-demo.html) | B-Quik tyre highlight demo host |
 | [b-quik-tyre-highlight.md](samples/km/b-quik-tyre-highlight.md) | Sample KM (tyre FAQ from public highlight page) |
-| [FEAT-0014](sdlc/01-features/FEAT-0014-embed-to-web.md) | Feature ACs |
+| [FEAT-0014](sdlc/01-features/FEAT-0014-embed-to-web.md) | Feature ACs (vanilla embed) |
+| [FEAT-0017](sdlc/01-features/FEAT-0017-embed-framework-sdks.md) | Framework SDK packages (backlog) |

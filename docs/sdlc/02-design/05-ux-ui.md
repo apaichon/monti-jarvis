@@ -1500,4 +1500,44 @@ Upload a Markdown FAQ (scope general) to ground answers.
 | API client | `apps/tenant-web/src/lib/api/km.ts` |
 | Nav link | `apps/tenant-web/src/routes/+layout.svelte` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+## Sprint 16 — Tenant Settings (T9)
+
+### Screen map → API
+
+| Zone | Action | API |
+| --- | --- | --- |
+| A0 | Nav Settings | — |
+| B1 | Save workspace | `PUT /api/tenant/settings` |
+| C1 | View meters | `GET /api/tenant/usage` |
+| D1 | Save call limits | `PUT /api/tenant/call-limits` |
+
+### T9 ASCII
+
+```
+┌─ Tenant shell … Knowledge [Settings] ───────────────────────┐
+│ Settings                                                     │
+│ ┌ Workspace ──────────────────────────────────────────────┐ │
+│ │ Display name [____________] Locale [th ▾] TZ [Bangkok▾] │ │
+│ │ AI reply language [auto ▾]                    [Save]    │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ ┌ Usage (this month) ─────────────────────────────────────┐ │
+│ │ Minutes  120 / 5000   KM docs  12 / 500   Agents 3 / 10 │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ ┌ Call limits ────────────────────────────────────────────┐ │
+│ │ Max minutes / call [15]   Max minutes / day [120]       │ │
+│ │ Package monthly ceiling: 5000 min             [Save]    │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ ┌ Labels (scaffold) ──────────────────────────────────────┐ │
+│ │ Tier label [____]  Group label [____]  (full tiers S18) │ │
+│ └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Components
+
+| UI | Path |
+| --- | --- |
+| Settings page | `apps/tenant-web/src/routes/settings/+page.svelte` |
+| API client | `apps/tenant-web/src/lib/api/settings.ts` |
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

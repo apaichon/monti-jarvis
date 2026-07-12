@@ -1,4 +1,4 @@
-# Monti AI Call Center — 35-Sprint Roadmap
+# Monti AI Call Center — Roadmap (35 core + S36 embed SDKs + S37 central brand portal)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -37,15 +37,15 @@
 | 11 | Platform Admin | Receipt ops | C | 10 ✅ v1.3.0 |
 | 12 | Tenant | Tax Invoice compliance | C | 10, 11 ✅ v1.3.0 |
 | 13 | Platform Admin | Quota, Rate Limit | B | 3, 4 ✅ v1.4.0 |
-| 14 | Tenant | Embed to Web | D | 1, 6 ✅ v1.5.0 |
+| 14 | Tenant | Embed to Web (vanilla loader + iframe) | D | 1, 6 ✅ v1.5.0 |
 | 15 | Tenant | Set Scope and KM | D | 2, 6 ✅ v1.6.0 |
-| 16 | Tenant | Settings, Locale, Limit user tier, group, Quota for customer call time per day, call minute per each call | D | 13, 15 |
+| 16 | Tenant | Settings, Locale, Limit user tier, group, Quota for customer call time per day, call minute per each call | D | 13, 15 ✅ v1.7.0 |
 | 17 | Tenant | Test and Preview | D | 15, 16 |
 | 18 | Tenant | Customer Tier | D | 16 |
-| 19 | Customer | Register | E | 3 |
+| 19 | Tenant | Customer Account Import, Integration | E | 3 |
 | 20 | Customer | Auth | E | 19 |
 | 21 | Customer | Select AI Workforce to Conversation | A | 1, 5 |
-| 22 | Platform / Tenant | Conversation Records, Knowledge Gap | F | 1, 3 |
+| 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt and not), Knowledge Gap | F | 1, 3 |
 | 23 | Tenant | Tickets | F | 22 |
 | 24 | Tenant | Review | F | 22, 23 |
 | 25 | Tenant | Dashboard | F | 22 (ClickHouse) |
@@ -55,10 +55,12 @@
 | 29 | Platform | Dashboard | G | 28 (ClickHouse) |
 | 30 | Platform | Monitoring | G | 29 |
 | 31 | Tuning | gRPC, Cache on Prod | H | 25+ |
-| 32 | Tuning | Partition, Hardening | H | 31 |
+| 32 | Tuning | Partition,Index, Hardening | H | 31 |
 | 33 | Infra | Scale, Auto Scale | I | 32 |
 | 34 | Infra | Canary Deployment | I | 33 |
 | 35 | Infra | Backup Restore Archive | I | 33 |
+| **36** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **D+** | **14** · [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · backlog |
+| **37** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
 
 ---
 
@@ -88,7 +90,14 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 
 ### Phase D — Tenant go-live (14–18)
 
-- Web embed widget, tenant KM/scope admin, locale/settings/limits, test sandbox, customer tiers
+- Web embed widget (vanilla `monti-embed.js` + iframe), tenant KM/scope admin, locale/settings/limits, test sandbox, customer tiers
+
+### Phase D+ — Integrator embed SDKs (36)
+
+- First-class packages for host apps: **Vue 3**, **React**, **Svelte**, and a **Web Component** (`<monti-embed>`) on top of S14 public resolve + embed surface
+- Shared `@monti/embed-core` + per-framework wrappers; keep zero-dep script tag path
+- Feature: [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · Depends on Sprint 14 (shipped v1.5.0)
+- *Pull forward before S19–35 if integrator demand is high; otherwise schedule after Phase D go-live*
 
 ### Phase E — Customer identity (19–20)
 
@@ -109,6 +118,14 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 ### Phase I — Infra scale (33–35)
 
 - Autoscale, canary deployments, backup/restore/archive
+
+### Phase J — Central multi-brand call portal (37)
+
+- Platform-hosted **call center hub**: search/browse **all listed tenant brands**, brand profile, language + AI employee, start chat/voice
+- Complements per-tenant **embed** (S14): hub = Monti multi-brand directory; embed = tenant’s own website
+- Tenant opt-in listing + brand profile fields; platform moderate/unlist
+- Blueprint §5.1 Customer Portal · Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md)
+- *Pull forward after S14–18 if hub-first distribution is priority*
 
 ---
 
@@ -185,6 +202,63 @@ Sprint: [SPRINT-014.md](../03-sprints/SPRINT-014.md) · Feature: [FEAT-0014](../
 
 Sprint: [SPRINT-015.md](../03-sprints/SPRINT-015.md) · Feature: [FEAT-0015](../01-features/FEAT-0015-tenant-scope-km.md) · Spec: [18-tenant-scope-km-spec.md](../02-design/18-tenant-scope-km-spec.md) · UAT: [SPRINT-015-manual.md](../06-manual-tests/SPRINT-015-manual.md)
 
-## Current sprint: SPRINT-016 — Settings, Locale, Limits *(next open)*
+## Shipped: SPRINT-016 — Settings, Locale, Limits — v1.7.0
 
-**Platform:** Tenant · **Feature:** Settings, Locale, Limit user tier, group, quota for customer call time · **Depends:** 13, 15
+**Closed 2026-07-12.** Tenant settings (locale/timezone), usage snapshot, operational call caps (daily + per-call), AI locale hint, voice caption polish.
+
+| Task | Points | Outcome |
+| --- | ---: | --- |
+| TASK-0072 | 3 | `tenant_settings` + `tenant_call_limits` schema, Redis daily keys |
+| TASK-0073 | 5 | Settings/usage/limits APIs + voice enforce |
+| TASK-0074 | 4 | `/tenant/settings` UI |
+| TASK-0075 | 3 | Locale / AI reply language wiring |
+| TASK-0076 | 1 | Manual UAT checklist |
+
+Sprint: [SPRINT-016.md](../03-sprints/SPRINT-016.md) · Feature: [FEAT-0016](../01-features/FEAT-0016-tenant-settings-locale-limits.md) · Spec: [19-tenant-settings-limits-spec.md](../02-design/19-tenant-settings-limits-spec.md) · UAT: [SPRINT-016-manual.md](../06-manual-tests/SPRINT-016-manual.md)
+
+### ⚠ Production launch gate (carry forward)
+
+**Before production launch to end customers** — after integrating **tenant customer-user authentication** (S19–20) — **must ensure rate limit and quota management work** under real multi-user traffic:
+
+1. Package quotas (S13) — monthly minutes, concurrent, KM, features  
+2. API rate limits (S13) — chat / voice / KM per minute  
+3. Operational call caps (S16) — daily + per-call minutes  
+4. Tenant isolation (customer of A ≠ quota of B)  
+5. Production env flags for quota/rate-limit fail mode  
+
+Do **not** open customer production traffic until this gate is signed off (DevOps + Tester).
+
+## Next sprint: SPRINT-017
+
+**Platform:** Tenant · **Feature:** Test and Preview · **Depends:** 15, 16
+
+## Backlog add: SPRINT-036 — Embed Framework SDKs
+
+**Platform:** Tenant / Integrator · **Feature:** Vue · React · Svelte · Web Component packages · **Depends:** 14 · **Status:** backlog
+
+| Deliverable | Notes |
+| --- | --- |
+| `@monti/embed-core` | Shared resolve, iframe lifecycle, postMessage |
+| `@monti/embed-vue` | Vue 3 component / plugin |
+| `@monti/embed-react` | React component + hooks |
+| `@monti/embed-svelte` | Svelte component |
+| `@monti/embed-web-component` | `<monti-embed>` custom element |
+| Docs + POCs | Update `EMBED_WEB_INTEGRATION.md`; `poc/` or `examples/` per stack |
+| Tenant UI snippets | Optional framework tab on `/tenant/embed` |
+
+Feature: [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · Builds on [FEAT-0014](../01-features/FEAT-0014-embed-to-web.md) (vanilla loader remains supported)
+
+## Backlog add: SPRINT-037 — Central Call Center Brand Portal
+
+**Platform:** Customer / Platform · **Feature:** Multi-tenant brand directory + conversation · **Depends:** 1, 5, 6, 7 · **Status:** backlog
+
+| Deliverable | Notes |
+| --- | --- |
+| Public brand directory | List/search **active + listed** tenant brands |
+| Brand profile page | Logo, blurb, languages, AI workforce CTAs |
+| Start chat / voice | Session under selected `tenant_id` + agent (KM/quota scoped) |
+| Tenant opt-in | “List on central portal” + public brand fields |
+| Platform moderate | Force-unlist; feature flags |
+| Routes | e.g. `/brands`, `/brands/{slug}` → conversation pre-bound |
+
+Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · Blueprint §5.1 · Complements [FEAT-0014](../01-features/FEAT-0014-embed-to-web.md) (per-site embed)
