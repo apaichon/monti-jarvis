@@ -55,7 +55,7 @@
           labels: 'ป้ายกำกับ (ชั่วคราว)',
           tier: 'ระดับลูกค้า (โน้ต)',
           group: 'กลุ่ม (โน้ต)',
-          labelsHelp: 'สำหรับโน้ตภายใน — โมเดลระดับเต็มใน Sprint 18',
+          labelsHelp: 'โน้ตภายใน — จัดการระดับลูกค้าที่เมนู Tiers',
           i18nNote: 'แปลทั้งพอร์ทัลยังไม่อยู่ในสโคป — หน้านี้เท่านั้น'
         }
       : {
@@ -78,7 +78,7 @@
           labels: 'Labels (scaffold)',
           tier: 'User tier label',
           group: 'User group label',
-          labelsHelp: 'Ops notes only — full customer tiers in Sprint 18',
+          labelsHelp: 'Ops notes — manage structured tiers under Tiers (menu)',
           i18nNote: 'Full portal i18n is out of scope — settings page only'
         }
   );
@@ -287,7 +287,10 @@
 
     <section class="card">
       <h2>{t.labels}</h2>
-      <p style="font-size:12px;color:var(--muted);margin:0 0 12px">{t.labelsHelp}</p>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px">
+        {t.labelsHelp}
+        <a class="link" href="{base}/tiers" style="margin-left:6px">Open Tiers →</a>
+      </p>
       <label>
         <span>{t.tier}</span>
         <input type="text" bind:value={tierLabel} placeholder="VIP / standard" />

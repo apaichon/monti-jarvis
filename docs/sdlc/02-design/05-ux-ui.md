@@ -1599,4 +1599,50 @@ Note Redis monthly minutes
 | API client | `apps/tenant-web/src/lib/api/preview.ts` |
 | Nav | `apps/tenant-web/src/routes/+layout.svelte` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+## Sprint 18 — Customer Tiers (T11)
+
+### Screen map → API
+
+| Zone | Action | API |
+| --- | --- | --- |
+| A0 | Nav Tiers | — |
+| B1 | List tiers | `GET /api/tenant/tiers` |
+| B2 | Create / save tier | `POST/PUT /api/tenant/tiers` |
+| B3 | Delete tier | `DELETE /api/tenant/tiers/{id}` |
+| C1 | Groups CRUD | `/api/tenant/groups` |
+| D1 | Preview with tier | `POST /api/tenant/preview/chat` + `tier_id` |
+
+### T11 ASCII
+
+```
+┌─ Tenant shell … Preview [Tiers] ────────────────────────────┐
+│ Customer tiers                                               │
+│ [+ New tier]                                                 │
+│ ┌ list ───────────────────────────────────────────────────┐ │
+│ │ VIP   vip   prio 100   locale th   caps 30/day inherit  │ │
+│ │ Standard …                                    [Edit] [×] │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ ┌ edit form ──────────────────────────────────────────────┐ │
+│ │ Name [VIP] Slug [vip] Priority [100] Active [✓]         │ │
+│ │ Default agent [Ava ▾]  AI locale [th ▾]                 │ │
+│ │ Max min/call [30]  Max min/day [0=inherit]     [Save]   │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│ Groups (ops labels)  [+ Add]  Retail · Enterprise           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Define VIP
+
+```
+New tier → name VIP slug vip → locale th → max_minutes_per_call 30 → Save
+→ appears in list → Preview tier select VIP → chat uses Thai preference
+```
+
+### Components → files
+
+| UI | Path |
+| --- | --- |
+| Tiers page | `apps/tenant-web/src/routes/tiers/+page.svelte` |
+| API client | `apps/tenant-web/src/lib/api/tiers.ts` |
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

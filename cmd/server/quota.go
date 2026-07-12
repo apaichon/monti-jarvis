@@ -99,7 +99,7 @@ func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 
-	// S16 operational caps (under package monthly).
+	// S16 operational caps (under package monthly); S18 tier overrides when tier_id set.
 	maxPerCall := 0
 	maxPerDay := 0
 	tz := "Asia/Bangkok"
@@ -108,6 +108,16 @@ func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, t
 		if lim, err := s.store.GetOrCreateTenantCallLimits(ctx, tenantID); err == nil && lim != nil {
 			maxPerCall = lim.MaxMinutesPerCall
 			maxPerDay = lim.MaxCallMinutesPerDay
+		}
+		if tierID := strings.TrimSpace(r.URL.Query().Get("tier_id")); tierID != "" {
+			if t, err := s.store.GetCustomerTier(ctx, tenantID, tierID); err == nil && t != nil && t.Active {
+				if t.MaxMinutesPerCall > 0 {
+					maxPerCall = t.MaxMinutesPerCall
+				}
+				if t.MaxCallMinutesPerDay > 0 {
+					maxPerDay = t.MaxCallMinutesPerDay
+				}
+			}
 		}
 		if err := s.quota.CheckDailyCallMinutes(ctx, tenantID, tz, maxPerDay); err != nil {
 			writeQuotaError(w, err)

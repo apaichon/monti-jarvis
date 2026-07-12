@@ -22,6 +22,7 @@
     type PreviewAgent,
     type PreviewChatMessage
   } from '$lib/api/preview';
+  import { listTiers, type CustomerTier } from '$lib/api/tiers';
   import {
     micAvailabilityError,
     requestMicrophone,
@@ -43,6 +44,8 @@
   let topic = $state('general');
   /** Session language: auto | en | th */
   let lang = $state<'auto' | 'en' | 'th'>('auto');
+  let tiers = $state<CustomerTier[]>([]);
+  let tierId = $state('');
   let input = $state('');
   let messages = $state<UiMsg[]>([]);
   let sessionId = $state('');
@@ -184,11 +187,13 @@
   async function load(preferAgent?: string) {
     loading = true;
     try {
-      const [ag, sc, emb] = await Promise.all([
+      const [ag, sc, emb, tr] = await Promise.all([
         listPreviewAgents(),
         listScenarios(),
-        getEmbedConfig().catch(() => null)
+        getEmbedConfig().catch(() => null),
+        listTiers().catch(() => ({ tiers: [] as CustomerTier[] }))
       ]);
+      tiers = (tr.tiers || []).filter((t) => t.active);
       agents = (ag.agents || []).filter((a) => a.id);
       if (!agents.length) {
         agents = [
@@ -263,7 +268,8 @@
         message: text,
         session_id: sessionId || undefined,
         history,
-        lang
+        lang,
+        tier_id: tierId || undefined
       });
       sessionId = res.session_id;
       history = [
@@ -347,7 +353,7 @@
       player.connect(playbackCtx.destination);
 
       connectStep = 'Connecting to AI (may take several seconds)…';
-      const url = previewVoiceURL(selected.id, topic, lang);
+      const url = previewVoiceURL(selected.id, topic, lang, tierId || undefined);
       voiceWs = new WebSocket(url);
       await new Promise<void>((resolve, reject) => {
         // Gemini Live dial + RAG can take >10s
@@ -581,6 +587,17 @@
               <option value="th">ไทย</option>
             </select>
           </label>
+          {#if tiers.length}
+            <label class="topic-lab">
+              Tier
+              <select bind:value={tierId} disabled={voiceLive || voiceBusy}>
+                <option value="">None</option>
+                {#each tiers as t}
+                  <option value={t.id}>{t.name}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
           {#if !voiceLive}
             <button
               class="voice-button"

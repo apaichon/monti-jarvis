@@ -1288,4 +1288,46 @@ flowchart LR
   end
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 52. Create customer tier (Sprint 18)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant Auth as RequireTenantAdminActive
+  participant P as Postgres
+
+  A->>G: POST /api/tenant/tiers
+  G->>Auth: JWT tenant_admin + active
+  G->>G: validate slug, caps ≥ 0, locale
+  G->>P: INSERT customer_tiers
+  G-->>A: 201 tier
+```
+
+## 53. Preview with tier_id (Sprint 18)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant T as customer_tiers
+  participant L as call limits resolve
+  participant AI as Gemini
+
+  A->>G: POST /api/tenant/preview/chat {tier_id}
+  G->>T: load tier by id + jwt.tenant
+  G->>L: effective caps = tier override or tenant defaults
+  G->>AI: system prompt + tier locale if set
+  G-->>A: reply mode=preview
+```
+
+## 54. Future: customer assigned to tier (S19+)
+
+```mermaid
+flowchart LR
+  C[customer account] --> T[customer_tiers]
+  C --> G[customer_groups]
+  T --> R[limits + agent + locale]
+```
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

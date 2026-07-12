@@ -900,4 +900,42 @@ erDiagram
 
 **No new tables required** if column add on existing `call_sessions` is preferred over separate `preview_sessions`.
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
+## Sprint 18 — customer_tiers + customer_groups
+
+```mermaid
+erDiagram
+  tenants ||--o{ customer_tiers : defines
+  tenants ||--o{ customer_groups : defines
+  customer_tiers {
+    text id PK
+    text tenant_id
+    text name
+    text slug
+    int priority
+    text description
+    text default_agent_id
+    text ai_reply_locale
+    int max_minutes_per_call
+    int max_call_minutes_per_day
+    boolean active
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+  customer_groups {
+    text id PK
+    text tenant_id
+    text name
+    text slug
+    text description
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+**Future (S19+):** `customers.tier_id` → `customer_tiers`, optional group membership.
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.

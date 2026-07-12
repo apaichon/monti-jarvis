@@ -1434,4 +1434,31 @@ Auth: **Bearer** `tenant_admin` + active. Tenant id from JWT only.
 | 401/403 | not tenant_admin / inactive |
 | 429 | `rate_limited` / `preview_concurrent` |
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+## Customer Tiers & Groups (Sprint 18)
+
+Auth: **Bearer** `tenant_admin` + active. Tenant id from JWT only.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/tenant/tiers` | List tiers |
+| `POST` | `/api/tenant/tiers` | Create tier |
+| `GET` | `/api/tenant/tiers/{id}` | Get one |
+| `PUT` | `/api/tenant/tiers/{id}` | Update |
+| `DELETE` | `/api/tenant/tiers/{id}` | Delete |
+| `GET` | `/api/tenant/groups` | List groups |
+| `POST` | `/api/tenant/groups` | Create group |
+| `GET` | `/api/tenant/groups/{id}` | Get one |
+| `PUT` | `/api/tenant/groups/{id}` | Update |
+| `DELETE` | `/api/tenant/groups/{id}` | Delete |
+
+**POST tier body:** see [21-customer-tier-spec.md](21-customer-tier-spec.md).
+
+**Preview:** `POST /api/tenant/preview/chat` may include `tier_id`; voice WS may pass `tier_id` query for cap/locale overrides.
+
+| HTTP | code |
+| ---: | --- |
+| 400 | invalid slug / locale / negative caps |
+| 404 | tier not found (or other tenant) |
+| 401/403 | not tenant_admin / inactive |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

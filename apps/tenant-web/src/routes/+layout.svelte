@@ -61,6 +61,11 @@
         >
         <a
           class="nav-link"
+          href="{base}/tiers"
+          class:active={$page.url.pathname.includes('/tiers')}><span>◆</span>Tiers</a
+        >
+        <a
+          class="nav-link"
           href="{base}/preview"
           class:active={$page.url.pathname.includes('/preview')}><span>◉</span>Preview <em>LIVE</em></a
         >

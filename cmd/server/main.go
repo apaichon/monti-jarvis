@@ -320,6 +320,18 @@ func main() {
 	mux.Handle("POST /api/tenant/preview/chat", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantPreviewChat)))
 	mux.HandleFunc("GET /ws/tenant/preview/voice", s.tenantPreviewVoiceWS)
 
+	// SPRINT-018 — customer tiers + groups
+	mux.Handle("GET /api/tenant/tiers", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantTiers)))
+	mux.Handle("POST /api/tenant/tiers", guard.RequireTenantAdminActive(http.HandlerFunc(s.createTenantTier)))
+	mux.Handle("GET /api/tenant/tiers/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantTier)))
+	mux.Handle("PUT /api/tenant/tiers/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantTier)))
+	mux.Handle("DELETE /api/tenant/tiers/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantTier)))
+	mux.Handle("GET /api/tenant/groups", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantGroups)))
+	mux.Handle("POST /api/tenant/groups", guard.RequireTenantAdminActive(http.HandlerFunc(s.createTenantGroup)))
+	mux.Handle("GET /api/tenant/groups/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantGroup)))
+	mux.Handle("PUT /api/tenant/groups/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantGroup)))
+	mux.Handle("DELETE /api/tenant/groups/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantGroup)))
+
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
 	mux.Handle("GET /api/tenant/orders/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrder)))

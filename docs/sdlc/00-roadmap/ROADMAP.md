@@ -41,7 +41,7 @@
 | 15 | Tenant | Set Scope and KM | D | 2, 6 ✅ v1.6.0 |
 | 16 | Tenant | Settings, Locale, Limit user tier, group, Quota for customer call time per day, call minute per each call | D | 13, 15 ✅ v1.7.0 |
 | 17 | Tenant | Test and Preview | D | 15, 16 ✅ v1.8.0 |
-| 18 | Tenant | Customer Tier | D | 16 |
+| 18 | Tenant | Customer Tier | D | 16 ✅ v1.9.0 |
 | 19 | Tenant | Customer Account Import, Domain Rules, Integration | E | 3 |
 | 20 | Customer | Auth | E | 19 |
 | 21 | Customer | Select AI Workforce to Conversation | A | 1, 5 |
@@ -246,9 +246,27 @@ Sprint: [SPRINT-017.md](../03-sprints/SPRINT-017.md) · Feature: [FEAT-0019](../
 
 Before **customer production** after tenant **customer-user auth** (S19–20): verify **rate limit + package quota** under multi-user load.
 
-## Next sprint: SPRINT-018
+## Shipped: SPRINT-018 — Customer Tier — v1.9.0
 
-**Platform:** Tenant · **Feature:** Customer Tier · **Depends:** 16
+**Closed 2026-07-12.** Tenant tier catalog + groups, REST CRUD, `/tenant/tiers` UI, preview `tier_id` locale/cap overrides, settings link.
+
+| Task | Points | Outcome |
+| --- | ---: | --- |
+| TASK-0082 | 3 | `customer_tiers` + `customer_groups` schema |
+| TASK-0083 | 5 | Tiers/groups REST APIs |
+| TASK-0084 | 4 | `/tenant/tiers` UI |
+| TASK-0085 | 3 | Preview tier_id + settings link |
+| TASK-0086 | 1 | Manual UAT |
+
+Sprint: [SPRINT-018.md](../03-sprints/SPRINT-018.md) · Feature: [FEAT-0020](../01-features/FEAT-0020-customer-tier.md) · Spec: [21-customer-tier-spec.md](../02-design/21-customer-tier-spec.md) · UAT: [SPRINT-018-manual.md](../06-manual-tests/SPRINT-018-manual.md)
+
+### Production launch gate (still open)
+
+Before **customer production** after tenant **customer-user auth** (S19–20): verify rate limit + quota **with tier overrides**.
+
+## Next sprint: SPRINT-019
+
+**Platform:** Tenant · **Feature:** Customer Account Import, Integration · **Depends:** 3
 
 ## Backlog add: SPRINT-036 — Embed Framework SDKs
 

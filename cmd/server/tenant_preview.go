@@ -24,6 +24,8 @@ type previewChatRequest struct {
 	History   []gemini.Message `json:"history"`
 	// Lang: en | th | auto (optional session language preference)
 	Lang string `json:"lang"`
+	// TierID optional customer tier for locale / future caps (SPRINT-018)
+	TierID string `json:"tier_id"`
 }
 
 // GET /api/tenant/preview/scenarios — static suggested questions (no AI).
@@ -60,6 +62,17 @@ func (s *server) tenantPreviewChat(w http.ResponseWriter, r *http.Request) {
 	if req.Message == "" {
 		writeError(w, http.StatusBadRequest, "message is required")
 		return
+	}
+
+	// Optional tier: default agent + locale override.
+	var tier *store.CustomerTier
+	if tid := strings.TrimSpace(req.TierID); tid != "" && s.store != nil {
+		if t, err := s.store.GetCustomerTier(r.Context(), tenantID, tid); err == nil && t != nil && t.Active {
+			tier = t
+			if strings.TrimSpace(req.AgentID) == "" && t.DefaultAgentID != "" {
+				req.AgentID = t.DefaultAgentID
+			}
+		}
 	}
 
 	agent := workforce.Resolve(req.AgentID)
@@ -105,6 +118,9 @@ func (s *server) tenantPreviewChat(w http.ResponseWriter, r *http.Request) {
 	}
 	prompt := workforce.SystemPrompt(agent)
 	lang := strings.ToLower(strings.TrimSpace(req.Lang))
+	if lang == "" && tier != nil && strings.TrimSpace(tier.AIReplyLocale) != "" {
+		lang = strings.ToLower(strings.TrimSpace(tier.AIReplyLocale))
+	}
 	switch lang {
 	case "th":
 		prompt += "\n\nReply in Thai (ภาษาไทย) for this conversation unless the user switches language."
@@ -118,6 +134,9 @@ func (s *server) tenantPreviewChat(w http.ResponseWriter, r *http.Request) {
 				prompt += "\n\n" + hint
 			}
 		}
+	}
+	if tier != nil {
+		prompt += "\n\nCustomer tier for this preview session: " + tier.Name + " (" + tier.Slug + ")."
 	}
 	if useRAG && ragSvc != nil {
 		prompt = ragSvc.AugmentPrompt(prompt, agent.ID, topic, req.Message, ragResult)
@@ -149,7 +168,7 @@ func (s *server) tenantPreviewChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	out := map[string]any{
 		"session_id": sessionID,
 		"agent_id":   agent.ID,
 		"reply":      reply,
@@ -157,7 +176,12 @@ func (s *server) tenantPreviewChat(w http.ResponseWriter, r *http.Request) {
 		"missing_km": ragResult.MissingKM,
 		"mode":       "preview",
 		"tenant_id":  tenantID,
-	})
+	}
+	if tier != nil {
+		out["tier_id"] = tier.ID
+		out["tier_slug"] = tier.Slug
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // GET /ws/tenant/preview/voice — tenant-admin preview voice.

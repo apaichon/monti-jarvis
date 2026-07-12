@@ -83,6 +83,7 @@ export function previewChat(body: {
   session_id?: string;
   history?: PreviewChatMessage[];
   lang?: string;
+  tier_id?: string;
 }) {
   return apiFetch<PreviewChatResult>('/api/tenant/preview/chat', {
     method: 'POST',
@@ -91,13 +92,19 @@ export function previewChat(body: {
 }
 
 /** Build preview voice WebSocket URL with access_token for auth. */
-export function previewVoiceURL(agentId: string, topic: string, lang?: string): string {
+export function previewVoiceURL(
+  agentId: string,
+  topic: string,
+  lang?: string,
+  tierId?: string
+): string {
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   const params = new URLSearchParams({
     agent: agentId,
     topic: topic || 'general'
   });
   if (lang) params.set('lang', lang);
+  if (tierId) params.set('tier_id', tierId);
   const token = getAccessToken();
   if (token) params.set('access_token', token);
   const tid = getStoredUser()?.tenant_id;
