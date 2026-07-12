@@ -12,9 +12,10 @@ const (
 )
 
 // ChillPay ChannelCode values (form field ChannelCode on InitPayment).
+// Sandbox/merchant docs: QR PromptPay uses bank_qrcode (not "promptpay").
 const (
 	ChannelCreditCard  = "creditcard"
-	ChannelQRPromptPay = "promptpay"
+	ChannelQRPromptPay = "bank_qrcode"
 )
 
 // NormalizePaymentMethod returns a canonical method or an error if unsupported.
@@ -22,7 +23,7 @@ func NormalizePaymentMethod(raw string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", MethodCreditCard, "creditcard", "card":
 		return MethodCreditCard, nil
-	case MethodQRPromptPay, "promptpay", "qr", "qrcode", "qr_code":
+	case MethodQRPromptPay, "promptpay", "qr", "qrcode", "qr_code", "bank_qrcode":
 		return MethodQRPromptPay, nil
 	default:
 		return "", fmt.Errorf("unsupported payment_method %q (use credit_card or qr_promptpay)", raw)

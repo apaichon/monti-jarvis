@@ -1018,4 +1018,161 @@ sequenceDiagram
   Note over A: Old key returns 404 on public resolve
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 40. Tenant uploads KM document (Sprint 15)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant B as Browser /tenant/km
+  participant G as Go :8091
+  participant Auth as internal/auth
+  participant Q as internal/quota
+  participant K as internal/km
+  participant P as Postgres
+  participant M as MinIO
+  participant C as ClickHouse
+  participant Emb as Gemini embed
+
+  A->>B: Select agent + scope + file
+  B->>G: POST /api/tenant/km/agents/{agent_id}/documents multipart Bearer
+  G->>Auth: RequireTenantAdminActive
+  alt unauthorized or inactive
+    G-->>B: 401/403
+  else ok
+    G->>Q: AllowRate(BucketKM) + CheckKMDocument
+    alt quota exceeded
+      G-->>B: 429/403 quota code
+    else allowed
+      G->>K: Ingest(jwt.tenant_id, agent, file, scope)
+      K->>M: PUT km/{tenant}/{agent}/{doc}/original/{file}
+      K->>P: INSERT knowledge_documents status=uploaded
+      K->>P: status=indexing
+      K->>Emb: embed chunks
+      K->>P: ReplaceKnowledgeChunks
+      K->>C: INSERT km_embeddings
+      K->>P: status=indexed chunk_count=N
+      G-->>B: 201 document JSON
+    end
+  end
+```
+
+## 41. Tenant deletes KM document (Sprint 15)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant K as internal/km
+  participant P as Postgres
+  participant M as MinIO
+  participant C as ClickHouse
+
+  A->>G: DELETE /api/tenant/km/documents/{id} Bearer
+  G->>K: DeleteDocument(jwt.tenant_id, id)
+  K->>P: GetKnowledgeDocument(id)
+  alt missing or tenant_id mismatch
+    G-->>A: 404 document not found
+  else ok
+    K->>C: DELETE km_embeddings WHERE tenant_id AND document_id
+    K->>M: Delete object_key
+    K->>P: DELETE knowledge_chunks CASCADE / document
+    G-->>A: 200 { deleted: true, id }
+  end
+```
+
+## 42. Tenant lists agents and documents (Sprint 15)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant P as Postgres
+
+  A->>G: GET /api/tenant/km/agents Bearer
+  G->>P: tenant workforce agents + COUNT docs by agent
+  G-->>A: { agents: [{id,name,doc_count,by_scope}] }
+  A->>G: GET /api/tenant/km/agents/{agent_id}/documents
+  G->>P: ListKnowledgeDocuments(tenant, agent)
+  G-->>A: { agent_id, documents: [...] }
+  A->>G: GET /api/tenant/km/scopes
+  G-->>A: { scopes: [general,billing,technical] }
+```
+
+## 43. Tenant updates document scope (Sprint 15)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant K as internal/km
+  participant P as Postgres
+  participant C as ClickHouse
+
+  A->>G: PATCH /api/tenant/km/documents/{id} {km_scope}
+  G->>K: UpdateDocumentScope(tenant, id, scope)
+  alt invalid scope
+    G-->>A: 400
+  else not found
+    G-->>A: 404
+  else ok
+    Note over K: Prefer re-tag chunks + CH without full re-embed when vector text unchanged; if implementation re-ingests, document it
+    K->>P: UPDATE knowledge_documents.km_scope + chunks.km_scope
+    K->>C: UPDATE/rewrite km_scope on embeddings for document_id
+    G-->>A: 200 document JSON
+  end
+```
+
+## 44. Tenant resets agent knowledge (Sprint 15)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant G as Go :8091
+  participant K as internal/km
+  participant P as Postgres
+  participant M as MinIO
+  participant C as ClickHouse
+
+  A->>G: POST /api/tenant/km/agents/{agent_id}/reset Bearer
+  G->>K: ResetAgent(jwt.tenant_id, agent_id)
+  K->>P: list object_keys for tenant+agent
+  K->>C: DELETE embeddings tenant+agent
+  K->>M: delete objects
+  K->>P: DeleteAgentKnowledge
+  G-->>A: 200 { agent_id, status: reset }
+```
+
+### Document status state (S2 + S15)
+
+| From | To | Trigger |
+| --- | --- | --- |
+| — | `uploaded` | Create after MinIO put |
+| `uploaded` | `indexing` | Chunk/embed start |
+| `indexing` | `indexed` | Embeddings + chunks ready (RAG) |
+| `indexing` | `failed` | Embed/chunk error |
+| any | *(deleted)* | DELETE document or agent reset |
+
+UI labels: show **ready** for `indexed`; **processing** for `uploaded`/`indexing`; **failed** for `failed`.
+
+## 45. Record knowledge gap on missing KM (Sprint 15)
+
+```mermaid
+sequenceDiagram
+  actor C as Caller
+  participant G as Go :8091
+  participant R as internal/rag
+  participant CH as ClickHouse qa_events
+  participant P as Postgres km_gaps
+
+  C->>G: POST /api/chat message
+  G->>R: Retrieve(agent, topic, question)
+  R-->>G: MissingKM=true, sources=[]
+  G->>CH: InsertQAEvent missing_km
+  G->>P: RecordKMGap upsert by question_hash
+  Note over P: occurrence_count++ if same tenant+agent+hash
+  G-->>C: reply + missing_km true
+```
+
+Tenant later: `GET /api/tenant/km/gaps` → write FAQ doc → `PATCH` gap `status=converted`.
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

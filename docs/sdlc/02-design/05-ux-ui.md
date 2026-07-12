@@ -1361,4 +1361,143 @@ Site http://evil.test loads snippet
 | Loader | static `/embed/monti-embed.js` (server or customer-web static) |
 | Embed UI | `apps/customer-web` embed route or query mode |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+## Sprint 15 — Tenant KM (T8)
+
+**What changed vs S14:** new **Knowledge** nav item and `/tenant/km` page. Customer portal, embed, and billing UIs unchanged.
+
+### Screen map → API
+
+| Zone | UI | User action | API / WS |
+| --- | --- | --- | --- |
+| A0 | Shell nav | Open **Knowledge** | — route `/tenant/km` |
+| A1 | Page title + help | Read scope explanation | `GET /api/tenant/km/scopes` (cache) |
+| B1 | Agent chips/tabs | Select agent | `GET /api/tenant/km/agents` then docs |
+| B2 | Overview matrix | View counts by scope | data from agents payload `by_scope` |
+| C1 | Upload row | Choose file + scope + Upload | `POST /api/tenant/km/agents/{id}/documents` |
+| D1 | Document table | Load list | `GET /api/tenant/km/agents/{id}/documents` |
+| D2 | Row scope control | Change scope | `PATCH /api/tenant/km/documents/{id}` |
+| D3 | Row delete | Confirm delete | `DELETE /api/tenant/km/documents/{id}` |
+| E1 | Reset | Confirm wipe agent KM | `POST /api/tenant/km/agents/{id}/reset` |
+| F1 | Toast / banner | Show quota/errors | response body |
+| G1 | Knowledge gaps panel | List open unanswered questions | `GET /api/tenant/km/gaps?status=open` |
+| G2 | Gap row | Dismiss / mark resolved | `PATCH /api/tenant/km/gaps/{id}` |
+
+### T8 desktop layout
+
+```
+┌─ A0 Tenant shell ───────────────────────────────────────────────────┐
+│ MONTI TENANT  Backoffice Billing Documents Tax Embed [Knowledge]    │
+│                                                         [Logout]    │
+├─────────────────────────────────────────────────────────────────────┤
+│ A1 Knowledge base                                                   │
+│    Upload FAQs for each AI agent. Scope tags match caller topics:   │
+│    general · billing · technical.                                   │
+│                                                                     │
+│ B1 Agents:  ( Ava ● 3 )  ( Max 1 )  ( Luna 0 )                      │
+│ B2 ┌ Overview ────────────────────────────────────────────────────┐ │
+│    │ Ava  default retrieval: general                              │ │
+│    │      docs by scope → general:2  billing:0  technical:1       │ │
+│    └──────────────────────────────────────────────────────────────┘ │
+│ C1 Upload  [ Choose .md / .txt ]  Scope [ general ▾ ]  [ Upload ]   │
+│                                                                     │
+│ D1 Documents                                                        │
+│ ┌─ filename ────────┬─ scope ───┬─ status ─┬─ chunks ┬─ actions ──┐ │
+│ │ faq.md            │ [general▾]│ Ready    │ 12      │ [Delete]   │ │
+│ │ tech-notes.md     │ [techni▾] │ Ready    │  8      │ [Delete]   │ │
+│ │ old.md            │ general   │ Failed   │  0      │ [Delete]   │ │
+│ └───────────────────┴───────────┴──────────┴─────────┴────────────┘ │
+│ E1 [ Reset Ava knowledge… ]                                         │
+│ G1 Knowledge gaps (unanswered)                                      │
+│ ┌─ question ──────────────────┬ agent ┬ count ┬ last ──┬ actions ─┐ │
+│ │ Do you offer student disc.? │ ava   │ 3     │ 10:00  │ dismiss  │ │
+│ └─────────────────────────────┴───────┴───────┴────────┴──────────┘ │
+│ F1 (error/success banner)                                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### T8 mobile collapse
+
+```
+┌ Knowledge ─────────────┐
+│ Agent [ Ava ▾ ]        │
+│ general:2 bill:0 tech:1│
+│ [file] [scope] [Upload]│
+│ faq.md  Ready  [⋮]     │
+│  ⋮ Change scope        │
+│  ⋮ Delete              │
+│ [Reset agent…]         │
+└────────────────────────┘
+```
+
+### Flows (ASCII)
+
+**Flow A — Upload**
+
+```
+Login active tenant_admin
+  → /tenant/km
+  → B1 select Ava
+  → C1 choose faq.md + scope general
+  → POST documents
+  → D1 row status Ready (indexed)
+  → Customer chat (same tenant) can cite faq
+```
+
+**Flow B — Change scope**
+
+```
+D2 open scope dropdown on row
+  → PATCH km_scope=billing
+  → row updates; overview B2 recount
+```
+
+**Flow C — Delete**
+
+```
+D3 Delete → confirm modal
+  → DELETE document
+  → row removed; B2 counts drop
+```
+
+**Flow D — Reset agent**
+
+```
+E1 Reset → type-confirm or strong confirm
+  → POST reset
+  → empty table + empty state CTA
+```
+
+**Flow E — Errors**
+
+```
+Quota exceeded → F1 red banner with package message
+Inactive tenant → redirect / blocked shell
+Wrong agent id → toast 400
+```
+
+### Empty state (B1 agent with 0 docs)
+
+```
+No documents for Ava yet.
+Upload a Markdown FAQ (scope general) to ground answers.
+[ Choose file ]
+```
+
+### Copy (EN primary)
+
+| Key | Text |
+| --- | --- |
+| Nav | Knowledge |
+| Help | Scopes match caller desk topics (General / Billing / Technical). |
+| Reset confirm | Delete all knowledge for {agent}? This cannot be undone. |
+| Delete confirm | Delete {filename}? Embeddings will be removed. |
+
+### Components → files
+
+| UI | Path |
+| --- | --- |
+| KM page | `apps/tenant-web/src/routes/km/+page.svelte` |
+| API client | `apps/tenant-web/src/lib/api/km.ts` |
+| Nav link | `apps/tenant-web/src/routes/+layout.svelte` |
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).

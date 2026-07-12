@@ -60,3 +60,18 @@ func ValidAgent(agentID string) bool {
 	_, ok := AgentScopes[strings.ToLower(strings.TrimSpace(agentID))]
 	return ok
 }
+
+// ValidScope reports whether s is a known KM scope tag.
+func ValidScope(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "general", "billing", "technical":
+		return true
+	default:
+		return false
+	}
+}
+
+// AllScopes is the fixed list for tenant KM UI.
+func AllScopes() []string {
+	return []string{"general", "billing", "technical"}
+}

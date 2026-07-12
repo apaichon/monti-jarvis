@@ -1177,4 +1177,204 @@ Chat/voice from embed: existing `POST /api/chat`, `GET /ws/voice` with `X-Tenant
 
 **POST rotate-key 200:** `{ "embed_key": "emb_…", "enabled": true, ... }`
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+## Tenant KM / Scope (Sprint 15)
+
+Auth: **Bearer** `tenant_admin` + tenant **active** (`RequireTenantAdminActive`).  
+**Tenant id always from JWT** — never accept `tenant_id` from body/query for these routes.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/tenant/km/scopes` | Allowed scope tags |
+| `GET` | `/api/tenant/km/agents` | Agents for tenant + doc counts |
+| `GET` | `/api/tenant/km/agents/{agent_id}/documents` | List documents for agent |
+| `POST` | `/api/tenant/km/agents/{agent_id}/documents` | Upload + ingest |
+| `PATCH` | `/api/tenant/km/documents/{id}` | Update `km_scope` |
+| `DELETE` | `/api/tenant/km/documents/{id}` | Cascade delete one doc |
+| `POST` | `/api/tenant/km/agents/{agent_id}/reset` | Clear all KM for agent |
+| `GET` | `/api/tenant/km/gaps` | List unanswered questions (`km_gaps`) |
+| `PATCH` | `/api/tenant/km/gaps/{id}` | Update gap status / notes |
+
+### GET `/api/tenant/km/gaps`
+
+Query: `status` (optional), `agent_id` (optional), default limit 100.
+
+**200**
+
+```json
+{
+  "gaps": [
+    {
+      "id": "…",
+      "tenant_id": "t_…",
+      "agent_id": "ava",
+      "topic": "billing",
+      "question": "Do you offer student discounts?",
+      "source": "chat",
+      "status": "open",
+      "occurrence_count": 3,
+      "last_seen_at": "2026-07-12T10:00:00Z"
+    }
+  ]
+}
+```
+
+### PATCH `/api/tenant/km/gaps/{id}`
+
+```json
+{ "status": "dismissed", "notes": "Out of scope", "resolved_document_id": "" }
+```
+
+`status`: `open` | `resolved` | `dismissed` | `converted`
+
+### GET `/api/tenant/km/scopes`
+
+**200**
+
+```json
+{
+  "scopes": [
+    { "id": "general", "label": "General" },
+    { "id": "billing", "label": "Billing" },
+    { "id": "technical", "label": "Technical" }
+  ]
+}
+```
+
+### GET `/api/tenant/km/agents`
+
+Prefer assigned workforce agents for the tenant (S5); if none assigned, fall back to catalog agents with `assigned: false`.
+
+**200**
+
+```json
+{
+  "agents": [
+    {
+      "id": "ava",
+      "name": "Ava",
+      "role": "General Support",
+      "doc_count": 3,
+      "chunk_count": 40,
+      "by_scope": { "general": 2, "billing": 0, "technical": 1 },
+      "default_scopes": ["general"],
+      "assigned": true
+    }
+  ]
+}
+```
+
+`default_scopes` is **read-only** help from `internal/scope.AgentScopes` (S2).
+
+### GET `/api/tenant/km/agents/{agent_id}/documents`
+
+| Query | Required | Notes |
+| --- | --- | --- |
+| — | — | Optional future: `?scope=general` filter |
+
+**200**
+
+```json
+{
+  "agent_id": "ava",
+  "documents": [
+    {
+      "id": "doc_…",
+      "tenant_id": "t_…",
+      "agent_id": "ava",
+      "filename": "faq.md",
+      "mime": "text/markdown",
+      "status": "indexed",
+      "km_scope": "general",
+      "km_version": 1,
+      "chunk_count": 12,
+      "created_at": "2026-07-12T00:00:00Z",
+      "updated_at": "2026-07-12T00:00:00Z"
+    }
+  ]
+}
+```
+
+Do **not** return `object_key` to the browser (internal storage path).
+
+### POST `/api/tenant/km/agents/{agent_id}/documents`
+
+`Content-Type: multipart/form-data`
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `file` | yes | text/markdown/plain; max ~8MB (existing server limit) |
+| `scope` | no | default `scope.DefaultScope(agent_id)` |
+
+**S13:** `AllowRate(BucketKM)` + `CheckKMDocument` before ingest.
+
+**201** — document object (status usually `indexed` on sync success, or `failed` with 502 if index fails after create — prefer atomic failure: 502 without orphan when possible).
+
+### PATCH `/api/tenant/km/documents/{id}`
+
+```json
+{ "km_scope": "billing" }
+```
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `km_scope` | yes | one of general \| billing \| technical |
+
+**200** — updated document. Updates PG chunks + CH `km_scope` for that document (re-embed optional if vectors independent of scope tag).
+
+### DELETE `/api/tenant/km/documents/{id}`
+
+**200**
+
+```json
+{ "deleted": true, "id": "doc_…" }
+```
+
+Or **204** No Content. Prefer **200** with body for UI.
+
+Cascade: CH embeddings → MinIO object → PG document (chunks CASCADE).
+
+### POST `/api/tenant/km/agents/{agent_id}/reset`
+
+**200**
+
+```json
+{
+  "agent_id": "ava",
+  "status": "reset",
+  "message": "knowledge base cleared for agent"
+}
+```
+
+### Error codes
+
+| HTTP | error / code | When |
+| ---: | --- | --- |
+| 400 | `unknown agent_id` / `invalid scope` / `file is required` / `file is empty` | Validation |
+| 401 | `unauthorized` | Missing/invalid JWT |
+| 403 | inactive tenant / not tenant_admin | RBAC |
+| 404 | `document not found` | Wrong id or other tenant |
+| 429 | S13 rate limit codes | KM write rate |
+| 403 | S13 `max_km_documents` etc. | Quota (existing writeQuotaError) |
+| 502 | ingest/embed failure | Downstream KM pipeline |
+
+### Dual surface (legacy)
+
+| Path | Audience |
+| --- | --- |
+| `/api/tenant/km/*` | **Product** — tenant portal S15 |
+| `/api/km/agents/*` | Ops / platform seed / OptionalBearer (S2) |
+
+Do not remove legacy routes in S15.
+
+### Packages
+
+| Package | Role |
+| --- | --- |
+| `internal/km` | Ingest, DeleteDocument, ResetAgent, UpdateScope |
+| `internal/store` | PG + MinIO KM methods |
+| `internal/clickhouse` | Embedding insert/delete |
+| `internal/scope` | ValidAgent, DefaultScope, scope tags |
+| `internal/quota` | KM rate + document limits |
+| `internal/auth` | RequireTenantAdminActive |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

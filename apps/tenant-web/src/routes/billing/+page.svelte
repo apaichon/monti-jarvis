@@ -16,7 +16,7 @@
   let current = $state<CurrentEntitlement>(null);
   let paymentMethods = $state<PaymentMethodOption[]>([
     { id: 'credit_card', label: 'Credit Card', channel_code: 'creditcard' },
-    { id: 'qr_promptpay', label: 'QR PromptPay', channel_code: 'promptpay' }
+    { id: 'qr_promptpay', label: 'QR PromptPay', channel_code: 'bank_qrcode' }
   ]);
   let loading = $state(true);
   let buying = $state(false);

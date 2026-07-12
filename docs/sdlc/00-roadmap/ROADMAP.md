@@ -38,7 +38,7 @@
 | 12 | Tenant | Tax Invoice compliance | C | 10, 11 ✅ v1.3.0 |
 | 13 | Platform Admin | Quota, Rate Limit | B | 3, 4 ✅ v1.4.0 |
 | 14 | Tenant | Embed to Web | D | 1, 6 ✅ v1.5.0 |
-| 15 | Tenant | Set Scope and KM | D | 2, 6 |
+| 15 | Tenant | Set Scope and KM | D | 2, 6 ✅ v1.6.0 |
 | 16 | Tenant | Settings, Locale, Limit user tier, group, Quota for customer call time per day, call minute per each call | D | 13, 15 |
 | 17 | Tenant | Test and Preview | D | 15, 16 |
 | 18 | Tenant | Customer Tier | D | 16 |
@@ -171,6 +171,20 @@ Sprint: [SPRINT-013.md](../03-sprints/SPRINT-013.md) · Feature: [FEAT-0013](../
 
 Sprint: [SPRINT-014.md](../03-sprints/SPRINT-014.md) · Feature: [FEAT-0014](../01-features/FEAT-0014-embed-to-web.md) · Spec: [17-embed-to-web-spec.md](../02-design/17-embed-to-web-spec.md) · Guide: [EMBED_WEB_INTEGRATION.md](../../EMBED_WEB_INTEGRATION.md) · UAT: [SPRINT-014-manual.md](../06-manual-tests/SPRINT-014-manual.md)
 
-## Current sprint: SPRINT-015 — Set Scope and KM *(next open)*
+## Shipped: SPRINT-015 — Set Scope and KM — v1.6.0
 
-**Platform:** Tenant · **Feature:** Set Scope and KM · **Depends:** 2, 6
+**Closed 2026-07-12.** Tenant KM admin UI/APIs, `km_gaps`, multi-tenant RAG for embed, OAuth path rename, QR `bank_qrcode`.
+
+| Task | Points | Outcome |
+| --- | ---: | --- |
+| TASK-0067 | 3 | Delete cascade + `km_gaps` |
+| TASK-0068 | 5 | Tenant KM REST API |
+| TASK-0069 | 4 | `/tenant/km` UI |
+| TASK-0070 | 3 | Scope matrix + gaps panel |
+| TASK-0071 | 1 | Manual UAT checklist |
+
+Sprint: [SPRINT-015.md](../03-sprints/SPRINT-015.md) · Feature: [FEAT-0015](../01-features/FEAT-0015-tenant-scope-km.md) · Spec: [18-tenant-scope-km-spec.md](../02-design/18-tenant-scope-km-spec.md) · UAT: [SPRINT-015-manual.md](../06-manual-tests/SPRINT-015-manual.md)
+
+## Current sprint: SPRINT-016 — Settings, Locale, Limits *(next open)*
+
+**Platform:** Tenant · **Feature:** Settings, Locale, Limit user tier, group, quota for customer call time · **Depends:** 13, 15

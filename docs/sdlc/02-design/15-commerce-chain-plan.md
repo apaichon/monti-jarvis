@@ -122,7 +122,7 @@ Do **not** open S10 until S9 TASK-0044 combined UAT passes.
 | Risk | Mitigation |
 | --- | --- |
 | Double-counting “receipt” in S9 and S11 | S9 = issue MVP; S11 = ops only |
-| ChillPay ChannelCode for PromptPay merchant-specific | Config override later; default `promptpay` / `creditcard` |
+| ChillPay ChannelCode for PromptPay | `bank_qrcode` (QR) / `creditcard` (card) |
 | VAT 7% assumption wrong for some packages | S10/S12 make rate configurable per currency |
 | Doc status drift (tasks still `todo` while code exists) | km-sync + doc-audit at S9 close |
 

@@ -85,6 +85,87 @@ FROM %s.knowledge_documents WHERE id = $1`, schema), id,
 	return doc, err
 }
 
+// DeleteKnowledgeDocument removes one document for a tenant. Returns object_key for MinIO cleanup.
+// Returns empty key and nil error only when… actually returns ("", err) if not found.
+func (s *Store) DeleteKnowledgeDocument(ctx context.Context, tenantID, documentID string) (objectKey string, agentID string, err error) {
+	if s.pg == nil {
+		return "", "", fmt.Errorf("postgres is not available")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var key, agent string
+	err = s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT object_key, agent_id FROM %s.knowledge_documents
+WHERE id = $1 AND tenant_id = $2`, schema), documentID, tenantID).Scan(&key, &agent)
+	if err != nil {
+		return "", "", err
+	}
+	if _, err := s.pg.Exec(ctx, fmt.Sprintf(`
+DELETE FROM %s.knowledge_chunks WHERE document_id = $1 AND tenant_id = $2`, schema), documentID, tenantID); err != nil {
+		return "", "", err
+	}
+	tag, err := s.pg.Exec(ctx, fmt.Sprintf(`
+DELETE FROM %s.knowledge_documents WHERE id = $1 AND tenant_id = $2`, schema), documentID, tenantID)
+	if err != nil {
+		return "", "", err
+	}
+	if tag.RowsAffected() == 0 {
+		return "", "", fmt.Errorf("document not found")
+	}
+	return key, agent, nil
+}
+
+// UpdateKnowledgeDocumentScope sets km_scope on document + its chunks.
+func (s *Store) UpdateKnowledgeDocumentScope(ctx context.Context, tenantID, documentID, kmScope string) (km.Document, error) {
+	if s.pg == nil {
+		return km.Document{}, fmt.Errorf("postgres is not available")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	actor := auditctx.ActorID(ctx)
+	tag, err := s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.knowledge_documents
+SET km_scope = $3, updated_by = $4, updated_at = now()
+WHERE id = $1 AND tenant_id = $2`, schema), documentID, tenantID, kmScope, actor)
+	if err != nil {
+		return km.Document{}, err
+	}
+	if tag.RowsAffected() == 0 {
+		return km.Document{}, fmt.Errorf("no rows")
+	}
+	if _, err := s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.knowledge_chunks
+SET km_scope = $3, updated_by = $4, updated_at = now()
+WHERE document_id = $1 AND tenant_id = $2`, schema), documentID, tenantID, kmScope, actor); err != nil {
+		return km.Document{}, err
+	}
+	return s.GetKnowledgeDocument(ctx, documentID)
+}
+
+// CountAgentKnowledgeByScope returns document counts per km_scope for an agent.
+func (s *Store) CountAgentKnowledgeByScope(ctx context.Context, tenantID, agentID string) (map[string]int, error) {
+	out := map[string]int{"general": 0, "billing": 0, "technical": 0}
+	if s.pg == nil {
+		return out, fmt.Errorf("postgres is not available")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
+SELECT km_scope, COUNT(*) FROM %s.knowledge_documents
+WHERE tenant_id = $1 AND agent_id = $2
+GROUP BY km_scope`, schema), tenantID, agentID)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sc string
+		var n int
+		if err := rows.Scan(&sc, &n); err != nil {
+			return out, err
+		}
+		out[sc] = n
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) DeleteAgentKnowledge(ctx context.Context, tenantID, agentID string) ([]string, error) {
 	if s.pg == nil {
 		return nil, fmt.Errorf("postgres is not available")

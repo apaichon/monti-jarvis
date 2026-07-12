@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/url"
 	"strings"
 	"time"
 
@@ -22,8 +24,11 @@ type Config struct {
 	PublicBaseURL      string
 	GoogleClientID     string
 	GoogleClientSecret string
+	// GoogleRedirectURL optional full callback URI registered in Google Cloud Console.
+	GoogleRedirectURL  string
 	GitHubClientID     string
 	GitHubClientSecret string
+	GitHubRedirectURL  string
 	RedisPrefix        string
 }
 
@@ -67,30 +72,69 @@ func New(redis *redis.Client, cfg Config) *Service {
 	if cfg.RedisPrefix == "" {
 		cfg.RedisPrefix = "monti_jarvis:"
 	}
-	base := strings.TrimRight(strings.TrimSpace(cfg.PublicBaseURL), "/")
-	if base == "" {
-		base = "http://localhost:8091"
-	}
 	s := &Service{cfg: cfg, redis: redis}
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		redir := resolveOAuthRedirectURL(cfg.PublicBaseURL, cfg.GoogleRedirectURL, "google")
+		log.Printf("oauth: google redirect_uri=%s", redir)
 		s.google = &oauth2.Config{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
-			RedirectURL:  base + "/api/public/tenant/register/oauth/google/callback",
+			RedirectURL:  redir,
 			Scopes:       []string{"openid", "email", "profile"},
 			Endpoint:     google.Endpoint,
 		}
 	}
 	if cfg.GitHubClientID != "" && cfg.GitHubClientSecret != "" {
+		redir := resolveOAuthRedirectURL(cfg.PublicBaseURL, cfg.GitHubRedirectURL, "github")
+		log.Printf("oauth: github redirect_uri=%s", redir)
 		s.github = &oauth2.Config{
 			ClientID:     cfg.GitHubClientID,
 			ClientSecret: cfg.GitHubClientSecret,
-			RedirectURL:  base + "/api/public/tenant/register/oauth/github/callback",
+			RedirectURL:  redir,
 			Scopes:       []string{"read:user", "user:email"},
 			Endpoint:     github.Endpoint,
 		}
 	}
 	return s
+}
+
+// OAuthCallbackPath is the shared Google/GitHub callback for login and register.
+// Example: /api/public/tenant/oauth/google/callback
+func OAuthCallbackPath(provider string) string {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	return "/api/public/tenant/oauth/" + provider + "/callback"
+}
+
+// resolveOAuthRedirectURL picks the callback URI for provider.
+// Explicit override wins. Otherwise PublicBaseURL + path; for plain HTTP on a
+// non-loopback host (e.g. http://monti-jarvis-dev.local:8091) Google returns
+// invalid_request — rewrite to http://localhost:PORT/... which Google allows.
+func resolveOAuthRedirectURL(publicBase, explicit, provider string) string {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	path := OAuthCallbackPath(provider)
+	if e := strings.TrimSpace(explicit); e != "" {
+		return strings.TrimRight(e, "/")
+	}
+	base := strings.TrimRight(strings.TrimSpace(publicBase), "/")
+	if base == "" {
+		base = "http://localhost:8091"
+	}
+	if u, err := url.Parse(base); err == nil && u.Scheme != "" && u.Host != "" {
+		host := strings.ToLower(u.Hostname())
+		if strings.EqualFold(u.Scheme, "http") && host != "localhost" && host != "127.0.0.1" {
+			port := u.Port()
+			if port == "" {
+				port = "80"
+			}
+			loop := "http://localhost"
+			if port != "80" {
+				loop = "http://localhost:" + port
+			}
+			log.Printf("oauth: %s using loopback redirect %s (APP_PUBLIC_URL host %q is not allowed by Google over http)", provider, loop+path, host)
+			return loop + path
+		}
+	}
+	return base + path
 }
 
 func (s *Service) ProviderEnabled(provider string) bool {

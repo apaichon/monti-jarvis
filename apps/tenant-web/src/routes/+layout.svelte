@@ -48,6 +48,11 @@
           href="{base}/embed"
           class:active={$page.url.pathname.includes('/embed')}>Embed</a
         >
+        <a
+          class="link"
+          href="{base}/km"
+          class:active={$page.url.pathname.includes('/km')}>Knowledge</a
+        >
         <a class="link" href="{base}/login">Profile</a>
       </nav>
       <button class="btn ghost" type="button" onclick={logout}>Logout</button>

@@ -19,12 +19,18 @@ type DocumentStore interface {
 	UpdateKnowledgeDocumentStatus(ctx context.Context, id, status string, version, chunkCount int) error
 	ListKnowledgeDocuments(ctx context.Context, tenantID, agentID string) ([]Document, error)
 	GetKnowledgeDocument(ctx context.Context, id string) (Document, error)
+	DeleteKnowledgeDocument(ctx context.Context, tenantID, documentID string) (objectKey, agentID string, err error)
+	UpdateKnowledgeDocumentScope(ctx context.Context, tenantID, documentID, kmScope string) (Document, error)
+	CountAgentKnowledgeByScope(ctx context.Context, tenantID, agentID string) (map[string]int, error)
 	DeleteAgentKnowledge(ctx context.Context, tenantID, agentID string) ([]string, error)
 	ReplaceKnowledgeChunks(ctx context.Context, tenantID, agentID, documentID, kmScope string, chunks []Chunk, chunkIDs []string) error
 	CountAgentKnowledge(ctx context.Context, tenantID, agentID string) (docs, chunks int, err error)
 	PutKMObject(ctx context.Context, objectKey, contentType string, data []byte) error
 	DeleteKMObjects(ctx context.Context, keys []string) error
 }
+
+// ErrNotFound is returned when a document is missing or not owned by the tenant.
+var ErrNotFound = fmt.Errorf("document not found")
 
 type Service struct {
 	store  DocumentStore
@@ -174,6 +180,73 @@ func (s *Service) ResetAgent(ctx context.Context, agentID string) error {
 		return s.ch.DeleteAgentEmbeddings(ctx, s.tenant, agentID)
 	}
 	return nil
+}
+
+// DeleteDocument removes one document (PG + MinIO + ClickHouse) for the service tenant.
+func (s *Service) DeleteDocument(ctx context.Context, documentID string) error {
+	documentID = strings.TrimSpace(documentID)
+	if documentID == "" {
+		return ErrNotFound
+	}
+	key, agentID, err := s.store.DeleteKnowledgeDocument(ctx, s.tenant, documentID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows") {
+			return ErrNotFound
+		}
+		return err
+	}
+	if key != "" {
+		_ = s.store.DeleteKMObjects(ctx, []string{key})
+	}
+	if s.ch != nil && s.ch.Enabled() {
+		_ = s.ch.DeleteDocumentEmbeddings(ctx, s.tenant, agentID, documentID)
+	}
+	return nil
+}
+
+// UpdateDocumentScope retags document + chunks + embeddings without re-embedding.
+func (s *Service) UpdateDocumentScope(ctx context.Context, documentID, kmScope string) (Document, error) {
+	documentID = strings.TrimSpace(documentID)
+	kmScope = strings.ToLower(strings.TrimSpace(kmScope))
+	if !scope.ValidScope(kmScope) {
+		return Document{}, fmt.Errorf("invalid scope")
+	}
+	doc, err := s.store.GetKnowledgeDocument(ctx, documentID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows") {
+			return Document{}, ErrNotFound
+		}
+		return Document{}, err
+	}
+	if doc.TenantID != s.tenant {
+		return Document{}, ErrNotFound
+	}
+	updated, err := s.store.UpdateKnowledgeDocumentScope(ctx, s.tenant, documentID, kmScope)
+	if err != nil {
+		return Document{}, err
+	}
+	if s.ch != nil && s.ch.Enabled() {
+		_ = s.ch.UpdateDocumentScope(ctx, s.tenant, updated.AgentID, documentID, kmScope)
+	}
+	// Never expose storage path to API consumers — caller should strip object_key.
+	return updated, nil
+}
+
+// PublicDocument returns a copy safe for JSON (no object_key).
+func PublicDocument(doc Document) map[string]any {
+	return map[string]any{
+		"id":          doc.ID,
+		"tenant_id":   doc.TenantID,
+		"agent_id":    doc.AgentID,
+		"filename":    doc.Filename,
+		"mime":        doc.Mime,
+		"status":      doc.Status,
+		"km_scope":    doc.KMScope,
+		"km_version":  doc.KMVersion,
+		"chunk_count": doc.ChunkCount,
+		"created_at":  doc.CreatedAt,
+		"updated_at":  doc.UpdatedAt,
+	}
 }
 
 func mimeFor(filename string) string {

@@ -20,20 +20,25 @@ type oauthCompleteRequest struct {
 	Slug        string `json:"slug"`
 }
 
+// startTenantOAuth starts Google/GitHub OAuth for login OR register (same endpoint).
+// Optional query: company_name, slug, display_name (register prefill).
 func (s *server) startTenantOAuth(w http.ResponseWriter, r *http.Request) {
-	if !s.cfg.TenantRegisterEnabled {
-		writeError(w, http.StatusServiceUnavailable, "tenant registration is disabled")
-		return
-	}
 	provider := strings.TrimSpace(r.PathValue("provider"))
 	if s.tenantOAuth == nil || !s.tenantOAuth.ProviderEnabled(provider) {
 		writeError(w, http.StatusServiceUnavailable, provider+" sign-in is not configured")
 		return
 	}
+	// Registration fields only accepted when signup is enabled.
+	company := r.URL.Query().Get("company_name")
+	slug := r.URL.Query().Get("slug")
+	if (company != "" || slug != "") && !s.cfg.TenantRegisterEnabled {
+		writeError(w, http.StatusServiceUnavailable, "tenant registration is disabled")
+		return
+	}
 	startURL, err := s.tenantOAuth.StartURL(r.Context(), tenantoauth.StartParams{
 		Provider:    provider,
-		CompanyName: r.URL.Query().Get("company_name"),
-		Slug:        r.URL.Query().Get("slug"),
+		CompanyName: company,
+		Slug:        slug,
 		DisplayName: r.URL.Query().Get("display_name"),
 	})
 	if err != nil {
@@ -43,11 +48,11 @@ func (s *server) startTenantOAuth(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, startURL, http.StatusFound)
 }
 
+// tenantOAuthCallback — single callback per provider:
+//  1. Existing OAuth identity → login (tokens → /tenant/login)
+//  2. New identity + company/slug in state → register immediately
+//  3. New identity otherwise → /tenant/register/complete (collect workspace)
 func (s *server) tenantOAuthCallback(w http.ResponseWriter, r *http.Request) {
-	if !s.cfg.TenantRegisterEnabled {
-		writeError(w, http.StatusServiceUnavailable, "tenant registration is disabled")
-		return
-	}
 	provider := strings.TrimSpace(r.PathValue("provider"))
 	code := strings.TrimSpace(r.URL.Query().Get("code"))
 	state := strings.TrimSpace(r.URL.Query().Get("state"))
@@ -72,7 +77,7 @@ func (s *server) tenantOAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	base := strings.TrimRight(s.cfg.PublicBaseURL, "/") + "/tenant"
 
-	// Existing Google/GitHub account → sign in (login page or re-auth after KYC).
+	// 1) Already registered → login (works from login OR register page).
 	if pair, ok, err := s.finishOAuthLogin(ctx, identity); err != nil {
 		s.redirectOAuthError(w, r, base, err)
 		return
@@ -81,6 +86,13 @@ func (s *server) tenantOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// New identity — registration path.
+	if !s.cfg.TenantRegisterEnabled {
+		http.Redirect(w, r, base+"/login?error="+url.QueryEscape("no account found — registration is disabled"), http.StatusFound)
+		return
+	}
+
+	// 2) Register page prefilled company+slug → create tenant immediately.
 	if payload.CompanyName != "" && payload.Slug != "" {
 		result, user, pair, err := s.finishOAuthRegistration(ctx, identity, payload.CompanyName, payload.Slug)
 		if err != nil {
@@ -92,7 +104,7 @@ func (s *server) tenantOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// New identity without company/slug → collect workspace details.
+	// 3) Login page (or incomplete register) → collect workspace details.
 	session, err := s.tenantOAuth.CreatePendingSession(ctx, identity)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
@@ -245,15 +257,18 @@ func redirectSuccess(w http.ResponseWriter, r *http.Request, successPath string,
 }
 
 func (s *server) redirectOAuthError(w http.ResponseWriter, r *http.Request, base string, err error) {
-	msg := "registration failed"
-	dest := base + "/register"
+	msg := "sign-in failed"
+	dest := base + "/login"
 	switch {
 	case errors.Is(err, store.ErrTenantSlugTaken):
 		msg = "slug already taken"
+		dest = base + "/register"
 	case errors.Is(err, store.ErrTenantEmailRegistered):
 		msg = "email already registered"
+		dest = base + "/register"
 	case errors.Is(err, store.ErrOAuthIdentityInUse):
 		msg = "account already linked"
+		dest = base + "/login"
 	case errors.Is(err, errOAuthUserInactive):
 		msg = "account is not active"
 		dest = base + "/login"

@@ -714,4 +714,132 @@ erDiagram
   }
 ```
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
+## Sprint 15 — KM lifecycle + km_gaps
+
+S15 productizes **tenant-admin** access to existing S2 KM entities and adds **`km_gaps`** for unanswered customer questions (FAQ backlog).
+
+```mermaid
+erDiagram
+  tenants ||--o{ knowledge_documents : owns
+  tenants ||--o{ km_gaps : records
+  knowledge_documents ||--o{ knowledge_chunks : contains
+  knowledge_documents {
+    text id PK
+    text tenant_id
+    text agent_id
+    text filename
+    text object_key
+    text mime
+    text status
+    text km_scope
+    int km_version
+    int chunk_count
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+  knowledge_chunks {
+    text id PK
+    text document_id FK
+    text tenant_id
+    text agent_id
+    int chunk_index
+    text content
+    text km_scope
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+  km_gaps {
+    text id PK
+    text tenant_id
+    text agent_id
+    text topic
+    text question
+    text question_hash
+    text session_id
+    text call_id
+    text source
+    text status
+    int occurrence_count
+    timestamptz last_seen_at
+    timestamptz resolved_at
+    text resolved_document_id
+    text notes
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### `km_gaps` (new — S15)
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | text PK | |
+| `tenant_id` | text NOT NULL | Isolation |
+| `agent_id` | text | Workforce agent at ask time |
+| `topic` | text | Caller topic tab |
+| `question` | text | Customer question (original) |
+| `question_hash` | text | sha256(lower(trim(question))) for dedupe |
+| `session_id` / `call_id` | text | Optional correlation |
+| `source` | text | `chat` \| `voice` \| `embed` |
+| `status` | text | `open` \| `resolved` \| `dismissed` \| `converted` |
+| `occurrence_count` | int | Bumped on repeat same hash |
+| `last_seen_at` | timestamptz | Last missing_km hit |
+| `resolved_at` | timestamptz null | When closed |
+| `resolved_document_id` | text | Optional link after KM upload |
+| `notes` | text | Tenant notes |
+| audit | | `created_at`, `updated_at`, `created_by`, `updated_by` |
+
+**Unique:** `(tenant_id, agent_id, question_hash)`  
+**Index:** `(tenant_id, status, last_seen_at DESC)`
+
+**Write path:** when chat RAG sets `missing_km=true` → `RecordKMGap` (Postgres) **and** existing ClickHouse `qa_events` (`event_type=missing_km`).
+
+**Tenant APIs:** `GET /api/tenant/km/gaps`, `PATCH /api/tenant/km/gaps/{id}`
+
+### ClickHouse (existing)
+
+| Table | S15 delete filter |
+| --- | --- |
+| `monti_jarvis.km_embeddings` | `tenant_id` + `document_id` (single doc) or `tenant_id` + `agent_id` (reset) |
+
+Columns (shipped S2): `tenant_id`, `agent_id`, `document_id`, `chunk_id`, `km_scope`, `km_version`, `content`, `embedding`.
+
+### MinIO object key layout
+
+```text
+km/{tenant_id}/{agent_id}/{document_id}/original/{filename}
+```
+
+### Delete cascade (document-level) — implement in `internal/km`
+
+1. Load doc by id; require `doc.tenant_id == jwt.tenant_id` else 404  
+2. ClickHouse: `ALTER … DELETE WHERE tenant_id AND document_id` (existing client helper)  
+3. MinIO: delete `object_key`  
+4. Postgres: delete document (chunks via `ON DELETE CASCADE`)
+
+### Document status (code constants)
+
+| status | UI label | Meaning |
+| --- | --- | --- |
+| `uploaded` | Processing | Row created, not yet indexed |
+| `indexing` | Processing | Chunking/embedding in progress |
+| `indexed` | Ready | Available for RAG |
+| `failed` | Failed | Ingest error |
+
+**Scope values (`km_scope`):** `general` | `billing` | `technical`
+
+### Explicit non-goals (do not create in S15)
+
+| Entity | Why deferred |
+| --- | --- |
+| `km_versions` / publish logs | Approval workflow later |
+| `tenant_agent_scope_overrides` | Use hard-map + document scope |
+| `knowledge_folders` | Flat list per agent is enough |
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.

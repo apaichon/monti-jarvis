@@ -457,4 +457,6 @@ Schema is created automatically: `callcenter.tenant_embed_configs` (on server st
 | [17-embed-to-web-spec.md](sdlc/02-design/17-embed-to-web-spec.md) | Technical design |
 | [SPRINT-014-manual.md](sdlc/06-manual-tests/SPRINT-014-manual.md) | Full UAT checklist |
 | [embed-demo.html](fixtures/embed-demo.html) | Sample host page |
+| [b-quik-tyre-embed-demo.html](fixtures/b-quik-tyre-embed-demo.html) | B-Quik tyre highlight demo host |
+| [b-quik-tyre-highlight.md](samples/km/b-quik-tyre-highlight.md) | Sample KM (tyre FAQ from public highlight page) |
 | [FEAT-0014](sdlc/01-features/FEAT-0014-embed-to-web.md) | Feature ACs |

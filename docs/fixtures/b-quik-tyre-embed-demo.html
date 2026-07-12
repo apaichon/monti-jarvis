@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>B-Quik ยาง (demo) · Monti embed sample</title>
+    <style>
+      :root {
+        --bq-yellow: #ffcb05;
+        --bq-dark: #1a1a1a;
+        --bq-muted: #5c5c5c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        background: #f5f5f5;
+        color: #222;
+        line-height: 1.5;
+      }
+      header {
+        background: var(--bq-dark);
+        color: #fff;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      header strong {
+        color: var(--bq-yellow);
+        letter-spacing: 0.04em;
+      }
+      header a {
+        color: var(--bq-yellow);
+        text-decoration: none;
+        font-size: 14px;
+      }
+      .hero {
+        background: linear-gradient(120deg, #222 0%, #333 50%, #111 100%);
+        color: #fff;
+        padding: 28px 20px 32px;
+      }
+      .hero h1 {
+        margin: 0 0 8px;
+        font-size: 1.6rem;
+      }
+      .hero p {
+        margin: 0;
+        opacity: 0.9;
+        max-width: 52rem;
+        font-size: 0.95rem;
+      }
+      .wrap {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 20px 16px 80px;
+      }
+      .note {
+        background: #fff8e1;
+        border: 1px solid #ffe082;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 13px;
+        margin-bottom: 18px;
+      }
+      .note code {
+        background: #fff;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 14px;
+      }
+      .card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e5e5e5;
+        padding: 14px 16px;
+        box-shadow: 0 2px 8px rgb(0 0 0 / 4%);
+      }
+      .card .brand {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--bq-muted);
+      }
+      .card h2 {
+        margin: 4px 0 8px;
+        font-size: 1.05rem;
+      }
+      .price-old {
+        text-decoration: line-through;
+        color: #888;
+        font-size: 13px;
+      }
+      .price {
+        color: #c62828;
+        font-size: 1.35rem;
+        font-weight: 700;
+      }
+      .meta {
+        font-size: 12px;
+        color: var(--bq-muted);
+        margin-top: 8px;
+      }
+      footer {
+        text-align: center;
+        padding: 24px;
+        font-size: 12px;
+        color: var(--bq-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>B-QUIK · ยาง (demo host)</strong>
+      <a href="https://www.b-quik.com/th/product/tyre/highlight" target="_blank" rel="noopener"
+        >ต้นฉบับ highlight ↗</a
+      >
+    </header>
+
+    <section class="hero">
+      <div class="wrap" style="padding-top: 0; padding-bottom: 0">
+        <h1>ยางแนะนำ / Tyre highlight</h1>
+        <p>
+          ตัวอย่างหน้าเว็บร้านค้าสำหรับทดสอบ <strong>Monti embed</strong> + KM จากเอกสาร
+          <code>docs/samples/km/b-quik-tyre-highlight.md</code> — ราคาตัวอย่างอ้างอิงหน้า
+          b-quik.com (ไม่ใช่ราคาสดตลอดเวลา)
+        </p>
+      </div>
+    </section>
+
+    <div class="wrap">
+      <div class="note">
+        <strong>Setup:</strong> Tenant → Embed → enable + allow
+        <code>http://localhost:5500</code> (or this server origin) → paste embed key below.<br />
+        Upload KM: <code>docs/samples/km/b-quik-tyre-highlight.md</code> for agent Ava
+        (scope general).<br />
+        Serve this file: <code>npx --yes serve docs/fixtures -p 5500</code> then open
+        <code>http://localhost:5500/b-quik-tyre-embed-demo.html</code>
+      </div>
+
+      <div class="grid">
+        <article class="card">
+          <div class="brand">Michelin</div>
+          <h2>185/60R15 Energy XM2+</h2>
+          <div class="price-old">4,290 บาท</div>
+          <div class="price">3,190 บาท</div>
+          <div class="meta">โปรฯ ตัวอย่าง · ผ่อน 0% ได้ตามเงื่อนไขเว็บ</div>
+        </article>
+        <article class="card">
+          <div class="brand">Dunlop</div>
+          <h2>205/65R16 Enasave EC300+</h2>
+          <div class="price-old">4,890 บาท</div>
+          <div class="price">3,690 บาท</div>
+          <div class="meta">economy / comfort touring</div>
+        </article>
+        <article class="card">
+          <div class="brand">Thunderer</div>
+          <h2>265/70R16 Ranger R601</h2>
+          <div class="price-old">4,690 บาท</div>
+          <div class="price">3,690 บาท</div>
+          <div class="meta">pickup / light truck size class</div>
+        </article>
+        <article class="card">
+          <div class="brand">BFGoodrich</div>
+          <h2>265/65R17 Advantage Touring</h2>
+          <div class="price-old">4,750 บาท</div>
+          <div class="price">4,450 บาท</div>
+          <div class="meta">SUV touring</div>
+        </article>
+        <article class="card">
+          <div class="brand">Goodyear</div>
+          <h2>235/60R18 EfficientGrip Perf. SUV</h2>
+          <div class="price-old">6,490 บาท</div>
+          <div class="price">5,290 บาท</div>
+          <div class="meta">SUV performance</div>
+        </article>
+      </div>
+    </div>
+
+    <footer>
+      Hotline sample: 1153 · Source:
+      <a href="https://www.b-quik.com/th/product/tyre/highlight">b-quik.com tyre highlight</a>
+      · Monti embed demo only
+    </footer>
+
+    <!--
+      Replace YOUR_EMBED_KEY after tenant embed setup.
+      data-base optional if script is proxied.
+    -->
+    <script
+      src="http://localhost:8091/embed/monti-embed.js"
+      data-embed-key="YOUR_EMBED_KEY"
+      data-position="bottom-right"
+      async
+    ></script>
+  </body>
+</html>

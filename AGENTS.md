@@ -55,8 +55,8 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** Next open: `SPRINT-015` — Set Scope and KM. Phase D embed **S14 shipped as v1.5.0**.
+**Current sprint:** Next open: `SPRINT-016` — Settings, Locale, Limits. Phase D KM **S15 shipped as v1.6.0**.
 
-**Shipped:** v1.5.0 `SPRINT-014` embed · v1.4.0 `SPRINT-013` quota · v1.3.1 commerce harden · v1.3.0 `SPRINT-008`–`012` commerce · v0.8.0 `SPRINT-007` · v0.7.0 `SPRINT-006` · v0.6.0 `SPRINT-005` · v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype
+**Shipped:** v1.6.0 `SPRINT-015` tenant KM · v1.5.0 `SPRINT-014` embed · v1.4.0 `SPRINT-013` quota · v1.3.1 commerce harden · v1.3.0 `SPRINT-008`–`012` commerce · v0.8.0 `SPRINT-007` · v0.7.0 `SPRINT-006` · v0.6.0 `SPRINT-005` · v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype
 
 **KM ops:** `docs/KM_SETUP.md` · **API:** `docs/sdlc/02-design/04-api-spec.md` · **Deploy:** `docs/sdlc/07-deployment/LOCAL-DEV.md` · **UAT:** `docs/sdlc/06-manual-tests/`

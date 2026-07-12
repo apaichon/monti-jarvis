@@ -153,6 +153,16 @@
     }
   }
 
+  function agentTopic(agentId: string): string {
+    const topicByAgent: Record<string, string> = {
+      ava: 'general',
+      max: 'billing',
+      luna: 'technical',
+      neo: 'general'
+    };
+    return topicByAgent[agentId] || 'general';
+  }
+
   async function startCall() {
     if (!selected || !tenantId) {
       error = 'Select an AI agent first.';
@@ -163,17 +173,18 @@
     transcriptKeys.clear();
     voiceState = 'Connecting to agent…';
     try {
+      const topic = agentTopic(selected.id);
       const gemini = new GeminiVoice();
       const [created] = await Promise.all([
         createCall({ tenantId }),
         gemini.start(
           selected.id,
-          'general',
+          topic,
           {
             onLive: (v) => {
               live = v;
               voiceState = v
-                ? `On call with ${selected?.name}.`
+                ? `On call with ${selected?.name}. Speak to ask about products or support.`
                 : `Ready to call ${selected?.name}.`;
             },
             onTranscript: (role, text) => {
@@ -182,6 +193,7 @@
             },
             onError: (message) => {
               error = message;
+              voiceState = message;
             }
           },
           { tenantId }
@@ -339,11 +351,12 @@
     ];
     void scrollChat();
     try {
+      const topic = agentTopic(selected.id);
       const res = await sendChat(
         {
           session_id: sessionId,
           agent_id: selected.id,
-          topic: 'general',
+          topic,
           message: text,
           history: payloadHistory
         },

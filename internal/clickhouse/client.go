@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -171,6 +172,30 @@ func (c *Client) DeleteAgentEmbeddings(ctx context.Context, tenantID, agentID st
 	return c.exec(ctx, q)
 }
 
+// DeleteDocumentEmbeddings removes vectors for one document.
+func (c *Client) DeleteDocumentEmbeddings(ctx context.Context, tenantID, agentID, documentID string) error {
+	if !c.Enabled() {
+		return nil
+	}
+	q := fmt.Sprintf(
+		"ALTER TABLE %s.km_embeddings DELETE WHERE tenant_id = '%s' AND agent_id = '%s' AND document_id = '%s'",
+		quoteIdent(c.db), escape(tenantID), escape(agentID), escape(documentID),
+	)
+	return c.exec(ctx, q)
+}
+
+// UpdateDocumentScope retags embeddings' km_scope for a document (no re-embed).
+func (c *Client) UpdateDocumentScope(ctx context.Context, tenantID, agentID, documentID, kmScope string) error {
+	if !c.Enabled() {
+		return nil
+	}
+	q := fmt.Sprintf(
+		"ALTER TABLE %s.km_embeddings UPDATE km_scope = '%s' WHERE tenant_id = '%s' AND agent_id = '%s' AND document_id = '%s'",
+		quoteIdent(c.db), escape(kmScope), escape(tenantID), escape(agentID), escape(documentID),
+	)
+	return c.exec(ctx, q)
+}
+
 func (c *Client) InsertQAEvent(ctx context.Context, tenantID, agentID, topic, question, eventType string) error {
 	if !c.Enabled() {
 		return nil
@@ -207,14 +232,19 @@ func (c *Client) Search(ctx context.Context, tenantID, agentID string, scopes []
 		scopeFilter = " AND km_scope IN (" + strings.Join(parts, ",") + ")"
 	}
 
+	agentFilter := ""
+	if strings.TrimSpace(agentID) != "" {
+		agentFilter = " AND agent_id = '" + escape(agentID) + "'"
+	}
+
 	// Fetch candidate rows and rank in Go for portable dev setups.
 	q := fmt.Sprintf(`
 SELECT chunk_id, document_id, agent_id, km_scope, content, embedding
 FROM %s.km_embeddings
-WHERE tenant_id = '%s' AND agent_id = '%s'%s
+WHERE tenant_id = '%s'%s%s
 LIMIT %d
 FORMAT JSON`,
-		quoteIdent(c.db), escape(tenantID), escape(agentID), scopeFilter, candidateLimit,
+		quoteIdent(c.db), escape(tenantID), agentFilter, scopeFilter, candidateLimit,
 	)
 
 	body, err := c.query(ctx, q)
@@ -269,14 +299,18 @@ func (c *Client) ListAgentChunks(ctx context.Context, tenantID, agentID string, 
 		}
 		scopeFilter = " AND km_scope IN (" + strings.Join(parts, ",") + ")"
 	}
+	agentFilter := ""
+	if strings.TrimSpace(agentID) != "" {
+		agentFilter = " AND agent_id = '" + escape(agentID) + "'"
+	}
 	q := fmt.Sprintf(`
 SELECT chunk_id, document_id, agent_id, km_scope, content
 FROM %s.km_embeddings
-WHERE tenant_id = '%s' AND agent_id = '%s'%s
+WHERE tenant_id = '%s'%s%s
 ORDER BY updated_at DESC
 LIMIT %d
 FORMAT JSON`,
-		quoteIdent(c.db), escape(tenantID), escape(agentID), scopeFilter, limit,
+		quoteIdent(c.db), escape(tenantID), agentFilter, scopeFilter, limit,
 	)
 	body, err := c.query(ctx, q)
 	if err != nil {
@@ -309,30 +343,80 @@ FORMAT JSON`,
 	return out, nil
 }
 
+// insertEmbeddings bulk-loads rows using JSONEachRow so markdown content with
+// quotes/newlines cannot break SQL VALUES parsing (CH 400 CANNOT_PARSE_INPUT).
 func (c *Client) insertEmbeddings(ctx context.Context, rows []EmbeddingRow) error {
-	var buf bytes.Buffer
-	for _, row := range rows {
-		vec := vectorLiteral(row.Embedding)
-		line := fmt.Sprintf(
-			"INSERT INTO %s.km_embeddings (tenant_id, agent_id, document_id, chunk_id, km_scope, km_version, content, embedding) VALUES ('%s','%s','%s','%s','%s',%d,'%s',%s)\n",
-			quoteIdent(c.db),
-			escape(row.TenantID),
-			escape(row.AgentID),
-			escape(row.DocumentID),
-			escape(row.ChunkID),
-			escape(row.KMScope),
-			row.KMVersion,
-			escape(row.Content),
-			vec,
-		)
-		buf.WriteString(line)
+	if len(rows) == 0 {
+		return nil
 	}
-	return c.exec(ctx, buf.String())
+	type payload struct {
+		TenantID   string    `json:"tenant_id"`
+		AgentID    string    `json:"agent_id"`
+		DocumentID string    `json:"document_id"`
+		ChunkID    string    `json:"chunk_id"`
+		KMScope    string    `json:"km_scope"`
+		KMVersion  uint32    `json:"km_version"`
+		Content    string    `json:"content"`
+		Embedding  []float32 `json:"embedding"`
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	// ClickHouse JSONEachRow is one object per line; Encoder adds newlines.
+	for _, row := range rows {
+		if err := enc.Encode(payload{
+			TenantID:   row.TenantID,
+			AgentID:    row.AgentID,
+			DocumentID: row.DocumentID,
+			ChunkID:    row.ChunkID,
+			KMScope:    row.KMScope,
+			KMVersion:  row.KMVersion,
+			Content:    row.Content,
+			Embedding:  row.Embedding,
+		}); err != nil {
+			return fmt.Errorf("clickhouse encode row: %w", err)
+		}
+	}
+	// Query in URL param; body is pure JSONEachRow data (safe for large text).
+	q := fmt.Sprintf(
+		"INSERT INTO %s.km_embeddings (tenant_id, agent_id, document_id, chunk_id, km_scope, km_version, content, embedding) FORMAT JSONEachRow",
+		quoteIdent(c.db),
+	)
+	return c.execInsert(ctx, q, buf.Bytes())
 }
 
 func (c *Client) exec(ctx context.Context, query string) error {
 	_, err := c.query(ctx, query)
 	return err
+}
+
+// execInsert runs an INSERT with body as the data payload (FORMAT in query string).
+func (c *Client) execInsert(ctx context.Context, query string, data []byte) error {
+	params := url.Values{"database": {c.db}, "query": {query}}
+	if c.user != "" {
+		params.Set("user", c.user)
+	}
+	if c.password != "" {
+		params.Set("password", c.password)
+	}
+	endpoint := c.baseURL + "/?" + params.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("clickhouse: http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
 }
 
 func (c *Client) query(ctx context.Context, query string) ([]byte, error) {
@@ -370,12 +454,4 @@ func quoteIdent(name string) string {
 
 func escape(value string) string {
 	return strings.ReplaceAll(value, "'", "''")
-}
-
-func vectorLiteral(values []float32) string {
-	parts := make([]string, len(values))
-	for i, v := range values {
-		parts[i] = fmt.Sprintf("%g", v)
-	}
-	return "[" + strings.Join(parts, ",") + "]"
 }

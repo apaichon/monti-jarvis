@@ -163,8 +163,10 @@ func main() {
 		PublicBaseURL:      cfg.PublicBaseURL,
 		GoogleClientID:     cfg.GoogleOAuthClientID,
 		GoogleClientSecret: cfg.GoogleOAuthClientSecret,
+		GoogleRedirectURL:  cfg.GoogleOAuthRedirectURL,
 		GitHubClientID:     cfg.GitHubOAuthClientID,
 		GitHubClientSecret: cfg.GitHubOAuthClientSecret,
+		GitHubRedirectURL:  cfg.GitHubOAuthRedirectURL,
 		RedisPrefix:        cfg.RedisPrefix,
 	})
 
@@ -215,6 +217,12 @@ func main() {
 	mux.HandleFunc("POST /api/public/tenant/register", s.registerTenant)
 	mux.HandleFunc("GET /api/public/tenant/verify-email", s.verifyTenantEmail)
 	mux.HandleFunc("POST /api/public/tenant/verify-email", s.verifyTenantEmail)
+	// Shared tenant OAuth (login + register): one start/callback per provider.
+	mux.HandleFunc("GET /api/public/tenant/oauth/providers", s.oauthProviders)
+	mux.HandleFunc("GET /api/public/tenant/oauth/{provider}", s.startTenantOAuth)
+	mux.HandleFunc("GET /api/public/tenant/oauth/{provider}/callback", s.tenantOAuthCallback)
+	mux.HandleFunc("POST /api/public/tenant/oauth/complete", s.completeTenantOAuth)
+	// Legacy paths (pre-rename register/oauth) — keep callbacks working until consoles updated.
 	mux.HandleFunc("GET /api/public/tenant/register/oauth/providers", s.oauthProviders)
 	mux.HandleFunc("GET /api/public/tenant/register/oauth/{provider}", s.startTenantOAuth)
 	mux.HandleFunc("GET /api/public/tenant/register/oauth/{provider}/callback", s.tenantOAuthCallback)
@@ -280,6 +288,16 @@ func main() {
 	mux.Handle("GET /api/tenant/embed", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantEmbed)))
 	mux.Handle("PUT /api/tenant/embed", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantEmbed)))
 	mux.Handle("POST /api/tenant/embed/rotate-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.rotateTenantEmbedKey)))
+	// SPRINT-015 — tenant KM + knowledge gaps
+	mux.Handle("GET /api/tenant/km/scopes", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKMScopes)))
+	mux.Handle("GET /api/tenant/km/agents", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKMAgents)))
+	mux.Handle("GET /api/tenant/km/agents/{agent_id}/documents", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKMDocuments)))
+	mux.Handle("POST /api/tenant/km/agents/{agent_id}/documents", guard.RequireTenantAdminActive(http.HandlerFunc(s.uploadTenantKMDocument)))
+	mux.Handle("POST /api/tenant/km/agents/{agent_id}/reset", guard.RequireTenantAdminActive(http.HandlerFunc(s.resetTenantKMAgent)))
+	mux.Handle("PATCH /api/tenant/km/documents/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.patchTenantKMDocument)))
+	mux.Handle("DELETE /api/tenant/km/documents/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantKMDocument)))
+	mux.Handle("GET /api/tenant/km/gaps", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKMGaps)))
+	mux.Handle("PATCH /api/tenant/km/gaps/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.patchTenantKMGap)))
 
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
@@ -471,12 +489,21 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 			useRAG = false
 		}
 	}
-	if useRAG && s.rag != nil {
-		ragResult, _ = s.rag.Retrieve(ctx, agent.ID, topic, req.Message)
+	// Always scope RAG to the request tenant (embed/chat X-Tenant-Id) — not DemoTenantID.
+	ragSvc := s.rag
+	if ragSvc != nil && tenantID != "" {
+		ragSvc = ragSvc.WithTenant(tenantID)
+	}
+	if useRAG && ragSvc != nil {
+		var err error
+		ragResult, err = ragSvc.Retrieve(ctx, agent.ID, topic, req.Message)
+		if err != nil {
+			log.Printf("chat rag tenant=%s agent=%s: %v", tenantID, agent.ID, err)
+		}
 	}
 	prompt := workforce.SystemPrompt(agent)
-	if useRAG && s.rag != nil {
-		prompt = s.rag.AugmentPrompt(prompt, agent.ID, topic, req.Message, ragResult)
+	if useRAG && ragSvc != nil {
+		prompt = ragSvc.AugmentPrompt(prompt, agent.ID, topic, req.Message, ragResult)
 	}
 
 	reply, err := s.ai.Reply(ctx, prompt, history)
@@ -486,6 +513,19 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.store.SaveExchange(context.Background(), sessionID, agent.ID, req.Message, reply)
+	if ragResult.MissingKM && s.store != nil {
+		// Persist FAQ backlog for tenant KM improvement (also logged to ClickHouse qa_events).
+		src := store.KMGapSourceChat
+		// Embed UI uses same chat API; source still "chat" unless client sends later.
+		_, _ = s.store.RecordKMGap(context.Background(), store.KMGap{
+			TenantID:  tenantID,
+			AgentID:   agent.ID,
+			Topic:     topic,
+			Question:  req.Message,
+			SessionID: sessionID,
+			Source:    src,
+		})
+	}
 	writeJSON(w, http.StatusOK, chatResponse{
 		SessionID: sessionID,
 		AgentID:   agent.ID,
@@ -549,7 +589,8 @@ func withCommonHeaders(next http.Handler) http.Handler {
 }
 
 func withCORS(_ bool, next http.Handler) http.Handler {
-	allowHeaders := "Content-Type, X-Tenant-Id, Authorization"
+	// Include embed parent-origin header so host-page preflight from Vue/etc. succeeds.
+	allowHeaders := "Content-Type, X-Tenant-Id, Authorization, X-Embed-Parent-Origin"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")

@@ -17,7 +17,8 @@ import (
 
 const (
 	liveURL          = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
-	voiceRAGTimeout  = 1500 * time.Millisecond
+	// Allow enough time to load tenant KM chunks into the Live setup prompt.
+	voiceRAGTimeout = 4 * time.Second
 )
 
 type Config struct {
@@ -47,6 +48,7 @@ func (r *Relay) Handler() http.HandlerFunc {
 
 		agent := workforce.Resolve(req.URL.Query().Get("agent"))
 		topic := strings.TrimSpace(req.URL.Query().Get("topic"))
+		tenantID := strings.TrimSpace(req.URL.Query().Get("tenant_id"))
 		client, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
 			log.Printf("voice upgrade: %v", err)
@@ -57,7 +59,14 @@ func (r *Relay) Handler() http.HandlerFunc {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 
-		gem, err := r.dial(ctx, agent, topic)
+		// Scope voice RAG to the same tenant as chat/embed (query tenant_id).
+		relay := r
+		if tenantID != "" && r.rag != nil {
+			cp := *r
+			cp.rag = r.rag.WithTenant(tenantID)
+			relay = &cp
+		}
+		gem, err := relay.dial(ctx, agent, topic)
 		if err != nil {
 			log.Printf("gemini live dial: %v", err)
 			_ = client.WriteJSON(serverMsg{Type: "error", Message: "Gemini Live connection failed"})

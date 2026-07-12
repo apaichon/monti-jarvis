@@ -13,6 +13,7 @@ func TestNormalizePaymentMethod(t *testing.T) {
 		{"CreditCard", MethodCreditCard, true},
 		{"qr_promptpay", MethodQRPromptPay, true},
 		{"promptpay", MethodQRPromptPay, true},
+		{"bank_qrcode", MethodQRPromptPay, true},
 		{"qr", MethodQRPromptPay, true},
 		{"bitcoin", "", false},
 	}
@@ -36,6 +37,9 @@ func TestChannelCodeForMethod(t *testing.T) {
 		t.Fatal("credit card channel")
 	}
 	if ChannelCodeForMethod(MethodQRPromptPay) != ChannelQRPromptPay {
-		t.Fatal("promptpay channel")
+		t.Fatal("qr channel")
+	}
+	if ChannelCodeForMethod(MethodQRPromptPay) != "bank_qrcode" {
+		t.Fatalf("expected bank_qrcode, got %q", ChannelCodeForMethod(MethodQRPromptPay))
 	}
 }

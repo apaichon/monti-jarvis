@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	minScore          = 0.55
-	voiceChunkLimit   = 3
-	voiceExcerptRunes = 100
-	searchCandidateLimit = 50
+	// Slightly lower than 0.55 so bilingual product FAQs (TH question / EN KM) still match.
+	minScore             = 0.42
+	voiceChunkLimit      = 8
+	voiceExcerptRunes    = 480
+	searchCandidateLimit = 80
 )
 
 type Source struct {
@@ -72,18 +73,40 @@ func (s *Service) Retrieve(ctx context.Context, agentID, topic, question string)
 		if embedErr != nil {
 			return Result{}, embedErr
 		}
+		// 1) Preferred: this agent + resolved scopes
 		hits, err = s.ch.Search(ctx, s.tenant, agentID, scopes, vec, 5, searchCandidateLimit)
-	} else {
-		hits, err = s.ch.ListAgentChunks(ctx, s.tenant, agentID, scopes, voiceChunkLimit)
+		if err != nil {
+			return Result{}, err
+		}
+		result := s.buildResult(hits, question, agentID, topic)
+		if !result.MissingKM {
+			return result, nil
+		}
+		// 2) Same agent, all scopes (doc tagged technical while topic is general)
+		hits, err = s.ch.Search(ctx, s.tenant, agentID, nil, vec, 5, searchCandidateLimit)
+		if err != nil {
+			return Result{}, err
+		}
+		result = s.buildResult(hits, question, agentID, topic)
+		if !result.MissingKM {
+			return result, nil
+		}
+		// 3) Tenant-wide any agent (KM uploaded under Luna but embed chat uses Ava)
+		hits, err = s.ch.Search(ctx, s.tenant, "", nil, vec, 5, searchCandidateLimit)
+		if err != nil {
+			return Result{}, err
+		}
+		return s.buildResult(hits, question, agentID, topic), nil
 	}
+	hits, err = s.ch.ListAgentChunks(ctx, s.tenant, agentID, scopes, voiceChunkLimit)
 	if err != nil {
 		return Result{}, err
 	}
-
 	return s.buildResult(hits, question, agentID, topic), nil
 }
 
-// RetrieveForVoice preloads a small KB slice for Gemini Live setup. Cached per agent+topic.
+// RetrieveForVoice preloads KB for Gemini Live setup (no query embedding — keep setup fast).
+// Same fallbacks as chat: agent scopes → agent all scopes → tenant-wide.
 func (s *Service) RetrieveForVoice(ctx context.Context, agentID, topic string) (Result, error) {
 	if !s.Enabled() {
 		return Result{}, nil
@@ -92,11 +115,35 @@ func (s *Service) RetrieveForVoice(ctx context.Context, agentID, topic string) (
 	if cached, ok := s.cache.get(key); ok {
 		return cached, nil
 	}
-	result, err := s.Retrieve(ctx, agentID, topic, "")
+	scopes := scope.Resolve(agentID, topic)
+	hits, err := s.ch.ListAgentChunks(ctx, s.tenant, agentID, scopes, voiceChunkLimit)
 	if err != nil {
 		return Result{}, err
 	}
-	result.ContextBlock = formatVoiceContext(result.Sources)
+	if len(hits) == 0 {
+		hits, err = s.ch.ListAgentChunks(ctx, s.tenant, agentID, nil, voiceChunkLimit)
+		if err != nil {
+			return Result{}, err
+		}
+	}
+	if len(hits) == 0 {
+		hits, err = s.ch.ListAgentChunks(ctx, s.tenant, "", nil, voiceChunkLimit)
+		if err != nil {
+			return Result{}, err
+		}
+	}
+	// Empty question keeps all hits; expand excerpts for product prices/SKUs.
+	srcs := make([]Source, 0, len(hits))
+	for _, h := range hits {
+		srcs = append(srcs, Source{
+			ChunkID:    h.ChunkID,
+			DocumentID: h.DocumentID,
+			Scope:      h.KMScope,
+			Excerpt:    excerpt(h.Content, voiceExcerptRunes),
+			Score:      1,
+		})
+	}
+	result := Result{Sources: srcs, ContextBlock: formatVoiceContext(srcs)}
 	s.cache.set(key, result)
 	return result, nil
 }
@@ -144,12 +191,15 @@ Use ONLY the following approved knowledge-base excerpts when answering. If the a
 func (s *Service) BuildVoicePrompt(basePrompt, agentID, topic string, rag Result) string {
 	basePrompt = strings.TrimSpace(basePrompt)
 	if rag.ContextBlock == "" {
-		return basePrompt
+		return basePrompt + `
+
+Voice call — keep replies short (1–3 sentences). If you lack product facts, say you will check with a specialist.`
 	}
 	return basePrompt + `
 
-Voice call — keep replies short. Use these KB excerpts when relevant:
+You HAVE an approved knowledge base for this tenant. Prefer these facts for product prices, sizes, and promotions. Quote promo prices accurately. Reply in the caller's language. Keep spoken answers short (1–3 sentences), then offer more help.
 
+Knowledge base excerpts:
 ` + rag.ContextBlock
 }
 

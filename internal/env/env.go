@@ -57,8 +57,12 @@ type Config struct {
 	ResendFromEmail          string
 	GoogleOAuthClientID      string
 	GoogleOAuthClientSecret  string
-	GitHubOAuthClientID      string
-	GitHubOAuthClientSecret  string
+	// Optional full redirect URI override (must match Google Console exactly).
+	// Prefer http://localhost:PORT/... for local HTTP — Google rejects http://*.local.
+	GoogleOAuthRedirectURL string
+	GitHubOAuthClientID    string
+	GitHubOAuthClientSecret string
+	GitHubOAuthRedirectURL  string
 	ChillPayMerchantCode     string
 	ChillPayAPIKey           string
 	ChillPayMD5Key           string
@@ -139,8 +143,16 @@ func Load() Config {
 		ResendFromEmail:         resolveResendFrom(),
 		GoogleOAuthClientID:     os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
 		GoogleOAuthClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+		GoogleOAuthRedirectURL: envOr(
+			"GOOGLE_OAUTH_REDIRECT_URL",
+			envOr("OAUTH_GOOGLE_REDIRECT_URL", ""),
+		),
 		GitHubOAuthClientID:     os.Getenv("GITHUB_OAUTH_CLIENT_ID"),
 		GitHubOAuthClientSecret: os.Getenv("GITHUB_OAUTH_CLIENT_SECRET"),
+		GitHubOAuthRedirectURL: envOr(
+			"GITHUB_OAUTH_REDIRECT_URL",
+			envOr("OAUTH_GITHUB_REDIRECT_URL", ""),
+		),
 		ChillPayMerchantCode:     os.Getenv("CHILLPAY_MERCHANT_CODE"),
 		ChillPayAPIKey:           os.Getenv("CHILLPAY_API_KEY"),
 		ChillPayMD5Key:           os.Getenv("CHILLPAY_MD5_KEY"),

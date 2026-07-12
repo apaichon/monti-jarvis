@@ -22,3 +22,11 @@ func TestResolveNeoTriage(t *testing.T) {
 		t.Fatalf("Resolve(neo,billing) = %v, want [billing]", got)
 	}
 }
+func TestValidScope(t *testing.T) {
+	if !ValidScope("general") || !ValidScope("Billing") {
+		t.Fatal("expected valid scopes")
+	}
+	if ValidScope("other") || ValidScope("") {
+		t.Fatal("expected invalid")
+	}
+}
