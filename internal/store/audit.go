@@ -41,6 +41,10 @@ var auditableTables = []string{
 	"tenant_call_limits",
 	"customer_tiers",
 	"customer_groups",
+	"customers",
+	"customer_group_members",
+	"customer_import_jobs",
+	"customer_domain_rules",
 }
 
 func (s *Store) ensureAuditSchema(ctx context.Context) error {

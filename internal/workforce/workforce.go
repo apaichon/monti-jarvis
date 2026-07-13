@@ -22,10 +22,10 @@ type Agent struct {
 	// goodbye) to a talking-loop GIF rendered with that feeling.
 	Expressions map[string]string `json:"expressions,omitempty"`
 	Popular     bool              `json:"popular,omitempty"`
-	Robot           bool   `json:"robot,omitempty"`
-	Skin            string `json:"skin,omitempty"`
-	Hair            string `json:"hair,omitempty"`
-	Greeting        string `json:"greeting"`
+	Robot       bool              `json:"robot,omitempty"`
+	Skin        string            `json:"skin,omitempty"`
+	Hair        string            `json:"hair,omitempty"`
+	Greeting    string            `json:"greeting"`
 }
 
 func FromWorkforceAgent(w store.WorkforceAgent) Agent {
@@ -55,6 +55,19 @@ func FromWorkforceAgent(w store.WorkforceAgent) Agent {
 	return a
 }
 
+// FindAssigned resolves an agent from active, tenant-scoped workforce rows.
+// It deliberately does not fall back; callers decide whether legacy fallback
+// to the built-in catalog is appropriate.
+func FindAssigned(id string, assigned []store.WorkforceAgent) (Agent, bool) {
+	id = strings.TrimSpace(strings.ToLower(id))
+	for _, candidate := range assigned {
+		if strings.TrimSpace(strings.ToLower(candidate.ID)) == id {
+			return FromWorkforceAgent(candidate), true
+		}
+	}
+	return Agent{}, false
+}
+
 // ExpressionTones is the set of response tones with pre-rendered loops.
 var ExpressionTones = []string{"hello", "happy", "sorry", "cheer", "goodbye"}
 
@@ -80,7 +93,7 @@ var agents = []Agent{
 		Color: "#0076ff", Voice: "Charon", Image: "/images/max.jpg",
 		SpeakingImage: "/images/speaking/max-speaking.gif",
 		Expressions:   expressionSet("max"),
-		Skin: "#e8ad88", Hair: "#2d221f",
+		Skin:          "#e8ad88", Hair: "#2d221f",
 		Greeting: "Hi, this is Max from billing. I can help with invoices, payments, and account questions.",
 	},
 	{
@@ -88,7 +101,7 @@ var agents = []Agent{
 		Color: "#b14dff", Voice: "Kore", Image: "/images/luna.jpg",
 		SpeakingImage: "/images/speaking/luna-speaking.gif",
 		Expressions:   expressionSet("luna"),
-		Skin: "#efc0a1", Hair: "#7c52c8",
+		Skin:          "#efc0a1", Hair: "#7c52c8",
 		Greeting: "Hello, Luna here from technical support. Tell me what's going on and we'll troubleshoot it together.",
 	},
 	{
@@ -96,7 +109,7 @@ var agents = []Agent{
 		Color: "#00a8ff", Voice: "Puck", Image: "/images/neo.jpg",
 		SpeakingImage: "/images/speaking/neo-speaking.gif",
 		Expressions:   expressionSet("neo"),
-		Greeting: "Neo triage online. Share your issue in one sentence and I'll route you to the right specialist.",
+		Greeting:      "Neo triage online. Share your issue in one sentence and I'll route you to the right specialist.",
 	},
 }
 

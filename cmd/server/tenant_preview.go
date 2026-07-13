@@ -75,7 +75,7 @@ func (s *server) tenantPreviewChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	agent := workforce.Resolve(req.AgentID)
+	agent := s.resolveWorkforceAgent(r.Context(), tenantID, req.AgentID)
 	sessionID := strings.TrimSpace(req.SessionID)
 	if sessionID == "" {
 		sessionID = newID()

@@ -43,6 +43,7 @@ export type TenantAssignmentsResponse = {
   cap: {
     max_ai_employees: number;
     active_count: number;
+    override_allowed: boolean;
   };
 };
 

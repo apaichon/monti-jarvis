@@ -168,7 +168,7 @@ JSON body:
 | `POST /api/chat` | `AllowRate(chat)` → resolve tenant → if RAG: `CheckFeature(rag_enabled)` → chat |
 | `GET /ws/voice` | `AllowRate(voice)` → `CheckFeature(voice_enabled)` → `CheckMonthlyMinutes(0)` → `AcquireConcurrent` → on close: `release` + `AddCallMinutes` |
 | `POST /api/km/agents/{id}/documents` | `AllowRate(km)` → `CheckKMDocument` → ingest |
-| `POST /api/platform/tenants/{id}/avatars` | `CheckAIEmployees(count+1)` → assign |
+| `POST /api/platform/tenants/{id}/avatars` | configured demo tenant: platform-admin cap override → assign/promote; otherwise `CheckAIEmployees(count+1)` → assign |
 
 ### Tenant resolution
 

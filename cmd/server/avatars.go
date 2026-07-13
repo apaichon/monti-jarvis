@@ -172,9 +172,10 @@ func (s *server) listTenantAvatars(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"tenant_id":   tenantID,
 		"assignments": tenantAssignmentListJSON(assignments),
-		"cap": map[string]int{
+		"cap": map[string]any{
 			"max_ai_employees": maxAI,
-			"active_count":       activeCount,
+			"active_count":     activeCount,
+			"override_allowed": s.demoAvatarCapOverrideAllowed(tenantID),
 		},
 	})
 }
@@ -228,6 +229,12 @@ func (s *server) checkAvatarAssignCap(ctx context.Context, tenantID, avatarID st
 			return nil
 		}
 	}
+	// The configured demo tenant is seeded with the complete avatar catalog so
+	// platform admins can promote and demote demo agents independently of the
+	// tenant's commercial package cap. Runtime quota checks remain unchanged.
+	if s.demoAvatarCapOverrideAllowed(tenantID) {
+		return nil
+	}
 	count, err := s.store.CountActiveTenantAssignments(ctx, tenantID)
 	if err != nil {
 		return err
@@ -250,6 +257,14 @@ func (s *server) checkAvatarAssignCap(ctx context.Context, tenantID, avatarID st
 		return store.ErrMaxAIEmployeesExceeded
 	}
 	return nil
+}
+
+func (s *server) demoAvatarCapOverrideAllowed(tenantID string) bool {
+	demoTenantID := strings.TrimSpace(s.cfg.DemoTenantID)
+	if demoTenantID == "" {
+		demoTenantID = "demo"
+	}
+	return strings.TrimSpace(tenantID) == demoTenantID
 }
 
 func (s *server) buildAvatarFromBody(body avatarBody, id string, requireVoices bool) (*store.Avatar, []store.AvatarVoice, error) {
@@ -294,16 +309,16 @@ func (s *server) buildAvatarFromBody(body avatarBody, id string, requireVoices b
 		flags = map[string]any{}
 	}
 	return &store.Avatar{
-		ID:        id,
-		Slug:      slug,
-		Name:      name,
-		Role:      strings.TrimSpace(body.Role),
-		Trait:     strings.TrimSpace(body.Trait),
-		Color:     strings.TrimSpace(body.Color),
-		ImageURL:  imageURL,
-		Greeting:  strings.TrimSpace(body.Greeting),
-		Status:    status,
-		Flags:     flags,
+		ID:       id,
+		Slug:     slug,
+		Name:     name,
+		Role:     strings.TrimSpace(body.Role),
+		Trait:    strings.TrimSpace(body.Trait),
+		Color:    strings.TrimSpace(body.Color),
+		ImageURL: imageURL,
+		Greeting: strings.TrimSpace(body.Greeting),
+		Status:   status,
+		Flags:    flags,
 	}, voices, nil
 }
 

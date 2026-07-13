@@ -1,8 +1,8 @@
 ---
 id: TEST-MATRIX
 status: active
-updated: 2026-07-11
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014]
+updated: 2026-07-13
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -94,6 +94,22 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | T14-07 | 5 | Quota applies to embed tenant | Manual optional | [S7](../06-manual-tests/SPRINT-014-manual.md#s7--quota-still-applies-on-embed-path-feat-ac-5--optional) |
 | T14-08 | — | Loader asset 200 | Smoke | `curl /embed/monti-embed.js` |
 | T14-09 | — | Origin helpers / key format | Auto | `go test ./internal/store/ -run Embed` |
+
+## FEAT-0021 — Customer Account Import and Domain Integration (SPRINT-019)
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T19-01 | 1 | Manual customer create/edit/deactivate | Manual | [S1](../06-manual-tests/SPRINT-019-manual.md#s1--manual-customer-crud-and-deactivation-task-00880089--feat-ac-1) | Pass |
+| T19-02 | 2 | CSV parser validates rows and limits | Auto | `go test ./internal/customerimport` | Pass |
+| T19-03 | 2 | Dry-run reports errors and performs no customer writes | Manual | [S2](../06-manual-tests/SPRINT-019-manual.md#s2--csv-dry-run-performs-no-customer-writes-task-00880089--feat-ac-2) | Pass |
+| T19-04 | 3 | Repeat source/external id preserves customer id | Manual | [S3](../06-manual-tests/SPRINT-019-manual.md#s3--csv-commit-and-idempotent-reimport-task-00880090--feat-ac-3) | Pass |
+| T19-05 | 4–5 | Explicit assignment wins over domain default | Manual | [S4](../06-manual-tests/SPRINT-019-manual.md#s4--explicit-assignment-and-domain-default-precedence-task-0090--feat-ac-45) | Pass |
+| T19-06 | 6 | Cross-tenant customer/import/rule ids return 404 | Manual | [S5](../06-manual-tests/SPRINT-019-manual.md#s5--tenant-isolation-task-008700880090--feat-ac-6) | Pass |
+| T19-07 | 5 | Email/domain/source normalization | Auto | `go test ./internal/store -run NormalizeCustomer` | Pass |
+| T19-08 | 7 | No customer credential/token surface | Manual | [S7](../06-manual-tests/SPRINT-019-manual.md#s7--customer-authentication-remains-unavailable-task-0091--feat-ac-7) | Pass |
+| T19-09 | 8 | Tenant UI checks and full build pass | Auto | `npm --prefix apps/tenant-web run check && make build` | Pass |
+
+---
 
 ## Build & regression gates (all sprints)
 

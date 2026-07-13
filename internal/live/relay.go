@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	liveURL          = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+	liveURL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
 	// Allow enough time to load tenant KM chunks into the Live setup prompt.
 	voiceRAGTimeout = 4 * time.Second
 )
@@ -29,10 +29,15 @@ type Config struct {
 // LocaleHintFunc returns an optional system-prompt suffix (e.g. preferred reply language).
 type LocaleHintFunc func(ctx context.Context, tenantID string) string
 
+// AgentResolver resolves a tenant-assigned catalog avatar. Returning false
+// preserves the built-in workforce fallback for legacy deployments.
+type AgentResolver func(ctx context.Context, tenantID, agentID string) (workforce.Agent, bool)
+
 type Relay struct {
-	cfg        Config
-	rag        *rag.Service
-	LocaleHint LocaleHintFunc
+	cfg           Config
+	rag           *rag.Service
+	LocaleHint    LocaleHintFunc
+	AgentResolver AgentResolver
 }
 
 func New(cfg Config, ragSvc *rag.Service) *Relay {
@@ -50,9 +55,9 @@ func (r *Relay) Handler() http.HandlerFunc {
 			return
 		}
 
-		agent := workforce.Resolve(req.URL.Query().Get("agent"))
 		topic := strings.TrimSpace(req.URL.Query().Get("topic"))
 		tenantID := strings.TrimSpace(req.URL.Query().Get("tenant_id"))
+		agent := r.resolveAgent(req.Context(), tenantID, req.URL.Query().Get("agent"))
 		lang := normalizeLang(req.URL.Query().Get("lang"))
 		client, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
@@ -195,6 +200,15 @@ func (r *Relay) Handler() http.HandlerFunc {
 			}
 		}
 	}
+}
+
+func (r *Relay) resolveAgent(ctx context.Context, tenantID, agentID string) workforce.Agent {
+	if r.AgentResolver != nil {
+		if agent, ok := r.AgentResolver(ctx, tenantID, agentID); ok {
+			return agent
+		}
+	}
+	return workforce.Resolve(agentID)
 }
 
 func (r *Relay) dial(ctx context.Context, agent workforce.Agent, topic, tenantID, lang string, status func(string)) (*websocket.Conn, error) {

@@ -55,9 +55,9 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** Next open: `SPRINT-019` — Customer Account Import, Integration. Phase D complete through **v1.9.0**.
+**Current sprint:** None — `SPRINT-019` shipped as v2.0.0; `SPRINT-020` Customer Auth is next and not opened.
 
-**Shipped:** v1.9.0 `SPRINT-018` customer tiers · v1.8.0 `SPRINT-017` test/preview · v1.7.0 `SPRINT-016` settings/locale/limits · v1.6.0 `SPRINT-015` tenant KM · v1.5.0 `SPRINT-014` embed · v1.4.0 `SPRINT-013` quota · v1.3.1 commerce harden · v1.3.0 `SPRINT-008`–`012` commerce · v0.8.0 `SPRINT-007` · v0.7.0 `SPRINT-006` · v0.6.0 `SPRINT-005` · v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype
+**Shipped:** v2.0.0 `SPRINT-019` customer import/domain integration · v1.9.0 `SPRINT-018` customer tiers · v1.8.0 `SPRINT-017` test/preview · v1.7.0 `SPRINT-016` settings/locale/limits · v1.6.0 `SPRINT-015` tenant KM · v1.5.0 `SPRINT-014` embed · v1.4.0 `SPRINT-013` quota · v1.3.1 commerce harden · v1.3.0 `SPRINT-008`–`012` commerce · v0.8.0 `SPRINT-007` · v0.7.0 `SPRINT-006` · v0.6.0 `SPRINT-005` · v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype
 
 **Prod gate:** Before customer production launch (post tenant customer-user auth S19–20), verify **rate limit + quota management** under multi-user load (see SPRINT-016 / SPRINT-017 notes).
 

@@ -274,8 +274,8 @@
       sessionId = res.session_id;
       history = [
         ...history,
-        { role: 'user', content: text },
-        { role: 'assistant', content: res.reply }
+        { role: 'user' as const, content: text },
+        { role: 'assistant' as const, content: res.reply }
       ].slice(-16);
       messages = [
         ...messages,

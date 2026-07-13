@@ -10,7 +10,7 @@
   let loading = $state(true);
 
   onMount(async () => {
-    const id = $page.params.id;
+    const id = $page.params.id ?? '';
     try {
       order = await getBillingOrder(id);
     } catch (err) {

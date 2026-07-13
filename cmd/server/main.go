@@ -37,17 +37,17 @@ import (
 )
 
 type server struct {
-	cfg    env.Config
-	ai     *gemini.Client
-	voice  *live.Relay
-	calls  *calls.Service
-	store  *store.Store
-	km     *km.Service
-	rag    *rag.Service
-	ch     *clickhouse.Client
-	bus    *natsbus.Bus
-	auth         *auth.Service
-	guard        *auth.HTTPGuard
+	cfg             env.Config
+	ai              *gemini.Client
+	voice           *live.Relay
+	calls           *calls.Service
+	store           *store.Store
+	km              *km.Service
+	rag             *rag.Service
+	ch              *clickhouse.Client
+	bus             *natsbus.Bus
+	auth            *auth.Service
+	guard           *auth.HTTPGuard
 	entitlements    *entitlements.Service
 	quota           *quota.Service
 	static          http.Handler
@@ -204,6 +204,7 @@ func main() {
 		mailer:          mailer,
 		tenantOAuth:     tenantOAuth,
 	}
+	voiceRelay.AgentResolver = s.resolveAssignedWorkforceAgent
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
@@ -332,6 +333,19 @@ func main() {
 	mux.Handle("PUT /api/tenant/groups/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantGroup)))
 	mux.Handle("DELETE /api/tenant/groups/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantGroup)))
 
+	// SPRINT-019 — tenant customer directory, CSV imports, domain rules
+	mux.Handle("GET /api/tenant/customers", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantCustomers)))
+	mux.Handle("POST /api/tenant/customers", guard.RequireTenantAdminActive(http.HandlerFunc(s.createTenantCustomer)))
+	mux.Handle("GET /api/tenant/customers/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCustomer)))
+	mux.Handle("PUT /api/tenant/customers/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantCustomer)))
+	mux.Handle("DELETE /api/tenant/customers/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantCustomer)))
+	mux.Handle("POST /api/tenant/customer-imports", guard.RequireTenantAdminActive(http.HandlerFunc(s.importTenantCustomers)))
+	mux.Handle("GET /api/tenant/customer-imports/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCustomerImport)))
+	mux.Handle("GET /api/tenant/customer-domain-rules", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantCustomerDomainRules)))
+	mux.Handle("POST /api/tenant/customer-domain-rules", guard.RequireTenantAdminActive(http.HandlerFunc(s.createTenantCustomerDomainRule)))
+	mux.Handle("PUT /api/tenant/customer-domain-rules/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantCustomerDomainRule)))
+	mux.Handle("DELETE /api/tenant/customer-domain-rules/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantCustomerDomainRule)))
+
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
 	mux.Handle("GET /api/tenant/orders/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrder)))
@@ -386,19 +400,19 @@ func main() {
 
 func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":           true,
-		"gemini":       s.ai != nil && s.ai.Enabled(),
-		"voice":        s.voice != nil && s.voice.Enabled(),
-		"livekit":      s.cfg.LiveKitAPIKey != "",
-		"nats":         s.bus != nil && s.bus.Enabled(),
-		"legacy_ui":    s.cfg.LegacyUIEnabled,
-		"sprint":              "SPRINT-009",
-		"auth_disabled":       s.cfg.AuthDisabled,
-		"tenant_register":     s.cfg.TenantRegisterEnabled,
-		"rag":                 s.rag != nil && s.rag.Enabled(),
-		"customer_web":        s.cfg.CustomerWebDir,
-		"platform_admin_web":  s.cfg.PlatformAdminWebDir,
-		"tenant_web":          s.cfg.TenantWebDir,
+		"ok":                 true,
+		"gemini":             s.ai != nil && s.ai.Enabled(),
+		"voice":              s.voice != nil && s.voice.Enabled(),
+		"livekit":            s.cfg.LiveKitAPIKey != "",
+		"nats":               s.bus != nil && s.bus.Enabled(),
+		"legacy_ui":          s.cfg.LegacyUIEnabled,
+		"sprint":             "SPRINT-019",
+		"auth_disabled":      s.cfg.AuthDisabled,
+		"tenant_register":    s.cfg.TenantRegisterEnabled,
+		"rag":                s.rag != nil && s.rag.Enabled(),
+		"customer_web":       s.cfg.CustomerWebDir,
+		"platform_admin_web": s.cfg.PlatformAdminWebDir,
+		"tenant_web":         s.cfg.TenantWebDir,
 	})
 }
 
@@ -423,12 +437,12 @@ func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out := map[string]any{
-		"postgres":    h.Postgres,
-		"redis":       h.Redis,
-		"minio":       h.Minio,
-		"clickhouse":  h.ClickHouse,
-		"nats":        h.NATS,
-		"livekit":     h.LiveKit,
+		"postgres":   h.Postgres,
+		"redis":      h.Redis,
+		"minio":      h.Minio,
+		"clickhouse": h.ClickHouse,
+		"nats":       h.NATS,
+		"livekit":    h.LiveKit,
 	}
 	if s.auth != nil && s.auth.Enabled() {
 		out["auth_cache"] = s.auth.CacheStatus()
@@ -478,6 +492,25 @@ func (s *server) workforce(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"agents": workforce.All()})
 }
 
+func (s *server) resolveAssignedWorkforceAgent(ctx context.Context, tenantID, agentID string) (workforce.Agent, bool) {
+	if s.store == nil || strings.TrimSpace(tenantID) == "" {
+		return workforce.Agent{}, false
+	}
+	agents, err := s.store.ListWorkforceAgents(ctx, tenantID)
+	if err != nil {
+		log.Printf("resolve workforce tenant=%s agent=%s: %v", tenantID, agentID, err)
+		return workforce.Agent{}, false
+	}
+	return workforce.FindAssigned(agentID, agents)
+}
+
+func (s *server) resolveWorkforceAgent(ctx context.Context, tenantID, agentID string) workforce.Agent {
+	if agent, ok := s.resolveAssignedWorkforceAgent(ctx, tenantID, agentID); ok {
+		return agent
+	}
+	return workforce.Resolve(agentID)
+}
+
 func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	var req chatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -490,7 +523,8 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	agent := workforce.Resolve(req.AgentID)
+	tenantID := s.quotaTenant(r)
+	agent := s.resolveWorkforceAgent(r.Context(), tenantID, req.AgentID)
 	sessionID := strings.TrimSpace(req.SessionID)
 	if sessionID == "" {
 		sessionID = newID()
@@ -505,7 +539,6 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 50*time.Second)
 	defer cancel()
 
-	tenantID := s.quotaTenant(r)
 	if s.quota != nil {
 		if err := s.quota.AllowRate(ctx, tenantID, quota.BucketChat); err != nil {
 			writeQuotaError(w, err)

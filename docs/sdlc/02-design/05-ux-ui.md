@@ -2,8 +2,8 @@
 id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
-updated: 2026-07-11
-sprint: SPRINT-014
+updated: 2026-07-12
+sprint: SPRINT-019
 ---
 
 # UX/UI — ASCII Wireframes
@@ -615,19 +615,20 @@ Same fields as P8 prefilled from `GET /api/platform/avatars/{id}` including **Vo
 | Zone | Element | API |
 | --- | --- | --- |
 | P10-H1 | Tenant id | route param |
-| P10-C1 | Cap hint | `cap.max_ai_employees` vs `active_count` from GET |
+| P10-C1 | Cap hint | `cap.max_ai_employees`, `active_count`, and demo `override_allowed` from GET |
 | P10-C2 | Assigned list | `assignments[]` |
 | P10-S1 | Avatar select | catalog dropdown |
 | P10-B1 | Assign | `POST …/avatars {avatar_id}` |
-| P10-B2 | Disable | `DELETE …/avatars/{avatar_id}` |
+| P10-B2 | Demote | `DELETE …/avatars/{avatar_id}` |
+| P10-B3 | Promote | `POST …/avatars {avatar_id}` for a disabled assignment |
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│  Tenant avatars — demo (P10-H1)     Cap: 2 max · 4 assigned (warning if over)    │
+│  Tenant avatars — demo (P10-H1)     Cap: 2 max · 4 assigned (demo override)      │
 ├──────────────────────────────────────────────────────────────────────────────────┤
 │  ┌─ Assigned ────────────────────────────────────────────────────────────────┐  │
-│  │ ava  Ava   General Support   [active]   [ Disable ]                         │  │
-│  │ max  Max   Billing          [active]   [ Disable ]                         │  │
+│  │ ava  Ava   General Support   [active]     [ Demote ]                        │  │
+│  │ max  Max   Billing          [disabled]   [ Promote ]                        │  │
 │  └────────────────────────────────────────────────────────────────────────────┘  │
 │  ┌─ Assign ──────────────────────────────────────────────────────────────────┐  │
 │  │ Avatar [ luna ▼ ]              [ Assign to tenant ]  P10-B1                 │  │
@@ -1645,4 +1646,140 @@ New tier → name VIP slug vip → locale th → max_minutes_per_call 30 → Sav
 | Tiers page | `apps/tenant-web/src/routes/tiers/+page.svelte` |
 | API client | `apps/tenant-web/src/lib/api/tiers.ts` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [04-api-spec.md](04-api-spec.md) · [02-workflow.md](02-workflow.md).
+## Sprint 19 — Customer Accounts and Import (T12)
+
+SPRINT-019 adds a tenant-admin customer directory. It does not add a customer-facing account or login screen; the customer conversation portal remains public until SPRINT-020.
+
+### Screen map → API
+
+| Zone | User action | API |
+| --- | --- | --- |
+| A0 | Open Customers from tenant navigation | — |
+| B1 | Search/filter customer directory | `GET /api/tenant/customers?q=&status=&tier_id=` |
+| B2 | Create customer | `POST /api/tenant/customers` |
+| B3 | Edit profile, tier, and groups | `PUT /api/tenant/customers/{id}` |
+| B4 | Deactivate customer | `DELETE /api/tenant/customers/{id}` |
+| C1 | Select and validate CSV | `POST /api/tenant/customer-imports` with `dry_run=true` |
+| C2 | Confirm CSV commit | `POST /api/tenant/customer-imports` with `dry_run=false` |
+| C3 | View import outcome | `GET /api/tenant/customer-imports/{id}` |
+| D1 | List domain rules | `GET /api/tenant/customer-domain-rules` |
+| D2 | Create domain rule | `POST /api/tenant/customer-domain-rules` |
+| D3 | Edit/delete domain rule | `PUT/DELETE /api/tenant/customer-domain-rules/{id}` |
+| E1 | Load tier/group selectors | `GET /api/tenant/tiers`, `GET /api/tenant/groups` |
+
+### T12 desktop layout
+
+```text
+┌─ Tenant shell ──────────────────────────────────────────────────────────┐
+│ MONTI       Workspace / Customers                    Search   AD Admin  │
+├──────────────┬──────────────────────────────────────────────────────────┤
+│ Overview     │ Customers                                                │
+│ Billing      │ Manage imported customer identities before sign-in.      │
+│ Documents    │                                                          │
+│ Tax          │ [Customers] [CSV imports] [Domain rules]    [+ Customer] │
+│ Embed        │                                                          │
+│ Knowledge    │ B1 [Search name/email…] [Status ▾] [Tier ▾]              │
+│ Tiers        │ ┌──────────────────────────────────────────────────────┐ │
+│ Customers A0 │ │ Name      Email           Tier      Groups   Status │ │
+│ Settings     │ │ Jane Doe  jane@acme.com   VIP       Retail   Active │ │
+│ Preview      │ │ Somchai   s@acme.co.th    Standard  —        Active │ │
+│              │ └──────────────────────────────────────────────────────┘ │
+│ Enterprise   │                                           [‹] 1 2 [›]    │
+│ 68% usage    │                                                          │
+└──────────────┴──────────────────────────────────────────────────────────┘
+```
+
+### T12 customer drawer (B2/B3/E1)
+
+```text
+┌─ Add customer ───────────────────────────────┐
+│ Display name* [___________________________]  │
+│ Email         [___________________________]  │
+│ Phone         [___________________________]  │
+│ Locale        [Auto / English / ไทย ▾]       │
+│ Tier          [VIP ▾]                        │
+│ Groups        [Retail ×] [Enterprise ×] [+]  │
+│ Source        [manual]  External ID [_____]  │
+│                                             │
+│                         [Cancel] [Save] B2   │
+└─────────────────────────────────────────────┘
+```
+
+### T12 CSV import (C1/C2/C3)
+
+```text
+┌─ Import customers ───────────────────────────────────────────────────┐
+│ 1 Upload              2 Validate                3 Commit             │
+│ [ Download template ]  [ Choose CSV… ]                               │
+│                                                                     │
+│ Dry-run: 248 accepted · 2 rejected                                  │
+│ ┌ Row ┬ Field      ┬ Issue                                      ┐   │
+│ │ 14  │ email      │ Invalid email                              │   │
+│ │ 91  │ tier_slug  │ Tier not found                            │   │
+│ └─────┴────────────┴────────────────────────────────────────────┘   │
+│ [Replace file]                                  [Import 248 rows] C2 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+The commit action is disabled until the current file has a successful dry-run. Re-selecting or changing the file clears validation.
+
+### T12 domain rules (D1–D3)
+
+```text
+┌─ Domain rules ──────────────────────────────────────────────────────┐
+│ Domain          Policy   Default tier   Default group   Active      │
+│ acme.com        Allow    VIP            Employees       ●    [Edit] │
+│ blocked.test    Deny     —              —               ●    [Edit] │
+│                                                     [+ Add rule]    │
+│ Note: allow/deny is enforced when customer auth ships in SPRINT-020.│
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Manual customer
+
+```text
+B2 + Customer
+  → enter display name and email
+  → choose tenant-owned tier/groups (E1)
+  → POST customer
+  → new active row appears in B1
+```
+
+### Flow B — CSV dry-run and commit
+
+```text
+C1 choose CSV
+  → dry-run parses + validates without customer writes
+  → show accepted/rejected counts and row errors
+  → user confirms C2
+  → send file again as commit
+  → C3 completed summary → refresh B1
+```
+
+### Flow C — Domain defaults
+
+```text
+D2 add acme.com allow + Standard/Employees defaults
+  → imported acme.com row has no explicit assignment
+  → customer receives domain defaults
+  → rule policy remains informational until SPRINT-020 auth
+```
+
+### Mobile collapse
+
+- Existing responsive tenant shell becomes bottom navigation.
+- Customer table becomes stacked cards with name/email/status first.
+- Filters open in a compact sheet; customer editor and import occupy full width.
+- Import row errors scroll horizontally only inside their table, not the page.
+
+### Component → file
+
+| Component | Path |
+| --- | --- |
+| Customers route | `apps/tenant-web/src/routes/customers/+page.svelte` |
+| Customer API client | `apps/tenant-web/src/lib/api/customers.ts` |
+| Tenant navigation | `apps/tenant-web/src/routes/+layout.svelte` |
+| Server handlers | `cmd/server/tenant_customers.go` |
+| Store/domain logic | `internal/store/customers.go`, `internal/customerimport/` |
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [02-workflow.md](02-workflow.md) · [03-er-diagram.md](03-er-diagram.md) · [04-api-spec.md](04-api-spec.md).
