@@ -12,7 +12,7 @@
   import { ApiError } from '$lib/api/http';
   import { feedback } from '$lib/feedback.svelte';
 
-  const tenantId = $derived($page.params.id);
+  const tenantId = $derived($page.params.id ?? '');
 
   let entitlement = $state<Entitlement | null>(null);
   let packages = $state<Package[]>([]);

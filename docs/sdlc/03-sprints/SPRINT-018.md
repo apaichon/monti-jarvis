@@ -33,11 +33,11 @@ Let **active tenants** manage a **customer tier catalog** (and optional groups) 
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0082](../04-tasks/TASK-0082.md) | 3 | done | devops | `customer_tiers` + `customer_groups` schema |
-| [TASK-0083](../04-tasks/TASK-0083.md) | 5 | done | dev | Tenant tiers/groups REST APIs + validation |
-| [TASK-0084](../04-tasks/TASK-0084.md) | 4 | done | dev | Tenant UI `/tenant/tiers` |
-| [TASK-0085](../04-tasks/TASK-0085.md) | 3 | done | dev | Apply tier overrides on preview (+ settings link) |
-| [TASK-0086](../04-tasks/TASK-0086.md) | 1 | done | tester | Manual UAT checklist |
+| [TASK-0082](../04-tasks/TASK-0082.md) | 3 | completed | devops | `customer_tiers` + `customer_groups` schema |
+| [TASK-0083](../04-tasks/TASK-0083.md) | 5 | completed | dev | Tenant tiers/groups REST APIs + validation |
+| [TASK-0084](../04-tasks/TASK-0084.md) | 4 | completed | dev | Tenant UI `/tenant/tiers` |
+| [TASK-0085](../04-tasks/TASK-0085.md) | 3 | completed | dev | Apply tier overrides on preview (+ settings link) |
+| [TASK-0086](../04-tasks/TASK-0086.md) | 1 | completed | tester | Manual UAT checklist |
 
 **Committed:** 16 · **Completed:** 16
 

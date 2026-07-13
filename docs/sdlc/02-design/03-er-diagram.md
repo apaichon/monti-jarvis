@@ -2,8 +2,8 @@
 id: DES-0003
 title: Entity Relationship Diagram
 status: approved
-updated: 2026-07-11
-sprint: SPRINT-014
+updated: 2026-07-12
+sprint: SPRINT-019
 ---
 
 # ER Diagram — Monti Jarvis
@@ -660,9 +660,12 @@ monti-jarvis/
 | 8 ✅ v0.9.0 | `payment_gateway_configs`, `payment_callback_events` |
 | 9–12 ✅ v1.3.0 | `payment_orders`, `payment_documents`, `tenant_tax_profiles`, billing ops |
 | 13 ✅ v1.4.0 | Redis quota/rate-limit keys (no required DDL) |
-| 14 🔄 v1.5.0 | `tenant_embed_configs` |
-| 15 | `km_scope_assignments`, tenant-driven re-index |
-| 16 | Tenant-facing limit/settings (reads S13 counters) |
+| 14 ✅ v1.5.0 | `tenant_embed_configs` |
+| 15 ✅ v1.6.0 | Tenant KM store + `km_gaps`; no `km_scope_assignments` table required |
+| 16 ✅ v1.7.0 | `tenant_settings`, `tenant_call_limits` |
+| 17 ✅ v1.8.0 | `call_sessions.source`; preview uses existing call model |
+| 18 ✅ v1.9.0 | `customer_tiers`, `customer_groups` |
+| 19 🔄 v2.0.0 | `customers`, `customer_group_members`, `customer_import_jobs`, `customer_domain_rules` |
 | 21 | Runtime voice failover + `ai_employee_configs` embedding bindings (voice stays on `ai_avatar_voices`) |
 | 22 | `conversation_records` (ClickHouse denorm) |
 | backlog | optional `quota_usage_events` audit (not in S13 commitment) |
@@ -938,4 +941,93 @@ erDiagram
 
 **Future (S19+):** `customers.tier_id` → `customer_tiers`, optional group membership.
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · blueprint §15.3 Embedding Provider · §16.4 KM domains · §16.7 Billing.
+## Sprint 19 — customer accounts, imports, and domain rules
+
+```mermaid
+erDiagram
+  tenants ||--o{ customers : owns
+  customer_tiers ||--o{ customers : classifies
+  tenants ||--o{ customer_import_jobs : runs
+  tenants ||--o{ customer_domain_rules : defines
+  customer_tiers ||--o{ customer_domain_rules : defaults
+  customer_groups ||--o{ customer_domain_rules : defaults
+  customers ||--o{ customer_group_members : joins
+  customer_groups ||--o{ customer_group_members : joins
+
+  customers {
+    text id PK
+    text tenant_id FK
+    text email
+    text email_normalized
+    text phone
+    text display_name
+    text locale
+    text tier_id FK
+    text source
+    text external_id
+    text status
+    jsonb metadata
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_group_members {
+    text customer_id PK_FK
+    text group_id PK_FK
+    text tenant_id FK
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_import_jobs {
+    text id PK
+    text tenant_id FK
+    text filename
+    text mode
+    text status
+    int total_rows
+    int created_rows
+    int updated_rows
+    int rejected_rows
+    jsonb errors
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_domain_rules {
+    text id PK
+    text tenant_id FK
+    text domain
+    text policy
+    text default_tier_id FK
+    text default_group_id FK
+    boolean active
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Constraints and indexes
+
+| Entity | Rule |
+| --- | --- |
+| `customers` | unique `(tenant_id, email_normalized)` when email exists |
+| `customers` | unique `(tenant_id, source, external_id)` when external id exists |
+| `customers` | `status IN ('active','inactive')`; delete API sets inactive |
+| `customer_group_members` | PK `(customer_id, group_id)`; service verifies same tenant |
+| `customer_import_jobs` | `mode IN ('dry_run','commit')`; state follows §56 workflow |
+| `customer_domain_rules` | unique `(tenant_id, domain)`; policy allow/deny |
+
+TASK-0087 uses the idempotent `internal/store` ensure-schema mechanism. No Redis, ClickHouse, or MinIO entity is added. CSV bytes are not retained.
+
+**Future SPRINT-020:** customer credential/user binding and domain-rule enforcement. No password, OAuth, or session fields belong in the SPRINT-019 tables.
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [02-workflow.md](02-workflow.md) · [04-api-spec.md](04-api-spec.md) · [05-ux-ui.md](05-ux-ui.md).

@@ -58,6 +58,27 @@ func TestFromWorkforceAgent(t *testing.T) {
 	}
 }
 
+func TestFindAssignedResolvesCustomAvatar(t *testing.T) {
+	assigned := []store.WorkforceAgent{{
+		ID:       "mira",
+		Name:     "Mira",
+		Role:     "Customer Care",
+		Voice:    "Kore",
+		Greeting: "Hi! Welcome. I'm Mira.",
+	}}
+
+	agent, ok := FindAssigned(" MIRA ", assigned)
+	if !ok {
+		t.Fatal("FindAssigned(mira) = false, want true")
+	}
+	if agent.ID != "mira" || agent.Name != "Mira" || agent.Greeting != "Hi! Welcome. I'm Mira." {
+		t.Fatalf("FindAssigned(mira) = %#v, want Mira catalog data", agent)
+	}
+	if _, ok := FindAssigned("ava", assigned); ok {
+		t.Fatal("FindAssigned(ava) = true, want false for unassigned avatar")
+	}
+}
+
 func containsAll(text string, parts ...string) bool {
 	for _, part := range parts {
 		if !contains(text, part) {

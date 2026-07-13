@@ -122,8 +122,8 @@ All `/api/platform/avatars*` routes: `platform_admin` + Bearer. See [04-api-spec
 | PUT | `/api/platform/avatars/{id}` | Update |
 | DELETE | `/api/platform/avatars/{id}` | Soft-archive |
 | GET | `/api/platform/tenants/{tenant_id}/avatars` | List assignments + avatar metadata |
-| POST | `/api/platform/tenants/{tenant_id}/avatars` | Assign `{avatar_id}` |
-| DELETE | `/api/platform/tenants/{tenant_id}/avatars/{avatar_id}` | Disable assignment |
+| POST | `/api/platform/tenants/{tenant_id}/avatars` | Assign or promote `{avatar_id}`; configured demo tenant may exceed cap through this platform-admin route |
+| DELETE | `/api/platform/tenants/{tenant_id}/avatars/{avatar_id}` | Demote/disable assignment |
 
 **Public (unchanged auth):** `GET /api/workforce` — resolves tenant via `X-Tenant-Id` or auth context; returns assigned `active` avatars; if zero assignments, falls back to `workforce.All()`.
 

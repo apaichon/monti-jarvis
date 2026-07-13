@@ -2,8 +2,8 @@
 id: DES-0004
 title: API Specification
 status: approved
-updated: 2026-07-11
-sprint: SPRINT-014
+updated: 2026-07-12
+sprint: SPRINT-019
 ---
 
 # API Specification — Monti Jarvis
@@ -500,12 +500,16 @@ Requires `AUTH_DISABLED=false`. Platform routes: `Authorization: Bearer <access_
   ],
   "cap": {
     "max_ai_employees": 2,
-    "active_count": 4
+    "active_count": 4,
+    "override_allowed": true
   }
 }
 ```
 
-`cap` is informational for UI; assign still returns `409` when over limit.
+`cap` is informational for UI. `override_allowed` is true only for the configured
+demo tenant, whose platform-admin assignment management may exceed the commercial
+package cap so admins can promote/demote demo avatars. Other tenants return `409`
+when an assignment would exceed the limit.
 
 ### `POST /api/platform/tenants/{tenant_id}/avatars`
 
@@ -515,7 +519,7 @@ Requires `AUTH_DISABLED=false`. Platform routes: `Authorization: Bearer <access_
 | --- | --- | --- | --- |
 | `avatar_id` | string | yes | Target catalog avatar |
 
-**Response 200:** assignment + avatar metadata · **404** unknown tenant/avatar · **409** at `max_ai_employees` cap
+**Response 200:** assignment + avatar metadata (also reactivates a disabled assignment) · **404** unknown tenant/avatar · **409** at `max_ai_employees` cap except for configured demo-tenant platform administration
 
 ### `DELETE /api/platform/tenants/{tenant_id}/avatars/{avatar_id}`
 
@@ -1461,4 +1465,176 @@ Auth: **Bearer** `tenant_admin` + active. Tenant id from JWT only.
 | 404 | tier not found (or other tenant) |
 | 401/403 | not tenant_admin / inactive |
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [02-workflow.md](02-workflow.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+## Customer Accounts & Imports (Sprint 19)
+
+**Auth:** Bearer, active `tenant_admin`. Tenant id is read only from JWT. `AUTH_DISABLED` does not expose these routes.
+
+### Endpoint summary
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/tenant/customers` | Search/list tenant customers |
+| `POST` | `/api/tenant/customers` | Create or idempotently upsert a customer |
+| `GET` | `/api/tenant/customers/{id}` | Get one tenant customer |
+| `PUT` | `/api/tenant/customers/{id}` | Update profile and assignments |
+| `DELETE` | `/api/tenant/customers/{id}` | Deactivate customer |
+| `POST` | `/api/tenant/customer-imports` | CSV dry-run or commit |
+| `GET` | `/api/tenant/customer-imports/{id}` | Read import summary |
+| `GET` | `/api/tenant/customer-domain-rules` | List domain rules |
+| `POST` | `/api/tenant/customer-domain-rules` | Create rule |
+| `PUT` | `/api/tenant/customer-domain-rules/{id}` | Update rule |
+| `DELETE` | `/api/tenant/customer-domain-rules/{id}` | Delete rule |
+
+### `GET /api/tenant/customers`
+
+| Query | Type | Required | Description |
+| --- | --- | --- | --- |
+| `q` | string | no | Search display name, normalized email, phone, external id |
+| `status` | string | no | `active`, `inactive`, or empty for all |
+| `tier_id` | string | no | Tenant-owned tier filter |
+| `limit` | int | no | Default 50, maximum 200 |
+| `cursor` | string | no | Opaque pagination cursor |
+
+**Response `200`**
+
+```json
+{
+  "customers": [
+    {
+      "id": "cust_01",
+      "email": "jane@example.com",
+      "phone": "+66812345678",
+      "display_name": "Jane Doe",
+      "locale": "th",
+      "tier_id": "tier_vip",
+      "group_ids": ["grp_retail"],
+      "source": "csv",
+      "external_id": "crm-42",
+      "status": "active",
+      "metadata": {},
+      "created_at": "2026-07-12T12:00:00Z",
+      "updated_at": "2026-07-12T12:00:00Z"
+    }
+  ],
+  "next_cursor": ""
+}
+```
+
+`tenant_id` and `email_normalized` are never writable and need not be returned.
+
+### `POST /api/tenant/customers`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `display_name` | string | yes | Trimmed, 1–200 chars |
+| `email` | string | conditional | Required unless external id supplied |
+| `phone` | string | no | Max 40 chars |
+| `locale` | string | no | Empty, `en`, or `th` |
+| `tier_id` | string | no | Same-tenant tier |
+| `group_ids` | string[] | no | Same-tenant groups |
+| `source` | string | no | Default `manual`; reserved values validated |
+| `external_id` | string | conditional | Stable source id |
+| `metadata` | object | no | Max serialized 16 KiB; credentials forbidden |
+
+**Request**
+
+```json
+{
+  "display_name": "Jane Doe",
+  "email": "jane@example.com",
+  "locale": "th",
+  "tier_id": "tier_vip",
+  "group_ids": ["grp_retail"],
+  "source": "api",
+  "external_id": "crm-42"
+}
+```
+
+**Response `201`** for create or `200` for idempotent update: customer shape plus `"outcome":"created|updated"`.
+
+### `GET|PUT|DELETE /api/tenant/customers/{id}`
+
+`GET` returns the customer shape. `PUT` accepts the mutable POST fields; source/external id may be set only when they do not conflict. `DELETE` performs soft deactivation.
+
+**DELETE response `200`**
+
+```json
+{ "id": "cust_01", "status": "inactive" }
+```
+
+### `POST /api/tenant/customer-imports`
+
+`Content-Type: multipart/form-data`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `file` | CSV file | yes | UTF-8, max `CUSTOMER_IMPORT_MAX_BYTES` |
+| `dry_run` | boolean | yes | Must be true before UI enables commit |
+| `source` | string | no | Default `csv` |
+
+CSV columns: `display_name,email,phone,locale,tier_slug,group_slugs,source,external_id`. `group_slugs` uses `|` as the within-cell separator.
+
+**Response `200` dry-run / `201` commit**
+
+```json
+{
+  "id": "cimp_01",
+  "mode": "dry_run",
+  "status": "validated",
+  "total_rows": 3,
+  "accepted_rows": 2,
+  "created_rows": 0,
+  "updated_rows": 0,
+  "rejected_rows": 1,
+  "errors": [
+    { "row": 3, "field": "email", "code": "invalid_email", "message": "Invalid email" }
+  ]
+}
+```
+
+Dry-run writes only the import summary, not customers or memberships. Commit reparses/revalidates the uploaded CSV; the client must send the file again.
+
+### `GET /api/tenant/customer-imports/{id}`
+
+Returns the import summary above. Other-tenant ids return 404. Raw CSV content is never returned because it is not retained.
+
+### Customer domain rules
+
+**POST/PUT body**
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `domain` | string | yes | Normalized lower-case domain, no scheme/path |
+| `policy` | string | yes | `allow` or `deny` |
+| `default_tier_id` | string | no | Same-tenant tier |
+| `default_group_id` | string | no | Same-tenant group |
+| `active` | boolean | no | Default true |
+
+```json
+{
+  "domain": "example.com",
+  "policy": "allow",
+  "default_tier_id": "tier_standard",
+  "default_group_id": "grp_retail",
+  "active": true
+}
+```
+
+`GET` returns `{ "rules": [...] }`. `POST` returns 201. `PUT` returns 200. `DELETE` returns `{ "deleted": true }`. SPRINT-019 stores `policy`; public registration/login enforcement begins in SPRINT-020.
+
+### Errors
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `validation_error` | Invalid body, locale, domain, references, CSV row, or metadata size |
+| 400 | `import_invalid` | Encoding, header, byte/row cap, or parser failure |
+| 401 | `unauthorized` | Missing/invalid token |
+| 403 | `forbidden` | Wrong role or inactive tenant |
+| 404 | `not_found` | Missing or cross-tenant customer/import/rule/reference |
+| 409 | `customer_conflict` | Email and external id point to different existing customers |
+| 409 | `domain_rule_exists` | Duplicate normalized domain in tenant |
+| 413 | `import_too_large` | Upload exceeds configured byte/row cap |
+
+See [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [02-workflow.md](02-workflow.md) §55–58, [03-er-diagram.md](03-er-diagram.md) § Sprint 19, and [05-ux-ui.md](05-ux-ui.md) § T12.
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

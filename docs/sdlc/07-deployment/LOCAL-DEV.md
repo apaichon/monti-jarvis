@@ -106,6 +106,8 @@ make up
 | `RATE_LIMIT_KM_PER_MIN` | No | `30` |
 | `RATE_LIMIT_VOICE_PER_MIN` | No | `20` |
 | `EMBED_ALLOW_EMPTY_ORIGINS` | No | `true` — empty tenant allowlist accepts any Origin (dev) |
+| `CUSTOMER_IMPORT_MAX_BYTES` | No | `2097152` — maximum tenant CSV upload bytes |
+| `CUSTOMER_IMPORT_MAX_ROWS` | No | `5000` — maximum customer rows per CSV |
 
 **Quota Redis keys** (prefix `REDIS_PREFIX`, default `monti_jarvis:`):
 

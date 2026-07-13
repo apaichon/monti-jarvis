@@ -66,6 +66,11 @@
         >
         <a
           class="nav-link"
+          href="{base}/customers"
+          class:active={$page.url.pathname.includes('/customers')}><span>♙</span>Customers</a
+        >
+        <a
+          class="nav-link"
           href="{base}/preview"
           class:active={$page.url.pathname.includes('/preview')}><span>◉</span>Preview <em>LIVE</em></a
         >

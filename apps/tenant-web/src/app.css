@@ -222,7 +222,7 @@ body:has(.login-wrap) { overflow-y: auto; }
   .tenant-app-shell { display: block; }
   .tenant-sidebar { position: fixed; top: auto; bottom: 0; width: 100%; height: 64px; padding: 7px; border: 0; border-top: 1px solid var(--line); }
   .tenant-brand, .workspace-switcher, .tenant-sidebar-foot { display: none; }
-  .tenant-nav { height: 100%; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+  .tenant-nav { height: 100%; grid-template-columns: repeat(10, minmax(44px, 1fr)); gap: 2px; overflow-x: auto; }
   .nav-link { min-height: 48px; }
   .tenant-workspace { padding-bottom: 64px; }
   .tenant-topbar { padding: 0 14px; }

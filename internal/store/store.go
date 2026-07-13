@@ -242,6 +242,9 @@ CREATE INDEX IF NOT EXISTS knowledge_chunks_agent_idx ON %s.knowledge_chunks (te
 	if err := s.ensureTiersSchema(ctx); err != nil {
 		return err
 	}
+	if err := s.ensureCustomersSchema(ctx); err != nil {
+		return err
+	}
 	return s.ensureAuditSchema(ctx)
 }
 

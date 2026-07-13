@@ -42,8 +42,8 @@
 | 16 | Tenant | Settings, Locale, Limit user tier, group, Quota for customer call time per day, call minute per each call | D | 13, 15 ✅ v1.7.0 |
 | 17 | Tenant | Test and Preview | D | 15, 16 ✅ v1.8.0 |
 | 18 | Tenant | Customer Tier | D | 16 ✅ v1.9.0 |
-| 19 | Tenant | Customer Account Import, Domain Rules, Integration | E | 3 |
-| 20 | Customer | Auth | E | 19 |
+| 19 | Tenant | Customer Account Import, Domain Rules, Integration | E | 3, 18 ✅ v2.0.0 |
+| 20 | Customer | Auth (how to integrate if solution must integrate to existing system of tenant) | E | 19 |
 | 21 | Customer | Select AI Workforce to Conversation | A | 1, 5 |
 | 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt and not), Knowledge Gap | F | 1, 3 |
 | 23 | Tenant | Tickets | F | 22 |
@@ -264,9 +264,27 @@ Sprint: [SPRINT-018.md](../03-sprints/SPRINT-018.md) · Feature: [FEAT-0020](../
 
 Before **customer production** after tenant **customer-user auth** (S19–20): verify rate limit + quota **with tier overrides**.
 
-## Next sprint: SPRINT-019
+## Shipped: SPRINT-019 — Customer Account Import, Domain Rules, Integration — v2.0.0
 
-**Platform:** Tenant · **Feature:** Customer Account Import, Integration · **Depends:** 3
+**Closed 2026-07-13.** Tenant customer directory, CSV dry-run/commit import, idempotent integration identity, domain defaults, and `/tenant/customers` UI.
+
+| Task | Points | Outcome |
+| --- | ---: | --- |
+| TASK-0087 | 3 | Customer, import-job, domain-rule, and group-membership schema |
+| TASK-0088 | 5 | Tenant customer, CSV import, and domain-rule APIs |
+| TASK-0089 | 4 | Tenant `/tenant/customers` management and import UI |
+| TASK-0090 | 3 | Tier/group binding and idempotent integration contracts |
+| TASK-0091 | 1 | Automated smoke coverage and signed two-tenant UAT |
+
+Two-tenant UAT passed. Customer authentication remains SPRINT-020, and production customer traffic remains blocked until auth plus quota/rate-limit isolation are signed off under multi-user load.
+
+Sprint: [SPRINT-019.md](../03-sprints/SPRINT-019.md) · Feature: [FEAT-0021](../01-features/FEAT-0021-customer-account-import.md) · Spec: [22-customer-account-import-spec.md](../02-design/22-customer-account-import-spec.md)
+
+## Next sprint: SPRINT-020
+
+**Platform:** Customer · **Feature:** Customer authentication · **Depends:** 19
+
+Bind imported customer identities to credentials/sessions, enforce domain rules, and verify quota/rate-limit isolation under authenticated multi-user load. SPRINT-019 data/import foundations are verified and available for this scope.
 
 ## Backlog add: SPRINT-036 — Embed Framework SDKs
 

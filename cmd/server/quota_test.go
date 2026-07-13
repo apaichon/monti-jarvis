@@ -77,3 +77,17 @@ func TestWriteQuotaError_Unknown(t *testing.T) {
 		t.Fatalf("status %d", rr.Code)
 	}
 }
+
+func TestWithVoiceTenantUsesResolvedTenant(t *testing.T) {
+	req := httptest.NewRequest("GET", "/ws/voice?agent=mira&tenant_id=spoofed", nil)
+	resolved := withVoiceTenant(req, "demo")
+	if got := resolved.URL.Query().Get("tenant_id"); got != "demo" {
+		t.Fatalf("tenant_id = %q, want demo", got)
+	}
+	if got := resolved.URL.Query().Get("agent"); got != "mira" {
+		t.Fatalf("agent = %q, want mira", got)
+	}
+	if got := req.URL.Query().Get("tenant_id"); got != "spoofed" {
+		t.Fatalf("original request mutated: tenant_id = %q", got)
+	}
+}

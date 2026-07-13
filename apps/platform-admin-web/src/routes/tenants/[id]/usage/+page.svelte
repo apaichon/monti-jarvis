@@ -6,7 +6,7 @@
   import { ApiError } from '$lib/api/http';
   import { feedback } from '$lib/feedback.svelte';
 
-  const tenantId = $derived($page.params.id);
+  const tenantId = $derived($page.params.id ?? '');
 
   let data = $state<TenantUsage | null>(null);
   let loading = $state(true);

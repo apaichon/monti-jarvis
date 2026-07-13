@@ -16,10 +16,12 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** [`SPRINT-009`](03-sprints/SPRINT-009.md) — Tenant: Buy Package · target **v1.0.0** *(combined E2E with SPRINT-008 gateway)*
+**Current sprint:** None — [`SPRINT-019`](03-sprints/SPRINT-019.md) shipped as **v2.0.0**; SPRINT-020 Customer Auth is next and not opened.
 
-**Prior (code shipped):** [`SPRINT-008`](03-sprints/SPRINT-008.md) — Payment Gateway · **v0.9.0** *(VERIFY in Sprint 9)*
+**Latest shipped:** [`SPRINT-019`](03-sprints/SPRINT-019.md) — Customer Account Import, Domain Rules, Integration · **v2.0.0**
 
-**Shipped:** v0.8.0 [`SPRINT-007`](03-sprints/SPRINT-007.md) · v0.7.0 [`SPRINT-006`](03-sprints/SPRINT-006.md) · v0.6.0 [`SPRINT-005`](03-sprints/SPRINT-005.md) · v0.5.0 [`SPRINT-004`](03-sprints/SPRINT-004.md) · v0.4.0 [`SPRINT-003`](03-sprints/SPRINT-003.md) · v0.3.0 [`SPRINT-002`](03-sprints/SPRINT-002.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
+**Shipped:** v2.0.0 [`SPRINT-019`](03-sprints/SPRINT-019.md) · v1.9.0 [`SPRINT-018`](03-sprints/SPRINT-018.md) · v1.8.0 [`SPRINT-017`](03-sprints/SPRINT-017.md) · v1.7.0 [`SPRINT-016`](03-sprints/SPRINT-016.md) · v1.6.0 [`SPRINT-015`](03-sprints/SPRINT-015.md) · v1.5.0 [`SPRINT-014`](03-sprints/SPRINT-014.md) · v1.4.0 [`SPRINT-013`](03-sprints/SPRINT-013.md) · v1.3.0 SPRINT-008–012 · v0.8.0 [`SPRINT-007`](03-sprints/SPRINT-007.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
 
-**Ops:** [`docs/KM_SETUP.md`](../KM_SETUP.md) · **Deploy:** [`07-deployment/LOCAL-DEV.md`](07-deployment/LOCAL-DEV.md) · **UAT:** [`06-manual-tests/SPRINT-002-manual.md`](06-manual-tests/SPRINT-002-manual.md)
+**Production gate:** After SPRINT-019–020 customer identity, verify quota, rate-limit, tier overrides, and tenant isolation under multi-user load before opening customer traffic.
+
+**Ops:** [`docs/KM_SETUP.md`](../KM_SETUP.md) · **Deploy:** [`07-deployment/LOCAL-DEV.md`](07-deployment/LOCAL-DEV.md) · **UAT:** [`06-manual-tests/`](06-manual-tests/)

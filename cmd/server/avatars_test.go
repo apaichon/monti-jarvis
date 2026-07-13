@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/libra/monti-jarvis/internal/env"
 	"github.com/libra/monti-jarvis/internal/store"
 )
 
@@ -26,6 +27,28 @@ func TestHasActiveVoice(t *testing.T) {
 	voices := []store.AvatarVoice{{Status: "disabled"}, {Status: "active"}}
 	if !hasActiveVoice(voices) {
 		t.Fatal("hasActiveVoice() = false, want true")
+	}
+}
+
+func TestDemoAvatarCapOverrideAllowed(t *testing.T) {
+	tests := []struct {
+		name     string
+		demoID   string
+		tenantID string
+		want     bool
+	}{
+		{name: "configured demo tenant", demoID: "showcase", tenantID: "showcase", want: true},
+		{name: "other tenant", demoID: "showcase", tenantID: "demo", want: false},
+		{name: "default demo tenant", tenantID: "demo", want: true},
+		{name: "trim tenant id", tenantID: " demo ", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &server{cfg: env.Config{DemoTenantID: tt.demoID}}
+			if got := s.demoAvatarCapOverrideAllowed(tt.tenantID); got != tt.want {
+				t.Fatalf("demoAvatarCapOverrideAllowed(%q) = %v, want %v", tt.tenantID, got, tt.want)
+			}
+		})
 	}
 }
 

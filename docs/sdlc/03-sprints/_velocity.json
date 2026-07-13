@@ -143,8 +143,16 @@
       "velocity": 16,
       "closed": "2026-07-12",
       "release": "v1.9.0"
+    },
+    {
+      "id": "SPRINT-019",
+      "committed_points": 16,
+      "completed_points": 16,
+      "velocity": 16,
+      "closed": "2026-07-13",
+      "release": "v2.0.0"
     }
   ],
   "average_velocity": 16,
-  "note": "S15 tenant KM shipped v1.6.0. S14 embed v1.5.0. S13 quota v1.4.0. S8\u2013S12 commerce v1.3.0 + v1.3.1 harden."
+  "note": "S19 customer account import shipped v2.0.0. S18 customer tiers shipped v1.9.0. S15 tenant KM shipped v1.6.0. S14 embed v1.5.0. S13 quota v1.4.0. S8\u2013S12 commerce v1.3.0 + v1.3.1 harden."
 }

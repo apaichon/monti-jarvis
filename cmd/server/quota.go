@@ -76,6 +76,7 @@ func (s *server) voiceWS(w http.ResponseWriter, r *http.Request) {
 // voiceWithPackageQuota applies the same package metering as production voice
 // (used by /ws/voice and tenant preview voice — preview also logs source=preview).
 func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, tenantID string) {
+	r = withVoiceTenant(r, tenantID)
 	if s.quota == nil || s.voice == nil {
 		if s.voice != nil {
 			s.voice.Handler().ServeHTTP(w, r)
@@ -157,6 +158,20 @@ func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, t
 		req = r.WithContext(cctx)
 	}
 	s.voice.Handler().ServeHTTP(w, req)
+}
+
+func withVoiceTenant(r *http.Request, tenantID string) *http.Request {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" {
+		return r
+	}
+	req := r.Clone(r.Context())
+	u := *r.URL
+	query := u.Query()
+	query.Set("tenant_id", tenantID)
+	u.RawQuery = query.Encode()
+	req.URL = &u
+	return req
 }
 
 // getPlatformTenantUsage serves GET /api/platform/tenants/{tenant_id}/usage.

@@ -56,7 +56,7 @@ Let **active tenants** embed Monti conversation on their website via a **copy-pa
 - Public `GET /api/public/embed/{key}` with host-site `parent_origin` allowlist check
 - `monti-embed.js` floating launcher + iframe; close control top-right (not over Send)
 - Embed customer UI: avatar portrait, voice call, text chat; secure-context mic guidance
-- Tenant admin `/tenant/embed` + integrator guide [EMBED_WEB_INTEGRATION.md](../../../EMBED_WEB_INTEGRATION.md) (security §7)
+- Tenant admin `/tenant/embed` + integrator guide [EMBED_WEB_INTEGRATION.md](../../EMBED_WEB_INTEGRATION.md) (security §7)
 
 ## Scope boundary
 
@@ -100,7 +100,7 @@ go test ./internal/store/ ./cmd/server/ -count=1 -run Embed
 ```
 
 - **Manual UAT:** [SPRINT-014-manual.md](../06-manual-tests/SPRINT-014-manual.md) (TASK-0066) — checklist shipped; full browser sign-off optional
-- Integrator + security: [EMBED_WEB_INTEGRATION.md](../../../EMBED_WEB_INTEGRATION.md)
+- Integrator + security: [EMBED_WEB_INTEGRATION.md](../../EMBED_WEB_INTEGRATION.md)
 
 ## Risks
 
@@ -114,5 +114,5 @@ go test ./internal/store/ ./cmd/server/ -count=1 -run Embed
 ## Links
 
 - Depends: [SPRINT-001](SPRINT-001.md), [SPRINT-006](SPRINT-006.md)
-- Integrator guide: [docs/EMBED_WEB_INTEGRATION.md](../../../EMBED_WEB_INTEGRATION.md)
+- Integrator guide: [docs/EMBED_WEB_INTEGRATION.md](../../EMBED_WEB_INTEGRATION.md)
 - Next: SPRINT-015 Set Scope and KM

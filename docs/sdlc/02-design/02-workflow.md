@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: approved
-updated: 2026-07-11
-sprint: SPRINT-014
+updated: 2026-07-12
+sprint: SPRINT-019
 ---
 
 # Workflows — Monti Jarvis
@@ -1330,4 +1330,112 @@ flowchart LR
   T --> R[limits + agent + locale]
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 55. Tenant creates or updates a customer (Sprint 19)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant B as Browser /tenant/customers
+  participant G as Go :8091
+  participant Auth as internal/auth
+  participant S as internal/store
+  participant P as Postgres callcenter
+
+  A->>B: Save customer + tier/group ids
+  B->>G: POST/PUT /api/tenant/customers Bearer
+  G->>Auth: RequireTenantAdminActive
+  alt missing, inactive, or wrong role
+    Auth-->>B: 401/403
+  else authorized
+    G->>S: Validate tenant tier/groups + normalize identity
+    S->>P: UPSERT customer + replace group memberships
+    alt resource belongs to another tenant
+      S-->>B: 404 not_found
+    else duplicate without idempotent match
+      S-->>B: 409 conflict
+    else saved
+      G-->>B: 200/201 customer
+    end
+  end
+```
+
+## 56. CSV dry-run then commit (Sprint 19)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant B as Browser /tenant/customers
+  participant G as Go :8091
+  participant I as internal/customerimport
+  participant S as internal/store
+  participant P as Postgres callcenter
+
+  A->>B: Select UTF-8 CSV
+  B->>G: POST /api/tenant/customer-imports dry_run=true
+  G->>I: Parse with byte/row limits
+  I->>S: Resolve tier/group/domain refs by JWT tenant
+  I-->>B: 200 validated + accepted/rejected row summary
+  A->>B: Confirm import
+  B->>G: POST same CSV dry_run=false
+  G->>I: Parse + validate again
+  alt parser/file failure
+    I-->>B: 400 import_invalid
+  else valid rows
+    I->>P: transaction: upsert customers + memberships + import job
+    P-->>I: created/updated counts
+    I-->>B: 201 completed import summary
+  end
+```
+
+### Customer import state
+
+| Status | Meaning |
+| --- | --- |
+| `validating` | CSV parsing and reference validation in progress |
+| `validated` | Dry-run complete; no customer writes |
+| `completed` | Commit transaction completed |
+| `failed` | Parser or transaction failure |
+
+## 57. Domain default resolution (Sprint 19)
+
+```mermaid
+sequenceDiagram
+  participant G as Go :8091
+  participant I as internal/customerimport
+  participant D as customer_domain_rules
+  participant T as customer_tiers/groups
+  participant P as Postgres
+
+  G->>I: Upsert row {email, tier_slug?, group_slugs?}
+  I->>D: Find active normalized email domain in JWT tenant
+  I->>T: Resolve explicit and default assignments
+  alt explicit assignment provided
+    I->>P: persist explicit tier/groups
+  else matching allow/deny rule has defaults
+    Note over I: policy stored for S20; not an auth decision in S19
+    I->>P: persist domain default tier/group
+  else no defaults
+    I->>P: persist unassigned customer
+  end
+```
+
+## 58. Integration-safe upsert event (Sprint 19)
+
+```mermaid
+sequenceDiagram
+  participant API as Customer API/import
+  participant S as internal/store
+  participant P as Postgres
+  participant N as NATS optional
+
+  API->>S: Upsert(tenant, source, external_id)
+  S->>P: match source/external_id then normalized email fallback
+  P-->>S: stable customer_id
+  opt NATS configured
+    S->>N: monti.customer.upserted
+    Note over S,N: publish failure is non-fatal; no external webhook delivery
+  end
+  S-->>API: customer + created/updated outcome
+```
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

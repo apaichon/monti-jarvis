@@ -27,8 +27,11 @@ System design artifacts for Monti Jarvis.
 | 19 | [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) | 16 | Settings, locale, call limits | **`shipped`** v1.7.0 |
 | 20 | [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) | 17 | Tenant test/preview sandbox | **`shipped`** v1.8.0 |
 | 21 | [21-customer-tier-spec.md](21-customer-tier-spec.md) | 18 | Customer tier catalog + groups | **`shipped`** v1.9.0 |
+| 22 | [22-customer-account-import-spec.md](22-customer-account-import-spec.md) | 19 | Customer directory, CSV imports, domain defaults, integration identity | **`shipped`** v2.0.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
+
+**Sprint 19:** ✅ Shipped v2.0.0 — [22-customer-account-import-spec.md](22-customer-account-import-spec.md); workflow §55–58; API § Customer Accounts & Imports; UX T12. [SPRINT-019](../03-sprints/SPRINT-019.md).
 
 **Sprint 18:** ✅ Shipped v1.9.0 — [21-customer-tier-spec.md](21-customer-tier-spec.md); workflow §52–54; API § Tiers; UX T11. [SPRINT-018](../03-sprints/SPRINT-018.md).
 

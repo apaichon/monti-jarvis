@@ -11,58 +11,58 @@ import (
 )
 
 type Config struct {
-	Port            string
-	GeminiAPIKey    string
-	GeminiModel     string
-	GeminiLiveModel string
-	Voice           string
-	PostgresURL     string
-	PostgresSchema  string
-	RedisURL        string
-	RedisPrefix     string
-	MinioEndpoint   string
-	MinioAccessKey  string
-	MinioSecretKey  string
-	MinioBucket     string
-	MinioPrefix     string
-	MinioUseSSL     bool
-	DemoTenantID    string
-	LegacyUIEnabled bool
-	NATSURL         string
-	LiveKitURL      string
-	LiveKitAPIKey   string
-	LiveKitAPISecret string
-	CustomerWebDir      string
-	PlatformAdminWebDir string
-	ClickHouseURL      string
-	ClickHouseDB       string
-	ClickHouseUser     string
-	ClickHousePassword string
-	GeminiEmbedModel   string
-	AuthDisabled           bool
-	JWTSecret              string
-	JWTAccessTTL           time.Duration
-	JWTRefreshTTL          time.Duration
-	AuthCacheEnabled       bool
-	AuthWriteBehindEnabled bool
-	AuthEventsEnabled      bool
-	AuthUserCacheTTL         time.Duration
-	EntitlementCacheEnabled  bool
-	EntitlementCacheTTL      time.Duration
-	TenantRegisterEnabled    bool
-	TenantRegisterRateLimit  int
-	TenantWebDir             string
-	PublicBaseURL            string
-	ResendAPIKey             string
-	ResendFromEmail          string
-	GoogleOAuthClientID      string
-	GoogleOAuthClientSecret  string
+	Port                    string
+	GeminiAPIKey            string
+	GeminiModel             string
+	GeminiLiveModel         string
+	Voice                   string
+	PostgresURL             string
+	PostgresSchema          string
+	RedisURL                string
+	RedisPrefix             string
+	MinioEndpoint           string
+	MinioAccessKey          string
+	MinioSecretKey          string
+	MinioBucket             string
+	MinioPrefix             string
+	MinioUseSSL             bool
+	DemoTenantID            string
+	LegacyUIEnabled         bool
+	NATSURL                 string
+	LiveKitURL              string
+	LiveKitAPIKey           string
+	LiveKitAPISecret        string
+	CustomerWebDir          string
+	PlatformAdminWebDir     string
+	ClickHouseURL           string
+	ClickHouseDB            string
+	ClickHouseUser          string
+	ClickHousePassword      string
+	GeminiEmbedModel        string
+	AuthDisabled            bool
+	JWTSecret               string
+	JWTAccessTTL            time.Duration
+	JWTRefreshTTL           time.Duration
+	AuthCacheEnabled        bool
+	AuthWriteBehindEnabled  bool
+	AuthEventsEnabled       bool
+	AuthUserCacheTTL        time.Duration
+	EntitlementCacheEnabled bool
+	EntitlementCacheTTL     time.Duration
+	TenantRegisterEnabled   bool
+	TenantRegisterRateLimit int
+	TenantWebDir            string
+	PublicBaseURL           string
+	ResendAPIKey            string
+	ResendFromEmail         string
+	GoogleOAuthClientID     string
+	GoogleOAuthClientSecret string
 	// Optional full redirect URI override (must match Google Console exactly).
 	// Prefer http://localhost:PORT/... for local HTTP — Google rejects http://*.local.
-	GoogleOAuthRedirectURL string
-	GitHubOAuthClientID    string
-	GitHubOAuthClientSecret string
-	GitHubOAuthRedirectURL  string
+	GoogleOAuthRedirectURL   string
+	GitHubOAuthClientID      string
+	GitHubOAuthClientSecret  string
+	GitHubOAuthRedirectURL   string
 	ChillPayMerchantCode     string
 	ChillPayAPIKey           string
 	ChillPayMD5Key           string
@@ -74,18 +74,21 @@ type Config struct {
 	PaymentCallbackDevBypass bool
 	PaymentMockAutoFulfill   bool
 	// Quota / rate limit (SPRINT-013)
-	QuotaEnabled           bool
-	QuotaFailOpen          bool
-	RateLimitEnabled       bool
-	RateLimitChatPerMin    int
-	RateLimitKMPerMin      int
-	RateLimitVoicePerMin   int
-	QuotaConcurrentTTL     time.Duration
+	QuotaEnabled         bool
+	QuotaFailOpen        bool
+	RateLimitEnabled     bool
+	RateLimitChatPerMin  int
+	RateLimitKMPerMin    int
+	RateLimitVoicePerMin int
+	QuotaConcurrentTTL   time.Duration
 	// Embed (SPRINT-014)
 	EmbedAllowEmptyOrigins bool
 	// Preview sandbox (SPRINT-017)
 	PreviewMaxConcurrent int
-	AppEnv               string
+	// Customer import (SPRINT-019)
+	CustomerImportMaxBytes int64
+	CustomerImportMaxRows  int
+	AppEnv                 string
 }
 
 func Load() Config {
@@ -99,41 +102,41 @@ func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Port:             envOr("PORT", "8091"),
-		GeminiAPIKey:     os.Getenv("GEMINI_API_KEY"),
-		GeminiModel:      envOr("GEMINI_MODEL", "gemini-flash-latest"),
-		GeminiLiveModel:  envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
-		Voice:            envOr("VOICE", "Aoede"),
-		PostgresURL:      os.Getenv("POSTGRES_URL"),
-		PostgresSchema:   envOr("POSTGRES_SCHEMA", "callcenter"),
-		RedisURL:         os.Getenv("REDIS_URL"),
-		RedisPrefix:      envOr("REDIS_PREFIX", "monti_jarvis:"),
-		MinioEndpoint:    os.Getenv("MINIO_ENDPOINT"),
-		MinioAccessKey:   os.Getenv("MINIO_ACCESS_KEY"),
-		MinioSecretKey:   os.Getenv("MINIO_SECRET_KEY"),
-		MinioBucket:      envOr("MINIO_BUCKET", "monti-jarvis"),
-		MinioPrefix:      envOr("MINIO_PREFIX", "calls/"),
-		MinioUseSSL:      envBool("MINIO_USE_SSL", false),
-		DemoTenantID:     envOr("DEMO_TENANT_ID", "demo"),
-		LegacyUIEnabled:  envBool("LEGACY_UI_ENABLED", false),
-		NATSURL:          envOr("NATS_URL", "nats://localhost:4222"),
-		LiveKitURL:       envOr("LIVEKIT_URL", "ws://localhost:7880"),
-		LiveKitAPIKey:    envOr("LIVEKIT_API_KEY", "devkey"),
-		LiveKitAPISecret: envOr("LIVEKIT_API_SECRET", "secret"),
-		CustomerWebDir:      envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
-		PlatformAdminWebDir: envOr("PLATFORM_ADMIN_WEB_DIR", "apps/platform-admin-web/build"),
-		ClickHouseURL:      envOr("CLICKHOUSE_URL", "http://localhost:8123"),
-		ClickHouseDB:       envOr("CLICKHOUSE_DB", "monti_jarvis"),
-		ClickHouseUser:     envOr("CLICKHOUSE_USER", "monti"),
-		ClickHousePassword: envOr("CLICKHOUSE_PASSWORD", "monti"),
-		GeminiEmbedModel: envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
-		AuthDisabled:           envBool("AUTH_DISABLED", true),
-		JWTSecret:              os.Getenv("JWT_SECRET"),
-		JWTAccessTTL:           envDuration("JWT_ACCESS_TTL", 15*time.Minute),
-		JWTRefreshTTL:          envDuration("JWT_REFRESH_TTL", 168*time.Hour),
-		AuthCacheEnabled:       envBool("AUTH_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
-		AuthWriteBehindEnabled: envBool("AUTH_WRITE_BEHIND_ENABLED", os.Getenv("REDIS_URL") != ""),
-		AuthEventsEnabled:      envBool("AUTH_EVENTS_ENABLED", envOr("NATS_URL", "nats://localhost:4222") != ""),
+		Port:                    envOr("PORT", "8091"),
+		GeminiAPIKey:            os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:             envOr("GEMINI_MODEL", "gemini-flash-latest"),
+		GeminiLiveModel:         envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
+		Voice:                   envOr("VOICE", "Aoede"),
+		PostgresURL:             os.Getenv("POSTGRES_URL"),
+		PostgresSchema:          envOr("POSTGRES_SCHEMA", "callcenter"),
+		RedisURL:                os.Getenv("REDIS_URL"),
+		RedisPrefix:             envOr("REDIS_PREFIX", "monti_jarvis:"),
+		MinioEndpoint:           os.Getenv("MINIO_ENDPOINT"),
+		MinioAccessKey:          os.Getenv("MINIO_ACCESS_KEY"),
+		MinioSecretKey:          os.Getenv("MINIO_SECRET_KEY"),
+		MinioBucket:             envOr("MINIO_BUCKET", "monti-jarvis"),
+		MinioPrefix:             envOr("MINIO_PREFIX", "calls/"),
+		MinioUseSSL:             envBool("MINIO_USE_SSL", false),
+		DemoTenantID:            envOr("DEMO_TENANT_ID", "demo"),
+		LegacyUIEnabled:         envBool("LEGACY_UI_ENABLED", false),
+		NATSURL:                 envOr("NATS_URL", "nats://localhost:4222"),
+		LiveKitURL:              envOr("LIVEKIT_URL", "ws://localhost:7880"),
+		LiveKitAPIKey:           envOr("LIVEKIT_API_KEY", "devkey"),
+		LiveKitAPISecret:        envOr("LIVEKIT_API_SECRET", "secret"),
+		CustomerWebDir:          envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
+		PlatformAdminWebDir:     envOr("PLATFORM_ADMIN_WEB_DIR", "apps/platform-admin-web/build"),
+		ClickHouseURL:           envOr("CLICKHOUSE_URL", "http://localhost:8123"),
+		ClickHouseDB:            envOr("CLICKHOUSE_DB", "monti_jarvis"),
+		ClickHouseUser:          envOr("CLICKHOUSE_USER", "monti"),
+		ClickHousePassword:      envOr("CLICKHOUSE_PASSWORD", "monti"),
+		GeminiEmbedModel:        envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
+		AuthDisabled:            envBool("AUTH_DISABLED", true),
+		JWTSecret:               os.Getenv("JWT_SECRET"),
+		JWTAccessTTL:            envDuration("JWT_ACCESS_TTL", 15*time.Minute),
+		JWTRefreshTTL:           envDuration("JWT_REFRESH_TTL", 168*time.Hour),
+		AuthCacheEnabled:        envBool("AUTH_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
+		AuthWriteBehindEnabled:  envBool("AUTH_WRITE_BEHIND_ENABLED", os.Getenv("REDIS_URL") != ""),
+		AuthEventsEnabled:       envBool("AUTH_EVENTS_ENABLED", envOr("NATS_URL", "nats://localhost:4222") != ""),
 		AuthUserCacheTTL:        envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
 		EntitlementCacheEnabled: envBool("ENTITLEMENT_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
 		EntitlementCacheTTL:     envDuration("ENTITLEMENT_CACHE_TTL", 15*time.Minute),
@@ -166,15 +169,17 @@ func Load() Config {
 		PaymentCallbackDevBypass: envBool("PAYMENT_CALLBACK_DEV_BYPASS", false),
 		PaymentMockAutoFulfill:   envBool("PAYMENT_MOCK_AUTO_FULFILL", false),
 		// Default on when Redis is configured (same pattern as entitlement cache).
-		QuotaEnabled:         envBool("QUOTA_ENABLED", os.Getenv("REDIS_URL") != ""),
-		QuotaFailOpen:        envBool("QUOTA_FAIL_OPEN", true),
-		RateLimitEnabled:     envBool("RATE_LIMIT_ENABLED", os.Getenv("REDIS_URL") != ""),
-		RateLimitChatPerMin:  envInt("RATE_LIMIT_CHAT_PER_MIN", 60),
-		RateLimitKMPerMin:    envInt("RATE_LIMIT_KM_PER_MIN", 30),
-		RateLimitVoicePerMin: envInt("RATE_LIMIT_VOICE_PER_MIN", 20),
+		QuotaEnabled:           envBool("QUOTA_ENABLED", os.Getenv("REDIS_URL") != ""),
+		QuotaFailOpen:          envBool("QUOTA_FAIL_OPEN", true),
+		RateLimitEnabled:       envBool("RATE_LIMIT_ENABLED", os.Getenv("REDIS_URL") != ""),
+		RateLimitChatPerMin:    envInt("RATE_LIMIT_CHAT_PER_MIN", 60),
+		RateLimitKMPerMin:      envInt("RATE_LIMIT_KM_PER_MIN", 30),
+		RateLimitVoicePerMin:   envInt("RATE_LIMIT_VOICE_PER_MIN", 20),
 		QuotaConcurrentTTL:     envDuration("QUOTA_CONCURRENT_TTL", 2*time.Hour),
 		EmbedAllowEmptyOrigins: envBool("EMBED_ALLOW_EMPTY_ORIGINS", true),
 		PreviewMaxConcurrent:   envInt("PREVIEW_MAX_CONCURRENT", 2),
+		CustomerImportMaxBytes: int64(envInt("CUSTOMER_IMPORT_MAX_BYTES", 2*1024*1024)),
+		CustomerImportMaxRows:  envInt("CUSTOMER_IMPORT_MAX_ROWS", 5000),
 		AppEnv:                 appEnv,
 	}
 }

@@ -17,7 +17,7 @@
   import { ApiError } from '$lib/api/http';
   import { clearSession, loginPath } from '$lib/auth/session';
 
-  const id = $derived($page.params.id);
+  const id = $derived($page.params.id ?? '');
 
   let avatar = $state<Avatar | null>(null);
   let voices = $state<AvatarVoice[]>([]);

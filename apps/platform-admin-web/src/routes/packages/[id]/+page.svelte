@@ -15,7 +15,7 @@
   import { ApiError } from '$lib/api/http';
   import { feedback } from '$lib/feedback.svelte';
 
-  const id = $derived($page.params.id);
+  const id = $derived($page.params.id ?? '');
 
   let pkg = $state<Package | null>(null);
   let schemas = $state<RuleSchema[]>([]);

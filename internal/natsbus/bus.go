@@ -58,6 +58,18 @@ func (b *Bus) PublishCallEvent(ctx context.Context, subject string, event CallEv
 	return b.conn.Publish(subject, payload)
 }
 
+// PublishJSON publishes a bounded integration event when NATS is available.
+func (b *Bus) PublishJSON(subject string, value any) error {
+	if !b.Enabled() {
+		return fmt.Errorf("nats is not connected")
+	}
+	payload, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return b.conn.Publish(subject, payload)
+}
+
 func Subject(event string) string {
 	return event
 }
