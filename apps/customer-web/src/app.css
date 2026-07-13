@@ -228,6 +228,24 @@ button {
   font-size: 13px;
 }
 
+.picker-trigger {
+  min-height: 36px;
+  border: 1px solid rgb(0 183 255 / 36%);
+  border-radius: 999px;
+  background: rgb(0 110 255 / 12%);
+  color: var(--ink);
+  padding: 7px 14px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.picker-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .wave {
   height: 58px;
   display: flex;
@@ -334,6 +352,83 @@ button {
 .assistant-card.active {
   border-color: var(--assistant-color, var(--cyan));
   box-shadow: 0 0 18px color-mix(in srgb, var(--assistant-color, var(--cyan)) 35%, transparent);
+}
+
+.picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.picker-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgb(0 3 10 / 72%);
+  backdrop-filter: blur(10px);
+}
+
+.picker-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 100%);
+  max-height: min(760px, calc(100vh - 36px));
+  border: 1px solid rgb(96 151 210 / 30%);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgb(8 20 38 / 96%), rgb(3 11 23 / 98%)),
+    radial-gradient(circle at 50% 0%, rgb(0 132 255 / 18%), transparent 42%);
+  box-shadow: 0 28px 100px rgb(0 0 0 / 65%), inset 0 0 0 1px rgb(255 255 255 / 4%);
+  padding: 18px;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.picker-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.picker-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.picker-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.picker-close {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgb(70 132 190 / 28%);
+  border-radius: 999px;
+  background: rgb(4 14 28 / 72%);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.picker-grid {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.picker-card {
+  width: 100%;
 }
 
 .assistant-meta {
@@ -520,6 +615,19 @@ textarea {
   .control-panel,
   .workspace {
     height: auto;
+    overflow: visible;
+  }
+
+  .control-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+  }
+
+  .assistants {
+    max-height: min(460px, 70vh);
+    overflow: auto;
+    padding-bottom: 12px;
   }
 
   .composer {

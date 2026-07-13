@@ -13,9 +13,15 @@
     type TenantSettings,
     type UsageSnapshot
   } from '$lib/api/settings';
+  import {
+    getCustomerAuthSettings,
+    putCustomerAuthSettings,
+    type CustomerAuthSettings
+  } from '$lib/api/customerAuth';
 
   let settings = $state<TenantSettings | null>(null);
   let usage = $state<UsageSnapshot | null>(null);
+  let customerAuth = $state<CustomerAuthSettings | null>(null);
 
   let displayName = $state('');
   let locale = $state('en');
@@ -26,10 +32,16 @@
 
   let maxPerCall = $state(0);
   let maxPerDay = $state(0);
+  let customerAuthEnabled = $state(false);
+  let customerAuthMode = $state<'optional' | 'required'>('optional');
+  let customerAuthDomains = $state('');
+  let otpTTL = $state(600);
+  let customerSessionTTL = $state(604800);
 
   let loading = $state(true);
   let savingSettings = $state(false);
   let savingLimits = $state(false);
+  let savingCustomerAuth = $state(false);
 
   /** Simple EN/TH labels for this page only (full portal i18n is out of scope). */
   const uiLocale = $derived(locale === 'th' ? 'th' : 'en');
@@ -104,9 +116,10 @@
   async function load() {
     loading = true;
     try {
-      const [s, u] = await Promise.all([getSettings(), getUsage()]);
+      const [s, u, ca] = await Promise.all([getSettings(), getUsage(), getCustomerAuthSettings()]);
       settings = s;
       usage = u;
+      customerAuth = ca;
       displayName = s.display_name || '';
       locale = s.locale || 'en';
       timezone = s.timezone || 'Asia/Bangkok';
@@ -116,6 +129,11 @@
       const lim = u.call_limits;
       maxPerCall = lim?.max_minutes_per_call ?? 0;
       maxPerDay = lim?.max_call_minutes_per_day ?? 0;
+      customerAuthEnabled = ca.enabled;
+      customerAuthMode = ca.auth_mode || 'optional';
+      customerAuthDomains = (ca.allowed_domains || []).join('\n');
+      otpTTL = ca.otp_ttl_seconds || 600;
+      customerSessionTTL = ca.session_ttl_seconds || 604800;
     } catch (err) {
       feedback.error(err instanceof ApiError ? err.message : 'Failed to load settings');
     } finally {
@@ -157,6 +175,29 @@
       feedback.error(err instanceof ApiError ? err.message : 'Save failed');
     } finally {
       savingLimits = false;
+    }
+  }
+
+  async function saveCustomerAuth() {
+    savingCustomerAuth = true;
+    try {
+      const domains = customerAuthDomains
+        .split(/\r?\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      customerAuth = await putCustomerAuthSettings({
+        enabled: customerAuthEnabled,
+        auth_mode: customerAuthMode,
+        allowed_domains: domains,
+        otp_ttl_seconds: Number(otpTTL) || 600,
+        session_ttl_seconds: Number(customerSessionTTL) || 604800
+      });
+      customerAuthDomains = (customerAuth.allowed_domains || []).join('\n');
+      feedback.success('Customer auth settings saved');
+    } catch (err) {
+      feedback.error(err instanceof ApiError ? err.message : 'Save failed');
+    } finally {
+      savingCustomerAuth = false;
     }
   }
 
@@ -286,6 +327,44 @@
     </section>
 
     <section class="card">
+      <h2>Customer OTP auth</h2>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px">
+        Controls customer email OTP sign-in for the public caller desk. Leave disabled to keep no-auth demo behavior.
+      </p>
+      <label style="flex-direction:row;align-items:center;gap:10px">
+        <input type="checkbox" bind:checked={customerAuthEnabled} style="width:auto" />
+        <span>Enable customer email OTP</span>
+      </label>
+      <label>
+        <span>Auth mode</span>
+        <select bind:value={customerAuthMode}>
+          <option value="optional">Optional — no-auth still allowed</option>
+          <option value="required">Required — customer must sign in</option>
+        </select>
+      </label>
+      <label>
+        <span>Allowed email domains (comma or newline separated; blank = any except deny rules)</span>
+        <textarea bind:value={customerAuthDomains} placeholder="example.com&#10;acme.co.th"></textarea>
+      </label>
+      <label>
+        <span>OTP TTL seconds</span>
+        <input type="number" min="60" max="1800" bind:value={otpTTL} />
+      </label>
+      <label>
+        <span>Session TTL seconds</span>
+        <input type="number" min="3600" max="2592000" bind:value={customerSessionTTL} />
+      </label>
+      {#if customerAuth}
+        <p style="font-size:12px;color:var(--muted);margin:0 0 12px">
+          Current: {customerAuth.enabled ? 'enabled' : 'disabled'} · {customerAuth.auth_mode}
+        </p>
+      {/if}
+      <button class="btn" type="button" disabled={savingCustomerAuth} onclick={saveCustomerAuth}>
+        {savingCustomerAuth ? '…' : 'Save customer auth'}
+      </button>
+    </section>
+
+    <section class="card">
       <h2>{t.labels}</h2>
       <p style="font-size:12px;color:var(--muted);margin:0 0 12px">
         {t.labelsHelp}
@@ -338,13 +417,18 @@
     color: var(--muted);
   }
   input,
-  select {
+  select,
+  textarea {
     padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid var(--line);
     background: rgb(8 12 22);
     color: inherit;
     font-size: 14px;
+  }
+  textarea {
+    min-height: 84px;
+    resize: vertical;
   }
   .meter {
     margin-bottom: 10px;

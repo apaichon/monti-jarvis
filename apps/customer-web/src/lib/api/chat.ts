@@ -29,7 +29,7 @@ export async function sendChat(
   },
   opts?: { tenantId?: string }
 ): Promise<ChatResponse> {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  const headers: Record<string, string> = customerAuthHeaders({ 'content-type': 'application/json' });
   if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -40,3 +40,4 @@ export async function sendChat(
   if (!res.ok) throw new Error(data.error || data.message || 'Chat failed');
   return data;
 }
+import { customerAuthHeaders } from './customerAuth';

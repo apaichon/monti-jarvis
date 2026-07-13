@@ -218,7 +218,7 @@ func main() {
 	mux.Handle("GET /api/calls/{id}/events", guard.OptionalBearer(http.HandlerFunc(s.callEvents)))
 
 	mux.HandleFunc("GET /api/workforce", s.workforce)
-	mux.HandleFunc("POST /api/chat", s.chat)
+	mux.Handle("POST /api/chat", guard.OptionalBearer(http.HandlerFunc(s.chat)))
 	mux.Handle("GET /api/km/agents/{agent_id}", guard.OptionalBearer(http.HandlerFunc(s.getAgentKnowledge)))
 	mux.Handle("GET /api/km/agents/{agent_id}/documents", guard.OptionalBearer(http.HandlerFunc(s.listAgentDocuments)))
 	mux.Handle("POST /api/km/agents/{agent_id}/documents", guard.RequireKMWrite(http.HandlerFunc(s.uploadAgentDocument)))
@@ -346,6 +346,15 @@ func main() {
 	mux.Handle("PUT /api/tenant/customer-domain-rules/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantCustomerDomainRule)))
 	mux.Handle("DELETE /api/tenant/customer-domain-rules/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantCustomerDomainRule)))
 
+	// SPRINT-020 — customer email OTP auth.
+	mux.Handle("GET /api/tenant/customer-auth/settings", guard.RequireTenantAdminActive(http.HandlerFunc(s.getCustomerAuthSettings)))
+	mux.Handle("PUT /api/tenant/customer-auth/settings", guard.RequireTenantAdminActive(http.HandlerFunc(s.putCustomerAuthSettings)))
+	mux.HandleFunc("POST /api/customer/auth/request-otp", s.requestCustomerOTP)
+	mux.HandleFunc("POST /api/customer/auth/verify-otp", s.verifyCustomerOTP)
+	mux.HandleFunc("POST /api/customer/auth/refresh", s.refreshCustomerAuth)
+	mux.HandleFunc("POST /api/customer/auth/logout", s.logoutCustomerAuth)
+	mux.HandleFunc("GET /api/customer/me", s.customerMe)
+
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
 	mux.Handle("GET /api/tenant/orders/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrder)))
@@ -406,7 +415,7 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"livekit":            s.cfg.LiveKitAPIKey != "",
 		"nats":               s.bus != nil && s.bus.Enabled(),
 		"legacy_ui":          s.cfg.LegacyUIEnabled,
-		"sprint":             "SPRINT-019",
+		"sprint":             "SPRINT-020",
 		"auth_disabled":      s.cfg.AuthDisabled,
 		"tenant_register":    s.cfg.TenantRegisterEnabled,
 		"rag":                s.rag != nil && s.rag.Enabled(),

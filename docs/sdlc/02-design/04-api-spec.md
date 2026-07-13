@@ -1,9 +1,9 @@
 ---
 id: DES-0004
 title: API Specification
-status: approved
-updated: 2026-07-12
-sprint: SPRINT-019
+status: shipped
+updated: 2026-07-13
+sprint: SPRINT-020
 ---
 
 # API Specification — Monti Jarvis
@@ -1637,4 +1637,209 @@ Returns the import summary above. Other-tenant ids return 404. Raw CSV content i
 
 See [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [02-workflow.md](02-workflow.md) §55–58, [03-er-diagram.md](03-er-diagram.md) § Sprint 19, and [05-ux-ui.md](05-ux-ui.md) § T12.
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+## Customer Authentication & Domain Enforcement (Sprint 20)
+
+SPRINT-020 introduces customer-scoped email OTP authentication and sessions. Tenant id is resolved from trusted tenant context: host, embed key, or existing tenant routing metadata. API bodies must not be allowed to switch tenants.
+
+### Endpoint summary
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/tenant/customer-auth/settings` | active `tenant_admin` | Read auth settings |
+| `PUT` | `/api/tenant/customer-auth/settings` | active `tenant_admin` | Enable/disable auth and domain enforcement |
+| `POST` | `/api/customer/auth/request-otp` | public tenant context | Validate policy, create challenge, send OTP email |
+| `POST` | `/api/customer/auth/verify-otp` | public tenant context | Verify OTP and issue customer session |
+| `POST` | `/api/customer/auth/refresh` | refresh token | Rotate customer session tokens |
+| `POST` | `/api/customer/auth/logout` | `customer` | Revoke current session |
+| `GET` | `/api/customer/me` | `customer` | Current customer profile/context |
+
+### `GET /api/tenant/customer-auth/settings`
+
+Returns a lazy default if no row exists.
+
+```json
+{
+  "enabled": false,
+  "mode": "disabled",
+  "domain_enforcement": "off",
+  "allow_public_no_auth": true,
+  "session_ttl_minutes": 60,
+  "refresh_ttl_minutes": 43200
+}
+```
+
+### `PUT /api/tenant/customer-auth/settings`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `enabled` | boolean | yes | Enables customer OTP auth endpoints |
+| `mode` | string | yes | `disabled`, `optional`, or `required` |
+| `domain_enforcement` | string | yes | `off`, `allowlist`, `denylist`, or `allowlist_and_denylist` |
+| `allow_public_no_auth` | boolean | yes | Preserve public no-auth conversation path |
+| `session_ttl_minutes` | int | no | 5-240, default 60 |
+| `refresh_ttl_minutes` | int | no | 60-43200, default 43200 |
+
+**Response `200`** returns settings. Invalid combinations return `400 validation_error`; for example `mode=disabled` forces `enabled=false`.
+
+### `POST /api/customer/auth/request-otp`
+
+Creates an OTP challenge for an existing imported customer or a policy-allowed self-claim customer, then sends a short OTP to the customer email.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `email` | string | yes | Normalized and matched to tenant/domain rules |
+| `purpose` | string | yes | `login`, `register`, or `claim` |
+| `display_name` | string | no | Required only when no imported customer exists |
+| `external_id` | string | no | Optional claim hint for imported identities |
+
+```json
+{
+  "email": "jane@example.com",
+  "purpose": "login",
+  "display_name": "Jane Doe"
+}
+```
+
+**Response `202`**
+
+```json
+{
+  "challenge_id": "cotp_01",
+  "status": "otp_sent",
+  "delivery": {
+    "channel": "email",
+    "to": "j***@example.com",
+    "expires_in": 600,
+    "resend_after": 60
+  },
+  "customer_hint": {
+    "matched_existing_customer": true,
+    "requires_profile_completion": false
+  }
+}
+```
+
+The OTP email contains only the OTP code, expiry, tenant-facing brand name, and safety copy. It never contains tokens or internal ids except the user-visible masked email context.
+
+### `POST /api/customer/auth/verify-otp`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `challenge_id` | string | yes | OTP challenge id from request response |
+| `otp` | string | yes | Numeric OTP from email |
+
+**Request**
+
+```json
+{
+  "challenge_id": "cotp_01",
+  "otp": "123456"
+}
+```
+
+**Response `200`**
+
+```json
+{
+  "status": "authenticated",
+  "access_token": "<jwt>",
+  "refresh_token": "<opaque>",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_expires_in": 2592000,
+  "customer": {
+    "id": "cust_01",
+    "tenant_id": "demo",
+    "display_name": "Jane Doe",
+    "email": "jane@example.com",
+    "tier_id": "tier_vip",
+    "group_ids": ["grp_retail"],
+    "locale": "th",
+    "role": "customer"
+  }
+}
+```
+
+Customer access tokens include `sub`, `tenant_id`, `customer_id`, `role=customer`, and `session_id`. They must not include OTP hashes, refresh token hashes, or domain-rule internals.
+
+### `POST /api/customer/auth/refresh`
+
+```json
+{ "refresh_token": "<opaque>" }
+```
+
+**Response `200`** returns a rotated access/refresh token pair. Reuse of a revoked refresh token returns `401 session_revoked` and should revoke the session family when implemented.
+
+### `POST /api/customer/auth/logout`
+
+Requires `Authorization: Bearer <customer_access_token>`.
+
+```json
+{ "refresh_token": "<optional current refresh token>" }
+```
+
+**Response `200`**
+
+```json
+{ "revoked": true }
+```
+
+### `GET /api/customer/me`
+
+Requires customer token.
+
+```json
+{
+  "customer": {
+    "id": "cust_01",
+    "tenant_id": "demo",
+    "display_name": "Jane Doe",
+    "email": "jane@example.com",
+    "status": "active",
+    "tier_id": "tier_vip",
+    "group_ids": ["grp_retail"],
+    "locale": "th"
+  },
+  "auth": {
+    "session_id": "csess_01",
+    "expires_at": "2026-07-13T12:00:00Z"
+  }
+}
+```
+
+### Public chat/voice with customer token
+
+Existing `POST /api/chat`, `POST /api/calls`, and voice WebSocket paths accept an optional customer Bearer token. When present and valid, quota, rate-limit, RAG, locale, tier, and group resolution use the session customer context. When absent, the existing public no-auth flow remains available unless tenant settings require auth.
+
+### Domain policy behavior
+
+| `domain_enforcement` | Behavior |
+| --- | --- |
+| `off` | Domain rules ignored for auth; existing S19 defaults still apply on imports |
+| `allowlist` | Email domain must match active `allow` rule |
+| `denylist` | Email domain must not match active `deny` rule |
+| `allowlist_and_denylist` | Deny wins, otherwise require active allow |
+
+### Errors
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `validation_error` | Invalid email, invalid OTP format, invalid settings mode |
+| 401 | `otp_invalid_or_expired` | Challenge missing, expired, locked, or OTP mismatch |
+| 401 | `session_expired` | Access/refresh token expired |
+| 401 | `session_revoked` | Session was revoked or refresh token reused |
+| 403 | `customer_auth_disabled` | Tenant has auth disabled |
+| 403 | `domain_denied` | Active deny rule matched |
+| 403 | `domain_not_allowed` | Allowlist mode and no active allow rule matched |
+| 403 | `customer_inactive` | Linked S19 customer is inactive |
+| 404 | `not_found` | Cross-tenant customer/session reference |
+| 409 | `otp_already_pending` | Pending challenge exists and resend cooldown has not elapsed |
+| 409 | `identity_conflict` | Email and claim hint resolve to different tenant customers |
+| 429 | `rate_limited` | Auth attempt or chat/voice rate limit exceeded |
+| 502 | `otp_delivery_failed` | Mail provider rejected or failed delivery |
+
+`AUTH_DISABLED=true` does not mint customer sessions. It may continue to allow legacy public chat/voice for local development, but tenant-admin and customer-auth settings routes still require their explicit auth checks when `AUTH_DISABLED=false`.
+
+See [23-customer-auth-spec.md](23-customer-auth-spec.md), [02-workflow.md](02-workflow.md) §59–63, [03-er-diagram.md](03-er-diagram.md) § Sprint 20, and [05-ux-ui.md](05-ux-ui.md) § T13.
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

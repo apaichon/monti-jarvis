@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/libra/monti-jarvis/internal/auth"
 	"github.com/libra/monti-jarvis/internal/calltypes"
 )
 
@@ -28,7 +29,8 @@ func (s *server) createCall(w http.ResponseWriter, r *http.Request) {
 
 	sessionID := newID()
 	roomName := "monti-" + sessionID[:12]
-	session, err := s.calls.Create(r.Context(), sessionID, roomName)
+	tenantID := auth.ResolveTenant(r.Context(), req.TenantID, s.cfg.AuthDisabled, s.cfg.DemoTenantID)
+	session, err := s.calls.CreateForTenant(r.Context(), tenantID, sessionID, roomName)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return

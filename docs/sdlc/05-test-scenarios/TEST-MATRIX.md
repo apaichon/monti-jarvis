@@ -2,7 +2,7 @@
 id: TEST-MATRIX
 status: active
 updated: 2026-07-13
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019]
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -108,6 +108,25 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | T19-07 | 5 | Email/domain/source normalization | Auto | `go test ./internal/store -run NormalizeCustomer` | Pass |
 | T19-08 | 7 | No customer credential/token surface | Manual | [S7](../06-manual-tests/SPRINT-019-manual.md#s7--customer-authentication-remains-unavailable-task-0091--feat-ac-7) | Pass |
 | T19-09 | 8 | Tenant UI checks and full build pass | Auto | `npm --prefix apps/tenant-web run check && make build` | Pass |
+
+---
+
+## FEAT-0022 — Customer Authentication and Domain Enforcement (SPRINT-020)
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T20-01 | 1 | Customer auth settings tables and hashes-only storage | Manual + Auto | [S11](../06-manual-tests/SPRINT-020-manual.md#s11--storage-safety-hashes-only-no-plaintext-credentials-task-0092--ac-2-5) · `go test ./internal/store` | Pass |
+| T20-02 | 2 | OTP request returns safe challenge metadata and sends email | Manual | [S2](../06-manual-tests/SPRINT-020-manual.md#s2--otp-request-returns-safe-challenge-metadata-task-0093--ac-2-5) | Pass |
+| T20-03 | 3 | OTP verify issues customer JWT/session and `/me` profile | Manual | [S3](../06-manual-tests/SPRINT-020-manual.md#s3--otp-verify-issues-customer-jwtsession-and-me-profile-task-0093--ac-3-4) | Pass |
+| T20-04 | 4 | Existing imported customer claim binds by tenant/email | Manual | [S3](../06-manual-tests/SPRINT-020-manual.md#s3--otp-verify-issues-customer-jwtsession-and-me-profile-task-0093--ac-3-4) | Pass |
+| T20-05 | 5 | Domain allow/deny blocks invalid customer login | Manual | [S4](../06-manual-tests/SPRINT-020-manual.md#s4--denied-domain-blocks-otp-before-delivery-task-0093--ac-5) | Pass |
+| T20-06 | 6 | Cross-tenant challenge/session isolation | Manual | [S5](../06-manual-tests/SPRINT-020-manual.md#s5--cross-tenant-challengesession-isolation-task-0093--ac-1-6-task-0096--ac-2) | Pass |
+| T20-07 | TASK-0094 | Tenant settings UI saves customer-auth config | Manual | [S1](../06-manual-tests/SPRINT-020-manual.md#s1--customer-auth-settings-ui-and-api-survive-reload-task-0094--ac-1-4-5) | Pass |
+| T20-08 | TASK-0095 | Customer portal OTP UX preserves no-auth path | Manual | [S8](../06-manual-tests/SPRINT-020-manual.md#s8--customer-portal-otp-ux-preserves-no-auth-path-task-0095--ac-1-2-5) | Pass |
+| T20-09 | TASK-0096 | Authenticated chat rate-limit attribution | Manual | [S9](../06-manual-tests/SPRINT-020-manual.md#s9--authenticated-chat-consumes-correct-tenant-rate-limit-keys-task-0095--ac-3-task-0096--ac-4) | Pass |
+| T20-10 | TASK-0096 | Authenticated call tenant/quota attribution | Manual | [S10](../06-manual-tests/SPRINT-020-manual.md#s10--authenticated-call-session-uses-customer-tenant-context-task-0095--ac-3-task-0096--ac-4) | Pass |
+| T20-11 | — | Refresh/logout revokes customer sessions | Manual | [S6](../06-manual-tests/SPRINT-020-manual.md#s6--refresh-and-logout-revoke-customer-session-task-0093--ac-3-6) | Pass |
+| T20-12 | — | Full build/regression gate | Auto | [S12](../06-manual-tests/SPRINT-020-manual.md#s12--automatedbuild-regression-gate) · `make test && make build` | Pass |
 
 ---
 

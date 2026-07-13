@@ -36,8 +36,16 @@ func New(st *store.Store, bus *natsbus.Bus, lk lktoken.Config, tenantID string) 
 }
 
 func (s *Service) Create(ctx context.Context, sessionID, roomName string) (calltypes.Session, error) {
+	return s.CreateForTenant(ctx, strings.TrimSpace(s.tenantID), sessionID, roomName)
+}
+
+func (s *Service) CreateForTenant(ctx context.Context, tenantID, sessionID, roomName string) (calltypes.Session, error) {
 	if s.store == nil {
 		return calltypes.Session{}, fmt.Errorf("store is not available")
+	}
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" {
+		tenantID = strings.TrimSpace(s.tenantID)
 	}
 	sessionID = strings.TrimSpace(sessionID)
 	roomName = strings.TrimSpace(roomName)
@@ -45,7 +53,7 @@ func (s *Service) Create(ctx context.Context, sessionID, roomName string) (callt
 		return calltypes.Session{}, fmt.Errorf("session id and room name are required")
 	}
 
-	session, err := s.store.CreateCallSession(ctx, sessionID, s.tenantID, roomName)
+	session, err := s.store.CreateCallSession(ctx, sessionID, tenantID, roomName)
 	if err != nil {
 		return calltypes.Session{}, err
 	}

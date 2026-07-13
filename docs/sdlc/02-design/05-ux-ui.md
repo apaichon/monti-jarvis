@@ -1,9 +1,9 @@
 ---
 id: DES-0005
 title: UX/UI — ASCII Wireframes
-status: approved
-updated: 2026-07-12
-sprint: SPRINT-019
+status: shipped
+updated: 2026-07-13
+sprint: SPRINT-020
 ---
 
 # UX/UI — ASCII Wireframes
@@ -1782,4 +1782,130 @@ D2 add acme.com allow + Standard/Employees defaults
 | Server handlers | `cmd/server/tenant_customers.go` |
 | Store/domain logic | `internal/store/customers.go`, `internal/customerimport/` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [02-workflow.md](02-workflow.md) · [03-er-diagram.md](03-er-diagram.md) · [04-api-spec.md](04-api-spec.md).
+## Sprint 20 — Customer Authentication (T13)
+
+SPRINT-020 adds customer login/account state and tenant customer-auth controls. The public no-auth conversation path remains visible unless tenant settings require customer auth.
+
+### Screen map → API
+
+| Zone | User action | API / WS |
+| --- | --- | --- |
+| A6 | Open sign-in panel | — |
+| A7 | Request email OTP | `POST /api/customer/auth/request-otp` |
+| A8 | Verify OTP and sign in | `POST /api/customer/auth/verify-otp` |
+| A9 | Refresh session | `POST /api/customer/auth/refresh` |
+| A10 | Log out | `POST /api/customer/auth/logout` |
+| B6 | Load signed-in customer context | `GET /api/customer/me` |
+| B7 | Send signed-in chat | `POST /api/chat` with customer Bearer token |
+| B8 | Start signed-in voice | `POST /api/calls` / `WS /ws/voice` with customer Bearer token |
+| T13-1 | Tenant admin reads auth settings | `GET /api/tenant/customer-auth/settings` |
+| T13-2 | Tenant admin saves auth settings | `PUT /api/tenant/customer-auth/settings` |
+| T13-3 | Tenant admin edits domain rules | `GET/POST/PUT/DELETE /api/tenant/customer-domain-rules` |
+
+### Customer portal desktop layout
+
+```text
+┌─ Customer portal ─────────────────────────────────────────────────────┐
+│ MONTI Inbound Call Center                         [Email OTP] A6     │
+├───────────────────────────────┬──────────────────────────────────────┤
+│ Agent panel                   │ Caller Desk                          │
+│ ┌ Avatar / call controls ───┐ │ Customer: Jane Doe · VIP · Retail B6 │
+│ │ Mira                      │ │ [General] [Billing] [Technical]     │
+│ │ [Start call] A8           │ │                                      │
+│ └───────────────────────────┘ │ transcript ...                       │
+│ Agents list                  │ │ [ Ask your question... ] [Send] B7  │
+└───────────────────────────────┴──────────────────────────────────────┘
+```
+
+### Sign-in panel (A6-A10)
+
+```text
+┌─ Sign in to Monti ──────────────────────────────┐
+│ Email [____________________________________]    │
+│ [Send OTP] A7                                   │
+│ OTP code [ _ _ _ _ _ _ ]                        │
+│ [Verify and sign in] A8                         │
+│                                                 │
+│ New here? Same OTP verifies or claims account.  │
+│                                                 │
+│ Domain message: acme.com allowed by tenant      │
+│ Error states: denied domain, inactive customer, │
+│ expired OTP, delivery failed, auth disabled     │
+└─────────────────────────────────────────────────┘
+```
+
+### Tenant auth settings layout
+
+```text
+┌─ Tenant shell / Settings / Customer Auth ────────────────────────────┐
+│ Customer authentication                                               │
+│ Enable customer sign-in  [ on/off ] T13-2                             │
+│ Mode                    [ Optional ▾ ]                                │
+│ Domain enforcement      [ Allowlist + denylist ▾ ]                    │
+│ Public no-auth chat     [ Keep enabled ✓ ]                            │
+│ Session TTL             [ 60 ] min   Refresh TTL [ 43200 ] min        │
+│                                                                      │
+│ Domain rules                                                         │
+│ acme.com       Allow      Default tier VIP       Active               │
+│ blocked.test   Deny       —                      Active               │
+│ [Manage domain rules] T13-3                                          │
+│                                                                      │
+│ Production gate: quota/rate-limit isolation must pass before launch. │
+│ [Save settings]                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Optional customer sign-in
+
+```text
+Tenant admin sets mode optional
+  → customer opens portal
+  → public chat still available
+  → customer requests OTP by email (A7)
+  → customer verifies OTP (A8)
+  → B6 shows tier/group context
+  → B7/B8 send customer token for quota and RAG context
+```
+
+### Flow B — Domain enforcement
+
+```text
+Tenant admin enables allowlist
+  → adds acme.com allow rule
+  → customer jane@acme.com requests OTP
+  → POST /api/customer/auth/request-otp returns challenge_id
+  → email OTP delivered
+  → POST /api/customer/auth/verify-otp returns session
+  → customer eve@unknown.test requests OTP
+  → domain_not_allowed appears in sign-in panel
+```
+
+### Flow C — Multi-user quota gate
+
+```text
+Tenant A customer starts chat and voice
+  → Redis/package counters use tenant A
+Tenant B customer starts chat and voice
+  → Redis/package counters use tenant B
+Cross-tenant customer/session ids
+  → 403 or 404 without data leakage
+```
+
+### Mobile collapse
+
+- Sign-in moves into a top-right sheet; account state compresses to name + status chip.
+- Caller Desk remains the primary panel; agent picker collapses below the active avatar.
+- Tenant auth settings use stacked fields and keep domain rules as cards.
+
+### Component → file
+
+| Component | Path |
+| --- | --- |
+| Customer auth client | `apps/customer-web/src/lib/api/auth.ts` |
+| Customer sign-in/account UI | `apps/customer-web/src/routes/+page.svelte` or extracted auth component |
+| Tenant customer-auth settings | `apps/tenant-web/src/routes/settings/+page.svelte` or `apps/tenant-web/src/routes/customers/auth/+page.svelte` |
+| Tenant customer-auth API client | `apps/tenant-web/src/lib/api/customerAuth.ts` |
+| Server customer auth handlers | `cmd/server/customer_auth.go` |
+| Store/domain logic | `internal/store/customer_auth.go`, `internal/customerauth/` |
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [02-workflow.md](02-workflow.md) · [03-er-diagram.md](03-er-diagram.md) · [04-api-spec.md](04-api-spec.md).

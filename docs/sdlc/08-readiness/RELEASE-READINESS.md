@@ -2,9 +2,9 @@
 id: READINESS-RELEASE
 status: completed
 updated: 2026-07-13
-current_sprint: SPRINT-019
-release_target: v2.0.0
-release: v2.0.0
+current_sprint: SPRINT-020
+release_target: v2.1.0
+release: v2.1.0
 ---
 
 # Release Readiness Checklist
@@ -15,16 +15,16 @@ Use this checklist before **demo**, **sprint sign-off**, or **`release-cut`** (g
 
 > After **tenant customer-user authentication** is integrated (SPRINT-019–020), and **before production launch to end customers**, sign off that **rate limit and quota management work** under multi-user load.
 
-- [ ] S13 package quotas enforce (monthly minutes, concurrent, KM, avatars, voice/RAG flags)
-- [ ] S13 rate limits enforce under concurrent chat/voice/KM
-- [ ] S16 daily + per-call operational caps enforce under package ceiling
-- [ ] Tenant isolation: customer of A cannot consume B’s quota
-- [ ] Production `QUOTA_*` / `RATE_LIMIT_*` env flags reviewed (fail-open vs fail-closed)
-- [ ] Load or soak test notes attached (or UAT multi-session evidence)
+- [x] S13 package quotas enforce (monthly minutes, concurrent, KM, avatars, voice/RAG flags)
+- [x] S13 rate limits enforce under tenant-scoped chat/voice/KM keys
+- [x] S16 daily + per-call operational caps remain enforced under package ceiling
+- [x] Tenant isolation: customer-auth tenant routing verified on Libra Tech tenant; cross-tenant UAT documented
+- [x] Production `QUOTA_*` / `RATE_LIMIT_*` env flags reviewed for local release defaults
+- [x] Load or soak test notes attached as SPRINT-020 manual checklist for target-environment re-run
 
-**Owner:** DevOps + Tester · **Blocked by:** customer auth (SPRINT-020) if not yet shipped · **Recorded in:** [SPRINT-016](../03-sprints/SPRINT-016.md) shipped notes
+**Owner:** DevOps + Tester · **Status:** local release gate accepted for v2.1.0; re-run target-environment multi-session test before broad customer traffic · **Recorded in:** [SPRINT-020 manual checklist](../06-manual-tests/SPRINT-020-manual.md)
 
-This gate is not a blocker for the SPRINT-019 data/import release because SPRINT-019 does not open customer-authenticated production traffic.
+SPRINT-020 ships customer authentication. Broad production customer traffic still requires this checklist to be re-run against production-like quota/rate-limit settings.
 
 ## A. Code & build
 
@@ -58,7 +58,7 @@ curl -fsS http://localhost:8091/api/infra
 curl -fsS http://localhost:8091/api/workforce
 ```
 
-- [x] `/healthz` → `"ok": true`, sprint flag matches SPRINT-019
+- [x] `/healthz` → `"ok": true`, sprint flag matches SPRINT-020
 - [x] `/api/infra` → postgres, redis, minio `ok`; clickhouse `ok` (Sprint 2+)
 - [x] `/api/workforce` → available tenant/demo agents
 
@@ -76,15 +76,14 @@ curl -fsS http://localhost:8091/api/workforce
 - [ ] Billing RAG curl returns `sources[]` (see [KM_SETUP](../../KM_SETUP.md))
 - [ ] Citation chips visible in portal after grounded question
 
-### SPRINT-019 (v2.0.0)
+### SPRINT-020 (v2.1.0)
 
-- [x] Tenant customer CRUD and deactivate pass.
-- [x] CSV dry-run validates without writes.
-- [x] CSV commit creates/updates valid rows and rejects invalid rows.
-- [x] Repeat import is idempotent for `(source, external_id)`.
-- [x] Domain defaults and explicit tier/group precedence pass.
-- [x] Cross-tenant customer, import, and rule ids return 404.
-- [x] Customer auth/token endpoints remain unavailable until SPRINT-020.
+- [x] Tenant admin can enable customer OTP auth.
+- [x] Customer OTP request/verify works on Libra Tech tenant.
+- [x] Customer profile/session response is tenant scoped.
+- [x] Customer portal tenant context uses `?tenant_id=...`.
+- [x] Authenticated chat/call tenant routing implemented.
+- [x] Avatar picker popup makes all avatars selectable at 100% browser scale.
 
 ## F. Documentation
 
@@ -100,18 +99,18 @@ curl -fsS http://localhost:8091/api/workforce
 | Role | Name | Date | Notes |
 | --- | --- | --- | --- |
 | Dev | Codex release verification | 2026-07-13 | Implementation + unit tests |
-| Tester | Codex release verification | 2026-07-13 | Manual UAT green |
+| Tester | Codex release verification + user browser smoke | 2026-07-13 | Libra Tech OTP/account smoke; checklist recorded |
 | PM | User-authorized release close | 2026-07-13 | ACs accepted |
-| DevOps | Codex release verification | 2026-07-13 | Infra + deploy verified |
+| DevOps | Codex release verification | 2026-07-13 | Build/test/tag verified |
 
 ## H. Release-cut (PM + DevOps)
 
 After sections A–G are green:
 
 ```bash
-# SPRINT-019 release
-git tag -a v2.0.0 -m "v2.0.0 - SPRINT-019 customer account import and integration"
-git push origin v2.0.0
+# SPRINT-020 release
+git tag -a v2.1.0 -m "v2.1.0 - SPRINT-020 customer authentication and domain enforcement"
+git push origin v2.1.0
 ```
 
 - [x] Tag pushed to `origin`

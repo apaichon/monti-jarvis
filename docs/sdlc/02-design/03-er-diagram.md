@@ -1,9 +1,9 @@
 ---
 id: DES-0003
 title: Entity Relationship Diagram
-status: approved
-updated: 2026-07-12
-sprint: SPRINT-019
+status: shipped
+updated: 2026-07-13
+sprint: SPRINT-020
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1028,6 +1028,123 @@ erDiagram
 
 TASK-0087 uses the idempotent `internal/store` ensure-schema mechanism. No Redis, ClickHouse, or MinIO entity is added. CSV bytes are not retained.
 
-**Future SPRINT-020:** customer credential/user binding and domain-rule enforcement. No password, OAuth, or session fields belong in the SPRINT-019 tables.
+## Sprint 20 — customer OTP auth, sessions, and auth settings
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [02-workflow.md](02-workflow.md) · [04-api-spec.md](04-api-spec.md) · [05-ux-ui.md](05-ux-ui.md).
+```mermaid
+erDiagram
+  tenants ||--o| tenant_customer_auth_settings : configures
+  tenants ||--o{ customer_auth_identities : owns
+  customers ||--o{ customer_auth_identities : authenticates
+  tenants ||--o{ customer_otp_challenges : sends
+  customers ||--o{ customer_otp_challenges : verifies
+  customers ||--o{ customer_sessions : starts
+  customer_auth_identities ||--o{ customer_sessions : issues
+  tenants ||--o{ customer_auth_events : records
+  customers ||--o{ customer_auth_events : acts
+
+  tenant_customer_auth_settings {
+    text tenant_id PK
+    boolean enabled
+    text mode "disabled|optional|required"
+    text domain_enforcement "off|allowlist|denylist|allowlist_and_denylist"
+    boolean allow_public_no_auth
+    int session_ttl_minutes
+    int refresh_ttl_minutes
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_auth_identities {
+    text id PK
+    text tenant_id FK
+    text customer_id FK
+    text email_normalized
+    text status "active|locked"
+    timestamptz verified_at
+    timestamptz last_login_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_otp_challenges {
+    text id PK
+    text tenant_id FK
+    text customer_id FK
+    text email_normalized
+    text purpose "login|register|claim"
+    text otp_hash
+    text status "pending|verified|expired|locked"
+    int attempt_count
+    timestamptz expires_at
+    timestamptz sent_at
+    timestamptz verified_at
+    text ip_hash
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_sessions {
+    text id PK
+    text tenant_id FK
+    text customer_id FK
+    text auth_identity_id FK
+    text refresh_token_hash
+    text status "active|revoked|expired"
+    timestamptz expires_at
+    timestamptz refresh_expires_at
+    timestamptz revoked_at
+    text user_agent
+    text ip_hash
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_auth_events {
+    text id PK
+    text tenant_id FK
+    text customer_id FK
+    text event_type
+    text result
+    text reason
+    text ip_hash
+    jsonb metadata
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Constraints and indexes
+
+| Entity | Rule |
+| --- | --- |
+| `tenant_customer_auth_settings` | One row per tenant; lazy default `enabled=false`, `mode=disabled`, `allow_public_no_auth=true` |
+| `customer_auth_identities` | Unique `(tenant_id, email_normalized)` for active email identity |
+| `customer_auth_identities` | Unique `(tenant_id, customer_id)` unless future multiple-login methods are explicitly added |
+| `customer_auth_identities` | No password fields; OTP is the only SPRINT-020 customer credential mechanism |
+| `customer_otp_challenges` | Stores OTP hash only; no plaintext OTP, password, OAuth token, or reset token |
+| `customer_otp_challenges` | Indexed by `(tenant_id, email_normalized, status, expires_at)` for resend/rate checks |
+| `customer_sessions` | Unique refresh token hash; indexed by `(tenant_id, customer_id, status, expires_at)` |
+| `customer_auth_events` | Append-only auth audit; no secrets in `metadata` |
+
+### Redis
+
+| Key | Purpose |
+| --- | --- |
+| `monti_jarvis:customer_session:{session_id}` | Hot customer session cache with access-token TTL |
+| `monti_jarvis:rate:customer_auth:{tenant}:{email_hash}` | OTP request/verify attempt rate limit |
+| `monti_jarvis:customer_otp:{challenge_id}` | Optional hot OTP challenge cache with OTP TTL |
+| Existing quota/rate keys | Authenticated chat/voice must continue using tenant/package dimensions and include customer context in attribution |
+
+No ClickHouse or MinIO entity is added in SPRINT-020. Conversation analytics can later record `customer_id` once conversation records ship.
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [02-workflow.md](02-workflow.md) · [04-api-spec.md](04-api-spec.md) · [05-ux-ui.md](05-ux-ui.md).

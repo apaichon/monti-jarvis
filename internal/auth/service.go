@@ -237,6 +237,24 @@ func (s *Service) IssueTokenPairForUser(ctx context.Context, user store.AuthUser
 	return s.issueForUser(ctx, cachedFromStore(user, false))
 }
 
+func (s *Service) IssueAccessForPrincipal(userID, email string, role Role, tenantID string) (token string, expiresIn int, err error) {
+	if !s.TokensEnabled() {
+		return "", 0, ErrNotConfigured
+	}
+	if !role.Valid() {
+		return "", 0, fmt.Errorf("invalid role")
+	}
+	token, _, expiresIn, err = s.issuer.IssueAccess(userID, email, role, tenantID)
+	return token, expiresIn, err
+}
+
+func (s *Service) RefreshTTLSeconds() int {
+	if s == nil || s.refreshTTL <= 0 {
+		return 0
+	}
+	return int(s.refreshTTL.Seconds())
+}
+
 func (s *Service) Me(ctx context.Context, userID string) (UserProfile, error) {
 	if !s.TokensEnabled() {
 		return UserProfile{}, ErrNotConfigured

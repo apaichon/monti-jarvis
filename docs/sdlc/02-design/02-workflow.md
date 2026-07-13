@@ -1,9 +1,9 @@
 ---
 id: DES-0002
 title: Workflows
-status: approved
-updated: 2026-07-12
-sprint: SPRINT-019
+status: shipped
+updated: 2026-07-13
+sprint: SPRINT-020
 ---
 
 # Workflows — Monti Jarvis
@@ -1438,4 +1438,148 @@ sequenceDiagram
   S-->>API: customer + created/updated outcome
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 59. Tenant enables customer auth (Sprint 20)
+
+```mermaid
+sequenceDiagram
+  actor A as TenantAdmin
+  participant B as Browser /tenant/settings
+  participant G as Go :8091
+  participant Auth as internal/auth
+  participant S as internal/store
+  participant P as Postgres callcenter
+
+  A->>B: Enable customer auth + choose domain mode
+  B->>G: PUT /api/tenant/customer-auth/settings Bearer
+  G->>Auth: RequireTenantAdminActive
+  alt missing, inactive, or wrong role
+    Auth-->>B: 401/403
+  else authorized
+    G->>S: Validate mode disabled|optional|required
+    S->>P: UPSERT tenant_customer_auth_settings
+    G-->>B: 200 settings
+  end
+```
+
+## 60. Customer requests OTP by email (Sprint 20)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser /
+  participant G as Go :8091
+  participant CA as internal/customerauth
+  participant Mail as internal/mailer
+  participant D as customer_domain_rules
+  participant P as Postgres callcenter
+
+  C->>B: Enter email to sign in or claim account
+  B->>G: POST /api/customer/auth/request-otp
+  G->>CA: Resolve tenant from host/embed key/body-safe context
+  CA->>P: Load tenant_customer_auth_settings
+  alt auth disabled
+    CA-->>B: 403 customer_auth_disabled
+  else enabled
+    CA->>D: Match normalized email domain
+    alt denied domain
+      CA-->>B: 403 domain_denied
+    else required allow and no allow rule
+      CA-->>B: 403 domain_not_allowed
+    else allowed
+      CA->>P: Find or create tenant-scoped customer
+      CA->>P: INSERT customer_otp_challenges otp_hash
+      CA->>Mail: Send short OTP to customer email
+      alt mail delivery fails
+        CA-->>B: 502 otp_delivery_failed
+      else sent
+        CA-->>B: 202 challenge_id + masked email + expires_in
+      end
+    end
+  end
+```
+
+## 61. Customer verifies OTP and refreshes session (Sprint 20)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser /
+  participant G as Go :8091
+  participant CA as internal/customerauth
+  participant R as Redis
+  participant P as Postgres callcenter
+
+  C->>B: Submit OTP from email
+  B->>G: POST /api/customer/auth/verify-otp
+  G->>CA: Load challenge by challenge_id
+  CA->>P: Check pending challenge, expiry, attempts
+  alt expired, locked, or wrong code
+    CA-->>B: 401 otp_invalid_or_expired
+  else ok
+    CA->>P: UPSERT customer_auth_identities
+    CA->>P: INSERT customer_sessions
+    CA->>R: SET customer_session:{sid} TTL
+    CA-->>B: access_token + refresh_token + customer
+  end
+  B->>G: POST /api/customer/auth/refresh
+  G->>CA: Validate refresh token + session
+  CA-->>B: rotated tokens
+```
+
+### Customer auth states
+
+| Entity | Status | Meaning |
+| --- | --- | --- |
+| `tenant_customer_auth_settings` | `disabled` | Public no-auth portal only; customer auth endpoints return disabled |
+| `tenant_customer_auth_settings` | `optional` | Public no-auth portal remains; customers may sign in |
+| `tenant_customer_auth_settings` | `required` | Customer auth required for customer-specific account context |
+| `customer_auth_identities` | `active` | Email identity can request OTP/login |
+| `customer_auth_identities` | `locked` | OTP login blocked after security/manual action |
+| `customer_otp_challenges` | `pending` | OTP sent and awaiting verification |
+| `customer_otp_challenges` | `verified` | OTP accepted and exchanged for a session |
+| `customer_otp_challenges` | `expired` | Past OTP expiry |
+| `customer_otp_challenges` | `locked` | Too many wrong OTP attempts |
+| `customer_sessions` | `active` | Access/refresh pair valid until expiry |
+| `customer_sessions` | `revoked` | Logout or security revocation |
+| `customer_sessions` | `expired` | Past expiry; refresh rejected |
+
+## 62. Authenticated chat and quota attribution (Sprint 20)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser /
+  participant G as Go :8091
+  participant Auth as internal/customerauth
+  participant Q as internal/quota
+  participant S as internal/store
+  participant RAG as internal/rag
+  participant AI as Gemini
+
+  C->>B: Ask question while signed in
+  B->>G: POST /api/chat Bearer customer token
+  G->>Auth: Validate customer session
+  Auth->>S: Load tenant customer + tier/groups
+  G->>Q: Apply tenant package + rate + tier/group context
+  alt quota or rate exceeded
+    Q-->>B: 429/403 quota error
+  else allowed
+    G->>RAG: Retrieve with tenant + customer context
+    G->>AI: Prompt with tier/group/locale hints
+    G-->>B: reply + sources + customer_context
+  end
+```
+
+## 63. Multi-tenant customer auth UAT (Sprint 20)
+
+```mermaid
+flowchart LR
+  A1[Tenant A customer login] --> A2[Session tenant=A]
+  B1[Tenant B customer login] --> B2[Session tenant=B]
+  A2 --> A3[Chat consumes A quota keys]
+  B2 --> B3[Chat consumes B quota keys]
+  A2 -. cross-tenant id .-> X[404 or 403]
+  B2 -. cross-tenant id .-> X
+```
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

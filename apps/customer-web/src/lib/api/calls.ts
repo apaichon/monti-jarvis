@@ -27,7 +27,7 @@ function tenantHeaders(tenantId?: string, json = false): Record<string, string> 
   const headers: Record<string, string> = {};
   if (json) headers['content-type'] = 'application/json';
   if (tenantId) headers['X-Tenant-Id'] = tenantId;
-  return headers;
+  return customerAuthHeaders(headers);
 }
 
 export async function createCall(opts?: { tenantId?: string }): Promise<CallSession> {
@@ -98,3 +98,4 @@ export function subscribeTurns(
   });
   return () => source.close();
 }
+import { customerAuthHeaders } from './customerAuth';

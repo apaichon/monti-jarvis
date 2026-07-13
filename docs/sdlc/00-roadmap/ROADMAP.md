@@ -43,20 +43,20 @@
 | 17 | Tenant | Test and Preview | D | 15, 16 ✅ v1.8.0 |
 | 18 | Tenant | Customer Tier | D | 16 ✅ v1.9.0 |
 | 19 | Tenant | Customer Account Import, Domain Rules, Integration | E | 3, 18 ✅ v2.0.0 |
-| 20 | Customer | Auth (how to integrate if solution must integrate to existing system of tenant) | E | 19 |
-| 21 | Customer | Select AI Workforce to Conversation | A | 1, 5 |
-| 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt and not), Knowledge Gap | F | 1, 3 |
-| 23 | Tenant | Tickets | F | 22 |
-| 24 | Tenant | Review | F | 22, 23 |
-| 25 | Tenant | Dashboard | F | 22 (ClickHouse) |
-| 26 | Tenant | Monitoring | F | 25 |
+| 20 | Customer | Auth (how to integrate if solution must integrate to existing system of tenant) | E | 19 ✅ v2.1.0 |
+| 21 | Customer | Select AI Workforce to Conversation must login with OTP before and time limit with quota managment setting | A | 1, 5 |
+| 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt or not), Knowledge Gap | F | 1, 3 |
+| 23 | Tenant | Tickets, AI conversation ask to open ticket to human fix | F | 22 |
+| 24 | Tenant | Customer Review AI Satisfaction after conversation, Tenant view statistics | F | 22, 23 |
+| 25 | Tenant | Dashboard : Call Center Statistics | F | 22 (ClickHouse) |
+| 26 | Tenant | Monitoring : System Performance | F | 25 |
 | 27 | Platform | Audit Log | G | 3 |
-| 28 | Platform | Monitoring | G | 27 |
-| 29 | Platform | Dashboard | G | 28 (ClickHouse) |
-| 30 | Platform | Monitoring | G | 29 |
-| 31 | Tuning | gRPC, Cache on Prod | H | 25+ |
+| 28 | Platform | Monitoring : System Performance | G | 27 |
+| 29 | Platform | Dashboard: Overall Call Center Statistics and by Tenants,   | G | 28 (ClickHouse) |
+| 30 | Platform | Monitoring: Billing, Quota Usages, AI Infra Cost Usage | G | 29 |
+| 31 | Tuning | gRPC switch mode, Cache on Prod | H | 25+ |
 | 32 | Tuning | Partition,Index, Hardening | H | 31 |
-| 33 | Infra | Scale, Auto Scale | I | 32 |
+| 33 | Infra | Scale, Auto Scale with k8s | I | 32 |
 | 34 | Infra | Canary Deployment | I | 33 |
 | 35 | Infra | Backup Restore Archive | I | 33 |
 | **36** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **D+** | **14** · [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · backlog |
@@ -280,11 +280,25 @@ Two-tenant UAT passed. Customer authentication remains SPRINT-020, and productio
 
 Sprint: [SPRINT-019.md](../03-sprints/SPRINT-019.md) · Feature: [FEAT-0021](../01-features/FEAT-0021-customer-account-import.md) · Spec: [22-customer-account-import-spec.md](../02-design/22-customer-account-import-spec.md)
 
-## Next sprint: SPRINT-020
+## Shipped: SPRINT-020 — Customer Authentication and Domain Enforcement — v2.1.0
 
-**Platform:** Customer · **Feature:** Customer authentication · **Depends:** 19
+**Closed 2026-07-13.** Customer email OTP authentication, tenant auth settings, customer sessions, tenant-context customer portal, and authenticated chat/call tenant routing.
 
-Bind imported customer identities to credentials/sessions, enforce domain rules, and verify quota/rate-limit isolation under authenticated multi-user load. SPRINT-019 data/import foundations are verified and available for this scope.
+| Task | Points | Outcome |
+| --- | ---: | --- |
+| TASK-0092 | 3 | Customer OTP identity/session schema and auth settings |
+| TASK-0093 | 5 | Customer OTP request/verify, session, claim, and profile APIs |
+| TASK-0094 | 3 | Tenant customer-auth configuration UI |
+| TASK-0095 | 4 | Customer login/account UX and authenticated context wiring |
+| TASK-0096 | 1 | Authenticated tenant smoke, manual checklist, and production gate evidence |
+
+Browser OTP/account smoke passed on the Libra Tech tenant, and automated Go/customer-web/tenant-web release gates passed. Before broad production customer traffic, re-run the documented multi-session quota/rate-limit checklist against the target deployment.
+
+Sprint: [SPRINT-020.md](../03-sprints/SPRINT-020.md) · Feature: [FEAT-0022](../01-features/FEAT-0022-customer-auth.md) · Spec: [23-customer-auth-spec.md](../02-design/23-customer-auth-spec.md) · UAT: [SPRINT-020-manual.md](../06-manual-tests/SPRINT-020-manual.md)
+
+## Current sprint: none
+
+Run `sprint-planner` to open SPRINT-021.
 
 ## Backlog add: SPRINT-036 — Embed Framework SDKs
 
