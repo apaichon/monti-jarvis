@@ -81,11 +81,12 @@ func (s *server) retryTenantConversationArchive(w http.ResponseWriter, r *http.R
 		return
 	}
 	payload := map[string]any{"retry": true, "conversation_record_id": rec.ID, "call_id": rec.CallID, "summary": rec.Summary}
-	_, err = s.store.ArchiveConversationTranscript(r.Context(), tenantID, rec.CallID, payload, "")
+	obj, err := s.store.ArchiveConversationTranscriptForChannel(r.Context(), tenantID, rec.CallID, rec.Channel, payload, "")
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	s.projectCallCenterRecord(r.Context(), tenantID, obj.ConversationRecordID)
 	writeJSON(w, http.StatusAccepted, map[string]any{"status": "retry_queued"})
 }
 

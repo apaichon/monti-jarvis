@@ -516,7 +516,18 @@ func scanConversationRecord(row pgx.Row) (ConversationRecord, error) {
 }
 
 func (s *Store) ArchiveConversationTranscript(ctx context.Context, tenantID, callID string, payload any, protectionMode string) (ConversationArchiveObject, error) {
-	rec, err := s.UpsertConversationRecord(ctx, ConversationRecordInput{TenantID: tenantID, CallID: callID, Channel: "chat", Status: "archived", Summary: map[string]any{"archived_by": "server"}})
+	return s.archiveConversationTranscript(ctx, tenantID, callID, "chat", payload, protectionMode)
+}
+
+func (s *Store) ArchiveConversationTranscriptForChannel(ctx context.Context, tenantID, callID, channel string, payload any, protectionMode string) (ConversationArchiveObject, error) {
+	if channel != "voice" {
+		channel = "chat"
+	}
+	return s.archiveConversationTranscript(ctx, tenantID, callID, channel, payload, protectionMode)
+}
+
+func (s *Store) archiveConversationTranscript(ctx context.Context, tenantID, callID, channel string, payload any, protectionMode string) (ConversationArchiveObject, error) {
+	rec, err := s.UpsertConversationRecord(ctx, ConversationRecordInput{TenantID: tenantID, CallID: callID, Channel: channel, Status: "archived", Summary: map[string]any{"archived_by": "server"}})
 	if err != nil {
 		return ConversationArchiveObject{}, err
 	}
