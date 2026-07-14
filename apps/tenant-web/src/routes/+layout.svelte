@@ -86,6 +86,11 @@
         >
         <a
           class="nav-link"
+          href="{base}/satisfaction"
+          class:active={$page.url.pathname.includes('/satisfaction')}><span>★</span>Satisfaction</a
+        >
+        <a
+          class="nav-link"
           href="{base}/preview"
           class:active={$page.url.pathname.includes('/preview')}><span>◉</span>Preview <em>LIVE</em></a
         >

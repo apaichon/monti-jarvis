@@ -3,7 +3,7 @@ id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-023
+sprint: SPRINT-024
 ---
 
 # UX/UI — ASCII Wireframes
@@ -2146,3 +2146,94 @@ Tenant opens T16-1
 | Ticket event publisher | `internal/tickets/` |
 
 See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md) · [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [02-workflow.md](02-workflow.md) · [03-er-diagram.md](03-er-diagram.md) · [04-api-spec.md](04-api-spec.md).
+
+## Sprint 24 - Customer Satisfaction Review and Tenant Statistics (T17/C16)
+
+Customer UI adds a post-conversation star review prompt for chat and voice. Tenant UI adds an aggregate satisfaction dashboard with a default today range; no customer identity or transcript data is shown in statistics.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| C16-1 | Hear/see the post-conversation review prompt | Existing call-close flow; no new request |
+| C16-2 | Select 1-5 star score and submit | `POST /api/calls/{id}/rating` |
+| C16-3 | Open follow-up prompt for an unrated call | `POST /api/calls/{id}/rating` |
+| T17-1 | Open tenant Satisfaction dashboard | `GET /api/tenant/satisfaction/statistics` |
+| T17-2 | Change start/end date, avatar, or channel filters | `GET /api/tenant/satisfaction/statistics?...` |
+| T17-3 | Inspect KPI, distribution, and breakdowns | Same statistics response; no separate API |
+
+### Customer review surface
+
+```text
+┌─ Caller Desk / Call complete ───────────────────────────────────────┐
+│ Call complete                                                       │
+│ How was your call?                                                  │
+│ การให้บริการวันนี้เป็นอย่างไรบ้าง?                                  │
+│                                                                     │
+│        ☆       ☆       ☆       ☆       ☆                           │
+│       1 star   2       3       4       5 stars                     │
+│                                                                     │
+│ [Submit rating]                                     [Not now]       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Selecting a star uses a familiar star icon with a visible selected state. The review prompt is shown after the call/session is already closed. Selecting `Not now` leaves the archive and ticket/session state complete; the follow-up prompt may be opened later without reopening the call.
+
+### Tenant satisfaction dashboard
+
+```text
+┌─ Tenant shell / Operations / Satisfaction ─────────────────────────────────────────┐
+│ Customer satisfaction                                      [Today ▾]                │
+│ Start [2026-07-14]  End [2026-07-14]  Avatar [All ▾]  Channel [All ▾] [Apply]     │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│ Completed conversations 18     Reviewed 15     Completion 83%     Average ★ 4.47    │
+├───────────────────────────────┬───────────────────────────────┬────────────────────┤
+│ Rating distribution            │ By AI employee                │ By channel         │
+│ ★ 5  ████████  8               │ Ava    18 calls · ★ 4.47      │ Voice 12 · ★ 4.40  │
+│ ★ 4  ████      4               │                            │ Chat   6 · ★ 4.60  │
+│ ★ 3  ██        2               │                            │                    │
+│ ★ 2  █         1               │                            │                    │
+│ ★ 1            0               │                            │                    │
+└───────────────────────────────┴───────────────────────────────┴────────────────────┘
+```
+
+### Mobile collapse
+
+On narrow screens, date and dimension filters wrap into two rows. KPI values stay in a two-column grid, then the rating distribution, avatar breakdown, and channel breakdown stack vertically. The customer star buttons retain stable equal-width targets and do not shift when a score is selected.
+
+### Flow A - Customer rates a completed conversation
+
+```text
+Chat/voice call ends
+    │
+    ├─► AI speaks/displays the review request
+    │
+    ├─► Customer selects a star ──► POST /api/calls/{id}/rating ──► Confirmation
+    │
+    └─► Customer skips ──► Follow-up prompt available; call remains closed
+```
+
+### Flow B - Tenant reviews statistics
+
+```text
+Tenant opens T17-1
+    │
+    ├─► Default Today range loads
+    ├─► Tenant adjusts date/avatar/channel ──► GET statistics with query filters
+    ├─► No records ──► Show zero-value empty state
+    └─► Records exist ──► Show KPI, stars, distribution, avatar and channel breakdowns
+```
+
+### Component -> file
+
+| Component | Path |
+| --- | --- |
+| Customer rating dialog | `apps/customer-web/src/routes/+page.svelte` |
+| Customer rating API client | `apps/customer-web/src/lib/api/calls.ts` |
+| Tenant satisfaction route | `apps/tenant-web/src/routes/satisfaction/+page.svelte` |
+| Tenant satisfaction API client | `apps/tenant-web/src/lib/api/satisfaction.ts` |
+| Rating handler | `cmd/server/calls.go` |
+| Tenant statistics handler | `cmd/server/tenant_satisfaction.go` |
+| Rating schema/store | `internal/store/conversation_records.go` |
+
+See [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [04-api-spec.md](04-api-spec.md).

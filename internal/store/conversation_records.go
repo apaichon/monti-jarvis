@@ -149,12 +149,29 @@ func (s *Store) ensureConversationRecordsSchema(ctx context.Context) error {
   id text PRIMARY KEY,
   tenant_id text NOT NULL,
   call_id text NOT NULL,
+  conversation_record_id text NOT NULL DEFAULT '',
+  customer_id text NOT NULL DEFAULT '',
+  avatar_id text NOT NULL DEFAULT '',
+  channel text NOT NULL DEFAULT 'voice' CHECK (channel IN ('chat','voice')),
   score integer NOT NULL CHECK (score BETWEEN 1 AND 5),
   review text NOT NULL DEFAULT '',
+  created_by text NOT NULL DEFAULT 'system',
+  updated_by text NOT NULL DEFAULT 'system',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, call_id)
 )`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.conversation_ratings
+ADD COLUMN IF NOT EXISTS conversation_record_id text NOT NULL DEFAULT '',
+ADD COLUMN IF NOT EXISTS customer_id text NOT NULL DEFAULT '',
+ADD COLUMN IF NOT EXISTS avatar_id text NOT NULL DEFAULT '',
+ADD COLUMN IF NOT EXISTS channel text NOT NULL DEFAULT 'voice',
+ADD COLUMN IF NOT EXISTS created_by text NOT NULL DEFAULT 'system',
+ADD COLUMN IF NOT EXISTS updated_by text NOT NULL DEFAULT 'system'`, schema),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS conversation_ratings_tenant_date_idx
+ON %s.conversation_ratings (tenant_id, created_at DESC)`, schema),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS conversation_ratings_tenant_dimensions_idx
+ON %s.conversation_ratings (tenant_id, avatar_id, channel, created_at DESC)`, schema),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.conversation_archive_objects (
   id text PRIMARY KEY,
   tenant_id text NOT NULL,
@@ -203,11 +220,39 @@ func (s *Store) SaveConversationRating(ctx context.Context, tenantID, callID str
 		return fmt.Errorf("score must be between 1 and 5")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
+	var conversationRecordID, customerID, avatarID, channel, recordStatus string
+	recordErr := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT id,customer_id,avatar_id,channel,status
+FROM %s.conversation_records WHERE tenant_id=$1 AND call_id=$2 ORDER BY created_at DESC LIMIT 1`, schema), tenantID, callID).
+		Scan(&conversationRecordID, &customerID, &avatarID, &channel, &recordStatus)
+	if recordErr == nil {
+		if recordStatus != "archived" {
+			return fmt.Errorf("conversation has not ended")
+		}
+	} else {
+		var startedAt time.Time
+		var endedAt *time.Time
+		customerID, avatarID, startedAt, endedAt, _ = s.conversationContextForCall(ctx, callID)
+		if startedAt.IsZero() {
+			return fmt.Errorf("call session not found")
+		}
+		if endedAt == nil {
+			return fmt.Errorf("call session has not ended")
+		}
+		channel = "voice"
+	}
+	if channel != "chat" && channel != "voice" {
+		channel = "voice"
+	}
+	actor := auditctx.ActorID(ctx)
 	_, err := s.pg.Exec(ctx, fmt.Sprintf(`INSERT INTO %s.conversation_ratings
-(id,tenant_id,call_id,score,review,created_at,updated_at)
-VALUES ($1,$2,$3,$4,$5,now(),now())
-ON CONFLICT (tenant_id,call_id) DO UPDATE SET score=EXCLUDED.score,review=EXCLUDED.review,updated_at=now()`, schema),
-		"crat_"+newStoreID(), tenantID, callID, score, trimBounded(review, 2000))
+(id,tenant_id,call_id,conversation_record_id,customer_id,avatar_id,channel,score,review,created_at,updated_at,created_by,updated_by)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now(),$10,$10)
+ON CONFLICT (tenant_id,call_id) DO UPDATE SET
+conversation_record_id=COALESCE(NULLIF(EXCLUDED.conversation_record_id,''),conversation_ratings.conversation_record_id),
+customer_id=COALESCE(NULLIF(EXCLUDED.customer_id,''),conversation_ratings.customer_id),
+avatar_id=COALESCE(NULLIF(EXCLUDED.avatar_id,''),conversation_ratings.avatar_id),
+channel=EXCLUDED.channel,score=EXCLUDED.score,review=EXCLUDED.review,updated_at=now(),updated_by=EXCLUDED.updated_by`, schema),
+		"crat_"+newStoreID(), tenantID, callID, conversationRecordID, customerID, avatarID, channel, score, trimBounded(review, 2000), actor)
 	return err
 }
 

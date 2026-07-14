@@ -135,9 +135,16 @@ func (s *server) submitCallRating(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "store is not available")
 		return
 	}
-	session, err := s.calls.Get(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+	callID := r.PathValue("id")
+	tenantID := s.quotaTenant(r)
+	if session, err := s.calls.Get(r.Context(), callID); err == nil {
+		if session.TenantID != tenantID {
+			writeError(w, http.StatusNotFound, "call not found")
+			return
+		}
+		tenantID = session.TenantID
+	} else if _, recordErr := s.store.GetConversationRecordByCallID(r.Context(), tenantID, callID); recordErr != nil {
+		writeError(w, http.StatusNotFound, "call not found")
 		return
 	}
 	var req callRatingRequest
@@ -153,7 +160,7 @@ func (s *server) submitCallRating(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "review is too long")
 		return
 	}
-	if err := s.store.SaveConversationRating(r.Context(), session.TenantID, session.ID, req.Score, req.Review); err != nil {
+	if err := s.store.SaveConversationRating(r.Context(), tenantID, callID, req.Score, req.Review); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}

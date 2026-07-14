@@ -46,8 +46,8 @@
 | 20 | Customer | Auth (how to integrate if solution must integrate to existing system of tenant) | E | 19 ✅ v2.1.0 |
 | 21 | Customer | Select AI Workforce to Conversation must login with OTP before and time limit with quota management setting | A | 1, 5 ✅ v2.2.0 |
 | 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt or not), Knowledge Gap | F | 1, 3 ✅ v2.3.0 |
-| 23 | Tenant, Customer | Tickets, AI conversation ask to open ticket to human in the loop | F | 22 |
-| 24 | Tenant | Customer Review AI Satisfaction after conversation, Tenant view statistics | F | 22, 23 |
+| 23 | Tenant, Customer | Tickets, AI conversation ask to open ticket to human in the loop | F | 22 ✅ v2.4.0 |
+| 24 | Tenant | Customer Review AI Satisfaction after conversation, Tenant view statistics | F | 22, 23 ✅ v2.5.0 |
 | 25 | Tenant | Dashboard : Call Center Statistics, Call Quota Usage | F | 22 (ClickHouse) |
 | 26 | Tenant | Monitoring : System Performance | F | 25 |
 | 27 | Platform | Audit Log | G | 3 |
@@ -315,6 +315,16 @@ Sprint: [SPRINT-020.md](../03-sprints/SPRINT-020.md) · Feature: [FEAT-0022](../
 **Status:** completed · **Release:** v2.4.0 · **Commitment:** 16 points
 
 Sprint: [SPRINT-023.md](../03-sprints/SPRINT-023.md) · Feature: [FEAT-0025](../01-features/FEAT-0025-tickets-human-escalation.md)
+
+## Shipped sprint: SPRINT-024
+
+**Status:** completed · **Release:** v2.5.0 · **Commitment:** 16 points
+
+Sprint: [SPRINT-024.md](../03-sprints/SPRINT-024.md) · Feature: [FEAT-0026](../01-features/FEAT-0026-customer-satisfaction-statistics.md)
+
+## Current sprint: none
+
+**Status:** no active sprint · **Release target:** — · **Commitment:** —
 
 ## Parallel build sprint: none
 

@@ -84,7 +84,6 @@
   let ratingOpen = $state(false);
   let ratingCallId = $state('');
   let ratingScore = $state(0);
-  let ratingReview = $state('');
   let ratingBusy = $state(false);
   let ratingError = $state('');
   let portalPolicy = $state<CustomerPortalPolicy | null>(null);
@@ -492,7 +491,6 @@
       busy = false;
       ratingCallId = endedCallId;
       ratingScore = 0;
-      ratingReview = '';
       ratingError = '';
       ratingOpen = true;
       if (reason === 'timeout') {
@@ -509,7 +507,7 @@
     try {
       await submitCallRating(
         ratingCallId,
-        { score: ratingScore, review: ratingReview.trim() },
+        { score: ratingScore },
         tenantId ? { tenantId } : undefined
       );
       ratingOpen = false;
@@ -518,6 +516,14 @@
     } finally {
       ratingBusy = false;
     }
+  }
+
+  function finishChat() {
+    if (!chatSessionId || live || ratingBusy) return;
+    ratingCallId = chatSessionId;
+    ratingScore = 0;
+    ratingError = '';
+    ratingOpen = true;
   }
 
   async function cleanup(resetSession: boolean) {
@@ -950,6 +956,9 @@
           ></textarea>
           <button class="send" type="submit" disabled={busy || authRequired || quotaExhausted}>Send</button>
         </div>
+        {#if chatSessionId && !live}
+          <button class="plain-button finish-chat" type="button" onclick={finishChat}>Finish chat &amp; rate</button>
+        {/if}
         <div class="error">{error}</div>
       </form>
       <div class="infra">{sessionLabel}</div>
@@ -976,11 +985,11 @@
             >{ratingScore >= score ? '★' : '☆'}</button>
           {/each}
         </div>
-        <textarea bind:value={ratingReview} maxlength="2000" placeholder="Tell us more (optional)"></textarea>
         {#if ratingError}<div class="rating-error">{ratingError}</div>{/if}
         <button class="rating-submit" type="submit" disabled={ratingScore === 0 || ratingBusy}>
           {ratingBusy ? 'Saving…' : 'Submit review'}
         </button>
+        <button class="rating-skip" type="button" disabled={ratingBusy} onclick={() => (ratingOpen = false)}>Not now</button>
       </form>
     </div>
   </div>

@@ -367,6 +367,8 @@ func main() {
 	mux.Handle("GET /api/tenant/tickets/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantTicket)))
 	mux.Handle("PATCH /api/tenant/tickets/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.patchTenantTicket)))
 	mux.Handle("POST /api/tenant/tickets/{id}/events", guard.RequireTenantAdminActive(http.HandlerFunc(s.addTenantTicketEvent)))
+	// SPRINT-024 — tenant-scoped customer satisfaction statistics.
+	mux.Handle("GET /api/tenant/satisfaction/statistics", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantSatisfactionStatistics)))
 	mux.HandleFunc("POST /api/customer/auth/request-otp", s.requestCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/verify-otp", s.verifyCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/refresh", s.refreshCustomerAuth)

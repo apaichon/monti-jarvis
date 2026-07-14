@@ -3,7 +3,7 @@ id: DES-0004
 title: API Specification
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-023
+sprint: SPRINT-024
 ---
 
 # API Specification — Monti Jarvis
@@ -2190,3 +2190,83 @@ Adds a bounded internal note to the tenant ticket timeline.
 See [26-tickets-human-escalation-spec.md](26-tickets-human-escalation-spec.md), [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [05-ux-ui.md](05-ux-ui.md).
 
 See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md), [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+
+## Customer Satisfaction (Sprint 24)
+
+The customer rating endpoint extends the existing call contract. The tenant is resolved from the call session; clients must not choose the tenant in the request body.
+
+### `POST /api/calls/{id}/rating`
+
+**Auth:** public/optional customer bearer, matching the existing call routes. When customer authentication is required by tenant policy, the normal customer session must be present.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `score` | integer | yes | Whole number from 1 to 5; rendered as star icons |
+| `review` | string | no | Existing bounded compatibility field; Sprint 24 UI does not expose free-form comments |
+
+**Request**
+
+```json
+{ "score": 5 }
+```
+
+**Response `201`**
+
+```json
+{ "status": "saved" }
+```
+
+The operation is idempotent for `(tenant_id, call_id)` and updates the existing score on repeated submission.
+
+**Errors**
+
+| Code | When |
+| --- | --- |
+| `400 validation_error` | Invalid JSON, score outside 1-5, or compatibility review exceeds the bounded length |
+| `401 customer_auth_required` | Tenant policy requires a customer session |
+| `404 not_found` | Call id is missing or does not belong to the resolved tenant |
+| `502 storage_unavailable` | Postgres is unavailable while saving the rating |
+
+### `GET /api/tenant/satisfaction/statistics`
+
+**Auth:** `tenant_admin` with an active tenant. `AUTH_DISABLED` does not bypass tenant-admin protection.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `start_date` | date | no | Inclusive `YYYY-MM-DD`; defaults to today in deployment timezone |
+| `end_date` | date | no | Inclusive `YYYY-MM-DD`; defaults to today |
+| `avatar_id` | string | no | Filter to one AI employee |
+| `channel` | string | no | `chat` or `voice` |
+
+**Response `200`**
+
+```json
+{
+  "range": { "start_date": "2026-07-14", "end_date": "2026-07-14" },
+  "total_completed_conversations": 18,
+  "reviewed_conversations": 15,
+  "unrated_conversations": 3,
+  "review_completion_rate": 83.33,
+  "average_score": 4.47,
+  "distribution": { "1": 0, "2": 1, "3": 2, "4": 4, "5": 8 },
+  "by_avatar": [
+    { "avatar_id": "ava", "avatar_name": "Ava", "completed": 18, "reviewed": 15, "average_score": 4.47 }
+  ],
+  "by_channel": [
+    { "channel": "voice", "completed": 12, "reviewed": 10, "average_score": 4.4 },
+    { "channel": "chat", "completed": 6, "reviewed": 5, "average_score": 4.6 }
+  ]
+}
+```
+
+**Errors**
+
+| Code | When |
+| --- | --- |
+| `400 validation_error` | Invalid date range or unsupported avatar/channel filter |
+| `401 unauthorized` | Missing or invalid tenant-admin bearer |
+| `403 forbidden` | Caller is not an active tenant admin |
+| `404 not_found` | Requested avatar is outside the tenant assignment |
+| `500 statistics_unavailable` | Aggregate query failed |
+
+See [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [05-ux-ui.md](05-ux-ui.md).

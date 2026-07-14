@@ -102,3 +102,39 @@ export async function patchKnowledgeGap(id: string, body: { status: KnowledgeGap
   });
   return data.gap;
 }
+
+export type SatisfactionBucket = {
+  id?: string;
+  name?: string;
+  channel?: 'chat' | 'voice';
+  completed: number;
+  reviewed: number;
+  average_score: number;
+};
+
+export type SatisfactionStatistics = {
+  range: { start_date: string; end_date: string };
+  total_completed_conversations: number;
+  reviewed_conversations: number;
+  unrated_conversations: number;
+  review_completion_rate: number;
+  average_score: number;
+  distribution: Record<string, number>;
+  by_avatar: SatisfactionBucket[];
+  by_channel: SatisfactionBucket[];
+};
+
+export async function getSatisfactionStatistics(filters: {
+  startDate?: string;
+  endDate?: string;
+  avatarId?: string;
+  channel?: '' | 'chat' | 'voice';
+} = {}) {
+  const params = new URLSearchParams();
+  if (filters.startDate) params.set('start_date', filters.startDate);
+  if (filters.endDate) params.set('end_date', filters.endDate);
+  if (filters.avatarId) params.set('avatar_id', filters.avatarId);
+  if (filters.channel) params.set('channel', filters.channel);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch<SatisfactionStatistics>(`/api/tenant/satisfaction/statistics${qs}`);
+}

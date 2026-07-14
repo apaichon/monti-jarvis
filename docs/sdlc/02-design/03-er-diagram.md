@@ -3,7 +3,7 @@ id: DES-0003
 title: Entity Relationship Diagram
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-023
+sprint: SPRINT-024
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1351,3 +1351,45 @@ erDiagram
 Migration placeholder: `scripts/migrations/023_tickets_human_escalation.sql`.
 
 See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md) · [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md) · [02-workflow.md](02-workflow.md) · [04-api-spec.md](04-api-spec.md) · [05-ux-ui.md](05-ux-ui.md).
+
+## Sprint 24 - customer satisfaction review and tenant statistics
+
+```mermaid
+erDiagram
+  tenants ||--o{ conversation_ratings : receives
+  call_sessions ||--o| conversation_ratings : rated_by
+  conversation_records ||--o| conversation_ratings : archived_as
+  customers ||--o{ conversation_ratings : submits
+  ai_avatars ||--o{ conversation_ratings : handled_by
+
+  conversation_ratings {
+    text id PK
+    text tenant_id FK
+    text call_id FK
+    text conversation_record_id FK
+    text customer_id FK
+    text avatar_id FK
+    text channel "chat|voice"
+    int score "1..5"
+    text review "legacy bounded field; not aggregated"
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Sprint 24 storage contract
+
+| Store | Contract |
+| --- | --- |
+| Postgres | `conversation_ratings` is the source of truth; one row per `(tenant_id, call_id)` with tenant/date/avatar/channel indexes. |
+| Redis | No new key; active call state remains in existing session keys. |
+| ClickHouse | No new table; aggregate statistics use Postgres until Sprint 25 dashboard projection. |
+| MinIO | Reuse `calls/{tenant_id}/{call_id}/` archive objects; rating submission does not alter audio or transcript objects. |
+
+Migration placeholder: `scripts/migrations/024_customer_satisfaction_reviews.sql`.
+
+All new/extended audit fields are `created_at`, `updated_at`, `created_by`, and `updated_by`; the migration must preserve the existing `conversation_ratings` rows and unique tenant/call constraint.
+
+See [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md), [02-workflow.md](02-workflow.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).

@@ -3,7 +3,7 @@ id: DES-0002
 title: Workflows
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-023
+sprint: SPRINT-024
 ---
 
 # Workflows — Monti Jarvis
@@ -1810,3 +1810,76 @@ stateDiagram-v2
 ```
 
 See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md), [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+
+## 71. Customer submits satisfaction review (Sprint 24)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser / voice client
+  participant G as Go :8091
+  participant A as internal/auth
+  participant S as internal/store
+  participant P as Postgres callcenter
+
+  G->>B: call/session ended
+  B->>C: Show 1-5 star review prompt
+  alt customer selects a star
+    C->>B: Select score 1..5
+    B->>G: POST /api/calls/{id}/rating {score}
+    G->>A: Resolve call tenant and optional customer context
+    alt invalid score or unknown/cross-tenant call
+      G-->>B: 400 validation_error or 404 not_found
+    else valid score
+      G->>S: SaveConversationRating(tenant_id, call_id, score)
+      S->>P: INSERT ... ON CONFLICT (tenant_id, call_id) DO UPDATE
+      P-->>S: rating saved
+      S-->>G: saved
+      G-->>B: 201 {status: saved}
+    end
+  else customer skips or closes prompt
+    B->>B: Keep call/archive closed; mark review as unrated locally
+    B->>C: Follow-up prompt remains available without reopening call
+  end
+```
+
+### Satisfaction review state
+
+| State | Meaning |
+| --- | --- |
+| `unrated` | Conversation ended and no score has been saved |
+| `prompted` | Customer was shown or told about the review |
+| `submitted` | A valid 1-5 score is stored; repeated submission updates the same row |
+| `skipped` | Customer dismissed the prompt; no rating row is required |
+
+The prompt state is client/session UX state. Postgres stores only submitted ratings, so closing a call never waits for a review.
+
+## 72. Tenant views satisfaction statistics (Sprint 24)
+
+```mermaid
+sequenceDiagram
+  actor T as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant S as internal/store
+  participant P as Postgres callcenter
+
+  T->>B: Open Satisfaction
+  B->>G: GET /api/tenant/satisfaction/statistics?start_date&end_date&avatar_id&channel
+  G->>S: Resolve tenant from JWT and normalize date range
+  alt missing/invalid tenant role or date range
+    G-->>B: 403 forbidden or 400 validation_error
+  else valid request
+    S->>P: Aggregate completed conversations and ratings by tenant/date
+    P-->>S: KPI, distribution, avatar and channel buckets
+    alt no completed conversations in range
+      S-->>G: Empty aggregate with zero counts
+      G-->>B: 200 empty statistics
+    else data available
+      S-->>G: Tenant-scoped aggregate
+      G-->>B: 200 statistics
+    end
+  end
+```
+
+See [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md), [03-er-diagram.md](03-er-diagram.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).

@@ -409,10 +409,11 @@ button {
   cursor: pointer;
 }
 .rating-score.active { border-color: var(--cyan); background: rgb(0 140 255 / 22%); color: white; }
-.rating-dialog textarea { width: 100%; min-height: 84px; box-sizing: border-box; resize: vertical; }
 .rating-submit { width: 100%; margin-top: 12px; min-height: 44px; border: 1px solid var(--cyan); border-radius: 10px; background: rgb(0 140 255 / 18%); color: white; cursor: pointer; }
 .rating-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 .rating-error { color: #ff9b9b; font-size: 13px; margin-top: 8px; }
+.rating-skip { width: 100%; margin-top: 8px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.finish-chat { margin-top: 10px; }
 
 .customer-session {
   display: grid;
