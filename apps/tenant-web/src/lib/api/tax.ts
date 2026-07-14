@@ -1,4 +1,4 @@
-import { apiFetch } from '$lib/api/http';
+import { apiFetch, handleUnauthorized } from '$lib/api/http';
 import { getAccessToken } from '$lib/auth/session';
 import type { PaymentDocument } from '$lib/api/billing';
 
@@ -37,6 +37,7 @@ export async function openTenantDocumentHTML(docId: string): Promise<void> {
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`/api/tenant/billing/documents/${docId}?format=html`, { headers });
+  if (res.status === 401 && !!token) handleUnauthorized(true);
   if (!res.ok) {
     let message = 'Failed to open document';
     try {

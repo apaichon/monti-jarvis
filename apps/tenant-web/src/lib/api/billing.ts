@@ -1,4 +1,4 @@
-import { apiFetch } from '$lib/api/http';
+import { apiFetch, handleUnauthorized } from '$lib/api/http';
 import { getAccessToken } from '$lib/auth/session';
 
 export type PackageSummary = {
@@ -116,6 +116,7 @@ export async function openDocumentHTML(orderId: string, docType: string): Promis
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(documentURL(orderId, docType), { headers });
+  if (res.status === 401 && !!token) handleUnauthorized(true);
   if (!res.ok) {
     let message = `Failed to load ${docType}`;
     try {

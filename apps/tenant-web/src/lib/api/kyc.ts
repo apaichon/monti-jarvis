@@ -1,4 +1,4 @@
-import { apiFetch } from '$lib/api/http';
+import { apiFetch, handleUnauthorized } from '$lib/api/http';
 import { getAccessToken } from '$lib/auth/session';
 
 export type KYCDocument = {
@@ -43,6 +43,7 @@ export async function uploadKYCPhoto(file: File) {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body
   });
+  if (res.status === 401 && !!token) handleUnauthorized(true);
   if (!res.ok) {
     let message = res.statusText;
     try {
@@ -65,6 +66,7 @@ export async function uploadKYCDocument(file: File) {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body
   });
+  if (res.status === 401 && !!token) handleUnauthorized(true);
   if (!res.ok) {
     let message = res.statusText;
     try {

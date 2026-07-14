@@ -1,4 +1,4 @@
-import { apiFetch } from './http';
+import { apiFetch, handleUnauthorized } from './http';
 import { getAccessToken } from '$lib/auth/session';
 
 export type ConversationRecord = {
@@ -85,6 +85,7 @@ export async function getConversationArchiveObjectBlob(recordId: string, objectI
   const res = await fetch(`/api/tenant/conversation-records/${recordId}/archive-objects/${objectId}/content`, {
     headers
   });
+  if (res.status === 401 && !!getAccessToken()) handleUnauthorized(true);
   if (!res.ok) throw new Error('Failed to load archive audio');
   return res.blob();
 }

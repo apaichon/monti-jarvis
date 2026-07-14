@@ -64,6 +64,9 @@
 
   onMount(async () => {
     if (consumeOAuthCallback()) return;
+    if ($page.url.searchParams.get('reason') === 'session_expired') {
+      feedback.info('Your session expired. Please sign in again.', 'Session expired');
+    }
     // Already signed in + return from payment → continue to next.
     if (hasRegistrationSession()) {
       const next = $page.url.searchParams.get('next');

@@ -1,4 +1,4 @@
-import { apiFetch } from './http';
+import { apiFetch, handleUnauthorized } from './http';
 import { getAccessToken, getStoredUser } from '$lib/auth/session';
 
 export type PreviewScenario = {
@@ -52,6 +52,7 @@ export async function listPreviewAgents(): Promise<{ agents: PreviewAgent[] }> {
   // Full avatar portraits from workforce catalog.
   try {
     const res = await fetch('/api/workforce', { headers });
+    if (res.status === 401 && !!token) handleUnauthorized(true);
     if (res.ok) {
       const data = (await res.json()) as { agents?: PreviewAgent[] };
       if (data.agents?.length) return { agents: data.agents };

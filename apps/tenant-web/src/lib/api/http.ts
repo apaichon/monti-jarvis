@@ -1,4 +1,6 @@
-import { getAccessToken } from '$lib/auth/session';
+import { browser } from '$app/environment';
+import { base } from '$app/paths';
+import { clearSession, getAccessToken } from '$lib/auth/session';
 
 export class ApiError extends Error {
   status: number;
@@ -7,6 +9,25 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+let authRedirecting = false;
+
+/** Clear an expired tenant session and return the user to login once. */
+export function handleUnauthorized(hadSession = true) {
+  if (!browser || !hadSession || authRedirecting) return;
+  authRedirecting = true;
+  clearSession();
+
+  const loginPath = `${base}/login`;
+  if (window.location.pathname === loginPath || window.location.pathname.endsWith('/login')) {
+    authRedirecting = false;
+    return;
+  }
+
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+  const params = new URLSearchParams({ reason: 'session_expired', next: currentPath });
+  window.location.replace(`${loginPath}?${params.toString()}`);
 }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -32,6 +53,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const isJSON = ct.includes('application/json');
 
   if (!res.ok) {
+    if (res.status === 401 && !!token) {
+      handleUnauthorized(true);
+    }
     let message = res.statusText || `HTTP ${res.status}`;
     if (isJSON) {
       try {
