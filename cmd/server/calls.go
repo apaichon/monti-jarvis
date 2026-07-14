@@ -126,6 +126,7 @@ func (s *server) archiveCallAudio(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		objects = append(objects, obj)
+		s.projectCallCenterRecord(r.Context(), session.TenantID, obj.ConversationRecordID)
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"objects": objects})
 }
@@ -200,7 +201,8 @@ func (s *server) endCall(w http.ResponseWriter, r *http.Request) {
 	if s.store != nil {
 		turns, _ := s.calls.ListTurns(r.Context(), id)
 		payload := map[string]any{"call": session, "turns": turns}
-		_, _ = s.store.ArchiveConversationTranscript(r.Context(), session.TenantID, id, payload, "")
+		obj, _ := s.store.ArchiveConversationTranscriptForChannel(r.Context(), session.TenantID, id, "voice", payload, "")
+		s.projectCallCenterRecord(r.Context(), session.TenantID, obj.ConversationRecordID)
 	}
 	writeJSON(w, http.StatusOK, session)
 }

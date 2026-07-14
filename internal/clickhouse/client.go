@@ -107,7 +107,10 @@ ORDER BY (tenant_id, created_at)`, db),
 			return err
 		}
 	}
-	return c.ensureAuditSchema(ctx)
+	if err := c.ensureAuditSchema(ctx); err != nil {
+		return err
+	}
+	return c.EnsureCallCenterSchema(ctx)
 }
 
 func (c *Client) ensureAuditSchema(ctx context.Context) error {

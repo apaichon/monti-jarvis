@@ -369,6 +369,8 @@ func main() {
 	mux.Handle("POST /api/tenant/tickets/{id}/events", guard.RequireTenantAdminActive(http.HandlerFunc(s.addTenantTicketEvent)))
 	// SPRINT-024 — tenant-scoped customer satisfaction statistics.
 	mux.Handle("GET /api/tenant/satisfaction/statistics", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantSatisfactionStatistics)))
+	// SPRINT-025 — tenant-scoped call-center usage and quota statistics.
+	mux.Handle("GET /api/tenant/call-center/statistics", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCallCenterStatistics)))
 	mux.HandleFunc("POST /api/customer/auth/request-otp", s.requestCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/verify-otp", s.verifyCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/refresh", s.refreshCustomerAuth)
@@ -624,9 +626,10 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 			customerID = customer.ID
 			_ = s.store.RecordCustomerUsage(r.Context(), tenantID, customer.ID, sessionID, agent.ID, "chat", 1, "committed", "")
 		}
+		endedAt := time.Now().UTC()
 		rec, err := s.store.UpsertConversationRecord(r.Context(), store.ConversationRecordInput{
 			TenantID: tenantID, CallID: sessionID, CustomerID: customerID, AvatarID: agent.ID,
-			Channel: "chat", Status: "archived", Summary: map[string]any{"topic": topic, "message_count": len(history)},
+			Channel: "chat", Status: "archived", EndedAt: &endedAt, Summary: map[string]any{"topic": topic, "message_count": len(history)},
 		})
 		if err == nil {
 			conversationID = rec.ID
@@ -634,6 +637,7 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 				"session_id": sessionID, "tenant_id": tenantID, "agent_id": agent.ID, "topic": topic,
 				"question": req.Message, "reply": reply, "sources": ragResult.Sources,
 			}, "")
+			s.projectCallCenterRecord(r.Context(), tenantID, rec.ID)
 		}
 	}
 	if ragResult.MissingKM && s.store != nil {
