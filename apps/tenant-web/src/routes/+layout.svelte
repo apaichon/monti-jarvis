@@ -71,6 +71,16 @@
         >
         <a
           class="nav-link"
+          href="{base}/conversation-records"
+          class:active={$page.url.pathname.includes('/conversation-records')}><span>▥</span>Records</a
+        >
+        <a
+          class="nav-link"
+          href="{base}/knowledge-gaps"
+          class:active={$page.url.pathname.includes('/knowledge-gaps')}><span>△</span>Gaps</a
+        >
+        <a
+          class="nav-link"
           href="{base}/preview"
           class:active={$page.url.pathname.includes('/preview')}><span>◉</span>Preview <em>LIVE</em></a
         >

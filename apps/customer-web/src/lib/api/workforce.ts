@@ -1,3 +1,5 @@
+import { customerAuthHeaders } from './customerAuth';
+
 export type Agent = {
   id: string;
   name: string;
@@ -17,8 +19,11 @@ export type Agent = {
 export async function loadWorkforce(opts?: { tenantId?: string }): Promise<Agent[]> {
   const headers: Record<string, string> = {};
   if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
-  const res = await fetch('/api/workforce', { headers });
+  const qs = opts?.tenantId ? `?tenant_id=${encodeURIComponent(opts.tenantId)}` : '';
+  const res = await fetch(`/api/customer/workforce${qs}`, {
+    headers: customerAuthHeaders(headers)
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to load workforce');
-  return data.agents ?? [];
+  return data.agents ?? data.avatars ?? [];
 }

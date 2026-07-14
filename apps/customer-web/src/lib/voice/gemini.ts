@@ -26,6 +26,22 @@ export type VoiceCallbacks = {
   onError?: (message: string) => void;
 };
 
+export type VoiceRecording = {
+  name: string;
+  content_type: 'audio/wav';
+  data_base64: string;
+};
+
+const MAX_RECORDING_BYTES = 32 * 1024 * 1024;
+const MIX_SAMPLE_RATE = 24000;
+
+type TimedPCMChunk = {
+  pcm: Uint8Array;
+  sampleRate: number;
+  offsetSamples: number;
+  source: 'caller' | 'agent';
+};
+
 /** Why getUserMedia is missing (common for embed iframes on http://custom-host). */
 export function micAvailabilityError(): string | null {
   if (typeof window === 'undefined') return 'Microphone unavailable';
@@ -55,6 +71,7 @@ export class GeminiVoice {
   private source: MediaStreamAudioSourceNode | null = null;
   private recorder: AudioWorkletNode | null = null;
   private player: AudioWorkletNode | null = null;
+  private playbackRecorder: AudioWorkletNode | null = null;
 
   /** Accumulators for streamed partial transcripts (one active turn each). */
   private callerBuf = '';
@@ -62,6 +79,11 @@ export class GeminiVoice {
   /** Prefer output transcription over modelTurn.text to avoid short dual captions. */
   private agentFromTranscript = false;
   private preferredLang: PreferredLang = '';
+  private recordingStartedAt = 0;
+  private recordingChunks: TimedPCMChunk[] = [];
+  private recordingBytes = 0;
+  private recordingTrackStarts: Record<'caller' | 'agent', number | null> = { caller: null, agent: null };
+  private recordingTrackCursors: Record<'caller' | 'agent', number> = { caller: 0, agent: 0 };
 
   async start(
     agentId: string,
@@ -76,6 +98,11 @@ export class GeminiVoice {
     this.callerBuf = '';
     this.agentBuf = '';
     this.agentFromTranscript = false;
+    this.recordingStartedAt = performance.now();
+    this.recordingChunks = [];
+    this.recordingBytes = 0;
+    this.recordingTrackStarts = { caller: null, agent: null };
+    this.recordingTrackCursors = { caller: 0, agent: 0 };
 
     callbacks.onStatus?.('Requesting microphone…');
     // Create and resume audio while the Start call click still carries user activation.
@@ -112,13 +139,16 @@ export class GeminiVoice {
     callbacks.onStatus?.('Loading audio…');
     await Promise.all([
       this.captureCtx.audioWorklet.addModule('/recorder.js'),
-      this.playbackCtx.audioWorklet.addModule('/player.js')
+      this.playbackCtx.audioWorklet.addModule('/player.js'),
+      this.playbackCtx.audioWorklet.addModule('/recorder.js')
     ]);
     this.source = this.captureCtx.createMediaStreamSource(this.micStream);
     this.recorder = new AudioWorkletNode(this.captureCtx, 'recorder-processor');
     this.player = new AudioWorkletNode(this.playbackCtx, 'player-processor');
+    this.playbackRecorder = new AudioWorkletNode(this.playbackCtx, 'recorder-processor');
     this.source.connect(this.recorder);
-    this.player.connect(this.playbackCtx.destination);
+    this.player.connect(this.playbackRecorder);
+    this.playbackRecorder.connect(this.playbackCtx.destination);
 
     callbacks.onStatus?.('Connecting to agent (may take a few seconds)…');
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -169,16 +199,42 @@ export class GeminiVoice {
     this.recorder.port.onmessage = (event) => {
       if (!(event.data instanceof Float32Array)) return;
       if (!ready || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-      this.ws.send(JSON.stringify({ type: 'audio', data: floatToBase64PCM16(event.data) }));
+      const pcm = floatToPCM16Bytes(event.data);
+      this.appendRecordingChunk(pcm, 16000, 'caller');
+      this.ws.send(JSON.stringify({ type: 'audio', data: bytesToBase64(pcm) }));
+    };
+    this.playbackRecorder.port.onmessage = (event) => {
+      if (!(event.data instanceof Float32Array)) return;
+      this.appendRecordingChunk(floatToPCM16Bytes(event.data), 24000, 'agent', 0);
     };
   }
 
-  async stop() {
+  async stop(): Promise<VoiceRecording[]> {
+    const recordings = this.recordings();
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'end' }));
       this.ws.close();
     }
     await this.cleanup();
+    return recordings;
+  }
+
+  sendText(text: string) {
+    const content = text.trim();
+    if (!content || this.ws?.readyState !== WebSocket.OPEN) return false;
+    this.ws.send(JSON.stringify({ type: 'text', text: content }));
+    return true;
+  }
+
+  recordings(): VoiceRecording[] {
+    if (this.recordingBytes === 0 || this.recordingChunks.length === 0) return [];
+    return [
+      {
+        name: 'call-recording',
+        content_type: 'audio/wav',
+        data_base64: bytesToBase64(stereoPCM16ToWav(renderStereoRecording(this.recordingChunks), MIX_SAMPLE_RATE))
+      }
+    ];
   }
 
   private async cleanup() {
@@ -192,9 +248,39 @@ export class GeminiVoice {
     this.source = null;
     this.recorder = null;
     this.player = null;
+    this.playbackRecorder = null;
     this.callerBuf = '';
     this.agentBuf = '';
     this.agentFromTranscript = false;
+    this.recordingStartedAt = 0;
+    this.recordingChunks = [];
+    this.recordingBytes = 0;
+    this.recordingTrackStarts = { caller: null, agent: null };
+    this.recordingTrackCursors = { caller: 0, agent: 0 };
+  }
+
+  private appendRecordingChunk(
+    pcm: Uint8Array,
+    sampleRate: number,
+    source: 'caller' | 'agent',
+    firstChunkOffsetMs?: number
+  ) {
+    if (pcm.byteLength === 0 || this.recordingBytes >= MAX_RECORDING_BYTES) return;
+    const available = MAX_RECORDING_BYTES - this.recordingBytes;
+    const next = pcm.byteLength > available ? pcm.slice(0, available) : pcm;
+    if (this.recordingTrackStarts[source] === null) {
+      const offsetMs = firstChunkOffsetMs ?? Math.max(0, performance.now() - this.recordingStartedAt);
+      this.recordingTrackStarts[source] = Math.round((offsetMs / 1000) * MIX_SAMPLE_RATE);
+    }
+    const offsetSamples = this.recordingTrackStarts[source]! + this.recordingTrackCursors[source];
+    this.recordingChunks.push({
+      pcm: next,
+      sampleRate,
+      offsetSamples,
+      source
+    });
+    this.recordingTrackCursors[source] += Math.ceil((next.byteLength / 2) * (MIX_SAMPLE_RATE / sampleRate));
+    this.recordingBytes += next.byteLength;
   }
 
   private emitTranscript(
@@ -215,7 +301,8 @@ export class GeminiVoice {
       return;
     }
     if (msg.type === 'audio' && msg.data && this.player && this.playbackCtx) {
-      const samples = base64PCM16ToFloat(msg.data);
+      const pcm = base64ToBytes(msg.data);
+      const samples = pcm16BytesToFloat(pcm);
       if (this.playbackCtx.state === 'suspended') {
         void this.playbackCtx
           .resume()
@@ -292,18 +379,17 @@ export class GeminiVoice {
   }
 }
 
-function floatToBase64PCM16(float32: Float32Array) {
+function floatToPCM16Bytes(float32: Float32Array) {
   const bytes = new Uint8Array(float32.length * 2);
   const view = new DataView(bytes.buffer);
   for (let i = 0; i < float32.length; i++) {
     const sample = Math.max(-1, Math.min(1, float32[i]));
     view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
   }
-  return bytesToBase64(bytes);
+  return bytes;
 }
 
-function base64PCM16ToFloat(base64: string) {
-  const bytes = base64ToBytes(base64);
+function pcm16BytesToFloat(bytes: Uint8Array) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const out = new Float32Array(bytes.byteLength / 2);
   for (let i = 0; i < out.length; i++) out[i] = view.getInt16(i * 2, true) / 0x8000;
@@ -324,4 +410,84 @@ function base64ToBytes(base64: string) {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
+}
+
+function renderStereoRecording(chunks: TimedPCMChunk[]) {
+  let totalSamples = 0;
+  const prepared = chunks.map((chunk) => {
+    const samples = pcm16BytesToFloat(chunk.pcm);
+    const mixed = chunk.sampleRate === MIX_SAMPLE_RATE ? samples : resampleLinear(samples, chunk.sampleRate, MIX_SAMPLE_RATE);
+    const offset = chunk.offsetSamples;
+    totalSamples = Math.max(totalSamples, offset + mixed.length);
+    return { samples: mixed, offset, source: chunk.source };
+  });
+  const left = new Float32Array(totalSamples);
+  const right = new Float32Array(totalSamples);
+  for (const item of prepared) {
+    const target = item.source === 'caller' ? left : right;
+    for (let i = 0; i < item.samples.length; i++) {
+      const idx = item.offset + i;
+      target[idx] = item.samples[i];
+    }
+  }
+  return interleaveStereoPCM16(left, right);
+}
+
+function interleaveStereoPCM16(left: Float32Array, right: Float32Array) {
+  const length = Math.max(left.length, right.length);
+  const bytes = new Uint8Array(length * 4);
+  const view = new DataView(bytes.buffer);
+  for (let i = 0; i < length; i++) {
+    view.setInt16(i * 4, floatToInt16(left[i] || 0), true);
+    view.setInt16(i * 4 + 2, floatToInt16(right[i] || 0), true);
+  }
+  return bytes;
+}
+
+function floatToInt16(value: number) {
+  const sample = Math.max(-1, Math.min(1, value));
+  return sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+}
+
+function resampleLinear(input: Float32Array, fromRate: number, toRate: number) {
+  if (fromRate === toRate || input.length === 0) return input;
+  const ratio = fromRate / toRate;
+  const out = new Float32Array(Math.ceil(input.length / ratio));
+  for (let i = 0; i < out.length; i++) {
+    const pos = i * ratio;
+    const left = Math.floor(pos);
+    const right = Math.min(left + 1, input.length - 1);
+    const frac = pos - left;
+    out[i] = input[left] + (input[right] - input[left]) * frac;
+  }
+  return out;
+}
+
+function stereoPCM16ToWav(pcm: Uint8Array, sampleRate: number) {
+  const header = new ArrayBuffer(44);
+  const view = new DataView(header);
+  const channels = 2;
+  const bytesPerSample = 2;
+  const blockAlign = channels * bytesPerSample;
+  writeAscii(view, 0, 'RIFF');
+  view.setUint32(4, 36 + pcm.byteLength, true);
+  writeAscii(view, 8, 'WAVE');
+  writeAscii(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, 'data');
+  view.setUint32(40, pcm.byteLength, true);
+  const wav = new Uint8Array(44 + pcm.byteLength);
+  wav.set(new Uint8Array(header), 0);
+  wav.set(pcm, 44);
+  return wav;
+}
+
+function writeAscii(view: DataView, offset: number, value: string) {
+  for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
 }

@@ -29,8 +29,14 @@ System design artifacts for Monti Jarvis.
 | 21 | [21-customer-tier-spec.md](21-customer-tier-spec.md) | 18 | Customer tier catalog + groups | **`shipped`** v1.9.0 |
 | 22 | [22-customer-account-import-spec.md](22-customer-account-import-spec.md) | 19 | Customer directory, CSV imports, domain defaults, integration identity | **`shipped`** v2.0.0 |
 | 23 | [23-customer-auth-spec.md](23-customer-auth-spec.md) | 20 | Customer credentials, sessions, domain enforcement, quota isolation | `shipped` |
+| 24 | [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md) | 21 | Authenticated workforce selection and customer quota limits | `approved` |
+| 25 | [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md) | 22 | Conversation records, MinIO archive, and knowledge gaps | `approved` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
+
+**Sprint 22:** Design pack approved; implementation in progress — [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md); workflow §66–67; API § Conversation Records & Knowledge Gaps; UX T15. [SPRINT-022](../03-sprints/SPRINT-022.md).
+
+**Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 
 **Sprint 20:** ✅ Shipped v2.1.0 — [23-customer-auth-spec.md](23-customer-auth-spec.md); workflow §59–63; API § Customer Authentication & Domain Enforcement; UX T13. [SPRINT-020](../03-sprints/SPRINT-020.md).
 

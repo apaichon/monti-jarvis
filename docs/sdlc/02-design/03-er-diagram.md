@@ -1,9 +1,9 @@
 ---
 id: DES-0003
 title: Entity Relationship Diagram
-status: shipped
+status: approved
 updated: 2026-07-13
-sprint: SPRINT-020
+sprint: SPRINT-022
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1147,4 +1147,141 @@ erDiagram
 
 No ClickHouse or MinIO entity is added in SPRINT-020. Conversation analytics can later record `customer_id` once conversation records ship.
 
-See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [02-workflow.md](02-workflow.md) · [04-api-spec.md](04-api-spec.md) · [05-ux-ui.md](05-ux-ui.md).
+## Sprint 21 — workforce auth policy and customer usage ledger
+
+SPRINT-021 extends existing S20 customer auth settings and S13 quota primitives. It may add a compact usage ledger if existing call rows are not sufficient for daily customer limit accounting.
+
+```mermaid
+erDiagram
+  tenants ||--o| tenant_customer_auth_settings : configures
+  tenants ||--o{ tenant_avatar_assignments : assigns
+  customers ||--o{ customer_usage_events : consumes
+  workforce_avatars ||--o{ customer_usage_events : selected
+  customer_sessions ||--o{ customer_usage_events : authorizes
+
+  tenant_customer_auth_settings {
+    text tenant_id PK
+    boolean enabled
+    text mode "disabled|optional|required"
+    boolean require_auth_for_workforce
+    boolean allow_public_no_auth
+    int customer_daily_call_seconds
+    int customer_max_call_seconds
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_usage_events {
+    text id PK
+    text tenant_id FK
+    text customer_id FK
+    text session_id FK
+    text avatar_id FK
+    text usage_type "chat|voice"
+    int reserved_seconds
+    int consumed_seconds
+    text status "reserved|committed|released|denied"
+    text deny_reason
+    date usage_date
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Sprint 21 Redis quota keys
+
+| Key | Purpose |
+| --- | --- |
+| `monti_jarvis:quota:{tenant}:customer:{customer}:day:{yyyymmdd}` | Daily customer call/chat time counter |
+| `monti_jarvis:quota:{tenant}:customer:{customer}:avatar:{avatar}:day:{yyyymmdd}` | Optional per-avatar attribution |
+| `monti_jarvis:rate:{tenant}:customer:{customer}:chat` | Customer chat rate limiter |
+| `monti_jarvis:rate:{tenant}:customer:{customer}:call` | Customer call start limiter |
+
+Migration placeholder: `scripts/migrations/021_customer_workforce_quota.sql`.
+
+## Sprint 22 — conversation records, archive objects, and knowledge gaps
+
+```mermaid
+erDiagram
+  tenants ||--o{ conversation_records : owns
+  customers ||--o{ conversation_records : starts
+  workforce_avatars ||--o{ conversation_records : handles
+  calls ||--o| conversation_records : records
+  conversation_records ||--o{ conversation_archive_objects : stores
+  conversation_records ||--o{ knowledge_gap_candidates : reveals
+  tenants ||--o{ knowledge_gap_candidates : reviews
+
+  conversation_records {
+    text id PK
+    text tenant_id FK
+    text call_id FK
+    text customer_id FK
+    text avatar_id FK
+    text channel "chat|voice"
+    text status "recording|archived|archive_failed"
+    timestamptz started_at
+    timestamptz ended_at
+    int duration_seconds
+    jsonb summary
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  conversation_archive_objects {
+    text id PK
+    text tenant_id FK
+    text conversation_record_id FK
+    text object_key
+    text object_type "transcript|audio|metadata"
+    text content_type
+    bigint size_bytes
+    text checksum_sha256
+    text protection_mode "none|sse-s3|sse-kms|client"
+    text status "stored|failed|deleted"
+    text error_code
+    timestamptz stored_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  knowledge_gap_candidates {
+    text id PK
+    text tenant_id FK
+    text conversation_record_id FK
+    text avatar_id FK
+    text customer_id FK
+    text source_turn_id
+    text question
+    text answer_excerpt
+    text gap_reason "no_source|low_confidence|fallback|tenant_flag"
+    numeric confidence
+    text status "open|snoozed|resolved|ignored"
+    text reviewer_note
+    timestamptz snoozed_until
+    timestamptz resolved_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Sprint 22 MinIO and ClickHouse
+
+| Store | Contract |
+| --- | --- |
+| MinIO | `monti-jarvis/calls/{tenant_id}/{call_id}/transcript.json`, `metadata.json`, optional `audio.*` |
+| Postgres | Source of truth for record/gap lifecycle and object metadata |
+| ClickHouse | No new required table in S22; later dashboards may project record/gap aggregates |
+
+Migration placeholder: `scripts/migrations/022_conversation_records_knowledge_gaps.sql`.
+
+See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md) · [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md) · [02-workflow.md](02-workflow.md) · [04-api-spec.md](04-api-spec.md) · [05-ux-ui.md](05-ux-ui.md).

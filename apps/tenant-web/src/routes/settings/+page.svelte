@@ -37,6 +37,9 @@
   let customerAuthDomains = $state('');
   let otpTTL = $state(600);
   let customerSessionTTL = $state(604800);
+  let requireAuthForWorkforce = $state(false);
+  let customerDailyCallMinutes = $state(0);
+  let customerMaxCallMinutes = $state(0);
 
   let loading = $state(true);
   let savingSettings = $state(false);
@@ -134,6 +137,9 @@
       customerAuthDomains = (ca.allowed_domains || []).join('\n');
       otpTTL = ca.otp_ttl_seconds || 600;
       customerSessionTTL = ca.session_ttl_seconds || 604800;
+      requireAuthForWorkforce = !!ca.require_auth_for_workforce;
+      customerDailyCallMinutes = Math.floor((ca.customer_daily_call_seconds || 0) / 60);
+      customerMaxCallMinutes = Math.floor((ca.customer_max_call_seconds || 0) / 60);
     } catch (err) {
       feedback.error(err instanceof ApiError ? err.message : 'Failed to load settings');
     } finally {
@@ -190,7 +196,10 @@
         auth_mode: customerAuthMode,
         allowed_domains: domains,
         otp_ttl_seconds: Number(otpTTL) || 600,
-        session_ttl_seconds: Number(customerSessionTTL) || 604800
+        session_ttl_seconds: Number(customerSessionTTL) || 604800,
+        require_auth_for_workforce: requireAuthForWorkforce,
+        customer_daily_call_seconds: Math.max(0, Number(customerDailyCallMinutes) || 0) * 60,
+        customer_max_call_seconds: Math.max(0, Number(customerMaxCallMinutes) || 0) * 60
       });
       customerAuthDomains = (customerAuth.allowed_domains || []).join('\n');
       feedback.success('Customer auth settings saved');
@@ -341,6 +350,18 @@
           <option value="optional">Optional — no-auth still allowed</option>
           <option value="required">Required — customer must sign in</option>
         </select>
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:10px">
+        <input type="checkbox" bind:checked={requireAuthForWorkforce} style="width:auto" />
+        <span>Require OTP before AI workforce selection</span>
+      </label>
+      <label>
+        <span>Customer daily call minutes (0 = unset)</span>
+        <input type="number" min="0" bind:value={customerDailyCallMinutes} />
+      </label>
+      <label>
+        <span>Max minutes per customer call (0 = unset)</span>
+        <input type="number" min="0" bind:value={customerMaxCallMinutes} />
       </label>
       <label>
         <span>Allowed email domains (comma or newline separated; blank = any except deny rules)</span>

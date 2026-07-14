@@ -4,8 +4,10 @@ class RecorderProcessor extends AudioWorkletProcessor {
     this.batch = new Float32Array(800);
     this.off = 0;
   }
-  process(inputs) {
+  process(inputs, outputs) {
     const channel = inputs[0]?.[0];
+    const output = outputs[0]?.[0];
+    if (output) output.set(channel || new Float32Array(output.length));
     if (!channel) return true;
     for (let i = 0; i < channel.length; i++) {
       this.batch[this.off++] = channel[i];

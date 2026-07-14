@@ -17,6 +17,8 @@ Step-by-step UAT checklists for sprint sign-off. Run **after** `go test ./...` p
 | SPRINT-018 | [SPRINT-018-manual.md](SPRINT-018-manual.md) | v1.9.0 tiers/groups |
 | SPRINT-019 | [SPRINT-019-manual.md](SPRINT-019-manual.md) | v2.0.0 customer import |
 | SPRINT-020 | [SPRINT-020-manual.md](SPRINT-020-manual.md) | v2.1.0 customer auth |
+| SPRINT-021 | [SPRINT-021-manual.md](SPRINT-021-manual.md) | v2.2.0 authenticated workforce |
+| SPRINT-022 | [SPRINT-022-manual.md](SPRINT-022-manual.md) | v2.3.0 records/gaps |
 
 **Generate new checklists:** `.claude/skills/manual-test-doc/SKILL.md`
 

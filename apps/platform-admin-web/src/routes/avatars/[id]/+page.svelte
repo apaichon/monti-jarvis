@@ -8,12 +8,16 @@
   import { feedback } from '$lib/feedback.svelte';
   import {
     archiveAvatar,
+    assignTenantAvatar,
     getAvatar,
+    listTenantAvatars,
+    revokeTenantAvatar,
     updateAvatar,
     type Avatar,
     type AvatarFlags,
     type AvatarVoice
   } from '$lib/api/avatars';
+  import { listTenants, type TenantListItem } from '$lib/api/tenants';
   import { ApiError } from '$lib/api/http';
   import { clearSession, loginPath } from '$lib/auth/session';
 
@@ -28,6 +32,10 @@
   let saving = $state(false);
   let showArchive = $state(false);
   let archiving = $state(false);
+  let tenants = $state<TenantListItem[]>([]);
+  let assignedTenantIds = $state<string[]>([]);
+  let tenantAssignmentsLoading = $state(true);
+  let assignmentBusy = $state<string | null>(null);
 
   function handleError(err: unknown, fallback: string) {
     if (err instanceof ApiError) {
@@ -59,15 +67,53 @@
 
   onMount(async () => {
     try {
-      const av = await getAvatar(id);
+      const [av, tenantResult] = await Promise.all([
+        getAvatar(id),
+        listTenants('', '', 100, 0)
+      ]);
       avatar = av;
       voices = av.voices.map((v) => ({ ...v }));
       applyFlags(av.flags);
+      tenants = tenantResult.tenants;
+
+      const assignmentResults = await Promise.allSettled(
+        tenants.map((tenant) => listTenantAvatars(tenant.id))
+      );
+      assignedTenantIds = assignmentResults.flatMap((result, index) => {
+        if (result.status !== 'fulfilled') return [];
+        const assigned = result.value.assignments.some(
+          (assignment) => assignment.avatar_id === id && assignment.status === 'active'
+        );
+        return assigned ? [tenants[index].id] : [];
+      });
     } catch (err) {
       const msg = handleError(err, 'Failed to load avatar');
       if (msg) feedback.error(msg);
+    } finally {
+      tenantAssignmentsLoading = false;
     }
   });
+
+  async function toggleTenantAssignment(tenantId: string, checked: boolean) {
+    if (!avatar || assignmentBusy) return;
+    assignmentBusy = tenantId;
+    try {
+      if (checked) {
+        await assignTenantAvatar(tenantId, avatar.id);
+        assignedTenantIds = [...assignedTenantIds, tenantId];
+        feedback.success('Avatar assigned to tenant');
+      } else {
+        await revokeTenantAvatar(tenantId, avatar.id);
+        assignedTenantIds = assignedTenantIds.filter((id) => id !== tenantId);
+        feedback.success('Avatar removed from tenant');
+      }
+    } catch (err) {
+      const msg = handleError(err, checked ? 'Assignment failed' : 'Removal failed');
+      if (msg) feedback.error(msg);
+    } finally {
+      assignmentBusy = null;
+    }
+  }
 
   async function save(e: Event) {
     e.preventDefault();
@@ -194,6 +240,46 @@
 
     <div class="card" style="margin-bottom:16px">
       <VoiceProfilesForm bind:voices />
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0;font-size:16px">Tenant assignments</h2>
+        {#if !tenantAssignmentsLoading}
+          <span style="color:var(--muted);font-size:13px">{assignedTenantIds.length} assigned</span>
+        {/if}
+      </div>
+      <p style="margin:8px 0 14px;color:var(--muted);font-size:14px">
+        Assign or remove this AI employee for tenants at any time.
+      </p>
+      {#if tenantAssignmentsLoading}
+        <p style="margin:0;color:var(--muted);font-size:14px">Loading tenant assignments…</p>
+      {:else if tenants.length === 0}
+        <p style="margin:0;color:var(--muted);font-size:14px">No tenants available.</p>
+      {:else}
+        <div style="display:grid;gap:8px;max-height:360px;overflow:auto">
+          {#each tenants as tenant}
+            <label
+              style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px;cursor:pointer"
+            >
+              <input
+                type="checkbox"
+                checked={assignedTenantIds.includes(tenant.id)}
+                disabled={assignmentBusy === tenant.id}
+                onchange={(event) =>
+                  void toggleTenantAssignment(
+                    tenant.id,
+                    (event.currentTarget as HTMLInputElement).checked
+                  )}
+              />
+              <span style="min-width:0">
+                <strong style="display:block">{tenant.name}</strong>
+                <span style="color:var(--muted);font-size:13px">{tenant.slug} · {tenant.status}</span>
+              </span>
+            </label>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap">

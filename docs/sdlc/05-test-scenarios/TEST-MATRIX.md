@@ -130,6 +130,29 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 
 ---
 
+## FEAT-0023 — Authenticated Workforce Selection and Customer Quota Enforcement (SPRINT-021)
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T21-01 | 1–2 | Required-auth tenant blocks workforce selection until OTP | Manual | [S2](../06-manual-tests/SPRINT-021-manual.md#s2--required-tenant-blocks-workforce-until-otp-task-0097-task-0098) | Pending |
+| T21-02 | 2 | Optional-auth tenant preserves no-auth chat/call | Manual | [S1](../06-manual-tests/SPRINT-021-manual.md#s1--optional-tenant-preserves-no-auth-flow-task-0097-task-0098) | Pending |
+| T21-03 | 3–4 | Signed-in customer can select active assigned avatars only | Manual + Auto | [S2](../06-manual-tests/SPRINT-021-manual.md#s2--required-tenant-blocks-workforce-until-otp-task-0097-task-0098) · `go test ./cmd/server` | Pending |
+| T21-04 | 5–7 | Customer quota status and exhausted limit behavior | Manual + Auto | [S3](../06-manual-tests/SPRINT-021-manual.md#s3--customer-quota-state-is-visible-and-enforced-task-0099-task-0100) · `go test ./internal/store` | Pending |
+| T21-05 | 8 | Tenant settings persist workforce-auth/quota fields | Manual | [S4](../06-manual-tests/SPRINT-021-manual.md#s4--tenant-settings-persist-s21-fields-task-0100) | Pending |
+
+---
+
+## FEAT-0024 — Conversation Records and Knowledge Gap Review (SPRINT-022)
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T22-01 | 1–3 | Chat/call creates conversation record and archive object metadata | Manual + Auto | [S1](../06-manual-tests/SPRINT-022-manual.md#s1--chat-creates-conversation-record-and-archive-metadata-task-0102-task-0103) · `go test ./internal/store` | Pending |
+| T22-02 | 4–5 | Missing-KM turn creates knowledge gap and tenant can update lifecycle | Manual | [S3](../06-manual-tests/SPRINT-022-manual.md#s3--knowledge-gap-candidate-lifecycle-task-0104-task-0105) | Pending |
+| T22-03 | 6 | Cross-tenant record/gap access is denied | Manual | [S4](../06-manual-tests/SPRINT-022-manual.md#s4--cross-tenant-isolation-task-0106) | Pending |
+| T22-04 | 7 | Tenant records/gaps UI loads and archive retry works | Manual | [S2](../06-manual-tests/SPRINT-022-manual.md#s2--tenant-records-ui-works-task-0105) | Pending |
+
+---
+
 ## Build & regression gates (all sprints)
 
 | ID | Scenario | Type | Command |

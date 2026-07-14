@@ -1,9 +1,9 @@
 ---
 id: DES-0005
 title: UX/UI — ASCII Wireframes
-status: shipped
+status: approved
 updated: 2026-07-13
-sprint: SPRINT-020
+sprint: SPRINT-022
 ---
 
 # UX/UI — ASCII Wireframes
@@ -1908,4 +1908,144 @@ Cross-tenant customer/session ids
 | Server customer auth handlers | `cmd/server/customer_auth.go` |
 | Store/domain logic | `internal/store/customer_auth.go`, `internal/customerauth/` |
 
-See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [02-workflow.md](02-workflow.md) · [03-er-diagram.md](03-er-diagram.md) · [04-api-spec.md](04-api-spec.md).
+## Sprint 21 — Authenticated Workforce Selection (C14/T14)
+
+S21 changes the customer entry flow: tenant policy can require OTP before the avatar/workforce picker is usable, and quota state is visible before chat/voice start.
+
+### Screen map → API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| C14-1 | Load tenant portal policy | `GET /api/customer/portal-policy` |
+| C14-2 | Sign in when workforce auth is required | `POST /api/customer/auth/request-otp`, `POST /api/customer/auth/verify-otp` |
+| C14-3 | Open workforce picker popup | `GET /api/customer/workforce` |
+| C14-4 | View remaining call/chat quota | `GET /api/customer/quota` |
+| C14-5 | Start voice call with selected avatar | `POST /api/calls` |
+| C14-6 | Send chat with selected avatar | `POST /api/chat` |
+| T14-1 | Tenant admin edits auth-required workforce policy | `PUT /api/tenant/customer-auth/settings` |
+
+### Customer portal layout
+
+```text
+┌─ MONTI Customer Portal ───────────────────────────────────────────────┐
+│ Tenant · libra-tech-co-ltd                  [PUP signed in] [Sign out]│
+├───────────────────────────────┬───────────────────────────────────────┤
+│ A. Active AI workforce        │ B. Caller Desk                         │
+│ ┌───────────────────────────┐ │ Policy: OTP required ✓  Quota: 20m left│
+│ │ Ava portrait              │ │ [General] [Billing] [Technical]       │
+│ │ General Support           │ │ transcript ...                         │
+│ │ [◇ Change avatar] C14-3   │ │ [Ask question...] [Send] C14-6         │
+│ │ [00:00:00] [Start] C14-5  │ │                                       │
+│ └───────────────────────────┘ │                                       │
+└───────────────────────────────┴───────────────────────────────────────┘
+```
+
+### Required-auth gate
+
+```text
+Tenant policy requires customer auth
+  → portal loads C14-1
+  → workforce picker and Start call are disabled
+  → customer verifies OTP C14-2
+  → portal loads workforce C14-3 and quota C14-4
+  → customer can select avatar and start chat/voice
+```
+
+### Workforce picker popup
+
+```text
+┌─ Select AI workforce ────────────────────────────────┐
+│ Search [____________________]                        │
+│ Quota: 20m remaining today · Max call 5m             │
+├──────────────────────────────────────────────────────┤
+│ ● Ava    General Support      available   [Select]   │
+│ ○ Luna   Technical Support    available   [Select]   │
+│ ○ Max    Billing Specialist   unavailable quota      │
+└──────────────────────────────────────────────────────┘
+```
+
+### Component → file
+
+| Component | Path |
+| --- | --- |
+| Portal policy/quota/workforce client | `apps/customer-web/src/lib/api/*.ts` |
+| Customer auth gate and picker popup | `apps/customer-web/src/routes/+page.svelte` |
+| Tenant settings auth/quota controls | `apps/tenant-web/src/routes/settings/+page.svelte` |
+| Server policy/workforce/quota handlers | `cmd/server/customer_*.go`, `cmd/server/calls.go` |
+
+## Sprint 22 — Conversation Records and Knowledge Gaps (T15)
+
+S22 adds tenant operator surfaces for archived conversations and knowledge-gap review. Customer UI has no new mandatory screen beyond conversations producing archived records.
+
+### Screen map → API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| T15-1 | Open conversation records | `GET /api/tenant/conversation-records` |
+| T15-2 | Inspect record detail | `GET /api/tenant/conversation-records/{id}` |
+| T15-3 | Retry failed archive | `POST /api/tenant/conversation-records/{id}/archive/retry` |
+| T15-4 | Open knowledge gaps | `GET /api/tenant/knowledge-gaps` |
+| T15-5 | Resolve/snooze/ignore gap | `PATCH /api/tenant/knowledge-gaps/{id}` |
+
+### Tenant records layout
+
+```text
+┌─ Tenant shell / Operations / Conversation Records ───────────────────┐
+│ Filters: Date [Today ▾] Avatar [All ▾] Status [Archived ▾] [Search] │
+├──────────────────────────────────────────────────────────────────────┤
+│ Time        Customer       Avatar   Channel  Duration  Archive  Gaps │
+│ 10:00       PUP            Ava      voice    03:00     stored   1    │
+│ 09:42       Anonymous      Luna     chat     —         failed   0    │
+├──────────────────────────────────────────────────────────────────────┤
+│ Detail: crec_01                                                       │
+│ Summary, safe transcript preview, object metadata, linked gap ids     │
+│ [Retry archive] T15-3                                                 │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Knowledge gap review layout
+
+```text
+┌─ Tenant shell / KM / Knowledge Gaps ─────────────────────────────────┐
+│ Status [Open ▾] Reason [No source ▾] Avatar [All ▾]                 │
+├──────────────────────────────────────────────────────────────────────┤
+│ Question                                      Reason       Action    │
+│ What is warranty policy?                      no_source    [Review]  │
+├──────────────────────────────────────────────────────────────────────┤
+│ Review panel                                                         │
+│ Question, answer excerpt, confidence, conversation link              │
+│ [Resolve] [Snooze] [Ignore] T15-5                                    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Archive verification
+
+```text
+Customer chat/voice ends
+  → server writes MinIO object calls/{tenant}/{call}/transcript.json
+  → tenant opens T15-1
+  → record shows archive stored or failed
+  → failed archive can be retried from T15-3
+```
+
+### Flow B — Knowledge gap lifecycle
+
+```text
+RAG cannot answer from tenant KM
+  → gap candidate created
+  → tenant opens T15-4
+  → tenant reviews linked conversation
+  → tenant resolves/snoozes/ignores T15-5
+```
+
+### Component → file
+
+| Component | Path |
+| --- | --- |
+| Tenant records route | `apps/tenant-web/src/routes/conversation-records/+page.svelte` |
+| Tenant knowledge gaps route | `apps/tenant-web/src/routes/knowledge-gaps/+page.svelte` |
+| Tenant records/gaps API client | `apps/tenant-web/src/lib/api/operations.ts` |
+| Archive/gap handlers | `cmd/server/conversation_records.go`, `cmd/server/knowledge_gaps.go` |
+| Archive/gap store | `internal/store/conversation_records.go`, `internal/km/` |
+
+See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md) · [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [02-workflow.md](02-workflow.md) · [03-er-diagram.md](03-er-diagram.md) · [04-api-spec.md](04-api-spec.md).

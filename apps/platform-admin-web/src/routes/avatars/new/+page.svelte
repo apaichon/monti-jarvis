@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
@@ -7,10 +8,12 @@
   import { feedback } from '$lib/feedback.svelte';
   import {
     createAvatar,
+    assignTenantAvatar,
     defaultVoiceRow,
     type AvatarFlags,
     type AvatarVoice
   } from '$lib/api/avatars';
+  import { listTenants, type TenantListItem } from '$lib/api/tenants';
   import { ApiError } from '$lib/api/http';
   import { clearSession, loginPath } from '$lib/auth/session';
 
@@ -27,7 +30,23 @@
   let skin = $state('');
   let hair = $state('');
   let voices = $state<AvatarVoice[]>([defaultVoiceRow()]);
+  let tenants = $state<TenantListItem[]>([]);
+  let selectedTenantIds = $state<string[]>([]);
+  let tenantsLoading = $state(true);
   let saving = $state(false);
+
+  onMount(async () => {
+    try {
+      const result = await listTenants('', '', 100, 0);
+      tenants = result.tenants;
+      selectedTenantIds = tenants.map((tenant) => tenant.id);
+    } catch (err) {
+      const msg = handleError(err, 'Failed to load tenants');
+      if (msg) feedback.error(msg);
+    } finally {
+      tenantsLoading = false;
+    }
+  });
 
   function handleError(err: unknown, fallback: string) {
     if (err instanceof ApiError) {
@@ -50,6 +69,12 @@
     return flags;
   }
 
+  function toggleTenant(tenantId: string) {
+    selectedTenantIds = selectedTenantIds.includes(tenantId)
+      ? selectedTenantIds.filter((id) => id !== tenantId)
+      : [...selectedTenantIds, tenantId];
+  }
+
   async function submit(e: Event) {
     e.preventDefault();
     if (voices.length === 0) {
@@ -70,6 +95,15 @@
         flags: buildFlags(),
         voices
       });
+      const assignments = await Promise.allSettled(
+        selectedTenantIds.map((tenantId) => assignTenantAvatar(tenantId, created.id))
+      );
+      const failed = assignments.filter((result) => result.status === 'rejected');
+      if (failed.length > 0) {
+        feedback.error(`Avatar created, but ${failed.length} tenant assignment${failed.length === 1 ? '' : 's'} failed. Check package caps.`);
+      } else if (selectedTenantIds.length > 0) {
+        feedback.success(`Avatar created and assigned to ${selectedTenantIds.length} tenant${selectedTenantIds.length === 1 ? '' : 's'}`);
+      }
       goto(`${base}/avatars/${created.id}`);
     } catch (err) {
       const msg = handleError(err, 'Create failed');
@@ -146,6 +180,35 @@
         <input id="hair" bind:value={hair} placeholder="#5a3428" />
       </div>
     </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h2 style="margin:0 0 6px;font-size:16px">Tenant assignments</h2>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:13px">
+      Optional. Select the tenants that should receive this AI employee immediately after creation.
+    </p>
+    {#if tenantsLoading}
+      <p style="color:var(--muted);font-size:13px">Loading tenants…</p>
+    {:else if tenants.length === 0}
+      <p style="color:var(--muted);font-size:13px">No tenants available.</p>
+    {:else}
+      <div style="display:grid;gap:8px;max-height:260px;overflow:auto">
+        {#each tenants as tenant (tenant.id)}
+          <label style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:8px;cursor:pointer">
+            <input
+              type="checkbox"
+              checked={selectedTenantIds.includes(tenant.id)}
+              onchange={() => toggleTenant(tenant.id)}
+            />
+            <span>
+              <strong>{tenant.name || tenant.slug}</strong>
+              <small style="display:block;color:var(--muted)">{tenant.slug} · {tenant.status}</small>
+            </span>
+          </label>
+        {/each}
+      </div>
+      <p style="margin:10px 0 0;color:var(--muted);font-size:12px">{selectedTenantIds.length} selected</p>
+    {/if}
   </div>
 
   <div class="card" style="margin-bottom:16px">

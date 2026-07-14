@@ -109,6 +109,14 @@ func (s *server) getTenantUsage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	// AI employee usage is the number of active avatar assignments, not a
+	// separately metered counter. Read it directly so package usage follows
+	// the tenant's current Avatar assignment state.
+	if s.store != nil {
+		if assigned, countErr := s.store.CountActiveTenantAssignments(r.Context(), tenantID); countErr == nil {
+			snap.Usage.AIEmployees = assigned
+		}
+	}
 	// Enrich with S16 operational caps + daily usage.
 	out := map[string]any{
 		"tenant_id": snap.TenantID,

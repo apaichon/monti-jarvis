@@ -1,3 +1,5 @@
+import { customerAuthHeaders } from './customerAuth';
+
 export type CallSession = {
   id: string;
   tenant_id: string;
@@ -21,6 +23,17 @@ export type CallTurn = {
   created_at: string;
 };
 
+export type CallAudioArchiveStream = {
+  name: string;
+  content_type: string;
+  data_base64: string;
+};
+
+export type CallRating = {
+  score: number;
+  review?: string;
+};
+
 const API = '';
 
 function tenantHeaders(tenantId?: string, json = false): Record<string, string> {
@@ -30,11 +43,11 @@ function tenantHeaders(tenantId?: string, json = false): Record<string, string> 
   return customerAuthHeaders(headers);
 }
 
-export async function createCall(opts?: { tenantId?: string }): Promise<CallSession> {
+export async function createCall(opts?: { tenantId?: string; agentId?: string }): Promise<CallSession> {
   const res = await fetch(`${API}/api/calls`, {
     method: 'POST',
     headers: tenantHeaders(opts?.tenantId, true),
-    body: '{}'
+    body: JSON.stringify({ tenant_id: opts?.tenantId, agent_id: opts?.agentId })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to create call');
@@ -60,6 +73,31 @@ export async function endCall(callId: string, opts?: { tenantId?: string }): Pro
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to end call');
   return data;
+}
+
+export async function archiveCallAudio(
+  callId: string,
+  streams: CallAudioArchiveStream[],
+  opts?: { tenantId?: string }
+): Promise<void> {
+  if (streams.length === 0) return;
+  const res = await fetch(`${API}/api/calls/${callId}/audio`, {
+    method: 'POST',
+    headers: tenantHeaders(opts?.tenantId, true),
+    body: JSON.stringify({ streams })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to archive call audio');
+}
+
+export async function submitCallRating(callId: string, rating: CallRating, opts?: { tenantId?: string }) {
+  const res = await fetch(`${API}/api/calls/${callId}/rating`, {
+    method: 'POST',
+    headers: tenantHeaders(opts?.tenantId, true),
+    body: JSON.stringify(rating)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to save call rating');
 }
 
 export async function listTurns(callId: string, opts?: { tenantId?: string }): Promise<CallTurn[]> {
@@ -98,4 +136,3 @@ export function subscribeTurns(
   });
   return () => source.close();
 }
-import { customerAuthHeaders } from './customerAuth';

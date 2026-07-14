@@ -44,11 +44,11 @@
 | 18 | Tenant | Customer Tier | D | 16 ✅ v1.9.0 |
 | 19 | Tenant | Customer Account Import, Domain Rules, Integration | E | 3, 18 ✅ v2.0.0 |
 | 20 | Customer | Auth (how to integrate if solution must integrate to existing system of tenant) | E | 19 ✅ v2.1.0 |
-| 21 | Customer | Select AI Workforce to Conversation must login with OTP before and time limit with quota managment setting | A | 1, 5 |
-| 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt or not), Knowledge Gap | F | 1, 3 |
-| 23 | Tenant | Tickets, AI conversation ask to open ticket to human fix | F | 22 |
+| 21 | Customer | Select AI Workforce to Conversation must login with OTP before and time limit with quota management setting | A | 1, 5 ✅ v2.2.0 |
+| 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt or not), Knowledge Gap | F | 1, 3 ✅ v2.3.0 |
+| 23 | Tenant, Customer | Tickets, AI conversation ask to open ticket to human in the loop | F | 22 |
 | 24 | Tenant | Customer Review AI Satisfaction after conversation, Tenant view statistics | F | 22, 23 |
-| 25 | Tenant | Dashboard : Call Center Statistics | F | 22 (ClickHouse) |
+| 25 | Tenant | Dashboard : Call Center Statistics, Call Quota Usage | F | 22 (ClickHouse) |
 | 26 | Tenant | Monitoring : System Performance | F | 25 |
 | 27 | Platform | Audit Log | G | 3 |
 | 28 | Platform | Monitoring : System Performance | G | 27 |
@@ -72,7 +72,7 @@ Prove inbound AI call value before billing complexity.
 
 - **Sprint 1:** Svelte customer portal, LiveKit voice room, transcript, NATS call events, Postgres sessions, Redis 8 active state.
 - **Sprint 2:** KM ingest → MinIO → embed → ClickHouse `km_embeddings`; scope enforcement; RAG in orchestrator.
-- **Sprint 21:** Platform avatar catalog + tenant assignment; workforce picker in conversation UI.
+- **Sprint 21:** Customer OTP-required workforce selection where configured; customer-aware call time and quota enforcement.
 
 ### Phase B — Platform foundation (3, 4, 5, 13)
 
@@ -103,9 +103,23 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 
 - Optional customer accounts for history and tier benefits
 
+### Shipped SPRINT-021 — Authenticated workforce selection and quota limits
+
+- Status: **shipped** · Release: **v2.2.0**
+- Feature: [FEAT-0023](../01-features/FEAT-0023-authenticated-workforce-selection.md)
+- Sprint: [SPRINT-021](../03-sprints/SPRINT-021.md)
+- Scope: require OTP before workforce selection where tenant policy demands it, preserve optional-auth tenants, and enforce customer-aware time/quota limits.
+
 ### Phase F — Tenant operations (22–26)
 
 - Conversation records, tickets, QA review, ClickHouse dashboards and monitoring
+
+### Shipped SPRINT-022 — Conversation records and knowledge gaps
+
+- Status: **shipped** · Release: **v2.3.0**
+- Feature: [FEAT-0024](../01-features/FEAT-0024-conversation-records-knowledge-gaps.md)
+- Sprint: [SPRINT-022](../03-sprints/SPRINT-022.md)
+- Scope: archive conversation artifacts to MinIO, support configurable archive protection, and surface knowledge-gap candidates for tenant review.
 
 ### Phase G — Platform operations (27–30)
 
@@ -296,9 +310,17 @@ Browser OTP/account smoke passed on the Libra Tech tenant, and automated Go/cust
 
 Sprint: [SPRINT-020.md](../03-sprints/SPRINT-020.md) · Feature: [FEAT-0022](../01-features/FEAT-0022-customer-auth.md) · Spec: [23-customer-auth-spec.md](../02-design/23-customer-auth-spec.md) · UAT: [SPRINT-020-manual.md](../06-manual-tests/SPRINT-020-manual.md)
 
-## Current sprint: none
+## Current sprint: SPRINT-021
 
-Run `sprint-planner` to open SPRINT-021.
+**Status:** in progress · **Target:** v2.2.0 · **Commitment:** 16 points
+
+Sprint: [SPRINT-021.md](../03-sprints/SPRINT-021.md) · Feature: [FEAT-0023](../01-features/FEAT-0023-authenticated-workforce-selection.md)
+
+## Parallel build sprint: SPRINT-022
+
+**Status:** in progress · **Target:** v2.3.0 · **Commitment:** 16 points
+
+Sprint: [SPRINT-022.md](../03-sprints/SPRINT-022.md) · Feature: [FEAT-0024](../01-features/FEAT-0024-conversation-records-knowledge-gaps.md)
 
 ## Backlog add: SPRINT-036 — Embed Framework SDKs
 

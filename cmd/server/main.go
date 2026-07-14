@@ -213,11 +213,16 @@ func main() {
 	mux.Handle("GET /api/calls/{id}", guard.OptionalBearer(http.HandlerFunc(s.getCall)))
 	mux.Handle("POST /api/calls/{id}/token", guard.OptionalBearer(http.HandlerFunc(s.issueCallToken)))
 	mux.Handle("POST /api/calls/{id}/end", guard.OptionalBearer(http.HandlerFunc(s.endCall)))
+	mux.Handle("POST /api/calls/{id}/audio", guard.OptionalBearer(http.HandlerFunc(s.archiveCallAudio)))
+	mux.Handle("POST /api/calls/{id}/rating", guard.OptionalBearer(http.HandlerFunc(s.submitCallRating)))
 	mux.Handle("GET /api/calls/{id}/turns", guard.OptionalBearer(http.HandlerFunc(s.listCallTurns)))
 	mux.Handle("POST /api/calls/{id}/turns", guard.OptionalBearer(http.HandlerFunc(s.addCallTurn)))
 	mux.Handle("GET /api/calls/{id}/events", guard.OptionalBearer(http.HandlerFunc(s.callEvents)))
 
 	mux.HandleFunc("GET /api/workforce", s.workforce)
+	mux.Handle("GET /api/customer/portal-policy", guard.OptionalBearer(http.HandlerFunc(s.customerPortalPolicy)))
+	mux.Handle("GET /api/customer/workforce", guard.OptionalBearer(http.HandlerFunc(s.customerWorkforce)))
+	mux.Handle("GET /api/customer/quota", guard.OptionalBearer(http.HandlerFunc(s.customerQuota)))
 	mux.Handle("POST /api/chat", guard.OptionalBearer(http.HandlerFunc(s.chat)))
 	mux.Handle("GET /api/km/agents/{agent_id}", guard.OptionalBearer(http.HandlerFunc(s.getAgentKnowledge)))
 	mux.Handle("GET /api/km/agents/{agent_id}/documents", guard.OptionalBearer(http.HandlerFunc(s.listAgentDocuments)))
@@ -349,6 +354,12 @@ func main() {
 	// SPRINT-020 — customer email OTP auth.
 	mux.Handle("GET /api/tenant/customer-auth/settings", guard.RequireTenantAdminActive(http.HandlerFunc(s.getCustomerAuthSettings)))
 	mux.Handle("PUT /api/tenant/customer-auth/settings", guard.RequireTenantAdminActive(http.HandlerFunc(s.putCustomerAuthSettings)))
+	mux.Handle("GET /api/tenant/conversation-records", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantConversationRecords)))
+	mux.Handle("GET /api/tenant/conversation-records/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantConversationRecord)))
+	mux.Handle("GET /api/tenant/conversation-records/{id}/archive-objects/{object_id}/content", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantConversationArchiveObjectContent)))
+	mux.Handle("POST /api/tenant/conversation-records/{id}/archive/retry", guard.RequireTenantAdminActive(http.HandlerFunc(s.retryTenantConversationArchive)))
+	mux.Handle("GET /api/tenant/knowledge-gaps", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKnowledgeGaps)))
+	mux.Handle("PATCH /api/tenant/knowledge-gaps/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.patchTenantKnowledgeGap)))
 	mux.HandleFunc("POST /api/customer/auth/request-otp", s.requestCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/verify-otp", s.verifyCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/refresh", s.refreshCustomerAuth)
@@ -534,6 +545,10 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 
 	tenantID := s.quotaTenant(r)
 	agent := s.resolveWorkforceAgent(r.Context(), tenantID, req.AgentID)
+	customer, _, ok := s.enforceCustomerPortalAccess(w, r, tenantID, agent.ID, "chat")
+	if !ok {
+		return
+	}
 	sessionID := strings.TrimSpace(req.SessionID)
 	if sessionID == "" {
 		sessionID = newID()
@@ -593,6 +608,25 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.store.SaveExchange(context.Background(), sessionID, agent.ID, req.Message, reply)
+	var conversationID string
+	if s.store != nil {
+		customerID := ""
+		if customer != nil {
+			customerID = customer.ID
+			_ = s.store.RecordCustomerUsage(r.Context(), tenantID, customer.ID, sessionID, agent.ID, "chat", 1, "committed", "")
+		}
+		rec, err := s.store.UpsertConversationRecord(r.Context(), store.ConversationRecordInput{
+			TenantID: tenantID, CallID: sessionID, CustomerID: customerID, AvatarID: agent.ID,
+			Channel: "chat", Status: "archived", Summary: map[string]any{"topic": topic, "message_count": len(history)},
+		})
+		if err == nil {
+			conversationID = rec.ID
+			_, _ = s.store.ArchiveConversationTranscript(r.Context(), tenantID, sessionID, map[string]any{
+				"session_id": sessionID, "tenant_id": tenantID, "agent_id": agent.ID, "topic": topic,
+				"question": req.Message, "reply": reply, "sources": ragResult.Sources,
+			}, "")
+		}
+	}
 	if ragResult.MissingKM && s.store != nil {
 		// Persist FAQ backlog for tenant KM improvement (also logged to ClickHouse qa_events).
 		src := store.KMGapSourceChat
@@ -604,6 +638,14 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 			Question:  req.Message,
 			SessionID: sessionID,
 			Source:    src,
+		})
+		customerID := ""
+		if customer != nil {
+			customerID = customer.ID
+		}
+		_, _ = s.store.CreateKnowledgeGapCandidate(r.Context(), store.KnowledgeGapInput{
+			TenantID: tenantID, ConversationRecordID: conversationID, AvatarID: agent.ID, CustomerID: customerID,
+			Question: req.Message, AnswerExcerpt: reply, GapReason: "no_source", Confidence: 0,
 		})
 	}
 	writeJSON(w, http.StatusOK, chatResponse{

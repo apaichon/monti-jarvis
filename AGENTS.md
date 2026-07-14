@@ -55,7 +55,7 @@ SDLC index: `docs/sdlc/README.md`
 | `07-deployment` | `docs/sdlc/07-deployment/` |
 | `08-readiness` | `docs/sdlc/08-readiness/` |
 
-**Current sprint:** none — `SPRINT-020` shipped v2.1.0. Run `sprint-planner` to open SPRINT-021.
+**Current sprint:** `SPRINT-021` — Authenticated Workforce Selection and Quota Limits (**in progress**, target v2.2.0). Parallel build: `SPRINT-022` Conversation Records and Knowledge Gaps (**in progress**, target v2.3.0).
 
 **Shipped:** v2.1.0 `SPRINT-020` customer auth/domain enforcement · v2.0.0 `SPRINT-019` customer import/domain integration · v1.9.0 `SPRINT-018` customer tiers · v1.8.0 `SPRINT-017` test/preview · v1.7.0 `SPRINT-016` settings/locale/limits · v1.6.0 `SPRINT-015` tenant KM · v1.5.0 `SPRINT-014` embed · v1.4.0 `SPRINT-013` quota · v1.3.1 commerce harden · v1.3.0 `SPRINT-008`–`012` commerce · v0.8.0 `SPRINT-007` · v0.7.0 `SPRINT-006` · v0.6.0 `SPRINT-005` · v0.5.0 `SPRINT-004` · v0.4.0 `SPRINT-003` · v0.3.0 `SPRINT-002` · v0.2.0 `SPRINT-001` · v0.1.0 prototype
 

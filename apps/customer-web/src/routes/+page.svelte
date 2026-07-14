@@ -4,8 +4,10 @@
   import Waveform from '$lib/components/Waveform.svelte';
   import {
     addTurn,
+    archiveCallAudio,
     createCall,
     endCall,
+    submitCallRating,
     subscribeTurns,
     type CallSession
   } from '$lib/api/calls';
@@ -16,10 +18,14 @@
   import { GeminiVoice } from '$lib/voice/gemini';
   import {
     getStoredCustomer,
+    loadCustomerPortalPolicy,
+    loadCustomerQuota,
     loadCustomerMe,
     logoutCustomer,
     requestCustomerOTP,
     verifyCustomerOTP,
+    type CustomerPortalPolicy,
+    type CustomerQuotaSummary,
     type CustomerProfile
   } from '$lib/api/customerAuth';
 
@@ -47,6 +53,8 @@
   let busy = $state(false);
   let error = $state('');
   let timer = $state('00:00:00');
+  let remainingTimer = $state('00:00:00');
+  let remainingSeconds = $state(0);
   let voiceState = $state('Select an agent, then start an inbound voice call.');
   let topic = $state<(typeof topics)[number]['id']>('general');
   let chatSessionId = $state('');
@@ -72,12 +80,24 @@
   let authStatus = $state('');
   let authBusy = $state(false);
   let pickerOpen = $state(false);
+  let ratingOpen = $state(false);
+  let ratingCallId = $state('');
+  let ratingScore = $state(0);
+  let ratingReview = $state('');
+  let ratingBusy = $state(false);
+  let ratingError = $state('');
+  let portalPolicy = $state<CustomerPortalPolicy | null>(null);
+  let quota = $state<CustomerQuotaSummary | null>(null);
+  let callControlsExpanded = $state(false);
 
   let tone = $state('');
   let toneTimer: ReturnType<typeof setTimeout> | undefined;
 
   let startedAt = 0;
+  let activeCallLimitSeconds = 0;
   let timerId: ReturnType<typeof setInterval> | undefined;
+  let warningTimerId: ReturnType<typeof setTimeout> | undefined;
+  let timeoutTimerId: ReturnType<typeof setTimeout> | undefined;
   let unsubscribe: (() => void) | undefined;
   const transcriptKeys = new Set<string>();
 
@@ -86,10 +106,10 @@
     customer = getStoredCustomer();
     void loadCustomerMe().then((profile) => {
       if (profile) customer = profile;
+      void refreshPortalState();
     });
     try {
-      agents = await loadWorkforce(tenantId ? { tenantId } : undefined);
-      selectedAgent = agents.find((a) => a.popular) || agents[0] || null;
+      await refreshPortalState();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load agents';
     }
@@ -105,17 +125,87 @@
     return new Date(seconds * 1000).toISOString().slice(11, 19);
   }
 
+  const authRequired = $derived(
+    !!portalPolicy?.customer_auth.enabled && !!portalPolicy?.customer_auth.require_auth_for_workforce && !customer
+  );
+  const quotaExhausted = $derived(quota?.state === 'quota_exhausted');
+  const quotaLabel = $derived(formatQuota(quota));
+
+  async function refreshPortalState() {
+    portalPolicy = await loadCustomerPortalPolicy(tenantId ? { tenantId } : undefined);
+    if (!authRequired) {
+      agents = await loadWorkforce(tenantId ? { tenantId } : undefined);
+      selectedAgent =
+        agents.find((a) => a.id === selectedAgent?.id) || agents.find((a) => a.popular) || agents[0] || null;
+    } else {
+      agents = [];
+      selectedAgent = null;
+    }
+    try {
+      quota = await loadCustomerQuota(tenantId ? { tenantId } : undefined);
+    } catch {
+      quota = portalPolicy.quota;
+    }
+  }
+
+  function formatQuota(value: CustomerQuotaSummary | null) {
+    if (!value) return 'quota loading';
+    if (value.daily_limit_seconds <= 0 && value.max_call_seconds <= 0) return 'quota not capped';
+    const parts: string[] = [];
+    if (value.daily_limit_seconds > 0) {
+      const remaining = value.daily_remaining_seconds ?? value.daily_limit_seconds;
+      parts.push(`${Math.floor(remaining / 60)}m daily left`);
+    }
+    if (value.max_call_seconds > 0) parts.push(`${Math.floor(value.max_call_seconds / 60)}m max/call`);
+    return parts.join(' · ');
+  }
+
   function startTimer() {
     startedAt = Date.now();
+    activeCallLimitSeconds = Math.max(0, quota?.max_call_seconds || 0);
+    remainingSeconds = activeCallLimitSeconds;
+    remainingTimer = formatTimer(activeCallLimitSeconds);
     clearInterval(timerId);
+    clearTimeout(warningTimerId);
+    clearTimeout(timeoutTimerId);
     timerId = setInterval(() => {
-      timer = formatTimer(Math.floor((Date.now() - startedAt) / 1000));
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      timer = formatTimer(elapsed);
+      if (activeCallLimitSeconds > 0) {
+        remainingSeconds = Math.max(0, activeCallLimitSeconds - elapsed);
+        remainingTimer = formatTimer(remainingSeconds);
+      }
     }, 1000);
+    if (activeCallLimitSeconds > 10) {
+      warningTimerId = setTimeout(() => {
+        if (!live || !voice) return;
+        voiceState = 'This call will end in 10 seconds. Please finish your question.';
+        voice.sendText(
+          'System notice: this call will end in 10 seconds because the customer time limit is nearly reached. Tell the customer to finish their question and let them know they can rate this call from 1 to 5 after it ends.'
+        );
+      }, (activeCallLimitSeconds - 10) * 1000);
+    } else if (activeCallLimitSeconds > 0) {
+      warningTimerId = setTimeout(() => {
+        if (!live || !voice) return;
+        voiceState = 'This call will end soon. Please finish your question.';
+        voice.sendText(
+          'System notice: this call will end very soon because the customer time limit is nearly reached. Ask the customer to finish and prepare to rate this call from 1 to 5 after it ends.'
+        );
+      }, 0);
+    }
+    if (activeCallLimitSeconds > 0) {
+      timeoutTimerId = setTimeout(() => void hangUp('timeout'), activeCallLimitSeconds * 1000);
+    }
   }
 
   function stopTimer() {
     clearInterval(timerId);
+    clearTimeout(warningTimerId);
+    clearTimeout(timeoutTimerId);
     timer = '00:00:00';
+    remainingTimer = '00:00:00';
+    remainingSeconds = 0;
+    activeCallLimitSeconds = 0;
   }
 
   async function scrollChat() {
@@ -188,11 +278,16 @@
 
   async function startCall() {
     if (!selectedAgent) {
-      error = 'Select an AI agent first.';
+      error = authRequired ? 'Sign in before selecting an AI agent.' : 'Select an AI agent first.';
+      return;
+    }
+    if (authRequired || quotaExhausted) {
+      error = authRequired ? 'Sign in with OTP before starting a call.' : 'Customer quota exhausted.';
       return;
     }
     error = '';
     busy = true;
+    callControlsExpanded = false;
     transcriptKeys.clear();
     voiceState = 'Connecting…';
     try {
@@ -202,7 +297,7 @@
         upsertVoiceTurn('agent', selectedAgent.greeting);
       }
       const [created] = await Promise.all([
-        createCall(tenantId ? { tenantId } : undefined),
+        createCall(tenantId ? { tenantId, agentId: selectedAgent.id } : { agentId: selectedAgent.id }),
         gemini.start(
           selectedAgent.id,
           topic,
@@ -256,17 +351,51 @@
     }
   }
 
-  async function hangUp() {
+  async function hangUp(reason: 'manual' | 'timeout' = 'manual') {
     if (!session) return;
+    const endedCallId = session.id;
     busy = true;
     try {
-      await voice?.stop();
+      const recordings = await voice?.stop();
+      if (recordings && recordings.length > 0) {
+        await archiveCallAudio(session.id, recordings, tenantId ? { tenantId } : undefined).catch((err) => {
+          error = err instanceof Error ? err.message : 'Failed to archive call audio';
+        });
+      }
       await endCall(session.id);
+      void loadCustomerQuota(tenantId ? { tenantId } : undefined).then((q) => (quota = q)).catch(() => {});
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to end call';
     } finally {
       await cleanup(true);
       busy = false;
+      ratingCallId = endedCallId;
+      ratingScore = 0;
+      ratingReview = '';
+      ratingError = '';
+      ratingOpen = true;
+      if (reason === 'timeout') {
+        voiceState = 'The call ended because the customer time limit was reached. Please rate the call.';
+      }
+    }
+  }
+
+  async function submitRating(event: Event) {
+    event.preventDefault();
+    if (!ratingCallId || ratingScore < 1 || ratingScore > 5 || ratingBusy) return;
+    ratingBusy = true;
+    ratingError = '';
+    try {
+      await submitCallRating(
+        ratingCallId,
+        { score: ratingScore, review: ratingReview.trim() },
+        tenantId ? { tenantId } : undefined
+      );
+      ratingOpen = false;
+    } catch (err) {
+      ratingError = err instanceof Error ? err.message : 'Failed to save rating';
+    } finally {
+      ratingBusy = false;
     }
   }
 
@@ -277,6 +406,7 @@
     unsubscribe = undefined;
     voice = null;
     if (resetSession) session = null;
+    callControlsExpanded = false;
     voiceState = selectedAgent
       ? `Ready to call ${selectedAgent.name}.`
       : 'Select an agent, then start an inbound voice call.';
@@ -322,6 +452,7 @@
       otp = '';
       challengeId = '';
       authStatus = `Signed in as ${res.customer.display_name || res.customer.email}`;
+      await refreshPortalState();
     } catch (err) {
       authStatus = err instanceof Error ? err.message : 'OTP verification failed';
     } finally {
@@ -333,12 +464,17 @@
     await logoutCustomer();
     customer = null;
     authStatus = 'Signed out';
+    await refreshPortalState();
   }
 
   async function submitChat(event: Event) {
     event.preventDefault();
     if (!selectedAgent) {
-      error = 'Select an AI agent first.';
+      error = authRequired ? 'Sign in before selecting an AI agent.' : 'Select an AI agent first.';
+      return;
+    }
+    if (authRequired || quotaExhausted) {
+      error = authRequired ? 'Sign in with OTP before starting chat.' : 'Customer quota exhausted.';
       return;
     }
     const text = input.trim();
@@ -372,6 +508,7 @@
       );
       chatHistory = [...chatHistory, { role: 'assistant', content: data.reply }];
       showTone(data.reply);
+      void loadCustomerQuota(tenantId ? { tenantId } : undefined).then((q) => (quota = q)).catch(() => {});
     } catch (err) {
       messages = messages.filter((m) => m.id !== thinking.id);
       chatHistory = chatHistory.slice(0, -1);
@@ -396,10 +533,21 @@
         ? `Call ${chatSessionId.slice(0, 8)} · ${selectedAgent?.name ?? 'agent'}`
         : 'New call session'
   );
+  const callStarted = $derived(live || !!session);
+  const customerLabel = $derived(customer?.display_name || customer?.email || 'Customer');
+  const canOpenPicker = $derived(!live && !authRequired && !quotaExhausted && agents.length > 0);
+  const showCallDetails = $derived(!callStarted || callControlsExpanded);
+  const hideAgentSurfaceBeforeLogin = $derived(!!portalPolicy?.customer_auth.enabled && !customer && !callStarted);
+  const callTimerLabel = $derived(activeCallLimitSeconds > 0 ? remainingTimer : timer);
+  const callTimerWarning = $derived(activeCallLimitSeconds > 0 && remainingSeconds <= 10);
 </script>
 
 <main class="app">
-  <aside class="panel control-panel">
+  <aside
+    class="panel control-panel"
+    class:live-collapsed={callStarted && !callControlsExpanded}
+    class:live-expanded={callStarted && callControlsExpanded}
+  >
     <header class="brand">
       <img class="brand-mark" src="/images/monti-logo.png" width="46" height="46" alt="Monti AI Ambassadors" />
       <div>
@@ -411,57 +559,142 @@
       </div>
     </header>
 
-    <section class="voice-card" aria-label="Customer sign in">
-      {#if customer}
-        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+    {#if callStarted}
+      <section class="live-call-strip" aria-label="Active call controls">
+        <div class="live-call-summary" style="--assistant-color:{selectedAgent?.color || 'var(--cyan)'}">
+          <div class="agent-dot">{agentInitial(selectedAgent?.name)}</div>
           <div>
-            <div style="font-weight:700">{customer.display_name || customer.email}</div>
-            <div class="voice-state">Signed in · {customer.email}</div>
+            <strong>{selectedAgent?.name || 'Agent'}</strong>
+            <span>{callTimerLabel} · {customerLabel}</span>
           </div>
-          <button class="voice-button" type="button" onclick={signOutCustomer}>Sign out</button>
         </div>
-      {:else}
-        <form onsubmit={challengeId ? verifyOTP : sendOTP} style="display:grid;gap:10px">
-          <div class="voice-state">Optional customer sign-in for account-aware support.</div>
-          <input
-            type="email"
-            bind:value={customerEmail}
-            placeholder="customer@example.com"
-            autocomplete="email"
-            disabled={authBusy || !!challengeId}
-            style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:#071120;color:var(--text);padding:12px"
-          />
-          {#if !challengeId}
-            <input
-              type="text"
-              bind:value={customerName}
-              placeholder="Name (optional)"
-              autocomplete="name"
-              disabled={authBusy}
-              style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:#071120;color:var(--text);padding:12px"
-            />
-          {:else}
-            <input
-              type="text"
-              bind:value={otp}
-              placeholder="6-digit OTP"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              disabled={authBusy}
-              style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:#071120;color:var(--text);padding:12px"
-            />
-          {/if}
-          <button class="voice-button" type="submit" disabled={authBusy || (!challengeId && !customerEmail.trim()) || (!!challengeId && !otp.trim())}>
-            {authBusy ? '…' : challengeId ? 'Verify OTP' : 'Send OTP'}
-          </button>
-        </form>
-      {/if}
-      {#if authStatus}
-        <div class="voice-state" style="margin-top:8px">{authStatus}</div>
-      {/if}
-    </section>
+        <button class="strip-button" type="button" onclick={() => (callControlsExpanded = !callControlsExpanded)}>
+          {callControlsExpanded ? 'Collapse' : 'Expand'}
+        </button>
+        <button class="strip-button end" type="button" disabled={busy} onclick={() => void hangUp()}>End</button>
+      </section>
+    {/if}
 
-    {#if selectedAgent}
+    {#if showCallDetails}
+      <section class={`voice-card auth-card ${callStarted ? 'auth-card-compact' : ''}`} aria-label="Customer sign in">
+        {#if customer}
+          <div class="customer-session">
+            {#if callStarted}
+              <div class="customer-initial">{customerLabel.slice(0, 1).toUpperCase()}</div>
+            {/if}
+            <div class="customer-session-main">
+              <div class="customer-name">{customerLabel}</div>
+              <div class="voice-state customer-meta">{callStarted ? 'Signed in' : `Signed in · ${customer.email}`}</div>
+            </div>
+            <button class="voice-button signout-button" type="button" onclick={signOutCustomer}>Sign out</button>
+          </div>
+        {:else}
+          <form onsubmit={challengeId ? verifyOTP : sendOTP} style="display:grid;gap:10px">
+            <div class="voice-state">
+              {portalPolicy?.customer_auth.require_auth_for_workforce
+                ? 'Customer sign-in required before selecting AI workforce.'
+                : 'Optional customer sign-in for account-aware support.'}
+            </div>
+            <input
+              type="email"
+              bind:value={customerEmail}
+              placeholder="customer@example.com"
+              autocomplete="email"
+              disabled={authBusy || !!challengeId}
+              style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:#071120;color:var(--text);padding:12px"
+            />
+            {#if !challengeId}
+              <input
+                type="text"
+                bind:value={customerName}
+                placeholder="Name (optional)"
+                autocomplete="name"
+                disabled={authBusy}
+                style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:#071120;color:var(--text);padding:12px"
+              />
+            {:else}
+              <input
+                type="text"
+                bind:value={otp}
+                placeholder="6-digit OTP"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                disabled={authBusy}
+                style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:#071120;color:var(--text);padding:12px"
+              />
+            {/if}
+            <button class="voice-button" type="submit" disabled={authBusy || (!challengeId && !customerEmail.trim()) || (!!challengeId && !otp.trim())}>
+              {authBusy ? '…' : challengeId ? 'Verify OTP' : 'Send OTP'}
+            </button>
+          </form>
+        {/if}
+        {#if authStatus && !callStarted}
+          <div class="voice-state" style="margin-top:8px">{authStatus}</div>
+        {/if}
+      </section>
+    {/if}
+
+    {#if authRequired}
+      <section class="voice-card auth-required-card">
+        <strong>Sign in required</strong>
+        <div class="voice-state">This tenant requires OTP before choosing an AI workforce.</div>
+      </section>
+    {/if}
+
+    {#if showCallDetails && !hideAgentSurfaceBeforeLogin}
+      <section class="voice-card call-card">
+        <div class="agent-select-row">
+          {#if selectedAgent}
+            <div class="selected-agent" style="--assistant-color:{selectedAgent.color}">
+              <div class="agent-dot">{agentInitial(selectedAgent.name)}</div>
+              <div class="selected-agent-copy">
+                <strong>{selectedAgent.name}</strong>
+                <span>{selectedAgent.role}</span>
+              </div>
+            </div>
+            <button
+              class="picker-trigger picker-trigger-compact"
+              type="button"
+              disabled={!canOpenPicker}
+              onclick={() => (pickerOpen = true)}
+            >
+              Change avatar
+            </button>
+          {:else}
+            <button
+              class="picker-trigger picker-trigger-wide"
+              type="button"
+              disabled={!canOpenPicker}
+              onclick={() => (pickerOpen = true)}
+            >
+              Choose avatar
+            </button>
+          {/if}
+        </div>
+        <div class="voice-row">
+          <div class="status-pill" class:warning={callTimerWarning}>
+            {callTimerLabel}
+          </div>
+          <button
+            class="voice-button"
+            class:live={live}
+            type="button"
+            disabled={busy || authRequired || quotaExhausted}
+            onclick={toggleCall}
+          >
+            {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
+          </button>
+        </div>
+        {#if busy && !live}
+          <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
+        {:else}
+          <div class="voice-state">{voiceState}</div>
+        {/if}
+        <div class="voice-state">Quota · {quotaLabel}</div>
+      </section>
+    {/if}
+
+    {#if selectedAgent && !hideAgentSurfaceBeforeLogin}
       <section class="assistant-orb">
         <div class="halo" style="--assistant-color:{selectedAgent.color}">
           <Portrait agent={selectedAgent} speaking={live} {tone} />
@@ -470,60 +703,9 @@
           <h2>{selectedAgent.name}</h2>
           <p>{selectedAgent.role} · {selectedAgent.trait}</p>
         </div>
-        <button class="picker-trigger" type="button" disabled={live} onclick={() => (pickerOpen = true)}>
-          <span aria-hidden="true">◇</span>
-          Change avatar
-        </button>
         <Waveform color={selectedAgent.color} />
       </section>
     {/if}
-
-    <section class="voice-card">
-      <div class="voice-row">
-        <div class="status-pill">{timer}</div>
-        <button
-          class="voice-button"
-          class:live={live}
-          type="button"
-          disabled={busy}
-          onclick={toggleCall}
-        >
-          {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
-        </button>
-      </div>
-      {#if busy && !live}
-        <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
-      {:else}
-        <div class="voice-state">{voiceState}</div>
-      {/if}
-    </section>
-
-    <section class="assistants" aria-label="Choose AI agent">
-      {#each agents as agent (agent.id)}
-        <button
-          type="button"
-          class="assistant-card"
-          class:active={selectedAgent?.id === agent.id}
-          style="--assistant-color:{agent.color}"
-          disabled={live}
-          onclick={() => selectAgent(agent)}
-        >
-          <Portrait {agent} mini />
-          <div>
-            <div>
-              <strong>{agent.name}</strong>
-              {#if agent.popular}
-                <span class="tag">Popular</span>
-              {/if}
-            </div>
-            <div class="assistant-meta">{agent.role}</div>
-            <div class="assistant-meta">{agent.trait}</div>
-            <Waveform color={agent.color} count={16} mini />
-          </div>
-          <span class="tag">Select</span>
-        </button>
-      {/each}
-    </section>
   </aside>
 
   {#if pickerOpen}
@@ -538,7 +720,7 @@
         <div class="picker-head">
           <div>
             <h2>Select avatar</h2>
-            <p>Choose who will answer this customer session.</p>
+            <p>Choose who will answer this customer session. Quota · {quotaLabel}</p>
           </div>
           <button class="picker-close" type="button" aria-label="Close avatar picker" onclick={() => (pickerOpen = false)}>
             ×
@@ -619,12 +801,12 @@
         <div class="composer">
           <textarea
             bind:value={input}
-            placeholder="Ask your question..."
+            placeholder={authRequired ? 'Sign in with OTP first...' : quotaExhausted ? 'Customer quota exhausted' : 'Ask your question...'}
             autocomplete="off"
-            disabled={busy}
+            disabled={busy || authRequired || quotaExhausted}
             onkeydown={handleKeydown}
           ></textarea>
-          <button class="send" type="submit" disabled={busy}>Send</button>
+          <button class="send" type="submit" disabled={busy || authRequired || quotaExhausted}>Send</button>
         </div>
         <div class="error">{error}</div>
       </form>
@@ -632,3 +814,32 @@
     </section>
   </section>
 </main>
+
+{#if ratingOpen}
+  <div class="rating-backdrop">
+    <div class="rating-dialog" role="dialog" aria-modal="true" aria-labelledby="rating-title">
+      <div class="rating-kicker">Call complete</div>
+      <h2 id="rating-title">How was your call?</h2>
+      <p>Choose a score from 1 to 5 before closing this review.</p>
+      <form onsubmit={submitRating}>
+        <div class="rating-scale" role="radiogroup" aria-label="Call score">
+          {#each [1, 2, 3, 4, 5] as score}
+            <button
+              type="button"
+              class:active={ratingScore >= score}
+              class="rating-score"
+              aria-label={`${score} out of 5`}
+              aria-pressed={ratingScore === score}
+              onclick={() => (ratingScore = score)}
+            >{ratingScore >= score ? '★' : '☆'}</button>
+          {/each}
+        </div>
+        <textarea bind:value={ratingReview} maxlength="2000" placeholder="Tell us more (optional)"></textarea>
+        {#if ratingError}<div class="rating-error">{ratingError}</div>{/if}
+        <button class="rating-submit" type="submit" disabled={ratingScore === 0 || ratingBusy}>
+          {ratingBusy ? 'Saving…' : 'Submit review'}
+        </button>
+      </form>
+    </div>
+  </div>
+{/if}

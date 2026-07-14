@@ -7,6 +7,9 @@ export type CustomerAuthSettings = {
   allowed_domains: string[];
   otp_ttl_seconds: number;
   session_ttl_seconds: number;
+  require_auth_for_workforce: boolean;
+  customer_daily_call_seconds: number;
+  customer_max_call_seconds: number;
   created_at?: string;
   updated_at?: string;
 };

@@ -1,9 +1,9 @@
 ---
 id: DES-0004
 title: API Specification
-status: shipped
+status: approved
 updated: 2026-07-13
-sprint: SPRINT-020
+sprint: SPRINT-022
 ---
 
 # API Specification — Monti Jarvis
@@ -1842,4 +1842,194 @@ Existing `POST /api/chat`, `POST /api/calls`, and voice WebSocket paths accept a
 
 See [23-customer-auth-spec.md](23-customer-auth-spec.md), [02-workflow.md](02-workflow.md) §59–63, [03-er-diagram.md](03-er-diagram.md) § Sprint 20, and [05-ux-ui.md](05-ux-ui.md) § T13.
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).
+## Authenticated Workforce Selection & Customer Quota (Sprint 21)
+
+**Auth:** public policy read, optional/required `customer` token depending on tenant setting, `tenant_admin` for settings.
+
+### `GET /api/customer/portal-policy`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `tenant_id` | string | yes | Tenant slug/id resolved from portal URL or embed context |
+
+**Response `200`**
+
+```json
+{
+  "tenant_id": "libra-tech-co-ltd",
+  "customer_auth": {
+    "enabled": true,
+    "mode": "required",
+    "require_auth_for_workforce": true,
+    "allow_public_no_auth": false
+  },
+  "quota": {
+    "daily_call_seconds": 1800,
+    "max_call_seconds": 300
+  }
+}
+```
+
+### `GET /api/customer/workforce`
+
+Returns active tenant-assigned avatars available for customer selection.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `tenant_id` | string | yes | Tenant context |
+
+**Response `200`**
+
+```json
+{
+  "avatars": [
+    {
+      "id": "ava",
+      "name": "Ava",
+      "role": "General Support",
+      "status": "active",
+      "portrait_url": "/api/assets/avatars/ava/portrait.png",
+      "quota_state": "available"
+    }
+  ],
+  "selected_avatar_id": "ava"
+}
+```
+
+### `GET /api/customer/quota`
+
+Requires customer token when tenant auth is required; optional otherwise.
+
+**Response `200`**
+
+```json
+{
+  "tenant_id": "libra-tech-co-ltd",
+  "customer_id": "cust_01",
+  "daily_remaining_seconds": 1200,
+  "max_call_seconds": 300,
+  "reset_at": "2026-07-14T00:00:00+07:00",
+  "state": "quota_available"
+}
+```
+
+### `PUT /api/tenant/customer-auth/settings` additions
+
+SPRINT-021 extends the S20 request body:
+
+```json
+{
+  "mode": "required",
+  "require_auth_for_workforce": true,
+  "allow_public_no_auth": false,
+  "customer_daily_call_seconds": 1800,
+  "customer_max_call_seconds": 300
+}
+```
+
+### Chat/call errors added in Sprint 21
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 401 | `customer_auth_required` | Tenant requires customer auth before workforce/chat/voice |
+| 403 | `avatar_unavailable` | Avatar disabled, unassigned, or unavailable for tenant/customer |
+| 403 | `call_duration_limit_exceeded` | Requested/active call exceeds per-call duration limit |
+| 429 | `customer_quota_exhausted` | Daily customer quota exhausted |
+
+## Conversation Records & Knowledge Gaps (Sprint 22)
+
+**Auth:** `tenant_admin`; all resources are tenant-scoped from token context.
+
+### `GET /api/tenant/conversation-records`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `from` | datetime | no | Start filter |
+| `to` | datetime | no | End filter |
+| `avatar_id` | string | no | Filter by workforce avatar |
+| `customer_id` | string | no | Filter by customer |
+| `status` | string | no | `recording`, `archived`, `archive_failed` |
+
+**Response `200`**
+
+```json
+{
+  "records": [
+    {
+      "id": "crec_01",
+      "call_id": "call_01",
+      "channel": "voice",
+      "customer_id": "cust_01",
+      "avatar_id": "ava",
+      "status": "archived",
+      "started_at": "2026-07-13T10:00:00Z",
+      "duration_seconds": 180,
+      "archive_object_count": 2,
+      "knowledge_gap_count": 1
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+### `GET /api/tenant/conversation-records/{id}`
+
+Returns safe metadata, transcript preview when permitted, archive object metadata, and linked gap ids. Object keys are not returned unless the caller has explicit archive-access permission.
+
+### `POST /api/tenant/conversation-records/{id}/archive/retry`
+
+Retries failed archive writes.
+
+**Response `202`**
+
+```json
+{ "status": "retry_queued" }
+```
+
+### `GET /api/tenant/knowledge-gaps`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `status` | string | no | `open`, `snoozed`, `resolved`, `ignored` |
+| `avatar_id` | string | no | Filter by avatar |
+| `reason` | string | no | `no_source`, `low_confidence`, `fallback`, `tenant_flag` |
+
+**Response `200`**
+
+```json
+{
+  "gaps": [
+    {
+      "id": "kgap_01",
+      "conversation_record_id": "crec_01",
+      "question": "What is Libra Tech warranty policy?",
+      "gap_reason": "no_source",
+      "status": "open",
+      "confidence": 0.22,
+      "created_at": "2026-07-13T10:02:00Z"
+    }
+  ]
+}
+```
+
+### `PATCH /api/tenant/knowledge-gaps/{id}`
+
+```json
+{
+  "status": "resolved",
+  "reviewer_note": "Added warranty policy to tenant KM"
+}
+```
+
+**Errors**
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `validation_error` | Invalid filters, status, or review note |
+| 401 | `unauthorized` | Missing/invalid tenant token |
+| 403 | `forbidden` | Wrong role |
+| 404 | `not_found` | Cross-tenant or missing record/gap |
+| 409 | `archive_not_retryable` | Archive object is already stored/deleted |
+| 502 | `archive_write_failed` | MinIO write failed |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md), [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

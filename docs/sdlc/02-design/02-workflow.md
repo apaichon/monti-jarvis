@@ -1,9 +1,9 @@
 ---
 id: DES-0002
 title: Workflows
-status: shipped
+status: approved
 updated: 2026-07-13
-sprint: SPRINT-020
+sprint: SPRINT-022
 ---
 
 # Workflows — Monti Jarvis
@@ -1582,4 +1582,138 @@ flowchart LR
   B2 -. cross-tenant id .-> X
 ```
 
-See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).
+## 64. Required-auth workforce selection (Sprint 21)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser
+  participant G as Go :8091
+  participant Auth as internal/auth
+  participant W as internal/workforce
+  participant S as internal/store
+  participant R as Redis
+  participant P as Postgres callcenter
+
+  C->>B: Open tenant portal with tenant_id
+  B->>G: GET /api/customer/portal-policy?tenant_id=...
+  G->>S: Load tenant auth + workforce policy
+  G-->>B: auth_required + quota summary + selected tenant
+  alt auth required and no customer token
+    B-->>C: Show OTP gate; disable workforce picker/start call
+  else optional or signed in
+    B->>G: GET /api/customer/workforce?tenant_id=...
+    G->>Auth: Validate optional customer Bearer
+    G->>W: List active tenant-assigned avatars
+    G->>R: Read customer/tenant quota counters
+    W->>P: Load tenant avatar assignments
+    G-->>B: workforce[] + selected_avatar + quota_state
+  end
+```
+
+## 65. Customer quota and call duration enforcement (Sprint 21)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser
+  participant G as Go :8091
+  participant Auth as internal/auth
+  participant Q as internal/quota
+  participant Calls as internal/calls
+  participant R as Redis
+  participant P as Postgres callcenter
+
+  C->>B: Start chat or voice with selected avatar
+  B->>G: POST /api/chat or POST /api/calls Bearer customer token
+  G->>Auth: Resolve tenant/customer/session when present
+  G->>Q: Check tenant package + customer daily + per-call limits
+  Q->>R: INCR/READ monti_jarvis:quota:{tenant}:{customer}:...
+  alt tenant requires auth and token missing
+    G-->>B: 401 customer_auth_required
+  else daily limit exhausted
+    G-->>B: 429 customer_quota_exhausted + reset_at
+  else per-call duration invalid/exceeded
+    G-->>B: 403 call_duration_limit_exceeded
+  else allowed
+    Calls->>P: Create tenant/customer/avatar call or chat record
+    G-->>B: call/chat response + quota_remaining
+  end
+```
+
+### Customer workforce/quota states
+
+| State | Meaning |
+| --- | --- |
+| `auth_optional` | Tenant allows anonymous use; customer can sign in for account-aware quota |
+| `auth_required` | Customer must verify OTP before workforce selection or call/chat start |
+| `quota_available` | Customer can start chat/voice for selected avatar |
+| `quota_exhausted` | Daily customer call/chat time is depleted until reset |
+| `avatar_unavailable` | Avatar is disabled, unassigned, or not allowed for tenant/customer context |
+
+## 66. Conversation archive write (Sprint 22)
+
+```mermaid
+sequenceDiagram
+  participant G as Go :8091
+  participant Calls as internal/calls
+  participant Arch as internal/archive
+  participant KM as internal/km
+  participant M as MinIO monti-jarvis/calls
+  participant P as Postgres callcenter
+
+  G->>Calls: Chat/voice turn completed
+  Calls->>Arch: Build transcript/artifact envelope
+  Arch->>P: INSERT conversation_records status=recording
+  Arch->>M: PUT calls/{tenant_id}/{call_id}/transcript.json
+  alt object write fails
+    Arch->>P: UPDATE archive status=failed retry metadata
+  else object stored
+    Arch->>P: INSERT conversation_archive_objects status=stored
+    Arch->>P: UPDATE conversation_records status=archived
+  end
+  Calls->>KM: Evaluate RAG/fallback confidence
+```
+
+## 67. Knowledge-gap review lifecycle (Sprint 22)
+
+```mermaid
+sequenceDiagram
+  participant RAG as internal/rag
+  participant Gaps as internal/km
+  participant P as Postgres callcenter
+  actor T as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+
+  RAG->>Gaps: Low confidence, fallback answer, or no source
+  Gaps->>P: UPSERT knowledge_gap_candidates status=open
+  T->>B: Open Knowledge Gaps
+  B->>G: GET /api/tenant/knowledge-gaps
+  G->>P: Query tenant-scoped gaps
+  G-->>B: gaps[]
+  T->>B: Resolve, snooze, or ignore
+  B->>G: PATCH /api/tenant/knowledge-gaps/{id}
+  alt cross-tenant id
+    G-->>B: 404 not_found
+  else ok
+    G->>P: Update status + reviewer notes
+    G-->>B: updated gap
+  end
+```
+
+### Conversation archive and gap states
+
+| Entity | Status | Meaning |
+| --- | --- | --- |
+| `conversation_records` | `recording` | Conversation is active or archive not complete |
+| `conversation_records` | `archived` | Required transcript/artifact metadata is stored |
+| `conversation_records` | `archive_failed` | Archive write failed and can be retried |
+| `conversation_archive_objects` | `stored` | MinIO object exists and checksum/size were recorded |
+| `conversation_archive_objects` | `deleted` | Object was removed by retention/admin action |
+| `knowledge_gap_candidates` | `open` | Needs tenant review |
+| `knowledge_gap_candidates` | `snoozed` | Hidden until review date |
+| `knowledge_gap_candidates` | `resolved` | Tenant addressed the gap or linked KM work |
+| `knowledge_gap_candidates` | `ignored` | Tenant decided no action is needed |
+
+See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md), [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

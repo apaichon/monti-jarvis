@@ -22,11 +22,14 @@ import (
 )
 
 type customerAuthSettingsBody struct {
-	Enabled           *bool    `json:"enabled"`
-	AuthMode          string   `json:"auth_mode"`
-	AllowedDomains    []string `json:"allowed_domains"`
-	OTPTTLSeconds     int      `json:"otp_ttl_seconds"`
-	SessionTTLSeconds int      `json:"session_ttl_seconds"`
+	Enabled                  *bool    `json:"enabled"`
+	AuthMode                 string   `json:"auth_mode"`
+	AllowedDomains           []string `json:"allowed_domains"`
+	OTPTTLSeconds            int      `json:"otp_ttl_seconds"`
+	SessionTTLSeconds        int      `json:"session_ttl_seconds"`
+	RequireAuthForWorkforce  *bool    `json:"require_auth_for_workforce"`
+	CustomerDailyCallSeconds *int     `json:"customer_daily_call_seconds"`
+	CustomerMaxCallSeconds   *int     `json:"customer_max_call_seconds"`
 }
 
 type customerOTPRequest struct {
@@ -74,6 +77,9 @@ func (s *server) putCustomerAuthSettings(w http.ResponseWriter, r *http.Request)
 	row, err := s.store.PutCustomerAuthSettings(r.Context(), tenantID, store.CustomerAuthSettingsInput{
 		Enabled: body.Enabled, AuthMode: body.AuthMode, AllowedDomains: body.AllowedDomains,
 		OTPTTLSeconds: body.OTPTTLSeconds, SessionTTLSeconds: body.SessionTTLSeconds,
+		RequireAuthForWorkforce:  body.RequireAuthForWorkforce,
+		CustomerDailyCallSeconds: body.CustomerDailyCallSeconds,
+		CustomerMaxCallSeconds:   body.CustomerMaxCallSeconds,
 	})
 	if err != nil {
 		writeCustomerAuthError(w, err)

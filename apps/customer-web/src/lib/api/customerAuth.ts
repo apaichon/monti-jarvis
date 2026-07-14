@@ -32,6 +32,28 @@ export type CustomerAuthResponse = {
   customer: CustomerProfile;
 };
 
+export type CustomerPortalPolicy = {
+  tenant_id: string;
+  customer_auth: {
+    enabled: boolean;
+    mode: 'optional' | 'required';
+    require_auth_for_workforce: boolean;
+    allow_public_no_auth: boolean;
+  };
+  quota: CustomerQuotaSummary;
+};
+
+export type CustomerQuotaSummary = {
+  tenant_id: string;
+  customer_id?: string;
+  daily_remaining_seconds?: number;
+  daily_limit_seconds: number;
+  max_call_seconds: number;
+  used_seconds: number;
+  reset_at: string;
+  state: 'quota_available' | 'quota_exhausted';
+};
+
 const ACCESS_KEY = 'monti_customer_access_token';
 const REFRESH_KEY = 'monti_customer_refresh_token';
 const PROFILE_KEY = 'monti_customer_profile';
@@ -140,4 +162,24 @@ export function customerAuthHeaders(headers: Record<string, string> = {}) {
   const token = getCustomerAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
+}
+
+export async function loadCustomerPortalPolicy(opts?: { tenantId?: string }) {
+  const headers: Record<string, string> = {};
+  if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  const qs = opts?.tenantId ? `?tenant_id=${encodeURIComponent(opts.tenantId)}` : '';
+  const res = await fetch(`/api/customer/portal-policy${qs}`, {
+    headers: customerAuthHeaders(headers)
+  });
+  return parseJSON<CustomerPortalPolicy>(res);
+}
+
+export async function loadCustomerQuota(opts?: { tenantId?: string }) {
+  const headers: Record<string, string> = {};
+  if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  const qs = opts?.tenantId ? `?tenant_id=${encodeURIComponent(opts.tenantId)}` : '';
+  const res = await fetch(`/api/customer/quota${qs}`, {
+    headers: customerAuthHeaders(headers)
+  });
+  return parseJSON<CustomerQuotaSummary>(res);
 }
