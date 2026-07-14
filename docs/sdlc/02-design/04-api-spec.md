@@ -3,7 +3,7 @@ id: DES-0004
 title: API Specification
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-024
+sprint: SPRINT-025
 ---
 
 # API Specification — Monti Jarvis
@@ -2270,3 +2270,98 @@ The operation is idempotent for `(tenant_id, call_id)` and updates the existing 
 | `500 statistics_unavailable` | Aggregate query failed |
 
 See [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [05-ux-ui.md](05-ux-ui.md).
+
+## Tenant Call Center Statistics and Quota Usage (Sprint 25)
+
+The Sprint 25 endpoint is tenant-admin only. It reads activity from the ClickHouse projection and current quota state from the existing entitlement/Redis path. It does not replace `GET /api/tenant/usage` or expose raw conversation records.
+
+### `GET /api/tenant/call-center/statistics`
+
+**Auth:** `tenant_admin` with an active tenant. `AUTH_DISABLED` does not bypass tenant-admin protection.
+
+| Query field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `start_date` | date | no | Inclusive `YYYY-MM-DD`; defaults to today in the resolved tenant/deployment timezone. |
+| `end_date` | date | no | Inclusive `YYYY-MM-DD`; defaults to `start_date` or today. |
+
+When only one date is supplied, the missing date is set to the supplied date. `start_date` must be less than or equal to `end_date`. The range is applied to `usage_date`; quota values describe the current package period and today's operational cap.
+
+**Response `200`**
+
+```json
+{
+  "tenant_id": "libra-tech-co-ltd",
+  "range": {
+    "start_date": "2026-07-14",
+    "end_date": "2026-07-14",
+    "timezone": "Asia/Bangkok"
+  },
+  "freshness": {
+    "source": "clickhouse",
+    "generated_at": "2026-07-14T10:20:00Z",
+    "last_projected_at": "2026-07-14T10:19:48Z"
+  },
+  "totals": {
+    "sessions": 18,
+    "chat_sessions": 6,
+    "voice_sessions": 12,
+    "voice_minutes": 32,
+    "average_duration_seconds": 106
+  },
+  "quota": {
+    "period": "2026-07",
+    "monthly_used_minutes": 32,
+    "monthly_limit_minutes": 5000,
+    "monthly_remaining_minutes": 4968,
+    "daily_used_minutes": 18,
+    "daily_limit_minutes": 180,
+    "daily_timezone": "Asia/Bangkok"
+  },
+  "by_avatar": [
+    { "avatar_id": "ava", "avatar_name": "Ava", "sessions": 18, "voice_minutes": 32 }
+  ],
+  "by_channel": [
+    { "channel": "voice", "sessions": 12, "minutes": 32 },
+    { "channel": "chat", "sessions": 6, "minutes": 0 }
+  ]
+}
+```
+
+`monthly_used_minutes` and `daily_used_minutes` come from the existing quota snapshot/counter path. `totals.voice_minutes` is the selected date range's completed voice duration from ClickHouse. The two values may differ when the requested range is not the current quota period; the response labels them separately.
+
+**Empty range `200`**
+
+```json
+{
+  "tenant_id": "libra-tech-co-ltd",
+  "range": { "start_date": "2026-07-01", "end_date": "2026-07-01", "timezone": "Asia/Bangkok" },
+  "freshness": { "source": "clickhouse", "generated_at": "2026-07-14T10:20:00Z", "last_projected_at": null },
+  "totals": { "sessions": 0, "chat_sessions": 0, "voice_sessions": 0, "voice_minutes": 0, "average_duration_seconds": 0 },
+  "quota": { "period": "2026-07", "monthly_used_minutes": 32, "monthly_limit_minutes": 5000, "monthly_remaining_minutes": 4968, "daily_used_minutes": 18, "daily_limit_minutes": 180, "daily_timezone": "Asia/Bangkok" },
+  "by_avatar": [],
+  "by_channel": []
+}
+```
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| `400` | `validation_error` | Invalid date format or `start_date` after `end_date`. |
+| `401` | `unauthorized` | Missing or invalid bearer token. |
+| `403` | `forbidden` | Caller is not an active tenant administrator. |
+| `502` | `quota_unavailable` | Existing entitlement or Redis quota snapshot cannot be read. |
+| `503` | `analytics_unavailable` | ClickHouse projection/query is unavailable. |
+| `500` | `statistics_unavailable` | Unexpected aggregate or response construction failure. |
+
+The error response uses the existing shape:
+
+```json
+{ "error": "analytics unavailable", "code": "analytics_unavailable" }
+```
+
+### Projection operations
+
+The replay/backfill path is an operator job and is not exposed as an HTTP endpoint in Sprint 25. It reads Postgres `conversation_records` and `call_sessions`, then writes the deterministic ClickHouse fact through `internal/clickhouse`. Tenant users only consume the read endpoint above.
+
+See [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [05-ux-ui.md](05-ux-ui.md).

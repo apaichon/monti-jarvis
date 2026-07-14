@@ -3,7 +3,7 @@ id: DES-0003
 title: Entity Relationship Diagram
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-024
+sprint: SPRINT-025
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1393,3 +1393,51 @@ Migration placeholder: `scripts/migrations/024_customer_satisfaction_reviews.sql
 All new/extended audit fields are `created_at`, `updated_at`, `created_by`, and `updated_by`; the migration must preserve the existing `conversation_ratings` rows and unique tenant/call constraint.
 
 See [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md), [02-workflow.md](02-workflow.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).
+
+## Sprint 25 - tenant call-center analytics (ClickHouse)
+
+```mermaid
+erDiagram
+  tenants ||--o{ call_center_usage_facts : scopes
+  conversation_records ||--o{ call_center_usage_facts : projects
+  call_sessions ||--o{ call_center_usage_facts : supplies_source
+  ai_avatars ||--o{ call_center_usage_facts : handled_by
+
+  call_center_usage_facts {
+    String fact_id PK
+    String tenant_id FK
+    String call_id
+    String conversation_record_id FK
+    String avatar_id FK
+    String channel "chat|voice"
+    String source "production|preview"
+    String status "archived|archive_failed"
+    DateTime started_at
+    DateTime ended_at
+    Date usage_date
+    UInt32 duration_seconds
+    DateTime source_updated_at
+    DateTime created_at
+    DateTime updated_at
+    String created_by
+    String updated_by
+  }
+```
+
+The relationships above are logical cross-store links. ClickHouse does not enforce Postgres foreign keys; the projector validates the tenant and source ids before writing a fact.
+
+### Sprint 25 storage contract
+
+| Store | Contract |
+| --- | --- |
+| Postgres | Source of truth: `conversation_records`, `call_sessions`, tenant timezone/call limits, and package entitlements. No new Postgres table. |
+| Redis | Existing `monti_jarvis:quota:{tenant}:minutes:{YYYYMM}` and related quota keys remain authoritative for enforcement. No new key. |
+| ClickHouse | New `call_center_usage_facts` `ReplacingMergeTree` table with tenant/date ordering and audit columns. |
+| MinIO | No new object. Existing `calls/{tenant_id}/{call_id}/` archive objects are not read into dashboard facts. |
+| NATS | No required new event. Projection may run from the existing close/archive call path and a replay job. |
+
+Migration/bootstrap placeholder: `scripts/migrations/025_call_center_analytics.sql`.
+
+The ClickHouse table excludes customer id, email, phone, contact name, transcript content, rating comments, and audio paths. `fact_id` is deterministic so retries and bounded replay do not create duplicate logical sessions.
+
+See [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md), [02-workflow.md](02-workflow.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).

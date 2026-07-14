@@ -3,7 +3,7 @@ id: DES-0002
 title: Workflows
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-024
+sprint: SPRINT-025
 ---
 
 # Workflows — Monti Jarvis
@@ -1883,3 +1883,105 @@ sequenceDiagram
 ```
 
 See [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md), [03-er-diagram.md](03-er-diagram.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).
+
+## 73. Project completed call facts (Sprint 25)
+
+```mermaid
+sequenceDiagram
+  participant G as Go :8091
+  participant A as internal/analytics
+  participant P as Postgres callcenter
+  participant C as internal/clickhouse
+  participant H as ClickHouse monti_jarvis
+
+  G->>P: Conversation close/archive update
+  A->>P: Read conversation_records + call_sessions source
+  alt ended_at is missing
+    A-->>A: Ignore non-terminal source record
+  else completed record
+    A->>C: Build fact_id from conversation_record_id
+    C->>H: INSERT call_center_usage_facts FORMAT JSONEachRow
+    Note over C,H: ReplacingMergeTree(updated_at) makes retries logically idempotent
+    alt ClickHouse unavailable
+      H-->>C: connection or insert error
+      C-->>A: retryable projection error
+      A-->>G: Keep source close/archive successful; record freshness gap
+    else projection stored
+      H-->>C: insert accepted
+      C-->>A: projected
+    end
+  end
+```
+
+The projection is a read-model side effect. It never blocks call closure, MinIO archive writes, rating submission, or Redis quota enforcement.
+
+## 74. Tenant opens the call-center dashboard (Sprint 25)
+
+```mermaid
+sequenceDiagram
+  actor T as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant A as internal/auth
+  participant P as Postgres callcenter
+  participant R as Redis monti_jarvis:
+  participant C as internal/clickhouse
+  participant H as ClickHouse monti_jarvis
+
+  T->>B: Open /tenant/dashboard
+  B->>G: GET /api/tenant/call-center/statistics?start_date&end_date
+  G->>A: Resolve active tenant-admin context
+  alt missing or invalid tenant-admin context
+    A-->>G: unauthorized or forbidden
+    G-->>B: 401/403 stable error
+  else authorized
+    G->>P: Resolve tenant timezone and current call limits
+    G->>R: Read current package quota usage and limits
+    G->>C: Query facts by tenant and inclusive usage_date range
+    C->>H: SELECT FINAL aggregate by channel and avatar
+    H-->>C: KPI and breakdown rows
+    C-->>G: Tenant-scoped activity aggregate
+    alt ClickHouse unavailable
+      C-->>G: analytics unavailable
+      G-->>B: 503 analytics_unavailable
+    else query succeeds
+      G-->>B: 200 statistics + quota + freshness
+      B-->>T: Render KPI, breakdowns, filters, and state
+    end
+  end
+```
+
+The activity range applies to ClickHouse facts. The quota block reports the current package period and today's operational cap, so a historical range cannot be mistaken for the current enforcement counter.
+
+## 75. Operator replays a bounded analytics range (Sprint 25)
+
+```mermaid
+sequenceDiagram
+  actor O as Operator
+  participant A as internal/analytics replay job
+  participant P as Postgres callcenter
+  participant C as internal/clickhouse
+  participant H as ClickHouse monti_jarvis
+
+  O->>A: Run replay for tenant/date range
+  A->>P: Read ended conversation_records and call_sessions
+  loop each source record
+    A->>C: Build deterministic usage fact
+    C->>H: INSERT same fact_id with source_updated_at
+    H-->>C: Replace latest logical version during FINAL query
+  end
+  A-->>O: Report scanned, projected, skipped, and failed counts
+```
+
+Replay is an operator job and is intentionally not exposed as a tenant or customer HTTP endpoint.
+
+### Analytics projection outcomes
+
+| Outcome | Meaning | Dashboard behavior |
+| --- | --- | --- |
+| `not_eligible` | Source has no `ended_at` yet | Excluded from facts and counts |
+| `projected` | Latest fact inserted into ClickHouse | Included after ClickHouse visibility delay |
+| `retryable_error` | Source is complete but ClickHouse write failed | Source remains valid; dashboard may report stale freshness or `analytics_unavailable` |
+| `replayed` | Existing source range was safely projected again | No logical double count |
+
+See [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md), [03-er-diagram.md](03-er-diagram.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).

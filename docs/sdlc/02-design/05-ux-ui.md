@@ -3,7 +3,7 @@ id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-024
+sprint: SPRINT-025
 ---
 
 # UX/UI — ASCII Wireframes
@@ -2237,3 +2237,99 @@ Tenant opens T17-1
 | Rating schema/store | `internal/store/conversation_records.go` |
 
 See [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [04-api-spec.md](04-api-spec.md).
+
+## Sprint 25 - Tenant Call Center Statistics and Quota Usage (T18)
+
+Sprint 25 adds a tenant operations dashboard. The customer Caller Desk and platform admin surfaces do not change. The existing tenant Settings usage panel remains the package-detail view; T18 is the date-filtered activity and quota overview.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| T18-1 Tenant dashboard shell | Open `/tenant/dashboard` | `GET /api/tenant/call-center/statistics` |
+| T18-2 Range controls | Set start and end dates | `GET /api/tenant/call-center/statistics?start_date&end_date` |
+| T18-3 KPI row | Inspect sessions, channel totals, voice minutes, and average duration | Same statistics response |
+| T18-4 Quota panel | Inspect current monthly and daily quota usage | Same statistics response; enforcement remains `/api/tenant/usage` |
+| T18-5 Avatar breakdown | Compare sessions and voice minutes by AI employee | Same statistics response |
+| T18-6 Channel breakdown | Compare chat and voice activity | Same statistics response |
+| T18-7 Freshness/error state | Retry after projection or ClickHouse failure | Repeat `GET /api/tenant/call-center/statistics` |
+
+### Tenant dashboard layout
+
+```text
+┌─ Tenant shell / Overview / Call center statistics ─────────────────────────────────────┐
+│ Call center statistics / สถิติศูนย์บริการ                         [Tenant scoped]      │
+│ Completed conversations and quota usage for the selected date range                   │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ T18-2  Start [2026-07-14]  End [2026-07-14]  [Apply]  [Today]    Source: ClickHouse     │
+├──────────────────────┬──────────────────────┬──────────────────────┬───────────────────┤
+│ T18-3 Sessions        │ T18-3 Voice minutes │ T18-3 Chat sessions  │ T18-3 Avg duration│
+│ 18                   │ 32 min              │ 6                    │ 1m 46s            │
+├───────────────────────────────────────┬────────────────────────────────────────────────┤
+│ T18-4 Quota usage                     │ T18-5 By AI employee                            │
+│ Monthly 32 / 5000 min                 │ Ava       18 sessions · 32 voice min           │
+│ Remaining 4968 min                    │                                             │
+│ Today   18 / 180 min                  │                                             │
+├───────────────────────────────────────┼────────────────────────────────────────────────┤
+│ T18-6 By channel                      │ T18-7 Data freshness                            │
+│ Voice 12 sessions · 32 min            │ Last projected 10:19:48                         │
+│ Chat   6 sessions · 0 min             │ Generated 10:20:00 · Asia/Bangkok              │
+└───────────────────────────────────────┴────────────────────────────────────────────────┘
+```
+
+The dashboard keeps range activity and current quota values in separate labeled zones. It does not show customer ids, emails, transcripts, ticket notes, ratings comments, or audio object paths.
+
+### Mobile collapse
+
+On screens below 700px, the date controls stack into two rows and the Apply/Today actions occupy a full-width row. KPI cards use a two-column grid. Quota, avatar, channel, and freshness sections stack in that order. Long avatar names wrap within their row; no metric or action overlaps another zone.
+
+### Flow A - Tenant opens the dashboard
+
+```text
+Tenant selects Overview / Call center statistics
+    |
+    +--> Dashboard sets start=end=today in tenant timezone
+    |
+    +--> GET /api/tenant/call-center/statistics
+    |
+    +--> Loading state --> KPI, quota, breakdown, and freshness sections
+```
+
+### Flow B - Tenant changes the date range
+
+```text
+Tenant edits start/end dates
+    |
+    +--> Invalid range --> Inline validation; no request
+    |
+    +--> Apply --> GET statistics?start_date&end_date
+                    |
+                    +--> Data --> Replace all dashboard sections atomically
+                    +--> Empty --> Show zero metrics and a date-range hint
+```
+
+### Flow C - Analytics dependency is unavailable
+
+```text
+Dashboard request
+    |
+    +--> 503 analytics_unavailable
+          |
+          +--> Preserve selected date range
+          +--> Show "Analytics temporarily unavailable / ไม่สามารถโหลดสถิติได้"
+          +--> [Retry] repeats the same request
+```
+
+### Component -> file
+
+| Component | Path |
+| --- | --- |
+| Tenant dashboard route | `apps/tenant-web/src/routes/dashboard/+page.svelte` |
+| Dashboard API client and types | `apps/tenant-web/src/lib/api/callCenter.ts` |
+| Tenant navigation entry | `apps/tenant-web/src/routes/+layout.svelte` |
+| Statistics handler | `cmd/server/tenant_call_center.go` |
+| Analytics projection/read service | `internal/analytics/` |
+| ClickHouse facts client | `internal/clickhouse/call_center.go` |
+| ClickHouse schema/bootstrap | `scripts/migrations/025_call_center_analytics.sql` |
+
+See [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [04-api-spec.md](04-api-spec.md).

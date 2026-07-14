@@ -8,6 +8,9 @@ PLATFORM_ADMIN_WEB_DIR := apps/platform-admin-web
 TENANT_WEB_DIR := apps/tenant-web
 COMPOSE_FILE := infra/docker-compose.yml
 
+# Stale GOROOT (e.g. ~/tools/go without crypto/pbkdf2) shadows the go.mod toolchain stdlib.
+unexport GOROOT
+
 .PHONY: help build run start stop restart status logs test \
 	customer-web customer-dev platform-admin-web platform-admin-dev tenant-web tenant-dev clean-web clean km-seed db-migrate \
 	infra-check infra-up infra-down infra-init infra-destroy infra-reset dev-hosts up down

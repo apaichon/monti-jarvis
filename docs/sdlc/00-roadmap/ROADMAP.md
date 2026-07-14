@@ -48,7 +48,7 @@
 | 22 | Platform / Tenant | Conversation Records to Minio with optional (encrypt or not), Knowledge Gap | F | 1, 3 ✅ v2.3.0 |
 | 23 | Tenant, Customer | Tickets, AI conversation ask to open ticket to human in the loop | F | 22 ✅ v2.4.0 |
 | 24 | Tenant | Customer Review AI Satisfaction after conversation, Tenant view statistics | F | 22, 23 ✅ v2.5.0 |
-| 25 | Tenant | Dashboard : Call Center Statistics, Call Quota Usage | F | 22 (ClickHouse) |
+| 25 | Tenant | Dashboard : Call Center Statistics, Call Quota Usage | F | 22 (ClickHouse) ✅ v2.6.0 · [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
 | 26 | Tenant | Monitoring : System Performance | F | 25 |
 | 27 | Platform | Audit Log | G | 3 |
 | 28 | Platform | Monitoring : System Performance | G | 27 |
@@ -321,6 +321,12 @@ Sprint: [SPRINT-023.md](../03-sprints/SPRINT-023.md) · Feature: [FEAT-0025](../
 **Status:** completed · **Release:** v2.5.0 · **Commitment:** 16 points
 
 Sprint: [SPRINT-024.md](../03-sprints/SPRINT-024.md) · Feature: [FEAT-0026](../01-features/FEAT-0026-customer-satisfaction-statistics.md)
+
+## Shipped sprint: SPRINT-025
+
+**Status:** completed · **Release:** v2.6.0 · **Commitment:** 16 points
+
+Sprint: [SPRINT-025.md](../03-sprints/SPRINT-025.md) · Feature: [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md)
 
 ## Current sprint: none
 
