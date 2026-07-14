@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -49,11 +51,33 @@ type CallCenterBucket struct {
 }
 
 type callCenterQueryRow struct {
-	AvatarID     string `json:"avatar_id"`
-	Channel      string `json:"channel"`
-	Sessions     int    `json:"sessions"`
-	TotalSeconds int    `json:"total_duration_seconds"`
-	Freshness    string `json:"freshness"`
+	AvatarID     string        `json:"avatar_id"`
+	Channel      string        `json:"channel"`
+	Sessions     clickhouseInt `json:"sessions"`
+	TotalSeconds clickhouseInt `json:"total_duration_seconds"`
+	Freshness    string        `json:"freshness"`
+}
+
+// ClickHouse JSON FORMAT JSON serializes UInt values as strings by default.
+// Accept numbers too so this remains compatible with test and proxy servers.
+type clickhouseInt int
+
+func (value *clickhouseInt) UnmarshalJSON(data []byte) error {
+	var number int
+	if err := json.Unmarshal(data, &number); err == nil {
+		*value = clickhouseInt(number)
+		return nil
+	}
+	var text string
+	if err := json.Unmarshal(data, &text); err != nil {
+		return err
+	}
+	parsed, err := strconv.Atoi(strings.TrimSpace(text))
+	if err != nil {
+		return err
+	}
+	*value = clickhouseInt(parsed)
+	return nil
 }
 
 func (c *Client) EnsureCallCenterSchema(ctx context.Context) error {
@@ -124,23 +148,25 @@ FORMAT JSON`, quoteIdent(c.db), escape(tenantID), escape(startDate), escape(endD
 	avatar := make(map[string]*CallCenterBucket)
 	channel := make(map[string]*CallCenterBucket)
 	for _, row := range parsed.Data {
-		stats.CompletedConversations += row.Sessions
-		stats.TotalDurationSeconds += row.TotalSeconds
-		if row.Sessions > 0 {
+		sessions := int(row.Sessions)
+		totalSeconds := int(row.TotalSeconds)
+		stats.CompletedConversations += sessions
+		stats.TotalDurationSeconds += totalSeconds
+		if sessions > 0 {
 			bucket := avatar[row.AvatarID]
 			if bucket == nil {
 				bucket = &CallCenterBucket{ID: row.AvatarID}
 				avatar[row.AvatarID] = bucket
 			}
-			bucket.CompletedConversations += row.Sessions
-			bucket.TotalDurationSeconds += row.TotalSeconds
+			bucket.CompletedConversations += sessions
+			bucket.TotalDurationSeconds += totalSeconds
 			bucket = channel[row.Channel]
 			if bucket == nil {
 				bucket = &CallCenterBucket{Channel: row.Channel}
 				channel[row.Channel] = bucket
 			}
-			bucket.CompletedConversations += row.Sessions
-			bucket.TotalDurationSeconds += row.TotalSeconds
+			bucket.CompletedConversations += sessions
+			bucket.TotalDurationSeconds += totalSeconds
 		}
 		if parsedTime, parseErr := time.Parse("2006-01-02 15:04:05", row.Freshness); parseErr == nil && parsedTime.After(stats.Freshness) {
 			stats.Freshness = parsedTime
@@ -155,8 +181,12 @@ FORMAT JSON`, quoteIdent(c.db), escape(tenantID), escape(startDate), escape(endD
 		bucket.AverageDurationSeconds = averageSeconds(bucket.TotalDurationSeconds, bucket.CompletedConversations)
 		stats.ByChannel = append(stats.ByChannel, *bucket)
 	}
-	sort.Slice(stats.ByAvatar, func(i, j int) bool { return stats.ByAvatar[i].CompletedConversations > stats.ByAvatar[j].CompletedConversations })
-	sort.Slice(stats.ByChannel, func(i, j int) bool { return stats.ByChannel[i].CompletedConversations > stats.ByChannel[j].CompletedConversations })
+	sort.Slice(stats.ByAvatar, func(i, j int) bool {
+		return stats.ByAvatar[i].CompletedConversations > stats.ByAvatar[j].CompletedConversations
+	})
+	sort.Slice(stats.ByChannel, func(i, j int) bool {
+		return stats.ByChannel[i].CompletedConversations > stats.ByChannel[j].CompletedConversations
+	})
 	return stats, nil
 }
 

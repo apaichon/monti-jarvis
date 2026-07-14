@@ -20,9 +20,9 @@ func TestQueryCallCenterStatsAggregatesDimensions(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[
-{"avatar_id":"ava","channel":"voice","sessions":2,"total_duration_seconds":90,"freshness":"2026-07-14 09:00:00"},
-{"avatar_id":"ava","channel":"chat","sessions":1,"total_duration_seconds":30,"freshness":"2026-07-14 09:05:00"},
-{"avatar_id":"neo","channel":"voice","sessions":1,"total_duration_seconds":120,"freshness":"2026-07-14 09:03:00"}]}`))
+{"avatar_id":"ava","channel":"voice","sessions":"2","total_duration_seconds":"90","freshness":"2026-07-14 09:00:00"},
+{"avatar_id":"ava","channel":"chat","sessions":"1","total_duration_seconds":"30","freshness":"2026-07-14 09:05:00"},
+{"avatar_id":"neo","channel":"voice","sessions":"1","total_duration_seconds":"120","freshness":"2026-07-14 09:03:00"}]}`))
 	}))
 	defer server.Close()
 
