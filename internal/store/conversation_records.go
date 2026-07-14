@@ -319,6 +319,17 @@ WHERE r.tenant_id=$1 AND r.id=$2`, schema, schema, schema, schema), tenantID, id
 	return scanConversationRecord(row)
 }
 
+func (s *Store) GetConversationRecordByCallID(ctx context.Context, tenantID, callID string) (ConversationRecord, error) {
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	row := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT r.id,r.tenant_id,r.call_id,r.customer_id,r.avatar_id,COALESCE(a.name,''),r.channel,r.status,r.started_at,r.ended_at,r.duration_seconds,r.summary,
+(SELECT COUNT(*) FROM %s.conversation_archive_objects o WHERE o.conversation_record_id=r.id),
+(SELECT COUNT(*) FROM %s.knowledge_gap_candidates g WHERE g.conversation_record_id=r.id)
+FROM %s.conversation_records r LEFT JOIN %s.ai_avatars a ON a.id=r.avatar_id
+WHERE r.tenant_id=$1 AND r.call_id=$2
+ORDER BY r.created_at DESC LIMIT 1`, schema, schema, schema, schema), tenantID, callID)
+	return scanConversationRecord(row)
+}
+
 func (s *Store) ListConversationArchiveObjects(ctx context.Context, tenantID, conversationRecordID string) ([]ConversationArchiveObject, error) {
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	rows, err := s.pg.Query(ctx, fmt.Sprintf(`SELECT id,tenant_id,conversation_record_id,object_key,object_type,content_type,size_bytes,checksum_sha256,protection_mode,status,error_code,stored_at

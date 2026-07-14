@@ -16,11 +16,11 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** _none_ — next sprint planning pending.
+**Current sprint:** [`SPRINT-023`](03-sprints/SPRINT-023.md) — Tickets and Human Escalation · **completed** · release **v2.4.0**
 
-**Parallel build:** _none_ — next parallel stream pending.
+**Parallel build:** _none_ — Sprint 23 has shipped.
 
-**Latest shipped:** [`SPRINT-022`](03-sprints/SPRINT-022.md) — Conversation Records and Knowledge Gaps · **v2.3.0**
+**Latest shipped:** [`SPRINT-023`](03-sprints/SPRINT-023.md) — Tickets and Human Escalation · **v2.4.0**
 
 **Shipped:** v2.3.0 [`SPRINT-022`](03-sprints/SPRINT-022.md) · v2.2.0 [`SPRINT-021`](03-sprints/SPRINT-021.md) · v2.1.0 [`SPRINT-020`](03-sprints/SPRINT-020.md) · v2.0.0 [`SPRINT-019`](03-sprints/SPRINT-019.md) · v1.9.0 [`SPRINT-018`](03-sprints/SPRINT-018.md) · v1.8.0 [`SPRINT-017`](03-sprints/SPRINT-017.md) · v1.7.0 [`SPRINT-016`](03-sprints/SPRINT-016.md) · v1.6.0 [`SPRINT-015`](03-sprints/SPRINT-015.md) · v1.5.0 [`SPRINT-014`](03-sprints/SPRINT-014.md) · v1.4.0 [`SPRINT-013`](03-sprints/SPRINT-013.md) · v1.3.0 SPRINT-008–012 · v0.8.0 [`SPRINT-007`](03-sprints/SPRINT-007.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
 

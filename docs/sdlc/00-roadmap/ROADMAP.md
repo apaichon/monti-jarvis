@@ -310,17 +310,15 @@ Browser OTP/account smoke passed on the Libra Tech tenant, and automated Go/cust
 
 Sprint: [SPRINT-020.md](../03-sprints/SPRINT-020.md) · Feature: [FEAT-0022](../01-features/FEAT-0022-customer-auth.md) · Spec: [23-customer-auth-spec.md](../02-design/23-customer-auth-spec.md) · UAT: [SPRINT-020-manual.md](../06-manual-tests/SPRINT-020-manual.md)
 
-## Current sprint: SPRINT-021
+## Shipped sprint: SPRINT-023
 
-**Status:** in progress · **Target:** v2.2.0 · **Commitment:** 16 points
+**Status:** completed · **Release:** v2.4.0 · **Commitment:** 16 points
 
-Sprint: [SPRINT-021.md](../03-sprints/SPRINT-021.md) · Feature: [FEAT-0023](../01-features/FEAT-0023-authenticated-workforce-selection.md)
+Sprint: [SPRINT-023.md](../03-sprints/SPRINT-023.md) · Feature: [FEAT-0025](../01-features/FEAT-0025-tickets-human-escalation.md)
 
-## Parallel build sprint: SPRINT-022
+## Parallel build sprint: none
 
-**Status:** in progress · **Target:** v2.3.0 · **Commitment:** 16 points
-
-Sprint: [SPRINT-022.md](../03-sprints/SPRINT-022.md) · Feature: [FEAT-0024](../01-features/FEAT-0024-conversation-records-knowledge-gaps.md)
+**Status:** no parallel stream
 
 ## Backlog add: SPRINT-036 — Embed Framework SDKs
 

@@ -2,8 +2,8 @@
 id: DES-0004
 title: API Specification
 status: approved
-updated: 2026-07-13
-sprint: SPRINT-022
+updated: 2026-07-14
+sprint: SPRINT-023
 ---
 
 # API Specification — Monti Jarvis
@@ -2031,5 +2031,162 @@ Retries failed archive writes.
 | 404 | `not_found` | Cross-tenant or missing record/gap |
 | 409 | `archive_not_retryable` | Archive object is already stored/deleted |
 | 502 | `archive_write_failed` | MinIO write failed |
+
+## Tickets & Human Escalation (Sprint 23)
+
+**Auth:** customer ticket creation is public or `customer` according to the existing tenant policy. Tenant queue APIs require `tenant_admin`; tenant id always comes from the token context.
+
+### `POST /api/customer/tickets`
+
+Creates a tenant ticket only after the customer explicitly confirms the structured `ticket_offer`. For anonymous callers, `contact_email` is required for follow-up. Send the same `Idempotency-Key` on retries.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `call_id` | string | conditional | Source call/session id when available |
+| `conversation_record_id` | string | no | Finalized Sprint 22 record, when available |
+| `confirm_escalation` | boolean | yes | Must be `true`; an offer alone never creates a ticket |
+| `subject` | string | yes | 1-160 characters |
+| `description` | string | yes | 1-2000 character bounded summary |
+| `category` | string | yes | `general`, `billing`, `technical`, `other` |
+| `contact_name` | string | no | Bounded anonymous requester name |
+| `contact_email` | string | conditional | Required when no customer session identifies follow-up contact |
+
+**Request**
+
+```json
+{
+  "call_id": "call_01",
+  "conversation_record_id": "crec_01",
+  "confirm_escalation": true,
+  "subject": "Need a human follow-up",
+  "description": "Customer requested human help with a billing question.",
+  "category": "billing",
+  "contact_name": "PUP",
+  "contact_email": "customer@example.com"
+}
+```
+
+**Response `201`**
+
+```json
+{
+  "ticket": {
+    "id": "tick_01",
+    "status": "open",
+    "priority": "normal",
+    "category": "billing",
+    "source": "customer_request",
+    "conversation_record_id": "crec_01",
+    "created_at": "2026-07-15T10:02:00Z"
+  }
+}
+```
+
+### `GET /api/tenant/tickets`
+
+Returns the current tenant's queue. The default view is recent tickets; clients may pass date filters for historical review.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `start_date` | date | no | Inclusive `YYYY-MM-DD` start filter |
+| `end_date` | date | no | Inclusive `YYYY-MM-DD` end filter |
+| `status` | string | no | `open`, `in_progress`, `waiting_customer`, `resolved`, `closed` |
+| `priority` | string | no | `low`, `normal`, `high`, `urgent` |
+| `category` | string | no | `general`, `billing`, `technical`, `other` |
+| `avatar_id` | string | no | Filter by source AI employee |
+| `customer_id` | string | no | Filter by known customer |
+| `assignee_user_id` | string | no | Filter by assigned tenant user |
+
+**Response `200`**
+
+```json
+{
+  "tickets": [
+    {
+      "id": "tick_01",
+      "subject": "Need a human follow-up",
+      "category": "billing",
+      "priority": "normal",
+      "status": "open",
+      "customer_label": "PUP",
+      "avatar_id": "ava",
+      "source": "customer_request",
+      "last_activity_at": "2026-07-15T10:02:00Z"
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+### `GET /api/tenant/tickets/{id}`
+
+Returns safe ticket detail, masked requester contact, source conversation summary/link, and the ticket event timeline. A missing or cross-tenant id returns `404 not_found`.
+
+**Response `200`**
+
+```json
+{
+  "ticket": {
+    "id": "tick_01",
+    "subject": "Need a human follow-up",
+    "description": "Customer requested human help with a billing question.",
+    "category": "billing",
+    "priority": "normal",
+    "status": "open",
+    "assignee_user_id": null,
+    "contact_email_masked": "c***@example.com",
+    "conversation_record_id": "crec_01"
+  },
+  "events": [
+    { "type": "created", "actor_type": "customer", "created_at": "2026-07-15T10:02:00Z" }
+  ]
+}
+```
+
+### `PATCH /api/tenant/tickets/{id}`
+
+Updates operator-controlled fields and validates the lifecycle transition.
+
+**Request**
+
+```json
+{ "status": "in_progress", "priority": "high", "assignee_user_id": "usr_01" }
+```
+
+**Response `200`**
+
+```json
+{ "ticket": { "id": "tick_01", "status": "in_progress", "priority": "high", "assignee_user_id": "usr_01" } }
+```
+
+### `POST /api/tenant/tickets/{id}/events`
+
+Adds a bounded internal note to the tenant ticket timeline.
+
+**Request**
+
+```json
+{ "type": "note", "note": "Asked billing team to review the invoice." }
+```
+
+**Response `201`**
+
+```json
+{ "event": { "id": "tev_01", "type": "note_added", "created_at": "2026-07-15T10:05:00Z" } }
+```
+
+### Ticket errors
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `validation_error` | Missing confirmation, invalid filter, field, or lifecycle transition |
+| 401 | `customer_auth_required` / `unauthorized` | Tenant policy requires customer auth or Bearer is invalid |
+| 403 | `forbidden` | Wrong role or ticket creation disabled |
+| 404 | `not_found` | Missing/cross-tenant source or ticket id |
+| 409 | `ticket_already_open` | Same source conversation already has an open ticket without a matching idempotency key |
+| 409 | `idempotency_conflict` | Idempotency key reused with a different request body |
+| 429 | `ticket_rate_limited` | Optional per-customer daily ticket guard exceeded |
+
+See [26-tickets-human-escalation-spec.md](26-tickets-human-escalation-spec.md), [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [05-ux-ui.md](05-ux-ui.md).
 
 See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md), [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), [05-ux-ui.md](05-ux-ui.md), and [docs/KM_SETUP.md](../../KM_SETUP.md).

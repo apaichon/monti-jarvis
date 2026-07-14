@@ -2,8 +2,8 @@
 id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
-updated: 2026-07-13
-sprint: SPRINT-022
+updated: 2026-07-14
+sprint: SPRINT-023
 ---
 
 # UX/UI — ASCII Wireframes
@@ -2047,5 +2047,102 @@ RAG cannot answer from tenant KM
 | Tenant records/gaps API client | `apps/tenant-web/src/lib/api/operations.ts` |
 | Archive/gap handlers | `cmd/server/conversation_records.go`, `cmd/server/knowledge_gaps.go` |
 | Archive/gap store | `internal/store/conversation_records.go`, `internal/km/` |
+
+## Sprint 23 - Tickets and Human Escalation (T16)
+
+Customer UI adds a confirmation step for human follow-up. Tenant UI adds a queue and detail workflow; it does not provide live transfer or customer ticket history.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| C15-1 | Receive structured human-follow-up offer during chat/voice | Existing chat/voice event stream: `ticket_offer` |
+| C15-2 | Confirm human follow-up | `POST /api/customer/tickets` |
+| C15-3 | Decline/dismiss offer | No ticket API call; conversation continues |
+| T16-1 | Open tenant ticket queue | `GET /api/tenant/tickets` |
+| T16-2 | Filter by date, status, priority, category, avatar, assignee | `GET /api/tenant/tickets?...` |
+| T16-3 | Inspect ticket, source conversation, and timeline | `GET /api/tenant/tickets/{id}` |
+| T16-4 | Change lifecycle, priority, or assignee | `PATCH /api/tenant/tickets/{id}` |
+| T16-5 | Add internal note | `POST /api/tenant/tickets/{id}/events` |
+
+### Customer confirmation surface
+
+```text
+┌─ Caller Desk / Human follow-up ─────────────────────────────────────┐
+│ Ava: I can ask the tenant team to follow up with you.               │
+│ Summary: Billing question                                            │
+│                                                                      │
+│ Contact email [ customer@example.com                    ]           │
+│ [Create ticket]                         [Continue with AI]           │
+│                                                                      │
+│ Your request will be sent to the tenant team. This is not a live    │
+│ transfer.                                                            │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Voice clients receive the same `ticket_offer` event and the AI speaks the offer. The client only calls the create API after a confirmed customer action or a voice confirmation mapped to the same idempotency key.
+
+### Tenant ticket queue layout
+
+```text
+┌─ Tenant shell / Operations / Tickets ─────────────────────────────────────────────┐
+│ Tickets                                                        [New ticket: out] │
+│ Date [Today ▾] Status [Open ▾] Priority [All ▾] Category [All ▾] [Search]        │
+├───────────────────────────────────────────────┬───────────────────────────────────┤
+│ Queue                                         │ Detail: tick_01                    │
+│ ID       Subject             Priority Status  │ Need a human follow-up             │
+│ tick_01  Billing question    Normal   Open    │ PUP · Ava · voice · 10:02          │
+│ tick_02  Account access      High     Working │ Contact c***@example.com           │
+│                                               │ Source: crec_01 [Open record]      │
+│                                               │ Assignee [Unassigned ▾]             │
+│                                               │ Status [Open ▾] Priority [Normal ▾] │
+│                                               │ Timeline                           │
+│                                               │ • created · customer confirmed     │
+│                                               │ Note [___________________________] │
+│                                               │ [Add note] [Save changes]           │
+└───────────────────────────────────────────────┴───────────────────────────────────┘
+```
+
+### Mobile collapse
+
+On narrow screens, T16-1 queue is shown first. Selecting a row opens T16-3 as a full-width detail view with a back control. Filters wrap into a two-row toolbar; the timeline and note composer remain below the ticket metadata so controls never overlap.
+
+### Flow A - Customer confirms escalation
+
+```text
+AI detects explicit human-help request or approved escalation signal
+    │
+    ├─► Send ticket_offer event and speak/display the offer
+    │
+    ├─► Customer declines ──► Continue conversation; no ticket
+    │
+    └─► Customer confirms ──► POST /api/customer/tickets
+                                │
+                                ├─► 201 open ticket
+                                └─► 409/4xx safe error state
+```
+
+### Flow B - Tenant triages ticket
+
+```text
+Tenant opens T16-1
+    │
+    ├─► GET /api/tenant/tickets with default Today/Open filters
+    ├─► Select row ──► GET /api/tenant/tickets/{id}
+    ├─► Change status/priority/assignee ──► PATCH ticket
+    └─► Add internal note ──► POST ticket event
+```
+
+### Component -> file
+
+| Component | Path |
+| --- | --- |
+| Customer ticket offer and confirmation | `apps/customer-web/src/routes/+page.svelte` |
+| Customer ticket API client | `apps/customer-web/src/lib/api/tickets.ts` |
+| Tenant tickets route | `apps/tenant-web/src/routes/tickets/+page.svelte` |
+| Tenant ticket API client | `apps/tenant-web/src/lib/api/tickets.ts` |
+| Ticket handlers | `cmd/server/tickets.go` |
+| Ticket store/schema | `internal/store/tickets.go` |
+| Ticket event publisher | `internal/tickets/` |
 
 See [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md) · [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md) · [06-auth-spec.md](06-auth-spec.md) · [08-packages-spec.md](08-packages-spec.md) · [02-workflow.md](02-workflow.md) · [03-er-diagram.md](03-er-diagram.md) · [04-api-spec.md](04-api-spec.md).

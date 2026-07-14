@@ -11,7 +11,8 @@
     subscribeTurns,
     type CallSession
   } from '$lib/api/calls';
-  import { sendChat, type ChatMessage as ChatHistoryEntry, type ChatSource } from '$lib/api/chat';
+  import { sendChat, type ChatMessage as ChatHistoryEntry, type ChatSource, type TicketOffer } from '$lib/api/chat';
+  import { createCustomerTicket } from '$lib/api/tickets';
   import { formatInfra, loadInfra } from '$lib/api/infra';
   import { classifyTone } from '$lib/tone';
   import { loadWorkforce, type Agent } from '$lib/api/workforce';
@@ -89,6 +90,11 @@
   let portalPolicy = $state<CustomerPortalPolicy | null>(null);
   let quota = $state<CustomerQuotaSummary | null>(null);
   let callControlsExpanded = $state(false);
+  let ticketOffer = $state<TicketOffer | null>(null);
+  let ticketContactEmail = $state('');
+  let ticketContactName = $state('');
+  let ticketBusy = $state(false);
+  let ticketError = $state('');
 
   let tone = $state('');
   let toneTimer: ReturnType<typeof setTimeout> | undefined;
@@ -98,6 +104,8 @@
   let timerId: ReturnType<typeof setInterval> | undefined;
   let warningTimerId: ReturnType<typeof setTimeout> | undefined;
   let timeoutTimerId: ReturnType<typeof setTimeout> | undefined;
+  let autoCloseTimerId: ReturnType<typeof setInterval> | undefined;
+  let autoClosePending = $state(false);
   let unsubscribe: (() => void) | undefined;
   const transcriptKeys = new Set<string>();
 
@@ -202,10 +210,13 @@
     clearInterval(timerId);
     clearTimeout(warningTimerId);
     clearTimeout(timeoutTimerId);
+    clearInterval(autoCloseTimerId);
     timer = '00:00:00';
     remainingTimer = '00:00:00';
     remainingSeconds = 0;
     activeCallLimitSeconds = 0;
+    autoCloseTimerId = undefined;
+    autoClosePending = false;
   }
 
   async function scrollChat() {
@@ -274,6 +285,109 @@
     const initial = uiRole === 'assistant' ? agentInitial(selectedAgent?.name) : 'C';
     appendOrMergeTranscript(uiRole, content, initial);
     if (uiRole === 'assistant') showTone(content);
+    const offer = uiRole === 'user' ? ticketOfferForText(content) : null;
+    if (offer) {
+      openTicketOffer(offer);
+    }
+  }
+
+  function callerFinished(text: string) {
+    const normalized = text
+      .toLowerCase()
+      .replace(/[\s!?.,…]+/g, '');
+    return [
+      /ไม่มี(?:แล้ว)?(?:ครับ|ค่ะ)?ขอบคุณ(?:ครับ|ค่ะ)?/,
+      /ไม่มีอะไรแล้ว(?:ครับ|ค่ะ)?/,
+      /หมดคำถามแล้ว(?:ครับ|ค่ะ)?/,
+      /that'sall(?:thankyou)?/,
+      /nomorequestions(?:thankyou)?/,
+      /nothingelse(?:thankyou)?/,
+      /that'sit(?:thankyou)?/
+    ].some((pattern) => pattern.test(normalized));
+  }
+
+  function scheduleCustomerFinishedClose() {
+    if (!live || !session || autoClosePending || busy) return;
+    autoClosePending = true;
+    let seconds = 5;
+    voiceState = `ขออนุญาตวางสายก่อนนะครับ ปิดสายภายใน ${seconds} วินาที`;
+    voice?.sendText(
+      'The caller said there is nothing else and thanked you. Respond in Thai: "ขออนุญาตวางสายก่อนนะครับ ขอบคุณครับ". Do not ask another question. The call will close in five seconds.'
+    );
+    autoCloseTimerId = setInterval(() => {
+      seconds -= 1;
+      if (seconds <= 0) {
+        clearInterval(autoCloseTimerId);
+        autoCloseTimerId = undefined;
+        void hangUp('customer_finished');
+        return;
+      }
+      voiceState = `ขออนุญาตวางสายก่อนนะครับ ปิดสายภายใน ${seconds} วินาที`;
+    }, 1000);
+  }
+
+  function ticketOfferForText(text: string): TicketOffer | null {
+    const normalized = text.toLowerCase();
+    const signals = ['human agent', 'live agent', 'real person', 'speak to a person', 'talk to someone', 'escalate', 'มนุษย์', 'เจ้าหน้าที่', 'คุยกับคน', 'ขอคน'];
+    if (!signals.some((signal) => normalized.includes(signal))) return null;
+    return {
+      subject: 'Human follow-up requested',
+      category: topic === 'billing' || topic === 'technical' ? topic : 'general',
+      reason: `Customer context: ${boundedCustomerContext(text)}`
+    };
+  }
+
+  function boundedCustomerContext(text: string) {
+    const value = text.trim().replace(/\s+/g, ' ');
+    return value.length > 500 ? `${value.slice(0, 500)}…` : value;
+  }
+
+  function openTicketOffer(offer: TicketOffer) {
+    if (ticketOffer) return;
+    ticketOffer = offer;
+    ticketError = '';
+    ticketContactEmail = customer?.email || '';
+    ticketContactName = customer?.display_name || '';
+  }
+
+  function declineTicketOffer() {
+    ticketOffer = null;
+    ticketError = '';
+  }
+
+  async function confirmTicketOffer() {
+    if (!ticketOffer || ticketBusy) return;
+    const callId = session?.id || chatSessionId;
+    if (!callId) {
+      ticketError = 'Start a chat or call before requesting follow-up.';
+      return;
+    }
+    if (!customer && !ticketContactEmail.trim()) {
+      ticketError = 'Enter an email so the tenant team can contact you.';
+      return;
+    }
+    ticketBusy = true;
+    ticketError = '';
+    try {
+      const result = await createCustomerTicket(
+        {
+          call_id: callId,
+          confirm_escalation: true,
+          subject: ticketOffer.subject,
+          description: ticketOffer.reason,
+          category: ticketOffer.category,
+          contact_name: ticketContactName.trim() || undefined,
+          contact_email: ticketContactEmail.trim() || undefined
+        },
+        { tenantId: tenantId || undefined, idempotencyKey: `customer-escalation:${callId}` }
+      );
+      addMessage('assistant', `Your follow-up request is confirmed. Reference ${result.ticket.id}.`, agentInitial(selectedAgent?.name));
+      ticketOffer = null;
+    } catch (err) {
+      ticketError = err instanceof Error ? err.message : 'Could not create follow-up ticket';
+    } finally {
+      ticketBusy = false;
+    }
   }
 
   async function startCall() {
@@ -289,6 +403,7 @@
     busy = true;
     callControlsExpanded = false;
     transcriptKeys.clear();
+    autoClosePending = false;
     voiceState = 'Connecting…';
     try {
       const gemini = new GeminiVoice();
@@ -316,6 +431,9 @@
             onTranscript: (role, text, meta) => {
               // Live caption grows as partial ASR chunks merge into full sentences.
               upsertVoiceTurn(role, text);
+              if (role === 'caller' && meta?.final && callerFinished(text)) {
+                scheduleCustomerFinishedClose();
+              }
               // Persist only finalized turns (not every short partial fragment).
               if (meta?.final && session) void persistTurn(session.id, role, text);
             },
@@ -333,6 +451,9 @@
         created.id,
         (turn) => {
           upsertVoiceTurn(turn.role, turn.content);
+          if (turn.role === 'caller' && callerFinished(turn.content)) {
+            scheduleCustomerFinishedClose();
+          }
         },
         tenantId ? { tenantId } : undefined
       );
@@ -351,7 +472,7 @@
     }
   }
 
-  async function hangUp(reason: 'manual' | 'timeout' = 'manual') {
+  async function hangUp(reason: 'manual' | 'timeout' | 'customer_finished' = 'manual') {
     if (!session) return;
     const endedCallId = session.id;
     busy = true;
@@ -501,6 +622,7 @@
         tenantId ? { tenantId } : undefined
       );
       chatSessionId = data.session_id;
+      if (data.ticket_offer) openTicketOffer(data.ticket_offer);
       messages = messages.map((m) =>
         m.id === thinking.id
           ? { ...m, content: data.reply, sources: data.sources, missingKm: data.missing_km }
@@ -797,6 +919,26 @@
     </section>
 
     <section class="composer-wrap">
+      {#if ticketOffer}
+        <section class="escalation-offer" aria-live="polite">
+          <div>
+            <p class="eyebrow">Human follow-up</p>
+            <h3>Would you like the tenant team to contact you?</h3>
+            <p>{ticketOffer.reason}</p>
+          </div>
+          {#if !customer}
+            <div class="ticket-contact">
+              <input bind:value={ticketContactEmail} type="email" placeholder="Contact email" autocomplete="email" />
+              <input bind:value={ticketContactName} placeholder="Name (optional)" autocomplete="name" />
+            </div>
+          {/if}
+          {#if ticketError}<div class="error">{ticketError}</div>{/if}
+          <div class="escalation-actions">
+            <button class="send" type="button" disabled={ticketBusy} onclick={confirmTicketOffer}>{ticketBusy ? 'Creating…' : 'Request follow-up'}</button>
+            <button class="plain-button" type="button" disabled={ticketBusy} onclick={declineTicketOffer}>No thanks</button>
+          </div>
+        </section>
+      {/if}
       <form onsubmit={submitChat}>
         <div class="composer">
           <textarea

@@ -2,8 +2,8 @@
 id: DES-0003
 title: Entity Relationship Diagram
 status: approved
-updated: 2026-07-13
-sprint: SPRINT-022
+updated: 2026-07-14
+sprint: SPRINT-023
 ---
 
 # ER Diagram — Monti Jarvis
@@ -667,7 +667,8 @@ monti-jarvis/
 | 18 ✅ v1.9.0 | `customer_tiers`, `customer_groups` |
 | 19 🔄 v2.0.0 | `customers`, `customer_group_members`, `customer_import_jobs`, `customer_domain_rules` |
 | 21 | Runtime voice failover + `ai_employee_configs` embedding bindings (voice stays on `ai_avatar_voices`) |
-| 22 | `conversation_records` (ClickHouse denorm) |
+| 22 ✅ v2.3.0 | `conversation_records`, `conversation_archive_objects`, `knowledge_gap_candidates` |
+| 23 (in progress) | `tickets`, `ticket_events` |
 | backlog | optional `quota_usage_events` audit (not in S13 commitment) |
 
 ## Sprint 13 — Quota (Redis + existing Postgres reads)
@@ -1283,5 +1284,70 @@ erDiagram
 | ClickHouse | No new required table in S22; later dashboards may project record/gap aggregates |
 
 Migration placeholder: `scripts/migrations/022_conversation_records_knowledge_gaps.sql`.
+
+## Sprint 23 — tickets and human escalation
+
+```mermaid
+erDiagram
+  tenants ||--o{ tickets : owns
+  conversation_records ||--o{ tickets : can_create
+  calls ||--o{ tickets : references
+  customers ||--o{ tickets : requests
+  ai_avatars ||--o{ tickets : handled_by
+  tickets ||--o{ ticket_events : records
+  users ||--o{ tickets : assigned_to
+
+  tickets {
+    text id PK
+    text tenant_id FK
+    text conversation_record_id FK
+    text call_id
+    text customer_id FK
+    text avatar_id FK
+    text subject
+    text description
+    text category "general|billing|technical|other"
+    text priority "low|normal|high|urgent"
+    text status "open|in_progress|waiting_customer|resolved|closed"
+    text source "customer_request|agent_escalation|tenant_created"
+    text assignee_user_id FK
+    text contact_name
+    text contact_email
+    timestamptz resolved_at
+    timestamptz closed_at
+    timestamptz last_activity_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  ticket_events {
+    text id PK
+    text tenant_id FK
+    text ticket_id FK
+    text event_type "created|status_changed|priority_changed|assigned|note_added|customer_confirmed"
+    text actor_type "system|customer|tenant_user"
+    text actor_id
+    text note
+    jsonb payload
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Sprint 23 storage contracts
+
+| Store | Contract |
+| --- | --- |
+| Postgres | Source of truth for tenant ticket state and append-only operator/customer events |
+| Redis | `monti_jarvis:ticket:idempotency:{tenant_id}:{key}` with a bounded TTL; optional per-customer daily abuse guard |
+| NATS | `ticket.created` and `ticket.updated` with tenant and ticket metadata only |
+| ClickHouse | No new table; ticket analytics are deferred |
+| MinIO | Reuse Sprint 22 conversation archive links; no new ticket object path |
+
+Migration placeholder: `scripts/migrations/023_tickets_human_escalation.sql`.
 
 See [01-architecture.md](01-architecture.md) · [08-packages-spec.md](08-packages-spec.md) · [10-avatars-spec.md](10-avatars-spec.md) · [11-tenant-register-spec.md](11-tenant-register-spec.md) · [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md) · [13-payment-gateway-spec.md](13-payment-gateway-spec.md) · [14-buy-package-spec.md](14-buy-package-spec.md) · [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md) · [17-embed-to-web-spec.md](17-embed-to-web-spec.md) · [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md) · [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md) · [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md) · [21-customer-tier-spec.md](21-customer-tier-spec.md) · [22-customer-account-import-spec.md](22-customer-account-import-spec.md) · [23-customer-auth-spec.md](23-customer-auth-spec.md) · [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md) · [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md) · [02-workflow.md](02-workflow.md) · [04-api-spec.md](04-api-spec.md) · [05-ux-ui.md](05-ux-ui.md).

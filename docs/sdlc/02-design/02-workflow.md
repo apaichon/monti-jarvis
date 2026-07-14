@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: approved
-updated: 2026-07-13
-sprint: SPRINT-022
+updated: 2026-07-14
+sprint: SPRINT-023
 ---
 
 # Workflows — Monti Jarvis
@@ -1715,5 +1715,98 @@ sequenceDiagram
 | `knowledge_gap_candidates` | `snoozed` | Hidden until review date |
 | `knowledge_gap_candidates` | `resolved` | Tenant addressed the gap or linked KM work |
 | `knowledge_gap_candidates` | `ignored` | Tenant decided no action is needed |
+
+## 68. Customer confirms human follow-up ticket (Sprint 23)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser / voice client
+  participant G as Go :8091
+  participant T as internal/tickets
+  participant A as internal/auth
+  participant P as Postgres callcenter
+  participant R as Redis
+  participant N as NATS
+
+  T->>B: ticket_offer {subject, category, source_call_id}
+  C->>B: Confirm human follow-up
+  B->>G: POST /api/customer/tickets {confirm_escalation:true}
+  G->>A: Resolve tenant/customer policy and session
+  alt auth required and no customer session
+    A-->>G: customer_auth_required
+    G-->>B: 401 customer_auth_required
+  else anonymous request has no contact email
+    G-->>B: 400 contact_required
+  else confirmed
+    G->>R: SETNX ticket idempotency key with TTL
+    alt duplicate confirmation
+      R-->>G: existing ticket id
+      G-->>B: 200 existing ticket
+    else first confirmation
+      G->>P: Validate source call/record in tenant scope
+      G->>P: INSERT tickets + ticket_events(created, customer_confirmed)
+      G->>N: ticket.created {tenant_id, ticket_id, source_id, status}
+      G-->>B: 201 ticket {id, status: open}
+    end
+  end
+```
+
+### Ticket offer states
+
+| State | Meaning |
+| --- | --- |
+| `offered` | Runtime asked the customer whether human follow-up is wanted; no ticket exists |
+| `confirmed` | Customer explicitly confirmed; create request may proceed |
+| `declined` | Customer declined or dismissed the offer; conversation continues normally |
+| `created` | Ticket and first event were persisted |
+
+## 69. Tenant triages ticket queue (Sprint 23)
+
+```mermaid
+sequenceDiagram
+  actor T as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant S as internal/tickets
+  participant P as Postgres callcenter
+  participant N as NATS
+
+  T->>B: Open Tickets
+  B->>G: GET /api/tenant/tickets?status=open&filters...
+  G->>S: Resolve tenant from JWT and validate filters
+  S->>P: SELECT tickets WHERE tenant_id = token.tenant_id
+  P-->>S: ticket queue rows
+  S-->>G: safe queue rows
+  G-->>B: 200 tickets[]
+  T->>B: Open ticket detail
+  B->>G: GET /api/tenant/tickets/{id}
+  G->>P: Load ticket + source record + events in tenant scope
+  G-->>B: 200 ticket detail
+  T->>B: Change status, priority, assignee, or add note
+  B->>G: PATCH /api/tenant/tickets/{id} or POST /events
+  alt invalid transition or cross-tenant id
+    G-->>B: 400 validation_error or 404 not_found
+  else valid update
+    G->>P: UPDATE ticket + INSERT ticket_events
+    G->>N: ticket.updated {tenant_id, ticket_id, status}
+    G-->>B: 200 updated ticket
+  end
+```
+
+## 70. Ticket lifecycle (Sprint 23)
+
+```mermaid
+stateDiagram-v2
+  [*] --> open: customer confirms
+  open --> in_progress: tenant starts work
+  open --> closed: tenant closes without work
+  in_progress --> waiting_customer: more information needed
+  waiting_customer --> in_progress: tenant resumes
+  in_progress --> resolved: follow-up completed
+  in_progress --> closed: tenant closes
+  resolved --> closed: final close
+  resolved --> in_progress: reopen for correction
+```
 
 See [06-auth-spec.md](06-auth-spec.md), [08-packages-spec.md](08-packages-spec.md), [10-avatars-spec.md](10-avatars-spec.md), [11-tenant-register-spec.md](11-tenant-register-spec.md), [12-kyc-tenant-spec.md](12-kyc-tenant-spec.md), [13-payment-gateway-spec.md](13-payment-gateway-spec.md), [14-buy-package-spec.md](14-buy-package-spec.md), [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md), [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [18-tenant-scope-km-spec.md](18-tenant-scope-km-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md), [20-tenant-test-preview-spec.md](20-tenant-test-preview-spec.md), [21-customer-tier-spec.md](21-customer-tier-spec.md), [22-customer-account-import-spec.md](22-customer-account-import-spec.md), [23-customer-auth-spec.md](23-customer-auth-spec.md), [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md), [25-conversation-records-knowledge-gaps-spec.md](25-conversation-records-knowledge-gaps-spec.md), [09-platform-admin-portal-spec.md](09-platform-admin-portal-spec.md), [04-api-spec.md](04-api-spec.md), [05-ux-ui.md](05-ux-ui.md).

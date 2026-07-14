@@ -68,11 +68,12 @@ type chatRequest struct {
 }
 
 type chatResponse struct {
-	SessionID string       `json:"session_id"`
-	AgentID   string       `json:"agent_id"`
-	Reply     string       `json:"reply"`
-	Sources   []rag.Source `json:"sources,omitempty"`
-	MissingKM bool         `json:"missing_km,omitempty"`
+	SessionID   string       `json:"session_id"`
+	AgentID     string       `json:"agent_id"`
+	Reply       string       `json:"reply"`
+	Sources     []rag.Source `json:"sources,omitempty"`
+	MissingKM   bool         `json:"missing_km,omitempty"`
+	TicketOffer *ticketOffer `json:"ticket_offer,omitempty"`
 }
 
 func main() {
@@ -360,6 +361,12 @@ func main() {
 	mux.Handle("POST /api/tenant/conversation-records/{id}/archive/retry", guard.RequireTenantAdminActive(http.HandlerFunc(s.retryTenantConversationArchive)))
 	mux.Handle("GET /api/tenant/knowledge-gaps", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKnowledgeGaps)))
 	mux.Handle("PATCH /api/tenant/knowledge-gaps/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.patchTenantKnowledgeGap)))
+	// SPRINT-023 — customer-confirmed human escalation and tenant ticket queue.
+	mux.Handle("POST /api/customer/tickets", guard.OptionalBearer(http.HandlerFunc(s.createCustomerTicket)))
+	mux.Handle("GET /api/tenant/tickets", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantTickets)))
+	mux.Handle("GET /api/tenant/tickets/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantTicket)))
+	mux.Handle("PATCH /api/tenant/tickets/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.patchTenantTicket)))
+	mux.Handle("POST /api/tenant/tickets/{id}/events", guard.RequireTenantAdminActive(http.HandlerFunc(s.addTenantTicketEvent)))
 	mux.HandleFunc("POST /api/customer/auth/request-otp", s.requestCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/verify-otp", s.verifyCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/refresh", s.refreshCustomerAuth)
@@ -649,11 +656,12 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, chatResponse{
-		SessionID: sessionID,
-		AgentID:   agent.ID,
-		Reply:     reply,
-		Sources:   ragResult.Sources,
-		MissingKM: ragResult.MissingKM,
+		SessionID:   sessionID,
+		AgentID:     agent.ID,
+		Reply:       reply,
+		Sources:     ragResult.Sources,
+		MissingKM:   ragResult.MissingKM,
+		TicketOffer: ticketOfferForMessage(req.Message, topic),
 	})
 }
 

@@ -11,11 +11,18 @@ export type ChatSource = {
   score: number;
 };
 
+export type TicketOffer = {
+  subject: string;
+  category: 'general' | 'billing' | 'technical' | 'other';
+  reason: string;
+};
+
 export type ChatResponse = {
   session_id: string;
   reply: string;
   sources?: ChatSource[];
   missing_km?: boolean;
+  ticket_offer?: TicketOffer;
   error?: string;
 };
 

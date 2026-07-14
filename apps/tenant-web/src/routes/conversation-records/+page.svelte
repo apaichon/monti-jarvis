@@ -38,7 +38,13 @@
     const today = localISODate();
     startDate = today;
     endDate = today;
-    await load();
+    const params = new URLSearchParams(window.location.search);
+    const preferredReference = params.get('record_id') || params.get('call_id') || '';
+    if (preferredReference) {
+      startDate = '';
+      endDate = '';
+    }
+    await load(preferredReference);
   });
 
   function localISODate(date = new Date()) {
@@ -46,11 +52,11 @@
     return local.toISOString().slice(0, 10);
   }
 
-  async function load() {
+  async function load(preferredReference = '') {
     loading = true;
     try {
       records = await listConversationRecords(status, startDate, endDate);
-      selected = records[0] ?? null;
+      selected = records.find((record) => record.id === preferredReference || record.call_id === preferredReference) ?? records[0] ?? null;
       transcript = [];
       archiveObjects = [];
       revokeAudioUrls();
