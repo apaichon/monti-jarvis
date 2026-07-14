@@ -157,6 +157,23 @@ func (s *server) projectCallCenterRecord(ctx context.Context, tenantID, recordID
 	}
 }
 
+func (s *server) backfillCallCenterAnalytics(ctx context.Context) {
+	if s == nil || s.ch == nil || !s.ch.Enabled() || s.store == nil {
+		return
+	}
+	rows, err := s.store.ListCompletedConversationAnalytics(ctx)
+	if err != nil {
+		log.Printf("call center analytics backfill: %v", err)
+		return
+	}
+	for _, item := range rows {
+		s.projectCallCenterRecord(ctx, item.Record.TenantID, item.Record.ID)
+	}
+	if len(rows) > 0 {
+		log.Printf("call center analytics backfill: projected %d conversation records", len(rows))
+	}
+}
+
 func formatCHTime(value time.Time) string {
 	if value.IsZero() {
 		value = time.Now().UTC()

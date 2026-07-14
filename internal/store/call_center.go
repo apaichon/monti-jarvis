@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -10,6 +11,31 @@ type ConversationAnalyticsContext struct {
 	Record          ConversationRecord
 	Source          string
 	SourceUpdatedAt time.Time
+}
+
+func (s *Store) ListCompletedConversationAnalytics(ctx context.Context) ([]ConversationAnalyticsContext, error) {
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	rows, err := s.pg.Query(ctx, fmt.Sprintf(`SELECT r.id,r.tenant_id,r.call_id,r.customer_id,r.avatar_id,COALESCE(a.name,''),r.channel,r.status,r.started_at,r.ended_at,r.duration_seconds,r.summary,
+(SELECT COUNT(*) FROM %s.conversation_archive_objects o WHERE o.conversation_record_id=r.id),
+(SELECT COUNT(*) FROM %s.knowledge_gap_candidates g WHERE g.conversation_record_id=r.id),
+COALESCE(cs.source,'production'),r.updated_at
+FROM %s.conversation_records r
+LEFT JOIN %s.ai_avatars a ON a.id=r.avatar_id
+LEFT JOIN %s.call_sessions cs ON cs.id=r.call_id
+WHERE r.status='archived' AND r.ended_at IS NOT NULL`, schema, schema, schema, schema, schema))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ConversationAnalyticsContext
+	for rows.Next() {
+		var item ConversationAnalyticsContext
+		if err := scanConversationRecordWithAnalytics(rows, &item); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) GetConversationAnalyticsContext(ctx context.Context, tenantID, recordID string) (ConversationAnalyticsContext, error) {

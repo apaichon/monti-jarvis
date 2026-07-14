@@ -205,6 +205,7 @@ func main() {
 		mailer:          mailer,
 		tenantOAuth:     tenantOAuth,
 	}
+	s.backfillCallCenterAnalytics(rootCtx)
 	voiceRelay.AgentResolver = s.resolveAssignedWorkforceAgent
 
 	mux := http.NewServeMux()

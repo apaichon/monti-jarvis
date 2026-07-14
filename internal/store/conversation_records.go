@@ -145,6 +145,12 @@ func (s *Store) ensureConversationRecordsSchema(ctx context.Context) error {
   summary jsonb NOT NULL DEFAULT '{}'::jsonb,%s
 )`, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS conversation_records_tenant_idx ON %s.conversation_records (tenant_id, started_at DESC)`, schema),
+		fmt.Sprintf(`UPDATE %s.conversation_records r
+SET ended_at=COALESCE(r.ended_at, cs.ended_at),
+    duration_seconds=CASE WHEN r.duration_seconds > 0 THEN r.duration_seconds ELSE GREATEST(0, EXTRACT(EPOCH FROM (cs.ended_at - cs.started_at))::integer) END,
+    updated_at=now()
+FROM %s.call_sessions cs
+WHERE r.call_id=cs.id AND cs.ended_at IS NOT NULL AND (r.ended_at IS NULL OR r.duration_seconds=0)`, schema, schema),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.conversation_ratings (
   id text PRIMARY KEY,
   tenant_id text NOT NULL,
@@ -342,8 +348,9 @@ func (s *Store) UpsertConversationRecord(ctx context.Context, in ConversationRec
 	_, err := s.pg.Exec(ctx, fmt.Sprintf(`INSERT INTO %s.conversation_records
 (id,tenant_id,call_id,customer_id,avatar_id,channel,status,started_at,ended_at,duration_seconds,summary,created_by,updated_by)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12)
-ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status,ended_at=EXCLUDED.ended_at,
-duration_seconds=EXCLUDED.duration_seconds,
+ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status,
+ended_at=COALESCE(EXCLUDED.ended_at,conversation_records.ended_at),
+duration_seconds=CASE WHEN EXCLUDED.duration_seconds > 0 THEN EXCLUDED.duration_seconds ELSE conversation_records.duration_seconds END,
 customer_id=COALESCE(NULLIF(EXCLUDED.customer_id,''),conversation_records.customer_id),
 avatar_id=COALESCE(NULLIF(EXCLUDED.avatar_id,''),conversation_records.avatar_id),
 summary=EXCLUDED.summary,updated_by=EXCLUDED.updated_by,updated_at=now()`, schema),
@@ -527,7 +534,12 @@ func (s *Store) ArchiveConversationTranscriptForChannel(ctx context.Context, ten
 }
 
 func (s *Store) archiveConversationTranscript(ctx context.Context, tenantID, callID, channel string, payload any, protectionMode string) (ConversationArchiveObject, error) {
-	rec, err := s.UpsertConversationRecord(ctx, ConversationRecordInput{TenantID: tenantID, CallID: callID, Channel: channel, Status: "archived", Summary: map[string]any{"archived_by": "server"}})
+	customerID, avatarID, startedAt, endedAt, durationSeconds := s.conversationContextForCall(ctx, callID)
+	rec, err := s.UpsertConversationRecord(ctx, ConversationRecordInput{
+		TenantID: tenantID, CallID: callID, CustomerID: customerID, AvatarID: avatarID,
+		Channel: channel, Status: "archived", StartedAt: startedAt, EndedAt: endedAt, DurationSeconds: durationSeconds,
+		Summary: map[string]any{"archived_by": "server"},
+	})
 	if err != nil {
 		return ConversationArchiveObject{}, err
 	}
