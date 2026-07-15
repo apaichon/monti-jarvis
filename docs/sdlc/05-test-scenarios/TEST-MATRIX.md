@@ -164,6 +164,15 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | G-05 | Infra dependencies ok | Smoke | `make infra-check` |
 | G-06 | Infra API reports stores | Smoke | `curl -fsS http://localhost:8091/api/infra` |
 
+## FEAT-0028 — Tenant System Performance Monitoring (SPRINT-026)
+
+| ID | AC | Scenario | Type | Test / Command |
+| --- | ---: | --- | --- | --- |
+| T26-01 | 1–3 | Normalized dependency statuses, ordering, timeout handling, and redaction | Auto | `go test ./internal/observability ./cmd/server` |
+| T26-02 | 1–4 | Tenant-admin auth, tenant scoping, and safe monitoring response | Auto + Manual | `go test ./cmd/server` · [UAT-026](../06-manual-tests/SPRINT-026-manual.md) |
+| T26-03 | 1–6 | Tenant monitoring route, loading/error/retry states, and responsive layout | Auto + Manual | `npm run check && npm run build` · [UAT-026](../06-manual-tests/SPRINT-026-manual.md) |
+| T26-04 | 4 | Existing call, archive, quota, statistics, and `/healthz` compatibility | Smoke / Manual | [UAT-026](../06-manual-tests/SPRINT-026-manual.md#uat-026-10) |
+
 ---
 
 ## Coverage gaps (planned)

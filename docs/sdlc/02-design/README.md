@@ -7,10 +7,10 @@ System design artifacts for Monti Jarvis.
 | # | Doc | Sprint | Description | Status |
 | ---: | --- | --- | --- | --- |
 | 01 | [01-architecture.md](01-architecture.md) | 1+ | Layers, packages, infra topology | `review_pending` |
-| 02 | [02-workflow.md](02-workflow.md) | 1+ | Chat, voice, call, KM, auth, packages, satisfaction, analytics sequences | `approved` |
-| 03 | [03-er-diagram.md](03-er-diagram.md) | 1+ | Postgres + ClickHouse + MinIO entities, satisfaction ratings, analytics facts | `approved` |
-| 04 | [04-api-spec.md](04-api-spec.md) | 1+ | REST, WebSocket, SSE, satisfaction and call-center statistics contracts | `approved` |
-| 05 | [05-ux-ui.md](05-ux-ui.md) | 1+ | ASCII wireframes - customer, tenant, platform, and analytics surfaces | `approved` |
+| 02 | [02-workflow.md](02-workflow.md) | 1+ | Chat, voice, call, KM, auth, packages, satisfaction, analytics, monitoring sequences | `approved` |
+| 03 | [03-er-diagram.md](03-er-diagram.md) | 1+ | Postgres + ClickHouse + MinIO entities, satisfaction ratings, analytics facts, monitoring storage contract | `approved` |
+| 04 | [04-api-spec.md](04-api-spec.md) | 1+ | REST, WebSocket, SSE, satisfaction, call-center statistics, and monitoring contracts | `approved` |
+| 05 | [05-ux-ui.md](05-ux-ui.md) | 1+ | ASCII wireframes - customer, tenant, platform, analytics, and monitoring surfaces | `approved` |
 | 06 | [06-auth-spec.md](06-auth-spec.md) | 3 | JWT, RBAC, route policy | `shipped` |
 | 07 | [07-auth-cache-events-spec.md](07-auth-cache-events-spec.md) | 3 | Redis cache, write-behind, NATS auth events | `approved` |
 | 08 | [08-packages-spec.md](08-packages-spec.md) | 4 | Package catalog + tenant entitlements (jsonb rules) | `approved` |
@@ -34,6 +34,7 @@ System design artifacts for Monti Jarvis.
 | 26 | [26-tickets-human-escalation-spec.md](26-tickets-human-escalation-spec.md) | 23 | Tenant tickets and customer-confirmed human escalation | `approved` |
 | 27 | [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md) | 24 | Customer 1-5 satisfaction review and tenant statistics | `approved` |
 | 28 | [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md) | 25 | Tenant ClickHouse call-center statistics and quota usage | `approved` |
+| 29 | [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md) | 26 | Tenant-safe dependency health, latency, and analytics freshness | `approved` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -44,6 +45,8 @@ System design artifacts for Monti Jarvis.
 **Sprint 24:** Design pack approved and shipped in v2.5.0 — [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md); workflow §71-72; API § Customer Satisfaction; UX T17/C16. [SPRINT-024](../03-sprints/SPRINT-024.md).
 
 **Sprint 25:** Design pack approved and shipped in v2.6.0 — [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md); workflow §73-75; API § Tenant Call Center Statistics; UX T18. [SPRINT-025](../03-sprints/SPRINT-025.md).
+
+**Sprint 26:** Design pack approved for implementation — [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md); workflow §76; API § Tenant System Performance; UX T19. [SPRINT-026](../03-sprints/SPRINT-026.md).
 
 **Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 

@@ -30,6 +30,51 @@ type Health struct {
 	LiveKit    string `json:"livekit"`
 }
 
+// ProbeDependency performs one bounded dependency check. It returns whether
+// the dependency is configured separately from the check error so callers can
+// distinguish disabled services from unavailable services without exposing
+// provider details.
+func (s *Store) ProbeDependency(ctx context.Context, name string) (bool, error) {
+	if s == nil {
+		return false, nil
+	}
+	switch name {
+	case "postgres":
+		if strings.TrimSpace(s.cfg.PostgresURL) == "" {
+			return false, nil
+		}
+		if s.pg == nil {
+			return true, fmt.Errorf("postgres unavailable")
+		}
+		return true, s.pg.Ping(ctx)
+	case "redis":
+		if strings.TrimSpace(s.cfg.RedisURL) == "" {
+			return false, nil
+		}
+		if s.redis == nil {
+			return true, fmt.Errorf("redis unavailable")
+		}
+		return true, s.redis.Ping(ctx).Err()
+	case "minio":
+		if strings.TrimSpace(s.cfg.MinioEndpoint) == "" {
+			return false, nil
+		}
+		if s.minio == nil {
+			return true, fmt.Errorf("minio unavailable")
+		}
+		exists, err := s.minio.BucketExists(ctx, s.cfg.MinioBucket)
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			return true, fmt.Errorf("minio bucket unavailable")
+		}
+		return true, nil
+	default:
+		return false, fmt.Errorf("unknown dependency")
+	}
+}
+
 func Open(ctx context.Context, cfg env.Config) (*Store, []string) {
 	s := &Store{cfg: cfg}
 	var warnings []string

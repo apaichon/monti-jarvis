@@ -3,7 +3,7 @@ id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-025
+sprint: SPRINT-026
 ---
 
 # UX/UI — ASCII Wireframes
@@ -2333,3 +2333,100 @@ Dashboard request
 | ClickHouse schema/bootstrap | `scripts/migrations/025_call_center_analytics.sql` |
 
 See [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [04-api-spec.md](04-api-spec.md).
+
+## Sprint 26 - Tenant System Performance Monitoring (T19)
+
+Sprint 26 adds a tenant-admin monitoring surface. The customer Caller Desk and platform admin surfaces do not change. The view presents normalized service health and analytics freshness; it never displays raw infrastructure errors or customer data.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| T19-1 Monitoring shell | Open `/tenant/monitoring` | `GET /api/tenant/system-performance` |
+| T19-2 Overall status | Read current overall state | Same monitoring response |
+| T19-3 Dependency grid | Inspect component status and latency | Same monitoring response |
+| T19-4 Analytics freshness | Inspect current/stale/unavailable projection state | Same monitoring response |
+| T19-5 Retry action | Request a fresh snapshot | Repeat `GET /api/tenant/system-performance` |
+
+### Tenant monitoring layout
+
+```text
+┌─ Tenant shell / Operations / System performance ───────────────────────────────────────┐
+│ System performance / ประสิทธิภาพระบบ                              [Tenant scoped]     │
+│ Current service health and analytics freshness                                      │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ T19-2 Overall status   [Degraded / ระบบทำงานช้าบางส่วน]  Checked 10:30:00  [Retry]    │
+├───────────────────────┬───────────────────────┬───────────────────────┬────────────────┤
+│ T19-3 Postgres         │ T19-3 Redis           │ T19-3 MinIO           │ T19-3 ClickHouse│
+│ Operational · 4 ms     │ Operational · 2 ms    │ Operational · 7 ms    │ Operational 9ms│
+├───────────────────────┼───────────────────────┼───────────────────────┼────────────────┤
+│ T19-3 NATS             │ T19-3 LiveKit         │ T19-3 Gemini          │ T19-4 Analytics │
+│ Disabled               │ Operational           │ Degraded              │ Current        │
+├───────────────────────┴───────────────────────┴───────────────────────┴────────────────┤
+│ Last projected 10:29:48 · Freshness is separate from live dependency status            │
+│ No customer, transcript, provider URL, or infrastructure error details are displayed. │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Status presentation
+
+| State | Visual treatment | User action |
+| --- | --- | --- |
+| `operational` | Green status icon and neutral latency label. | No action required. |
+| `degraded` | Amber icon and concise Thai/English guidance. | Retry when investigating. |
+| `unavailable` | Red icon, no raw error, last checked time retained. | Retry; contact operator if persistent. |
+| `disabled` | Neutral icon and `Not configured / ยังไม่ได้ตั้งค่า`. | No retry loop. |
+| `stale` | Amber freshness label separate from component health. | Retry or inspect analytics operations. |
+
+### Mobile collapse
+
+Below 700px, the overall status and Retry action remain in the first row with the action wrapping below the timestamp if needed. Dependency cards use a single-column list with fixed label/value rows. Analytics freshness follows the dependency list. No status text, latency value, or Retry action may overlap or force horizontal scrolling.
+
+### Flow A - Tenant opens monitoring
+
+```text
+Tenant selects Operations / System performance
+    |
+    +--> GET /api/tenant/system-performance
+    |
+    +--> Loading skeleton --> Render overall, dependency, and analytics states
+    +--> 401/403 --> Clear protected view and use existing tenant login redirect
+    +--> 503 --> Show safe unavailable state and Retry
+```
+
+### Flow B - Tenant retries a degraded snapshot
+
+```text
+Tenant selects Retry
+    |
+    +--> Disable Retry while request is pending
+    +--> GET /api/tenant/system-performance
+    +--> Partial probe failures --> Render 200 normalized degraded state
+    +--> Snapshot failure --> Keep last checked time and show safe unavailable state
+```
+
+### Flow C - Analytics is stale while services are healthy
+
+```text
+Monitoring response
+    |
+    +--> components all operational
+    +--> analytics.status = stale
+          |
+          +--> Overall = degraded
+          +--> Keep dependency cards operational
+          +--> Show freshness warning separately with Thai/English guidance
+```
+
+### Component -> file
+
+| Component | Path |
+| --- | --- |
+| Tenant monitoring route | `apps/tenant-web/src/routes/monitoring/+page.svelte` |
+| Monitoring API client and types | `apps/tenant-web/src/lib/api/monitoring.ts` |
+| Tenant navigation entry | `apps/tenant-web/src/routes/+layout.svelte` |
+| Monitoring handler | `cmd/server/tenant_monitoring.go` |
+| Probe and status aggregation | `internal/observability/` |
+| Existing dependency health adapters | `internal/store/store.go`, `internal/clickhouse/client.go` |
+
+See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [04-api-spec.md](04-api-spec.md).

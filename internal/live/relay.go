@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/gorilla/websocket"
 	"github.com/libra/monti-jarvis/internal/rag"
@@ -138,7 +139,11 @@ func (r *Relay) Handler() http.HandlerFunc {
 				}
 				sc := frame.ServerContent
 				if sc.InputTranscription != nil && strings.TrimSpace(sc.InputTranscription.Text) != "" {
-					_ = send(serverMsg{Type: "transcript", Role: "user", Text: sc.InputTranscription.Text})
+					inputText := sc.InputTranscription.Text
+					_ = send(serverMsg{Type: "transcript", Role: "user", Text: inputText})
+					if customerEndConfirmation(inputText) {
+						_ = send(serverMsg{Type: "customer_end_requested"})
+					}
 				}
 				if sc.OutputTranscription != nil && strings.TrimSpace(sc.OutputTranscription.Text) != "" {
 					_ = send(serverMsg{Type: "transcript", Role: "assistant", Text: sc.OutputTranscription.Text})
@@ -291,6 +296,32 @@ func normalizeLang(v string) string {
 	default:
 		return ""
 	}
+}
+
+// customerEndConfirmation is intentionally evaluated at the relay boundary,
+// before browser transcript merging can split the caller's confirmation into
+// separate partial turns.
+func customerEndConfirmation(text string) bool {
+	normalized := strings.ToLower(strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || unicode.IsPunct(r) {
+			return -1
+		}
+		return r
+	}, text))
+	for _, phrase := range []string{
+		"ไม่มีแล้ว",
+		"ไม่มีอะไรแล้ว",
+		"หมดคำถามแล้ว",
+		"nomore",
+		"nothingelse",
+		"thatsall",
+		"thatsit",
+	} {
+		if strings.Contains(normalized, phrase) {
+			return true
+		}
+	}
+	return false
 }
 
 func languageInstruction(lang string) string {

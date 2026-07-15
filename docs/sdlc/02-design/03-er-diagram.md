@@ -3,7 +3,7 @@ id: DES-0003
 title: Entity Relationship Diagram
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-025
+sprint: SPRINT-026
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1441,3 +1441,24 @@ Migration/bootstrap placeholder: `scripts/migrations/025_call_center_analytics.s
 The ClickHouse table excludes customer id, email, phone, contact name, transcript content, rating comments, and audio paths. `fact_id` is deterministic so retries and bounded replay do not create duplicate logical sessions.
 
 See [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md), [02-workflow.md](02-workflow.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).
+
+## Sprint 26 - tenant system performance monitoring
+
+Sprint 26 introduces no persisted entity. The monitoring snapshot is an ephemeral, bounded in-process read model assembled from existing dependency clients and the Sprint 25 analytics freshness result.
+
+### Sprint 26 storage contract
+
+| Store | Contract |
+| --- | --- |
+| Postgres | Existing `Store.Health` ping only. No new table, migration, audit columns, or monitoring rows. |
+| Redis | Existing client `PING` only. No `monti_jarvis:` monitoring key. |
+| ClickHouse | Existing health ping and call-center freshness read. No new table or raw analytics payload. |
+| MinIO | Existing configured-bucket probe only. No new object and no object listing in the tenant response. |
+| NATS | Existing enabled state. No new subject or event. |
+| LiveKit | Existing configured state. No room, token, or customer data. |
+| Gemini | Existing enabled state. No prompt, transcript, or provider response data. |
+| In-process state | No persisted monitoring state or cross-tenant cache is introduced. |
+
+There is no ER diagram or migration for this sprint because adding a monitoring table would exceed the approved scope. The logical relationships are service probes to existing stores, not foreign keys.
+
+See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md), [02-workflow.md](02-workflow.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).

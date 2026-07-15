@@ -3,7 +3,7 @@ id: DES-0004
 title: API Specification
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-025
+sprint: SPRINT-026
 ---
 
 # API Specification — Monti Jarvis
@@ -2365,3 +2365,63 @@ The error response uses the existing shape:
 The replay/backfill path is an operator job and is not exposed as an HTTP endpoint in Sprint 25. It reads Postgres `conversation_records` and `call_sessions`, then writes the deterministic ClickHouse fact through `internal/clickhouse`. Tenant users only consume the read endpoint above.
 
 See [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [05-ux-ui.md](05-ux-ui.md).
+
+## Tenant System Performance (Sprint 26)
+
+Sprint 26 adds one tenant-admin read endpoint. It returns a normalized, redacted snapshot assembled from existing dependency clients. It does not replace `/healthz`, `/api/infra`, `/api/tenant/usage`, or the call-center statistics endpoint.
+
+### `GET /api/tenant/system-performance`
+
+**Auth:** `tenant_admin` with an active tenant. `AUTH_DISABLED` does not bypass this guard. The request has no query parameters and cannot select a tenant.
+
+**Response `200`**
+
+```json
+{
+  "overall_status": "degraded",
+  "checked_at": "2026-07-14T10:30:00Z",
+  "components": [
+    { "name": "postgres", "status": "operational", "latency_ms": 4, "checked_at": "2026-07-14T10:29:59Z" },
+    { "name": "redis", "status": "operational", "latency_ms": 2, "checked_at": "2026-07-14T10:29:59Z" },
+    { "name": "minio", "status": "operational", "latency_ms": 7, "checked_at": "2026-07-14T10:29:59Z" },
+    { "name": "clickhouse", "status": "operational", "latency_ms": 9, "checked_at": "2026-07-14T10:29:59Z" },
+    { "name": "nats", "status": "disabled", "latency_ms": null, "checked_at": "2026-07-14T10:29:59Z" },
+    { "name": "livekit", "status": "operational", "latency_ms": null, "checked_at": "2026-07-14T10:29:59Z" },
+    { "name": "gemini", "status": "degraded", "latency_ms": null, "checked_at": "2026-07-14T10:29:59Z" }
+  ],
+  "analytics": {
+    "status": "current",
+    "generated_at": "2026-07-14T10:29:58Z",
+    "last_projected_at": "2026-07-14T10:29:48Z"
+  }
+}
+```
+
+Only the allowlisted component names and normalized statuses are serialized. `latency_ms` is null for configuration-only checks. `analytics.status` is `current`, `stale`, `unavailable`, or `disabled`; it is independent from the live dependency status.
+
+**Status values**
+
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `overall_status` | `operational`, `degraded`, `unavailable` | Aggregate tenant-safe state. |
+| `components[].status` | `operational`, `degraded`, `unavailable`, `disabled` | State of one configured dependency. |
+| `analytics.status` | `current`, `stale`, `unavailable`, `disabled` | Freshness of the existing analytics projection. |
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| `401` | `unauthorized` | Missing or invalid bearer token. |
+| `403` | `forbidden` | Caller is not an active tenant administrator. |
+| `503` | `monitoring_unavailable` | A snapshot cannot be produced at all; partial probe failures should return a `200` normalized snapshot. |
+| `500` | `monitoring_error` | Unexpected response construction failure. |
+
+The error response uses the existing shape:
+
+```json
+{ "error": "monitoring unavailable", "code": "monitoring_unavailable" }
+```
+
+Raw provider messages, credentials, dependency URLs, tenant ids, customer data, transcripts, ticket notes, rating comments, and audio paths are never returned. Probe timeouts use the configured bounded deadline and do not block customer operations.
+
+See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [05-ux-ui.md](05-ux-ui.md).

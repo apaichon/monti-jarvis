@@ -30,3 +30,20 @@ func TestResolveAgentFallsBackToBuiltIn(t *testing.T) {
 		t.Fatalf("resolveAgent(demo, luna).ID = %q, want luna", got.ID)
 	}
 }
+
+func TestCustomerEndConfirmation(t *testing.T) {
+	for _, phrase := range []string{
+		"ไม่มีแล้วครับ ขอบคุณครับ",
+		"ไม่มีอะไรแล้วค่ะ",
+		"หมดคำถามแล้วครับ",
+		"No more questions, thank you",
+	} {
+		if !customerEndConfirmation(phrase) {
+			t.Errorf("customerEndConfirmation(%q) = false, want true", phrase)
+		}
+	}
+
+	if customerEndConfirmation("ขอถามอีกเรื่องครับ") {
+		t.Fatal("customerEndConfirmation matched a non-closing caller message")
+	}
+}

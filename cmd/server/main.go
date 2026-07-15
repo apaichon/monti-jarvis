@@ -23,6 +23,7 @@ import (
 	"github.com/libra/monti-jarvis/internal/live"
 	"github.com/libra/monti-jarvis/internal/lktoken"
 	"github.com/libra/monti-jarvis/internal/natsbus"
+	"github.com/libra/monti-jarvis/internal/observability"
 	"github.com/libra/monti-jarvis/internal/payment"
 	"github.com/libra/monti-jarvis/internal/platformweb"
 	"github.com/libra/monti-jarvis/internal/quota"
@@ -57,6 +58,7 @@ type server struct {
 	registerLimiter *tenantregister.RateLimiter
 	mailer          *resend.Client
 	tenantOAuth     *tenantoauth.Service
+	monitoring      *observability.Service
 }
 
 type chatRequest struct {
@@ -204,6 +206,7 @@ func main() {
 		registerLimiter: registerLimiter,
 		mailer:          mailer,
 		tenantOAuth:     tenantOAuth,
+		monitoring:      newMonitoringService(st, ch, bus, ai, cfg),
 	}
 	s.backfillCallCenterAnalytics(rootCtx)
 	voiceRelay.AgentResolver = s.resolveAssignedWorkforceAgent
@@ -372,6 +375,7 @@ func main() {
 	mux.Handle("GET /api/tenant/satisfaction/statistics", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantSatisfactionStatistics)))
 	// SPRINT-025 — tenant-scoped call-center usage and quota statistics.
 	mux.Handle("GET /api/tenant/call-center/statistics", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCallCenterStatistics)))
+	mux.Handle("GET /api/tenant/system-performance", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantSystemPerformance)))
 	mux.HandleFunc("POST /api/customer/auth/request-otp", s.requestCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/verify-otp", s.verifyCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/refresh", s.refreshCustomerAuth)

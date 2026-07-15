@@ -30,6 +30,7 @@
       <nav class="tenant-nav" aria-label="Tenant navigation">
         <a class="nav-link" href="{base}/backoffice" class:active={$page.url.pathname.includes('/backoffice')}><span>⌂</span>Overview</a>
         <a class="nav-link" href="{base}/dashboard" class:active={$page.url.pathname.includes('/dashboard')}><span>▦</span>Call center</a>
+        <a class="nav-link" href="{base}/monitoring" class:active={$page.url.pathname.includes('/monitoring')}><span>◌</span>Monitoring</a>
         <a
           class="nav-link"
           href="{base}/billing"

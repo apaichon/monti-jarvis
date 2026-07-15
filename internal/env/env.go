@@ -88,6 +88,7 @@ type Config struct {
 	// Customer import (SPRINT-019)
 	CustomerImportMaxBytes int64
 	CustomerImportMaxRows  int
+	MonitoringProbeTimeout time.Duration
 	AppEnv                 string
 }
 
@@ -180,6 +181,7 @@ func Load() Config {
 		PreviewMaxConcurrent:   envInt("PREVIEW_MAX_CONCURRENT", 2),
 		CustomerImportMaxBytes: int64(envInt("CUSTOMER_IMPORT_MAX_BYTES", 2*1024*1024)),
 		CustomerImportMaxRows:  envInt("CUSTOMER_IMPORT_MAX_ROWS", 5000),
+		MonitoringProbeTimeout: envDuration("MONITORING_PROBE_TIMEOUT", 2*time.Second),
 		AppEnv:                 appEnv,
 	}
 }

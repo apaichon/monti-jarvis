@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (35 core + S36 embed SDKs + S37 central brand portal)
+# Monti AI Call Center — Roadmap (36 core + S37 embed SDKs + S38 central brand portal)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -49,18 +49,19 @@
 | 23 | Tenant, Customer | Tickets, AI conversation ask to open ticket to human in the loop | F | 22 ✅ v2.4.0 |
 | 24 | Tenant | Customer Review AI Satisfaction after conversation, Tenant view statistics | F | 22, 23 ✅ v2.5.0 |
 | 25 | Tenant | Dashboard : Call Center Statistics, Call Quota Usage | F | 22 (ClickHouse) ✅ v2.6.0 · [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
-| 26 | Tenant | Monitoring : System Performance | F | 25 |
-| 27 | Platform | Audit Log | G | 3 |
-| 28 | Platform | Monitoring : System Performance | G | 27 |
-| 29 | Platform | Dashboard: Overall Call Center Statistics and by Tenants,   | G | 28 (ClickHouse) |
-| 30 | Platform | Monitoring: Billing, Quota Usages, AI Infra Cost Usage | G | 29 |
-| 31 | Tuning | gRPC switch mode, Cache on Prod | H | 25+ |
-| 32 | Tuning | Partition,Index, Hardening | H | 31 |
-| 33 | Infra | Scale, Auto Scale with k8s | I | 32 |
-| 34 | Infra | Canary Deployment | I | 33 |
-| 35 | Infra | Backup Restore Archive | I | 33 |
-| **36** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **D+** | **14** · [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · backlog |
-| **37** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
+| 26 | Tenant | Monitoring : System Performance | F | 25 ✅ v2.7.0 |
+| **27** | **Customer / Integrator** | **Mobile Call API and SDK for inbound voice integration** | **G** | **1, 20** · planned v2.8.0 |
+| 28 | Platform | Audit Log | G | 3 |
+| 29 | Platform | Monitoring : System Performance | G | 28 |
+| 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) |
+| 31 | Platform | Monitoring: Billing, Quota Usages, AI Infra Cost Usage | G | 30 |
+| 32 | Tuning | gRPC switch mode, Cache on Prod | H | 25+ |
+| 33 | Tuning | Partition,Index, Hardening | H | 32 |
+| 34 | Infra | Scale, Auto Scale with k8s | I | 33 |
+| 35 | Infra | Canary Deployment | I | 34 |
+| 36 | Infra | Backup Restore Archive | I | 34 |
+| **37** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **D+** | **14** · [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · backlog |
+| **38** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
 
 ---
 
@@ -121,19 +122,22 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 - Sprint: [SPRINT-022](../03-sprints/SPRINT-022.md)
 - Scope: archive conversation artifacts to MinIO, support configurable archive protection, and surface knowledge-gap candidates for tenant review.
 
-### Phase G — Platform operations (27–30)
+### Phase G — Mobile integration and platform operations (27–31)
 
-- Cross-tenant audit, monitoring, dashboards
+- **Sprint 27:** Mobile Call API and SDK for inbound voice integration
+- **Sprint 28:** Cross-tenant audit log
+- **Sprint 29:** Platform system performance monitoring
+- **Sprints 30–31:** Overall dashboards, billing/quota, and AI infrastructure cost usage
 
-### Phase H — Production tuning (31–32)
+### Phase H — Production tuning (32–33)
 
 - gRPC internal APIs, Redis 8 cache strategy, ClickHouse partitioning, security hardening
 
-### Phase I — Infra scale (33–35)
+### Phase I — Infra scale (34–36)
 
 - Autoscale, canary deployments, backup/restore/archive
 
-### Phase J — Central multi-brand call portal (37)
+### Phase J — Central multi-brand call portal (38)
 
 - Platform-hosted **call center hub**: search/browse **all listed tenant brands**, brand profile, language + AI employee, start chat/voice
 - Complements per-tenant **embed** (S14): hub = Monti multi-brand directory; embed = tenant’s own website
@@ -328,15 +332,33 @@ Sprint: [SPRINT-024.md](../03-sprints/SPRINT-024.md) · Feature: [FEAT-0026](../
 
 Sprint: [SPRINT-025.md](../03-sprints/SPRINT-025.md) · Feature: [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md)
 
-## Current sprint: none
+## Shipped sprint: SPRINT-026
 
-**Status:** no active sprint · **Release target:** — · **Commitment:** —
+**Status:** completed · **Release:** v2.7.0 · **Commitment:** 16 points
+
+Sprint: [SPRINT-026.md](../03-sprints/SPRINT-026.md) · Feature: [FEAT-0028](../01-features/FEAT-0028-tenant-system-performance-monitoring.md)
+
+## Next planned: SPRINT-027 — Mobile Call API and SDK
+
+**Platform:** Customer / Integrator · **Status:** planned · **Release target:** v2.8.0 · **Depends:** Sprints 1 and 20
+
+Build a stable mobile integration contract for starting and ending inbound AI voice calls from a mobile application without coupling integrators to the web embed surface.
+
+| Deliverable | Notes |
+| --- | --- |
+| Mobile call API contract | Authenticated session creation, tenant/avatar selection, call status, transcript events, end-call, and rating endpoints with versioned schemas |
+| Voice transport adapter | Mobile-safe WebSocket/session handshake, reconnect behavior, audio permission/lifecycle guidance, and bounded failure states |
+| SDK package | Typed client for the selected mobile integration target with token refresh, call lifecycle, transcript callbacks, and explicit end-call control |
+| Tenant policy enforcement | Apply avatar assignment, customer auth, quota, rate-limit, and tenant isolation rules to mobile sessions |
+| Sample integration | Small mobile reference app, API examples, compatibility matrix, and migration guidance from web embed |
+
+The technical specification must choose native iOS/Android, React Native, Flutter, or a layered core-plus-adapters approach before implementation. Mobile SDKs must not expose provider credentials or raw infrastructure errors.
 
 ## Parallel build sprint: none
 
 **Status:** no parallel stream
 
-## Backlog add: SPRINT-036 — Embed Framework SDKs
+## Backlog add: SPRINT-037 — Embed Framework SDKs
 
 **Platform:** Tenant / Integrator · **Feature:** Vue · React · Svelte · Web Component packages · **Depends:** 14 · **Status:** backlog
 
@@ -352,7 +374,7 @@ Sprint: [SPRINT-025.md](../03-sprints/SPRINT-025.md) · Feature: [FEAT-0027](../
 
 Feature: [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · Builds on [FEAT-0014](../01-features/FEAT-0014-embed-to-web.md) (vanilla loader remains supported)
 
-## Backlog add: SPRINT-037 — Central Call Center Brand Portal
+## Backlog add: SPRINT-038 — Central Call Center Brand Portal
 
 **Platform:** Customer / Platform · **Feature:** Multi-tenant brand directory + conversation · **Depends:** 1, 5, 6, 7 · **Status:** backlog
 

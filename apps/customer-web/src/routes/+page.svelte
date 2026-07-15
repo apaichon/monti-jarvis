@@ -18,6 +18,11 @@
   import { loadWorkforce, type Agent } from '$lib/api/workforce';
   import { GeminiVoice } from '$lib/voice/gemini';
   import {
+    assistantConfirmedFarewell,
+    customerConfirmedEnd,
+    CUSTOMER_END_COUNTDOWN_SECONDS
+  } from '$lib/voice/end-call';
+  import {
     getStoredCustomer,
     loadCustomerPortalPolicy,
     loadCustomerQuota,
@@ -104,6 +109,8 @@
   let warningTimerId: ReturnType<typeof setTimeout> | undefined;
   let timeoutTimerId: ReturnType<typeof setTimeout> | undefined;
   let autoCloseTimerId: ReturnType<typeof setInterval> | undefined;
+  let customerCloseFallbackTimerId: ReturnType<typeof setTimeout> | undefined;
+  let customerEndRequested = $state(false);
   let autoClosePending = $state(false);
   let unsubscribe: (() => void) | undefined;
   const transcriptKeys = new Set<string>();
@@ -201,7 +208,7 @@
       }, 0);
     }
     if (activeCallLimitSeconds > 0) {
-      timeoutTimerId = setTimeout(() => void hangUp('timeout'), activeCallLimitSeconds * 1000);
+      timeoutTimerId = setTimeout(() => void endActiveCall('timeout'), activeCallLimitSeconds * 1000);
     }
   }
 
@@ -210,11 +217,14 @@
     clearTimeout(warningTimerId);
     clearTimeout(timeoutTimerId);
     clearInterval(autoCloseTimerId);
+    clearTimeout(customerCloseFallbackTimerId);
     timer = '00:00:00';
     remainingTimer = '00:00:00';
     remainingSeconds = 0;
     activeCallLimitSeconds = 0;
     autoCloseTimerId = undefined;
+    customerCloseFallbackTimerId = undefined;
+    customerEndRequested = false;
     autoClosePending = false;
   }
 
@@ -259,7 +269,7 @@
   }
 
   async function selectAgent(agent: Agent) {
-    if (live) await hangUp();
+    if (live) await endActiveCall();
     selectedAgent = agent;
     pickerOpen = false;
     if (agent.greeting) {
@@ -283,42 +293,49 @@
     const uiRole = role === 'caller' ? 'user' : 'assistant';
     const initial = uiRole === 'assistant' ? agentInitial(selectedAgent?.name) : 'C';
     appendOrMergeTranscript(uiRole, content, initial);
-    if (uiRole === 'assistant') showTone(content);
+    if (uiRole === 'assistant') {
+      showTone(content);
+      if (customerEndRequested && assistantConfirmedFarewell(content)) {
+        startCustomerFinishedCountdown();
+      }
+    }
     const offer = uiRole === 'user' ? ticketOfferForText(content) : null;
     if (offer) {
       openTicketOffer(offer);
     }
   }
 
-  function callerFinished(text: string) {
-    const normalized = text
-      .toLowerCase()
-      .replace(/[\s!?.,…]+/g, '');
-    return [
-      /ไม่มี(?:แล้ว)?(?:ครับ|ค่ะ)?ขอบคุณ(?:ครับ|ค่ะ)?/,
-      /ไม่มีอะไรแล้ว(?:ครับ|ค่ะ)?/,
-      /หมดคำถามแล้ว(?:ครับ|ค่ะ)?/,
-      /that'sall(?:thankyou)?/,
-      /nomorequestions(?:thankyou)?/,
-      /nothingelse(?:thankyou)?/,
-      /that'sit(?:thankyou)?/
-    ].some((pattern) => pattern.test(normalized));
-  }
-
-  function scheduleCustomerFinishedClose() {
-    if (!live || !session || autoClosePending || busy) return;
-    autoClosePending = true;
-    let seconds = 5;
-    voiceState = `ขออนุญาตวางสายก่อนนะครับ ปิดสายภายใน ${seconds} วินาที`;
-    voice?.sendText(
+  function requestCustomerFinishedClose() {
+    if (!live || !session || customerEndRequested || autoClosePending) return;
+    customerEndRequested = true;
+    voiceState = 'กำลังกล่าวลาและจะวางสายภายใน 5 วินาที';
+    const sent = voice?.sendText(
       'The caller said there is nothing else and thanked you. Respond in Thai: "ขออนุญาตวางสายก่อนนะครับ ขอบคุณครับ". Do not ask another question. The call will close in five seconds.'
     );
+    // Start even if output transcription is unavailable or the model does not
+    // repeat the farewell exactly. Normal calls start from the assistant caption.
+    if (!sent) {
+      startCustomerFinishedCountdown();
+      return;
+    }
+    customerCloseFallbackTimerId = setTimeout(startCustomerFinishedCountdown, 2000);
+  }
+
+  function startCustomerFinishedCountdown() {
+    if (!live || !session || !customerEndRequested || autoClosePending) return;
+    clearTimeout(customerCloseFallbackTimerId);
+    customerCloseFallbackTimerId = undefined;
+    autoClosePending = true;
+    let seconds = CUSTOMER_END_COUNTDOWN_SECONDS;
+    voiceState = `ขออนุญาตวางสายก่อนนะครับ ปิดสายภายใน ${seconds} วินาที`;
     autoCloseTimerId = setInterval(() => {
       seconds -= 1;
       if (seconds <= 0) {
         clearInterval(autoCloseTimerId);
         autoCloseTimerId = undefined;
-        void hangUp('customer_finished');
+        // Use the same handler as the visible End call button so recording,
+        // archive, session end, and rating all follow one path.
+        void endActiveCall('customer_finished');
         return;
       }
       voiceState = `ขออนุญาตวางสายก่อนนะครับ ปิดสายภายใน ${seconds} วินาที`;
@@ -402,62 +419,72 @@
     busy = true;
     callControlsExpanded = false;
     transcriptKeys.clear();
+    customerEndRequested = false;
     autoClosePending = false;
     voiceState = 'Connecting…';
+    let gemini: GeminiVoice | undefined;
     try {
-      const gemini = new GeminiVoice();
+      // Establish the call session before opening Gemini. Final caller
+      // transcription can arrive immediately after the voice socket is ready.
+      const created = await createCall(
+        tenantId ? { tenantId, agentId: selectedAgent.id } : { agentId: selectedAgent.id }
+      );
+      session = created;
+      chatSessionId = created.id;
+
+      gemini = new GeminiVoice();
+      // Make the live client available to callbacks while start() is still
+      // negotiating. Gemini can deliver the first caller transcript before
+      // start() resolves its ready promise.
+      voice = gemini;
       // Show greeting text immediately while audio path connects.
       if (selectedAgent.greeting) {
         upsertVoiceTurn('agent', selectedAgent.greeting);
       }
-      const [created] = await Promise.all([
-        createCall(tenantId ? { tenantId, agentId: selectedAgent.id } : { agentId: selectedAgent.id }),
-        gemini.start(
-          selectedAgent.id,
-          topic,
-          {
-            onLive: (v) => {
-              live = v;
-              if (v) {
-                voiceState = `On call with ${selectedAgent?.name} — listen for the greeting…`;
-              } else {
-                voiceState = `Ready to call ${selectedAgent?.name}.`;
-              }
-            },
-            onStatus: (message) => {
-              voiceState = message;
-            },
-            onTranscript: (role, text, meta) => {
-              // Live caption grows as partial ASR chunks merge into full sentences.
-              upsertVoiceTurn(role, text);
-              if (role === 'caller' && meta?.final && callerFinished(text)) {
-                scheduleCustomerFinishedClose();
-              }
-              // Persist only finalized turns (not every short partial fragment).
-              if (meta?.final && session) void persistTurn(session.id, role, text);
-            },
-            onError: (message) => {
-              error = message;
+      await gemini.start(
+        selectedAgent.id,
+        topic,
+        {
+          onLive: (v) => {
+            live = v;
+            if (v) {
+              voiceState = `On call with ${selectedAgent?.name} — listen for the greeting…`;
+            } else {
+              voiceState = `Ready to call ${selectedAgent?.name}.`;
             }
           },
-          { lang: 'auto', tenantId: tenantId || undefined }
-        )
-      ]);
+          onStatus: (message) => {
+            voiceState = message;
+          },
+          onTranscript: (role, text, meta) => {
+            // Live caption grows as partial ASR chunks merge into full sentences.
+            upsertVoiceTurn(role, text);
+            if (role === 'caller' && customerConfirmedEnd(text)) {
+              requestCustomerFinishedClose();
+            }
+            // Persist only finalized turns (not every short partial fragment).
+            if (meta?.final && session) void persistTurn(session.id, role, text);
+          },
+          onCustomerEndRequested: () => requestCustomerFinishedClose(),
+          onError: (message) => {
+            error = message;
+          }
+        },
+        { lang: 'auto', tenantId: tenantId || undefined }
+      );
 
-      session = created;
-      chatSessionId = created.id;
+      voice = gemini;
       unsubscribe = subscribeTurns(
         created.id,
         (turn) => {
           upsertVoiceTurn(turn.role, turn.content);
-          if (turn.role === 'caller' && callerFinished(turn.content)) {
-            scheduleCustomerFinishedClose();
+          if (turn.role === 'caller' && customerConfirmedEnd(turn.content)) {
+            requestCustomerFinishedClose();
           }
         },
         tenantId ? { tenantId } : undefined
       );
 
-      voice = gemini;
       live = true;
       startTimer();
       if (!voiceState.startsWith('On call')) {
@@ -465,13 +492,17 @@
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Call failed';
-      await cleanup(false);
+      await gemini?.stop().catch(() => {});
+      if (session) {
+        await endCall(session.id, tenantId ? { tenantId } : undefined).catch(() => {});
+      }
+      await cleanup(true);
     } finally {
       busy = false;
     }
   }
 
-  async function hangUp(reason: 'manual' | 'timeout' | 'customer_finished' = 'manual') {
+  async function endActiveCall(reason: 'manual' | 'timeout' | 'customer_finished' = 'manual') {
     if (!session) return;
     const endedCallId = session.id;
     busy = true;
@@ -482,7 +513,7 @@
           error = err instanceof Error ? err.message : 'Failed to archive call audio';
         });
       }
-      await endCall(session.id);
+      await endCall(session.id, tenantId ? { tenantId } : undefined);
       void loadCustomerQuota(tenantId ? { tenantId } : undefined).then((q) => (quota = q)).catch(() => {});
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to end call';
@@ -495,6 +526,8 @@
       ratingOpen = true;
       if (reason === 'timeout') {
         voiceState = 'The call ended because the customer time limit was reached. Please rate the call.';
+      } else if (reason === 'customer_finished') {
+        voiceState = 'The call ended. Please rate the call.';
       }
     }
   }
@@ -532,6 +565,9 @@
     unsubscribe?.();
     unsubscribe = undefined;
     voice = null;
+    clearTimeout(customerCloseFallbackTimerId);
+    customerCloseFallbackTimerId = undefined;
+    customerEndRequested = false;
     if (resetSession) session = null;
     callControlsExpanded = false;
     voiceState = selectedAgent
@@ -540,7 +576,7 @@
   }
 
   async function toggleCall() {
-    if (live) await hangUp();
+    if (live) await endActiveCall();
     else await startCall();
   }
 
@@ -699,7 +735,7 @@
         <button class="strip-button" type="button" onclick={() => (callControlsExpanded = !callControlsExpanded)}>
           {callControlsExpanded ? 'Collapse' : 'Expand'}
         </button>
-        <button class="strip-button end" type="button" disabled={busy} onclick={() => void hangUp()}>End</button>
+        <button class="strip-button end" type="button" disabled={busy} onclick={() => void endActiveCall()}>End</button>
       </section>
     {/if}
 

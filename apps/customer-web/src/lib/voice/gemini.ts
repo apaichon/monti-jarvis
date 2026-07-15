@@ -23,6 +23,8 @@ export type VoiceCallbacks = {
   onStatus?: (message: string) => void;
   /** Live caption updates — `text` is the full turn so far (not a short fragment). */
   onTranscript?: (role: 'caller' | 'agent', text: string, meta?: TranscriptMeta) => void;
+  /** Relay detected a caller confirmation that the conversation is finished. */
+  onCustomerEndRequested?: () => void;
   onError?: (message: string) => void;
 };
 
@@ -298,6 +300,10 @@ export class GeminiVoice {
     const msg: VoiceMsg = JSON.parse(raw);
     if (msg.type === 'status' && msg.message) {
       callbacks.onStatus?.(msg.message);
+      return;
+    }
+    if (msg.type === 'customer_end_requested') {
+      callbacks.onCustomerEndRequested?.();
       return;
     }
     if (msg.type === 'audio' && msg.data && this.player && this.playbackCtx) {

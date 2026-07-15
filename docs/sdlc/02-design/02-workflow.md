@@ -3,7 +3,7 @@ id: DES-0002
 title: Workflows
 status: approved
 updated: 2026-07-14
-sprint: SPRINT-025
+sprint: SPRINT-026
 ---
 
 # Workflows — Monti Jarvis
@@ -1984,4 +1984,59 @@ Replay is an operator job and is intentionally not exposed as a tenant or custom
 | `retryable_error` | Source is complete but ClickHouse write failed | Source remains valid; dashboard may report stale freshness or `analytics_unavailable` |
 | `replayed` | Existing source range was safely projected again | No logical double count |
 
-See [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md), [03-er-diagram.md](03-er-diagram.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).
+## 76. Tenant opens system performance monitoring (Sprint 26)
+
+```mermaid
+sequenceDiagram
+  actor T as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant A as internal/auth
+  participant O as internal/observability
+  participant P as Postgres callcenter
+  participant R as Redis monti_jarvis:
+  participant M as MinIO monti-jarvis
+  participant C as internal/clickhouse
+  participant H as ClickHouse monti_jarvis
+
+  T->>B: Open /tenant/monitoring
+  B->>G: GET /api/tenant/system-performance
+  G->>A: Resolve active tenant-admin context
+  alt missing, invalid, or inactive tenant context
+    A-->>G: unauthorized or forbidden
+    G-->>B: 401/403 safe error
+  else authorized
+    G->>O: Read or build bounded monitoring snapshot
+    par dependency probes
+      O->>P: Ping with shared deadline
+      O->>R: PING with shared deadline
+      O->>M: Check configured bucket with shared deadline
+      O->>C: Ping with shared deadline
+    and configured service states
+      O->>O: Read NATS, LiveKit, and Gemini enabled state
+    end
+    O->>C: Read allowlisted analytics freshness only
+    alt one or more probes timeout or fail
+      O-->>G: Normalized degraded/unavailable snapshot
+      G-->>B: 200 snapshot with safe statuses
+    else snapshot succeeds
+      O-->>G: Operational snapshot
+      G-->>B: 200 snapshot with status and latency
+    end
+    B-->>T: Render status, latency, freshness, and retry action
+  end
+```
+
+Probes use a shared bounded deadline and are isolated from call creation, voice relay, quota enforcement, archive writes, and `/healthz`. A dependency failure is represented in the monitoring response; it is not allowed to fail a live customer operation.
+
+### Monitoring status lifecycle
+
+| Status | Meaning | UI treatment |
+| --- | --- | --- |
+| `operational` | Configured probe completed successfully. | Green operational state. |
+| `degraded` | Probe completed with a warning or analytics freshness is outside the current threshold. | Amber warning with retry guidance. |
+| `unavailable` | Required configured probe failed or snapshot generation failed. | Red unavailable state; preserve last checked time. |
+| `disabled` | Optional dependency is not configured. | Neutral disabled state; no latency. |
+| `stale` | Analytics source is reachable but projection freshness is outside the threshold. | Amber stale label separate from dependency health. |
+
+See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md), [03-er-diagram.md](03-er-diagram.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).

@@ -50,9 +50,9 @@ Give tenant operators a reliable dashboard for call-center activity and package 
 
 **Out**
 
-- Platform-wide or cross-tenant dashboards; planned for Sprint 29.
+- Platform-wide or cross-tenant dashboards; planned for Sprint 30.
 - System performance monitoring; planned for Sprint 26.
-- Billing, AI infrastructure cost, and overage analytics; planned for Sprint 30.
+- Billing, AI infrastructure cost, and overage analytics; planned for Sprint 31.
 - Raw transcript, customer contact, or audio data in ClickHouse dashboard facts.
 
 ## Feature
