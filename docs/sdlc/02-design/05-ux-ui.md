@@ -2,8 +2,8 @@
 id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
-updated: 2026-07-14
-sprint: SPRINT-026
+updated: 2026-07-15
+sprint: SPRINT-027
 ---
 
 # UX/UI — ASCII Wireframes
@@ -2430,3 +2430,107 @@ Monitoring response
 | Existing dependency health adapters | `internal/store/store.go`, `internal/clickhouse/client.go` |
 
 See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [04-api-spec.md](04-api-spec.md).
+
+## Sprint 27 - Mobile Call API and SDK (M1)
+
+Sprint 27 adds no customer-web or tenant-admin route. It defines the host mobile call surface and the typed SDK contract that a mobile application embeds. Existing web Caller Desk controls remain unchanged.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| M1-1 Bootstrap / avatar picker | Load policy, locale, limits, and assigned AI employees | GET /api/mobile/v1/bootstrap |
+| M1-2 Start call | Select avatar and start | POST /api/mobile/v1/calls |
+| M1-3 Call shell | Connect and stream audio | GET /ws/mobile/v1/calls/{call_id} |
+| M1-4 Status / timer | Refresh lifecycle or remaining time | GET /api/mobile/v1/calls/{call_id} |
+| M1-5 Transcript | Read caller and assistant events | transcript events from WebSocket |
+| M1-6 End call | Confirm or timeout end | POST /api/mobile/v1/calls/{call_id}/end or end frame |
+| M1-7 Review | Select 1-5 star icon score | POST /api/mobile/v1/calls/{call_id}/rating |
+| M1-8 Session recovery | Refresh expired customer session | POST /api/customer/auth/refresh |
+
+### Full layout - reference mobile host app
+
+~~~text
+┌──────────────────────────────┐
+│ MONTI                         │
+│ General Support · Ava         │
+├──────────────────────────────┤
+│                              │
+│        [ avatar ]             │  M1-1
+│        Ava · General          │
+│                              │
+│  ┌────────────────────────┐  │
+│  │ 00:02:14   Active       │  │  M1-4
+│  └────────────────────────┘  │
+│                              │
+│  Assistant: สวัสดีค่ะ...     │  M1-5
+│  Caller: ต้องการสอบถาม...    │
+│                              │
+│  [ microphone ] [ End call ] │  M1-6
+│                              │
+│  ★ ★ ★ ★ ★                  │  M1-7 after ended
+│  [ Submit review ]            │
+└──────────────────────────────┘
+~~~
+
+The mobile host app owns microphone permission prompts and platform audio-session configuration. The SDK owns server connection state, frame sizing, reconnect, token refresh, and safe error presentation. No provider credential or raw infrastructure error appears in the mobile UI.
+
+### Flow A - Start a mobile call
+
+~~~text
+Open host app
+    |
+    +--> GET /api/workforce
+    +--> Select assigned avatar
+    +--> POST /api/mobile/v1/calls with Idempotency-Key
+    +--> 201 call_id and ws_path
+    +--> Request microphone permission
+    +--> GET /ws/mobile/v1/calls/{call_id}
+    +--> ready event --> show timer and active transcript
+~~~
+
+### Flow B - Recover a session
+
+~~~text
+WebSocket or status request returns session_expired
+    |
+    +--> SDK pauses audio capture
+    +--> POST /api/customer/auth/refresh
+    +--> Retry WebSocket once with the rotated access token
+    +--> If call is still active: resume
+    +--> Otherwise: show ended state and offer rating
+~~~
+
+The SDK must not retry a create request after an auth failure without a new explicit user action.
+
+### Flow C - End and review
+
+~~~text
+Customer taps End call, AI requests timeout close, or quota timer reaches zero
+    |
+    +--> SDK sends end frame and POST /api/mobile/v1/calls/{id}/end
+    +--> Stop microphone and wait for call_status=ended
+    +--> Show 1-5 star icon review
+    +--> POST /api/mobile/v1/calls/{id}/rating
+    +--> Return to idle avatar state
+~~~
+
+### Component -> file
+
+| Component | Ownership / location |
+| --- | --- |
+| Mobile host call screen | Integrator application; not a Monti Svelte route in Sprint 27. |
+| Typed SDK client | Package location is selected in the technical-spec approval; native, React Native, Flutter, or layered core-plus-adapters. |
+| Mobile REST facade | Go server mobile API package to be created during implementation. |
+| Mobile voice adapter | Go live relay adapter to be created during implementation; existing customer relay remains compatible. |
+| Contract and UAT tests | Go API/relay tests plus SDK target tests after platform selection. |
+
+### Responsive and accessibility constraints
+
+- The SDK exposes state and events so host apps can keep controls stable while audio permission or reconnect is pending.
+- End call remains available during active, ending, and timeout states; duplicate taps are idempotent.
+- Review uses familiar star icons with accessible labels such as 5 stars.
+- Host apps must reserve a fixed timer/control row so transcript growth cannot overlap the end button.
+- Thai and English user-facing status/error labels are host-app concerns; the API returns stable language-neutral codes.
+
+See 30-mobile-call-api-sdk-spec.md, 02-workflow.md §77–79, 03-er-diagram.md, and 04-api-spec.md.

@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: approved
-updated: 2026-07-14
-sprint: SPRINT-026
+updated: 2026-07-15
+sprint: SPRINT-027
 ---
 
 # Workflows — Monti Jarvis
@@ -2040,3 +2040,129 @@ Probes use a shared bounded deadline and are isolated from call creation, voice 
 | `stale` | Analytics source is reachable but projection freshness is outside the threshold. | Amber stale label separate from dependency health. |
 
 See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md), [03-er-diagram.md](03-er-diagram.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).
+
+## 77. Mobile SDK creates a call session (Sprint 27)
+
+~~~mermaid
+sequenceDiagram
+  actor M as Mobile caller
+  participant K as Mobile SDK
+  participant G as Go :8091
+  participant A as internal/auth
+  participant W as internal/workforce
+  participant Q as internal/quota
+  participant S as Postgres callcenter
+  participant R as Redis monti_jarvis:
+
+  M->>K: getBootstrap()
+  K->>G: GET /api/mobile/v1/bootstrap
+  G-->>K: Auth policy, locale, limits, and active assigned avatars
+  M->>K: createCall(avatar_id, locale)
+  K->>G: POST /api/mobile/v1/calls with Bearer, Idempotency-Key
+  G->>A: Resolve customer, tenant, and auth policy
+  alt missing or expired customer session
+    A-->>G: unauthorized or customer_auth_required
+    G-->>K: 401/403 safe error
+  else authorized or allowed public development flow
+    G->>W: Validate active avatar assignment for resolved tenant
+    alt avatar is not assigned or inactive
+      W-->>G: avatar_not_available
+      G-->>K: 404/409 safe error
+    else assigned
+      G->>Q: Check rate limit, concurrent calls, and remaining quota
+      alt quota or rate limit denied
+        Q-->>G: quota_exceeded or rate_limited
+        G-->>K: 429 safe error
+      else allowed
+        G->>S: Insert call_sessions with tenant, customer, and avatar context
+        G->>R: Save bounded idempotency response
+        S-->>G: call_id and active session
+        G-->>K: 201 call session and WebSocket path
+      end
+    end
+  end
+~~~
+
+A repeated create request with the same idempotency key returns the original session response. A different key creates a new session only when concurrency and quota policy allow it.
+
+## 78. Mobile SDK connects and exchanges voice events (Sprint 27)
+
+~~~mermaid
+sequenceDiagram
+  actor M as Mobile caller
+  participant K as Mobile SDK
+  participant G as Go :8091
+  participant A as internal/auth
+  participant S as call session store
+  participant L as internal/live
+  participant X as Gemini Live
+
+  K->>G: GET /ws/mobile/v1/calls/{call_id} with Bearer
+  G->>A: Validate caller, tenant, session, and active status
+  alt caller or call is not authorized
+    A-->>G: unauthorized or forbidden
+    G-->>K: Close with safe error envelope
+  else active call
+    G->>S: Verify call belongs to resolved tenant and caller
+    G->>L: Start bounded mobile relay for call
+    L-->>K: ready {call_id, avatar_id, encoding}
+    loop audio and control frames
+      K->>L: PCM16 audio or typed text
+      L->>X: Provider-neutral relay input
+      X-->>L: Audio and transcript output
+      L-->>K: audio, transcript, turn_complete, call_status
+    end
+    alt retryable transport interruption
+      K->>G: Reconnect with same call_id and Bearer
+      G->>S: Re-check active session and caller
+      G-->>K: ready with resumed lifecycle
+    else customer or server end
+      K->>L: end control frame
+      L->>S: End call session idempotently
+      L-->>K: call_status ended
+    end
+  end
+~~~
+
+The relay maps provider output to the versioned Monti event envelope. Provider errors, room names, credentials, and internal connection details stay server-side.
+
+## 79. Mobile SDK ends and rates a call (Sprint 27)
+
+~~~mermaid
+sequenceDiagram
+  actor M as Mobile caller
+  participant K as Mobile SDK
+  participant G as Go :8091
+  participant S as Postgres callcenter
+
+  M->>K: end(reason)
+  K->>G: POST /api/mobile/v1/calls/{call_id}/end with Idempotency-Key
+  G->>S: Verify tenant and caller ownership
+  alt active session
+    S-->>G: Update status ended and ended_at
+    G-->>K: 200 {status: ended}
+  else already ended
+    S-->>G: Return existing ended state
+    G-->>K: 200 idempotent response
+  end
+  K-->>M: Stop microphone, close socket, expose review state
+  M->>K: Select 1-5 stars
+  K->>G: POST /api/mobile/v1/calls/{call_id}/rating {score}
+  G->>S: Upsert conversation_ratings by tenant and call
+  S-->>G: Rating saved
+  G-->>K: 201 {status: saved}
+~~~
+
+### Mobile call lifecycle
+
+| State | Entry | Allowed next state | Client behavior |
+| --- | --- | --- | --- |
+| idle | No call handle | creating | Show avatar and Start call. |
+| creating | Create request pending | connecting, failed | Disable duplicate start. |
+| connecting | Session created, WebSocket pending | active, failed | Request microphone and connect. |
+| active | Ready event received | ending, failed | Stream bounded audio frames and transcript events. |
+| ending | End requested or timeout | ended, failed | Stop capture and wait for final status. |
+| ended | Server confirms close | idle | Offer star review; never reconnect. |
+| failed | Non-retryable error | idle, connecting | Map safe error and allow explicit retry. |
+
+See 30-mobile-call-api-sdk-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.

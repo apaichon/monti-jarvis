@@ -35,6 +35,7 @@ System design artifacts for Monti Jarvis.
 | 27 | [27-customer-satisfaction-statistics-spec.md](27-customer-satisfaction-statistics-spec.md) | 24 | Customer 1-5 satisfaction review and tenant statistics | `approved` |
 | 28 | [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md) | 25 | Tenant ClickHouse call-center statistics and quota usage | `approved` |
 | 29 | [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md) | 26 | Tenant-safe dependency health, latency, and analytics freshness | `approved` |
+| 30 | [30-mobile-call-api-sdk-spec.md](30-mobile-call-api-sdk-spec.md) | 27 | Versioned mobile call API, voice transport, and typed SDK contract | `approved` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -47,6 +48,8 @@ System design artifacts for Monti Jarvis.
 **Sprint 25:** Design pack approved and shipped in v2.6.0 — [28-call-center-statistics-spec.md](28-call-center-statistics-spec.md); workflow §73-75; API § Tenant Call Center Statistics; UX T18. [SPRINT-025](../03-sprints/SPRINT-025.md).
 
 **Sprint 26:** Design pack approved for implementation — [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md); workflow §76; API § Tenant System Performance; UX T19. [SPRINT-026](../03-sprints/SPRINT-026.md).
+
+**Sprint 27:** Design pack approved — [30-mobile-call-api-sdk-spec.md](30-mobile-call-api-sdk-spec.md); workflow §77–79; API § Mobile Call API and SDK; UX M1. [SPRINT-027](../03-sprints/SPRINT-027.md).
 
 **Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 

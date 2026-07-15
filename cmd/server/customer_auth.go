@@ -33,10 +33,17 @@ type customerAuthSettingsBody struct {
 }
 
 type customerOTPRequest struct {
-	TenantID    string `json:"tenant_id"`
-	Email       string `json:"email"`
-	DisplayName string `json:"display_name"`
-	Locale      string `json:"locale"`
+	TenantID     string                       `json:"tenant_id"`
+	Email        string                       `json:"email"`
+	DisplayName  string                       `json:"display_name"`
+	Locale       string                       `json:"locale"`
+	Notification *customerOTPNotificationBody `json:"notification,omitempty"`
+}
+
+type customerOTPNotificationBody struct {
+	Platform   string `json:"platform"`
+	PushToken  string `json:"push_token"`
+	AppVersion string `json:"app_version"`
 }
 
 type customerOTPVerifyRequest struct {
@@ -123,9 +130,22 @@ func (s *server) requestCustomerOTP(w http.ResponseWriter, r *http.Request) {
 
 	code := newOTPCode()
 	codeHash := s.customerOTPHash(tenantID, email, code)
-	chal, err := s.store.CreateCustomerOTPChallenge(r.Context(), tenantID, email, customer.ID, codeHash, time.Duration(settings.OTPTTLSeconds)*time.Second, map[string]any{
-		"ip": clientIP(r), "user_agent": r.UserAgent(),
-	})
+	metadata := map[string]any{"ip": clientIP(r), "user_agent": r.UserAgent()}
+	notification := map[string]any{"status": "not_configured"}
+	if req.Notification != nil {
+		platform := strings.ToLower(strings.TrimSpace(req.Notification.Platform))
+		pushToken := strings.TrimSpace(req.Notification.PushToken)
+		if (platform != "ios" && platform != "android") || pushToken == "" || len(pushToken) > 4096 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "valid iOS or Android notification details are required", "code": "notification_invalid"})
+			return
+		}
+		// Keep only a digest in the challenge metadata. Provider delivery is
+		// intentionally disabled until APNs/FCM credentials are configured.
+		digest := sha256.Sum256([]byte(pushToken))
+		metadata["notification"] = map[string]any{"platform": platform, "token_sha256": hex.EncodeToString(digest[:]), "app_version": strings.TrimSpace(req.Notification.AppVersion)}
+		notification = map[string]any{"status": "not_configured", "platform": platform}
+	}
+	chal, err := s.store.CreateCustomerOTPChallenge(r.Context(), tenantID, email, customer.ID, codeHash, time.Duration(settings.OTPTTLSeconds)*time.Second, metadata)
 	if err != nil {
 		writeCustomerAuthError(w, err)
 		return
@@ -137,8 +157,9 @@ func (s *server) requestCustomerOTP(w http.ResponseWriter, r *http.Request) {
 		"challenge_id": chal.ID,
 		"status":       "otp_sent",
 		"delivery": map[string]any{
-			"channel": "email",
-			"to":      maskEmail(email),
+			"channel":      "email",
+			"to":           maskEmail(email),
+			"notification": notification,
 		},
 		"expires_in":   settings.OTPTTLSeconds,
 		"resend_after": 60,

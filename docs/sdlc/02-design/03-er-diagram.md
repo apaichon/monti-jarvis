@@ -2,8 +2,8 @@
 id: DES-0003
 title: Entity Relationship Diagram
 status: approved
-updated: 2026-07-14
-sprint: SPRINT-026
+updated: 2026-07-15
+sprint: SPRINT-027
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1462,3 +1462,80 @@ Sprint 26 introduces no persisted entity. The monitoring snapshot is an ephemera
 There is no ER diagram or migration for this sprint because adding a monitoring table would exceed the approved scope. The logical relationships are service probes to existing stores, not foreign keys.
 
 See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md), [02-workflow.md](02-workflow.md), [04-api-spec.md](04-api-spec.md), and [05-ux-ui.md](05-ux-ui.md).
+
+## Sprint 27 - mobile call API and SDK
+
+Sprint 27 introduces no new Postgres entity. The mobile contract is a versioned facade over existing call, customer-session, workforce-assignment, quota, turn, and rating records.
+
+~~~mermaid
+erDiagram
+  tenants ||--o{ customer_sessions : authenticates
+  tenants ||--o{ call_sessions : owns
+  customers ||--o{ customer_sessions : starts
+  customers ||--o{ call_sessions : places
+  ai_avatars ||--o{ tenant_avatar_assignments : enabled_for
+  ai_avatars ||--o{ call_sessions : handles
+  tenant_avatar_assignments }o--|| tenants : scoped_to
+  call_sessions ||--o{ call_turns : contains
+  call_sessions ||--o| conversation_ratings : receives
+
+  call_sessions {
+    String id PK
+    String tenant_id FK
+    String customer_id FK
+    String avatar_id FK
+    String room_name
+    String status
+    DateTime started_at
+    DateTime ended_at
+    String recording_key
+    DateTime created_at
+    DateTime updated_at
+    String created_by
+    String updated_by
+  }
+
+  customer_sessions {
+    String id PK
+    String tenant_id FK
+    String customer_id FK
+    String refresh_token_hash
+    DateTime expires_at
+    DateTime revoked_at
+    DateTime created_at
+    DateTime updated_at
+    String created_by
+    String updated_by
+  }
+
+  conversation_ratings {
+    String id PK
+    String tenant_id FK
+    String call_id FK
+    Integer score
+    String review
+    DateTime created_at
+    DateTime updated_at
+    String created_by
+    String updated_by
+  }
+~~~
+
+The diagram shows logical relationships only. Existing migrations and store bootstrap remain authoritative; Sprint 27 does not add a migration.
+
+### Sprint 27 storage contract
+
+| Store | Contract |
+| --- | --- |
+| Postgres | Reuse call_sessions, call_turns, customer_sessions, ai_avatars, tenant_avatar_assignments, and conversation_ratings. No new table. |
+| Redis | Reuse monti_jarvis:call:active:{call_id}; add only a bounded mobile idempotency response key with expiry. No audio or transcript payload. |
+| NATS | No required new subject. Existing call lifecycle events remain compatible. |
+| LiveKit / Gemini | Provider relay remains server-side. Mobile clients receive only the normalized WebSocket event envelope. |
+| MinIO | Existing calls/{tenant_id}/{call_id}/ archive objects remain unchanged. |
+| ClickHouse | No new table or mobile-specific fact. Completed calls continue through the existing archive/projection path. |
+
+### Audit and isolation
+
+All persisted records retain created_at, updated_at, created_by, and updated_by. The mobile API resolves tenant context from trusted auth/routing context, verifies caller ownership on every call operation, and never treats a request-body tenant_id as authoritative.
+
+See 30-mobile-call-api-sdk-spec.md, 02-workflow.md, 04-api-spec.md, and 05-ux-ui.md.

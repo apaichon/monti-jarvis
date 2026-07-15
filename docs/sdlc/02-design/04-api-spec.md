@@ -2,8 +2,8 @@
 id: DES-0004
 title: API Specification
 status: approved
-updated: 2026-07-14
-sprint: SPRINT-026
+updated: 2026-07-15
+sprint: SPRINT-027
 ---
 
 # API Specification — Monti Jarvis
@@ -2425,3 +2425,254 @@ The error response uses the existing shape:
 Raw provider messages, credentials, dependency URLs, tenant ids, customer data, transcripts, ticket notes, rating comments, and audio paths are never returned. Probe timeouts use the configured bounded deadline and do not block customer operations.
 
 See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md), [02-workflow.md](02-workflow.md), [03-er-diagram.md](03-er-diagram.md), and [05-ux-ui.md](05-ux-ui.md).
+
+## Mobile Call API and SDK (Sprint 27)
+
+Sprint 27 adds a versioned mobile facade. It reuses existing call sessions, customer authentication, avatar assignment, quota, rate-limit, transcript, archive, and rating behavior. It does not replace /api/calls or /ws/voice.
+
+### Endpoint summary
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| POST | /api/mobile/v1/calls | customer Bearer when required by tenant policy | Create a mobile call session. |
+| GET | /api/mobile/v1/calls/{call_id} | same caller and tenant context | Read safe call state. |
+| POST | /api/mobile/v1/calls/{call_id}/end | same caller and tenant context | Idempotently end a call. |
+| POST | /api/mobile/v1/calls/{call_id}/rating | same caller and tenant context | Save or update a 1-5 star score. |
+| GET | /ws/mobile/v1/calls/{call_id} | Bearer on upgrade | Exchange mobile audio/control frames and receive events. |
+
+Tenant resolution is trusted context only. The request body cannot switch tenants.
+
+### GET /api/mobile/v1/bootstrap
+
+Returns the mobile-safe configuration for the resolved tenant. For an authenticated customer, tenant context comes from the Bearer token. For an optional/public flow, the existing trusted portal context is required.
+
+Response 200:
+
+~~~json
+{
+  "tenant": { "display_name": "Libra Tech Co.,Ltd", "slug": "libra-tech-co-ltd" },
+  "auth": {
+    "enabled": true,
+    "mode": "required",
+    "require_auth_for_workforce": true,
+    "allow_public_no_auth": false,
+    "otp": { "channel": "email", "ttl_seconds": 600, "resend_after_seconds": 60 }
+  },
+  "locale": {
+    "default": "th",
+    "customer": "th",
+    "ai_reply": "th",
+    "supported": ["en", "th"],
+    "timezone": "Asia/Bangkok"
+  },
+  "avatars": [
+    {
+      "id": "ava",
+      "name": "Ava",
+      "role": "General Support",
+      "trait": "Warm & Patient",
+      "image_url": "/api/assets/avatars/ava/portrait.png",
+      "status": "active",
+      "is_default": true
+    }
+  ],
+  "default_avatar_id": "ava",
+  "limits": {
+    "max_call_seconds": 300,
+    "daily_limit_seconds": 1800,
+    "daily_remaining_seconds": 1200,
+    "warning_at_seconds": 10,
+    "reset_at": "2026-07-16T00:00:00+07:00",
+    "state": "quota_available"
+  }
+}
+~~~
+
+Only active tenant-assigned avatars are returned. Locale resolution is customer.locale, then tenant ai_reply_locale, then tenant locale, then en. Tenant timezone defaults to Asia/Bangkok. max_call_seconds and daily_remaining_seconds are the minimum applicable server-side limits; reset_at is the next tenant-local day boundary.
+
+### Mobile OTP notification additions
+
+`POST /api/customer/auth/request-otp` remains email OTP authentication. The mobile client may include:
+
+~~~json
+{
+  "email": "jane@example.com",
+  "locale": "th",
+  "notification": {
+    "platform": "ios|android",
+    "push_token": "<apns-or-fcm-token>",
+    "app_version": "1.0.0"
+  }
+}
+~~~
+
+Email is required for the current customer-auth contract. When email delivery succeeds and a valid iOS or Android token is supplied, the server may queue a non-sensitive APNs/FCM notification telling the customer to check email. The OTP itself must never be included in a push payload.
+
+Response additions:
+
+~~~json
+{
+  "notifications": { "push": "queued|disabled|rejected" },
+  "expires_in": 600,
+  "resend_after": 60
+}
+~~~
+
+Push failures do not invalidate a successful email OTP delivery. APNs/FCM credentials stay server-side.
+
+### POST /api/mobile/v1/calls
+
+Headers:
+
+| Header | Required | Description |
+| --- | --- | --- |
+| Authorization | policy-dependent | Customer Bearer token when tenant customer auth requires it. |
+| Idempotency-Key | yes | 1-128 printable characters; same caller/key returns the original create response for the bounded TTL. |
+| X-Monti-SDK-Version | no | SDK version for diagnostics; not an authorization input. |
+
+Request:
+
+~~~json
+{
+  "avatar_id": "ava",
+  "locale": "th"
+}
+~~~
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| avatar_id | string | no | Active avatar assigned to the resolved tenant; omitted uses default_avatar_id from mobile bootstrap. |
+| locale | string | no | Supported locale hint; server default applies when absent. |
+| notification | object | no | Optional platform and push token for background call notifications. |
+| tenant_id | string | forbidden | Never accepted as an authority for tenant resolution. |
+
+`notification` accepts `platform` (`ios` or `android`), `push_token`, and `app_version`. The token is used only for non-sensitive lifecycle notifications and is never returned to the client or included in persisted conversation content.
+
+Response 201:
+
+~~~json
+{
+  "call_id": "call_01",
+  "avatar": {
+    "id": "ava",
+    "name": "Ava",
+    "role": "General Support"
+  },
+  "status": "active",
+  "started_at": "2026-07-15T10:00:00Z",
+  "expires_at": "2026-07-15T10:03:00Z",
+  "time_limits": {
+    "max_call_seconds": 300,
+    "daily_remaining_seconds": 1200,
+    "warning_at_seconds": 10,
+    "reset_at": "2026-07-16T00:00:00+07:00"
+  },
+  "ws_path": "/ws/mobile/v1/calls/call_01"
+}
+~~~
+
+No LiveKit token, room name, provider id, provider credential, tenant selector, or customer contact data is returned.
+
+### GET /api/mobile/v1/calls/{call_id}
+
+Response 200:
+
+~~~json
+{
+  "call_id": "call_01",
+  "status": "active",
+  "avatar_id": "ava",
+  "started_at": "2026-07-15T10:00:00Z",
+  "ended_at": null,
+  "remaining_seconds": 164,
+  "last_event_at": "2026-07-15T10:00:12Z"
+}
+~~~
+
+Allowed status values are creating, active, ending, ended, and failed. remaining_seconds is null when no per-call limit is configured. The response never includes a tenant selector, customer contact details, room name, recording path, or provider metadata.
+
+### POST /api/mobile/v1/calls/{call_id}/end
+
+Headers:
+
+| Header | Required | Description |
+| --- | --- | --- |
+| Authorization | policy-dependent | Same caller context used to create the call. |
+| Idempotency-Key | recommended | Repeated end requests return the same terminal state. |
+
+Request:
+
+~~~json
+{ "reason": "customer" }
+~~~
+
+reason is customer, timeout, network, or omitted.
+
+Response 200:
+
+~~~json
+{
+  "call_id": "call_01",
+  "status": "ended",
+  "ended_at": "2026-07-15T10:02:11Z"
+}
+~~~
+
+Calling end after the session is already ended returns the existing terminal response. It must not duplicate archive, quota, or rating side effects.
+
+### POST /api/mobile/v1/calls/{call_id}/rating
+
+Request:
+
+~~~json
+{ "score": 5 }
+~~~
+
+Response 201:
+
+~~~json
+{ "status": "saved" }
+~~~
+
+score is an integer from 1 through 5. The existing conversation_ratings uniqueness and upsert behavior makes repeated submission safe. Rating comments remain outside the mobile SDK v1 surface.
+
+### GET /ws/mobile/v1/calls/{call_id}
+
+The client sends a Bearer token during the WebSocket upgrade and the optional X-Monti-SDK-Version header. No query-string tenant selector is accepted.
+
+Client frame types:
+
+| Type | Fields | Meaning |
+| --- | --- | --- |
+| start_audio | sample_rate, channels, encoding | Declare PCM16 mono 16 kHz capture. |
+| audio | data_base64 | One bounded PCM16 chunk. |
+| text | text | Optional typed input through the same call session. |
+| end | none | Request server-side end and terminal status. |
+
+Server event types:
+
+| Type | Fields | Meaning |
+| --- | --- | --- |
+| ready | call_id, avatar_id, encoding | Session accepted for media. |
+| audio | data_base64 | AI audio chunk. |
+| transcript | role, text, final | Caller or assistant transcript. |
+| call_status | status | active, ending, ended, or failed. |
+| turn_complete | none | Current turn completed. |
+| error | code, retryable | Stable client-facing failure. |
+
+### Error contract
+
+| HTTP / close | Code | Client behavior |
+| --- | --- | --- |
+| 400 | validation_error | Fix request and do not retry automatically. |
+| 401 | unauthorized, session_expired, customer_auth_required | Refresh token or show sign-in. |
+| 403 | forbidden, avatar_not_available, feature_disabled | Stop and show policy-safe message. |
+| 404 | not_found | Treat the call as inaccessible or already gone. |
+| 409 | idempotency_conflict, call_not_active | Re-read status before creating another call. |
+| 413 / WS error | audio_frame_too_large | Split frames; do not retry the same oversized frame. |
+| 429 | quota_exceeded, concurrent_limit, rate_limited | Stop automatic create retries and expose retry timing. |
+| 502/503 | voice_unavailable, storage_unavailable, service_unavailable | Retry only when retryable is true. |
+
+The mobile contract maps provider and infrastructure failures to these stable codes. It never returns provider messages, credentials, URLs, tenant ids, customer email, transcript archive paths, or raw stack traces.
+
+See 30-mobile-call-api-sdk-spec.md, 02-workflow.md §77–79, 03-er-diagram.md, and 05-ux-ui.md M1.

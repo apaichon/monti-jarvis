@@ -10,6 +10,12 @@ import (
 	"github.com/libra/monti-jarvis/internal/calltypes"
 )
 
+type CallSessionContext struct {
+	Session    calltypes.Session
+	CustomerID string
+	AvatarID   string
+}
+
 func (s *Store) CreateCallSession(ctx context.Context, id, tenantID, roomName string) (calltypes.Session, error) {
 	if s.pg == nil {
 		return calltypes.Session{}, fmt.Errorf("postgres is not available")
@@ -56,6 +62,26 @@ FROM %s.call_sessions WHERE id = $1`, schema), id,
 	}
 	session.EndedAt = endedAt
 	return session, nil
+}
+
+func (s *Store) GetCallSessionContext(ctx context.Context, id string) (CallSessionContext, error) {
+	if s.pg == nil {
+		return CallSessionContext{}, fmt.Errorf("postgres is not available")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var out CallSessionContext
+	var endedAt *time.Time
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT id, tenant_id, room_name, status, started_at, ended_at,
+       COALESCE(customer_id, ''), COALESCE(avatar_id, '')
+FROM %s.call_sessions WHERE id = $1`, schema), id).Scan(
+		&out.Session.ID, &out.Session.TenantID, &out.Session.RoomName, &out.Session.Status,
+		&out.Session.StartedAt, &endedAt, &out.CustomerID, &out.AvatarID)
+	if err != nil {
+		return CallSessionContext{}, err
+	}
+	out.Session.EndedAt = endedAt
+	return out, nil
 }
 
 func (s *Store) EndCallSession(ctx context.Context, id string) (calltypes.Session, error) {
