@@ -1,8 +1,8 @@
 ---
 id: TEST-MATRIX
 status: active
-updated: 2026-07-13
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020]
+updated: 2026-07-16
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -172,6 +172,18 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | T26-02 | 1–4 | Tenant-admin auth, tenant scoping, and safe monitoring response | Auto + Manual | `go test ./cmd/server` · [UAT-026](../06-manual-tests/SPRINT-026-manual.md) |
 | T26-03 | 1–6 | Tenant monitoring route, loading/error/retry states, and responsive layout | Auto + Manual | `npm run check && npm run build` · [UAT-026](../06-manual-tests/SPRINT-026-manual.md) |
 | T26-04 | 4 | Existing call, archive, quota, statistics, and `/healthz` compatibility | Smoke / Manual | [UAT-026](../06-manual-tests/SPRINT-026-manual.md#uat-026-10) |
+
+## FEAT-0029 — Mobile Call API and SDK (SPRINT-027)
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T27-01 | 1, 8–9 | Mobile bootstrap and authenticated call creation use tenant/customer policy | Auto + Manual | `go test ./cmd/server` · [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
+| T27-02 | 2, 7 | Mobile API returns bounded safe errors and redacts provider/internal details | Auto + Manual | `go test ./cmd/server` · [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
+| T27-03 | 3, 7 | Mobile WebSocket ownership, event envelope, reconnect, and oversized-frame behavior | Auto + Manual | `go test ./cmd/server` · [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
+| T27-04 | 4 | Create and end-call idempotency prevents duplicate sessions and close side effects | Auto + Manual | `go test ./cmd/server` · [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
+| T27-05 | 5, 7 | Customer auth, tenant isolation, avatar assignment, quota, and rate-limit enforcement | Auto + Manual | `go test ./cmd/server` · [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
+| T27-06 | 6 | TypeScript SDK exposes token refresh, lifecycle, reconnect, transcript, end, and rating APIs | Auto + Manual | `tsc -p packages/monti-mobile-sdk/tsconfig.json` · [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
+| T27-07 | Regression | Existing web call routes, archive, quota, statistics, and `/healthz` remain compatible | Smoke / Manual | [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
 
 ---
 

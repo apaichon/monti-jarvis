@@ -1,10 +1,10 @@
 ---
 id: READINESS-RELEASE
 status: completed
-updated: 2026-07-13
-current_sprint: SPRINT-020
-release_target: v2.1.0
-release: v2.1.0
+updated: 2026-07-16
+current_sprint: SPRINT-027
+release_target: v2.8.0
+release: v2.8.0
 ---
 
 # Release Readiness Checklist
@@ -85,6 +85,15 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] Authenticated chat/call tenant routing implemented.
 - [x] Avatar picker popup makes all avatars selectable at 100% browser scale.
 
+### SPRINT-027 (v2.8.0)
+
+- [x] Mobile bootstrap returns tenant policy, locale/timezone, assigned active avatars, default avatar, and authoritative limits.
+- [x] Versioned mobile call lifecycle endpoints enforce customer session, tenant, assigned-avatar, quota, rate-limit, and idempotency policy.
+- [x] Mobile WebSocket validates call ownership and returns only bounded provider-independent event/error envelopes.
+- [x] Transcript, explicit end-call, and 1-5 star rating operations return mobile-safe data.
+- [x] TypeScript SDK builds independently and exposes OTP, bootstrap, token refresh, lifecycle, reconnect, transcript, end, and rating operations.
+- [x] Existing web call routes, archive, quota, statistics, and `/healthz` compatibility validated by regression gates.
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -98,19 +107,19 @@ curl -fsS http://localhost:8091/api/workforce
 
 | Role | Name | Date | Notes |
 | --- | --- | --- | --- |
-| Dev | Codex release verification | 2026-07-13 | Implementation + unit tests |
-| Tester | Codex release verification + user browser smoke | 2026-07-13 | Libra Tech OTP/account smoke; checklist recorded |
-| PM | User-authorized release close | 2026-07-13 | ACs accepted |
-| DevOps | Codex release verification | 2026-07-13 | Build/test/tag verified |
+| Dev | Codex release verification | 2026-07-16 | Mobile API, WebSocket, SDK implementation + unit tests |
+| Tester | Codex release verification | 2026-07-16 | Contract, tenant isolation, redaction, lifecycle, and SDK checks recorded in UAT-027 |
+| PM | User-authorized release close | 2026-07-16 | ACs accepted for SPRINT-027 |
+| DevOps | Codex release verification | 2026-07-16 | Build/test/tag verified |
 
 ## H. Release-cut (PM + DevOps)
 
 After sections A–G are green:
 
 ```bash
-# SPRINT-020 release
-git tag -a v2.1.0 -m "v2.1.0 - SPRINT-020 customer authentication and domain enforcement"
-git push origin v2.1.0
+# SPRINT-027 release
+git tag -a v2.8.0 -m "v2.8.0 - SPRINT-027 mobile call API and SDK"
+git push origin v2.8.0
 ```
 
 - [x] Tag pushed to `origin`

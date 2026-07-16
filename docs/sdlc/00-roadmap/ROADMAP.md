@@ -50,7 +50,7 @@
 | 24 | Tenant | Customer Review AI Satisfaction after conversation, Tenant view statistics | F | 22, 23 ✅ v2.5.0 |
 | 25 | Tenant | Dashboard : Call Center Statistics, Call Quota Usage | F | 22 (ClickHouse) ✅ v2.6.0 · [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
 | 26 | Tenant | Monitoring : System Performance | F | 25 ✅ v2.7.0 |
-| **27** | **Customer / Integrator** | **Mobile Call API and SDK for inbound voice integration** | **G** | **1, 20** · planned v2.8.0 |
+| **27** | **Customer / Integrator** | **Mobile Call API and SDK for inbound voice integration** | **G** | **1, 20** ✅ v2.8.0 |
 | 28 | Platform | Audit Log | G | 3 |
 | 29 | Platform | Monitoring : System Performance | G | 28 |
 | 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) |

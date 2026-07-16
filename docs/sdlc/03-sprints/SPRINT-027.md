@@ -54,10 +54,10 @@ The Sprint 27 technical design pack is approved for implementation. The build is
 
 | Task | Scope | Points | Status |
 | --- | --- | ---: | --- |
-| [TASK-0124](../04-tasks/TASK-0124.md) | Versioned mobile API and bootstrap | 4 | `in_progress` |
-| [TASK-0125](../04-tasks/TASK-0125.md) | Mobile voice WebSocket and lifecycle | 4 | `in_progress` |
-| [TASK-0126](../04-tasks/TASK-0126.md) | Typed SDK core and adapters | 4 | `in_progress` |
-| [TASK-0127](../04-tasks/TASK-0127.md) | Policy, contract tests, and reference integration | 4 | `in_progress` |
+| [TASK-0124](../04-tasks/TASK-0124.md) | Versioned mobile API and bootstrap | 4 | `completed` |
+| [TASK-0125](../04-tasks/TASK-0125.md) | Mobile voice WebSocket and lifecycle | 4 | `completed` |
+| [TASK-0126](../04-tasks/TASK-0126.md) | Typed SDK core and adapters | 4 | `completed` |
+| [TASK-0127](../04-tasks/TASK-0127.md) | Policy, contract tests, and reference integration | 4 | `completed` |
 
 ## Scope boundary
 
