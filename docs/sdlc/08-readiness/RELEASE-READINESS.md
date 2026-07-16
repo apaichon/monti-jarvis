@@ -2,9 +2,9 @@
 id: READINESS-RELEASE
 status: completed
 updated: 2026-07-16
-current_sprint: SPRINT-027
-release_target: v2.8.0
-release: v2.8.0
+current_sprint: SPRINT-028
+release_target: v2.9.0
+release: v2.9.0
 ---
 
 # Release Readiness Checklist
@@ -94,6 +94,16 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] TypeScript SDK builds independently and exposes OTP, bootstrap, token refresh, lifecycle, reconnect, transcript, end, and rating operations.
 - [x] Existing web call routes, archive, quota, statistics, and `/healthz` compatibility validated by regression gates.
 
+### SPRINT-028 (v2.9.0)
+
+- [x] Structured audit events capture tenant, actor, action, resource, request, outcome, and bounded metadata.
+- [x] Local JSONL spool rotates with the configured timestamp naming convention and transfers on the default five-second interval.
+- [x] ClickHouse sink, deterministic event IDs, acknowledgement markers, retry retention, and one-hour cleanup are implemented and unit tested.
+- [x] Platform audit API/UI exposes bounded filters, pagination, delivery health, and non-sensitive metadata only.
+- [x] `GET /api/platform/tenants` includes `logo_url` from the tenant brand profile for mobile/admin company-logo display.
+- [x] Full Go tests, server build, platform-admin Svelte check/build, and `git diff --check` pass.
+- [ ] Manual browser, ClickHouse outage/recovery, and retention UAT evidence; deferred to the next tester run.
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -107,9 +117,9 @@ curl -fsS http://localhost:8091/api/workforce
 
 | Role | Name | Date | Notes |
 | --- | --- | --- | --- |
-| Dev | Codex release verification | 2026-07-16 | Mobile API, WebSocket, SDK implementation + unit tests |
-| Tester | Codex release verification | 2026-07-16 | Contract, tenant isolation, redaction, lifecycle, and SDK checks recorded in UAT-027 |
-| PM | User-authorized release close | 2026-07-16 | ACs accepted for SPRINT-027 |
+| Dev | Codex release verification | 2026-07-16 | Audit pipeline, platform API/UI, tenant logo response + unit tests |
+| Tester | Codex release verification | 2026-07-16 | Automated contract, redaction, retention, and tenant response checks; manual UAT deferred |
+| PM | User-authorized release close | 2026-07-16 | ACs accepted for SPRINT-028 |
 | DevOps | Codex release verification | 2026-07-16 | Build/test/tag verified |
 
 ## H. Release-cut (PM + DevOps)
@@ -117,15 +127,15 @@ curl -fsS http://localhost:8091/api/workforce
 After sections A–G are green:
 
 ```bash
-# SPRINT-027 release
-git tag -a v2.8.0 -m "v2.8.0 - SPRINT-027 mobile call API and SDK"
-git push origin v2.8.0
+# SPRINT-028 release
+git tag -a v2.9.0 -m "v2.9.0 - SPRINT-028 cross-tenant audit log"
+git push origin v2.9.0
 ```
 
-- [x] Tag pushed to `origin`
+- [ ] Tag pushed to `origin`
 - [x] Sprint marked `completed` in `03-sprints/`
 - [x] `_velocity.json` updated
-- [x] ROADMAP current sprint pointer advanced
+- [x] ROADMAP sprint 28 marked shipped and next sprint pointer advanced
 
 ## Quick demo script (stakeholder, ~10 min)
 

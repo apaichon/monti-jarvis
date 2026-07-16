@@ -2,8 +2,8 @@
 id: DES-0004
 title: API Specification
 status: approved
-updated: 2026-07-15
-sprint: SPRINT-027
+updated: 2026-07-16
+sprint: SPRINT-028
 ---
 
 # API Specification — Monti Jarvis
@@ -587,6 +587,8 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
 
 **Response 200:**
 
+Each tenant includes `logo_url`, copied from its `brands.logo_url` profile value. It is an empty string when the tenant has no configured company logo; clients should render their normal fallback in that case.
+
 ```json
 {
   "tenants": [
@@ -594,6 +596,7 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
       "id": "acme",
       "slug": "acme",
       "name": "Acme Corp",
+      "logo_url": "https://cdn.example.com/brands/acme/logo.png",
       "status": "pending_kyc",
       "registration_id": "reg_a1b2c3d4e5f67890",
       "admin_email": "admin@acme.test",
@@ -2682,3 +2685,90 @@ Server event types:
 The mobile contract maps provider and infrastructure failures to these stable codes. It never returns provider messages, credentials, URLs, tenant ids, customer email, transcript archive paths, or raw stack traces.
 
 See 30-mobile-call-api-sdk-spec.md, 02-workflow.md §77–79, 03-er-diagram.md, and 05-ux-ui.md M1.
+
+## Platform Audit Log (Sprint 28)
+
+Audit events are emitted by protected Go handlers and background operations. There is no public event-ingest endpoint. Platform administrators query the ClickHouse projection; local spool paths and transfer markers remain backend-only.
+
+### GET /api/platform/audit-logs
+
+**Auth:** `platform_admin` only.
+**Purpose:** Search deduplicated, redacted audit events across tenants.
+
+Query fields:
+
+| Field | Type | Required | Contract |
+| --- | --- | --- | --- |
+| `tenant_id` | string | no | Exact tenant filter. |
+| `actor_id` | string | no | Exact actor filter. |
+| `action` | string | no | Exact allowlisted action filter. |
+| `resource_type` | string | no | Exact resource family filter. |
+| `outcome` | string | no | `success`, `denied`, or `failure`. |
+| `start_date` | `YYYY-MM-DD` | no | Inclusive UTC date; defaults to today minus 7 days. |
+| `end_date` | `YYYY-MM-DD` | no | Inclusive UTC date; defaults to today. |
+| `limit` | integer | no | Default 50, maximum 200. |
+| `cursor` | opaque string | no | Stable continuation cursor. |
+
+Response 200:
+
+~~~json
+{
+  "events": [
+    {
+      "event_id": "evt_01J2...",
+      "occurred_at": "2026-07-16T09:10:11.123Z",
+      "tenant_id": "tenant_01",
+      "actor_id": "user_01",
+      "actor_type": "platform_admin",
+      "action": "tenant.avatar.assignment.updated",
+      "resource_type": "tenant_avatar_assignment",
+      "resource_id": "assignment_01",
+      "request_id": "req_01",
+      "source": "platform_api",
+      "outcome": "success",
+      "metadata": {"avatar_id": "ava", "changed_fields": ["status"]}
+    }
+  ],
+  "next_cursor": "eyJvZmZzZXQiOjUwfQ",
+  "range": {"start_date": "2026-07-09", "end_date": "2026-07-16", "timezone": "UTC"}
+}
+~~~
+
+The query uses the ClickHouse `audit_events` table and a deduplication-safe read. Metadata is allowlisted, bounded, and redacted before serialization. Empty results return `200` with an empty array.
+
+### GET /api/platform/audit-logs/health
+
+**Auth:** `platform_admin` only.
+**Purpose:** Show delivery state without exposing local paths or infrastructure errors.
+
+Response 200:
+
+~~~json
+{
+  "mode": "spool",
+  "queue_depth": 12,
+  "last_successful_transfer": "2026-07-16T09:10:05Z",
+  "oldest_pending_file_age_seconds": 18,
+  "pending_files": 2,
+  "failed_files": 0,
+  "clickhouse": "operational"
+}
+~~~
+
+`clickhouse` is one of `operational`, `degraded`, `unavailable`, or `disabled`. The endpoint never returns `AUDIT_LOG_DIR`, marker contents, ClickHouse URLs, credentials, stack traces, or raw file names.
+
+### Audit API errors
+
+| HTTP | Code | Contract |
+| ---: | --- | --- |
+| 401 | `unauthorized` | No valid platform session. |
+| 403 | `forbidden` | Authenticated user is not a platform administrator. |
+| 400 | `validation_error` | Invalid date, enum, cursor, or limit. |
+| 503 | `analytics_unavailable` | ClickHouse query unavailable; retry without raw error detail. |
+| 500 | `service_unavailable` | Safe fallback when the audit query cannot be completed. |
+
+### Audit event emission contract
+
+Handlers use the internal audit writer rather than an HTTP client call. The minimum event fields are `event_id`, `occurred_at`, `tenant_id`, `actor_id`, `actor_type`, `action`, `resource_type`, `resource_id`, `request_id`, `source`, `outcome`, and bounded `metadata`. `AUDIT_LOG_MODE=spool` is the default; `AUDIT_LOG_FLUSH_INTERVAL=5s` is the default transfer interval; `AUDIT_LOG_RETENTION=1h` is the default local retention threshold.
+
+See 31-cross-tenant-audit-log-spec.md, 02-workflow.md §80–82, 03-er-diagram.md, and 05-ux-ui.md A20.

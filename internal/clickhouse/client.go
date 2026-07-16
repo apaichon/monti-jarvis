@@ -110,6 +110,9 @@ ORDER BY (tenant_id, created_at)`, db),
 	if err := c.ensureAuditSchema(ctx); err != nil {
 		return err
 	}
+	if err := c.EnsureAuditEventsSchema(ctx); err != nil {
+		return err
+	}
 	return c.EnsureCallCenterSchema(ctx)
 }
 

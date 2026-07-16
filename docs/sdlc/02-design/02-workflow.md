@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: approved
-updated: 2026-07-15
-sprint: SPRINT-027
+updated: 2026-07-16
+sprint: SPRINT-028
 ---
 
 # Workflows — Monti Jarvis
@@ -2166,3 +2166,101 @@ sequenceDiagram
 | failed | Non-retryable error | idle, connecting | Map safe error and allow explicit retry. |
 
 See 30-mobile-call-api-sdk-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
+
+## 80. Request emits an audit event (Sprint 28)
+
+```mermaid
+sequenceDiagram
+  actor U as Platform or tenant user
+  participant B as Browser
+  participant G as Go :8091
+  participant A as internal/auth + auditctx
+  participant Q as internal/audit queue
+  participant F as Backend local spool
+  participant P as Postgres callcenter
+
+  U->>B: Submit an authenticated mutation
+  B->>G: POST/PUT/DELETE protected resource
+  G->>A: Resolve tenant, actor, request_id, and authorization
+  alt denied
+    A-->>G: Safe forbidden result
+    G->>Q: Enqueue redacted denied event when context is safe
+    G-->>B: 403 safe error
+  else authorized
+    G->>P: Commit existing domain mutation
+    P-->>G: Mutation result
+    G->>Q: Enqueue immutable success event with stable event_id
+    Q->>F: Append one bounded JSON line to active audit file
+    alt local writer accepts event
+      F-->>Q: Accepted locally
+      G-->>B: Existing domain response
+    else queue or writer unavailable
+      F-->>Q: Write failure
+      Q-->>G: Observable audit acceptance failure
+      G-->>B: Existing route-specific safe failure policy
+    end
+  end
+```
+
+The domain mutation and audit event are not a distributed transaction. The local writer is the durability boundary in `spool` mode; ClickHouse is not called from the request handler. Event construction uses allowlisted metadata and strips secrets, tokens, OTPs, raw bodies, audio, transcripts, and unbounded personal data before enqueueing.
+
+## 81. Audit worker transfers and retains local files (Sprint 28)
+
+```mermaid
+sequenceDiagram
+  participant W as Go audit worker
+  participant F as Backend local spool
+  participant C as ClickHouse monti_jarvis
+  participant M as Transfer marker
+
+  loop every AUDIT_LOG_FLUSH_INTERVAL (default 5s)
+    W->>F: Close/rotate active file and scan closed files oldest-first
+    W->>F: Claim one file with exclusive lock
+    W->>C: INSERT audit_events in bounded JSONEachRow batches
+    alt complete insert acknowledged
+      C-->>W: HTTP 200 success for all batches
+      W->>M: Atomically write count, checksum, and acknowledged_at
+      alt file age >= AUDIT_LOG_RETENTION (default 1h)
+        W->>F: Delete file and marker
+      else retention not reached
+        W-->>F: Keep acknowledged file until retention threshold
+      end
+    else timeout, partial response, or ClickHouse unavailable
+      C-->>W: Retryable or unknown result
+      W->>F: Release claim and retain unacknowledged file
+      W-->>W: Record failure and retry on next bounded backoff
+    end
+  end
+```
+
+The event ID is deterministic across retries and ClickHouse queries deduplicate logical events. A successful HTTP response is required before writing the acknowledgement marker; an ambiguous timeout is never treated as delivered. Shutdown stops intake, drains the bounded queue, closes the active file, attempts a bounded final transfer, and leaves failed files on disk.
+
+## 82. Platform administrator searches audit events (Sprint 28)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin
+  participant B as Browser
+  participant G as Go :8091
+  participant H as ClickHouse audit_events
+  participant O as Audit health state
+
+  A->>B: Open /admin/audit-logs and choose filters
+  B->>G: GET /api/platform/audit-logs?filters
+  G->>G: Require platform_admin and validate bounded filters
+  alt unauthorized or invalid filter
+    G-->>B: 401/403 or validation_error
+  else authorized
+    G->>H: Query deduplicated audit events with FINAL and LIMIT
+    alt ClickHouse unavailable
+      G-->>B: 503 analytics_unavailable without raw infrastructure detail
+    else query succeeds
+      H-->>G: Events and next cursor
+      G->>O: Read last transfer and pending-file summary
+      G-->>B: Events, filters, pagination, and safe delivery health
+    end
+  end
+  B-->>A: Render tenant/action/resource/outcome audit rows
+```
+
+See 31-cross-tenant-audit-log-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.

@@ -95,6 +95,14 @@ type Config struct {
 	MobilePushEnabled     bool
 	MobilePushProvider    string
 	MobilePushTokenTTL    time.Duration
+	// Cross-tenant audit log (SPRINT-028)
+	AuditLogMode          string
+	AuditLogDir           string
+	AuditLogFlushInterval time.Duration
+	AuditLogRetention     time.Duration
+	AuditLogBatchSize     int
+	AuditLogQueueSize     int
+	AuditLogRetryBackoff  time.Duration
 	AppEnv                string
 }
 
@@ -193,6 +201,13 @@ func Load() Config {
 		MobilePushEnabled:      envBool("MOBILE_PUSH_ENABLED", false),
 		MobilePushProvider:     envOr("MOBILE_PUSH_PROVIDER", "auto"),
 		MobilePushTokenTTL:     envDuration("MOBILE_PUSH_TOKEN_TTL", 15*time.Minute),
+		AuditLogMode:           envOr("AUDIT_LOG_MODE", "spool"),
+		AuditLogDir:            envOr("AUDIT_LOG_DIR", "./var/audit"),
+		AuditLogFlushInterval:  envDuration("AUDIT_LOG_FLUSH_INTERVAL", 5*time.Second),
+		AuditLogRetention:      envDuration("AUDIT_LOG_RETENTION", time.Hour),
+		AuditLogBatchSize:      positiveEnvInt("AUDIT_LOG_BATCH_SIZE", 500),
+		AuditLogQueueSize:      positiveEnvInt("AUDIT_LOG_QUEUE_SIZE", 10000),
+		AuditLogRetryBackoff:   envDuration("AUDIT_LOG_RETRY_BACKOFF", time.Second),
 		AppEnv:                 appEnv,
 	}
 }

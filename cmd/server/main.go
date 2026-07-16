@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/libra/monti-jarvis/internal/auth"
+	"github.com/libra/monti-jarvis/internal/audit"
 	"github.com/libra/monti-jarvis/internal/calls"
 	"github.com/libra/monti-jarvis/internal/clickhouse"
 	"github.com/libra/monti-jarvis/internal/customerweb"
@@ -59,6 +60,7 @@ type server struct {
 	mailer          *resend.Client
 	tenantOAuth     *tenantoauth.Service
 	monitoring      *observability.Service
+	audit           *audit.Writer
 }
 
 type chatRequest struct {
@@ -113,6 +115,16 @@ func main() {
 		} else if err := ch.Ping(rootCtx); err != nil {
 			log.Printf("infra warning: clickhouse ping: %v", err)
 		}
+	}
+	auditWriter, err := audit.New(audit.Config{
+		Mode: cfg.AuditLogMode, Dir: cfg.AuditLogDir, FlushInterval: cfg.AuditLogFlushInterval,
+		Retention: cfg.AuditLogRetention, BatchSize: cfg.AuditLogBatchSize, QueueSize: cfg.AuditLogQueueSize,
+		RetryBackoff: cfg.AuditLogRetryBackoff,
+	}, ch)
+	if err != nil {
+		log.Printf("infra warning: audit log: %v", err)
+	} else {
+		auditWriter.Start(rootCtx)
 	}
 
 	ai := gemini.New(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.GeminiEmbedModel)
@@ -207,6 +219,7 @@ func main() {
 		mailer:          mailer,
 		tenantOAuth:     tenantOAuth,
 		monitoring:      newMonitoringService(st, ch, bus, ai, cfg),
+		audit:           auditWriter,
 	}
 	s.backfillCallCenterAnalytics(rootCtx)
 	voiceRelay.AgentResolver = s.resolveAssignedWorkforceAgent
@@ -258,6 +271,8 @@ func main() {
 	mux.HandleFunc("GET /api/public/tenant/register/oauth/{provider}/callback", s.tenantOAuthCallback)
 	mux.HandleFunc("POST /api/public/tenant/register/oauth/complete", s.completeTenantOAuth)
 	mux.Handle("GET /api/platform/tenants", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformTenants)))
+	mux.Handle("GET /api/platform/audit-logs", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformAuditLogs)))
+	mux.Handle("GET /api/platform/audit-logs/health", guard.RequirePlatformAdmin(http.HandlerFunc(s.platformAuditHealth)))
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/kyc", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/approve", guard.RequirePlatformAdmin(http.HandlerFunc(s.approvePlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))
@@ -425,9 +440,13 @@ func main() {
 
 	mux.Handle("/", s.static)
 
+	var handler http.Handler = mux
+	if auditWriter != nil {
+		handler = auditWriter.Middleware(mux, s.auditActor, cfg.DemoTenantID)
+	}
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           withCORS(cfg.AuthDisabled, withCommonHeaders(mux)),
+		Handler:           withCORS(cfg.AuthDisabled, withCommonHeaders(handler)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -445,6 +464,9 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+	if auditWriter != nil {
+		_ = auditWriter.Close(shutdownCtx)
+	}
 }
 
 func (s *server) apiJSONNotFound(w http.ResponseWriter, r *http.Request) {

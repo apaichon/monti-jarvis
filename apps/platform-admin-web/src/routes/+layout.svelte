@@ -81,6 +81,13 @@
         </a>
         <a
           class="nav-link"
+          class:active={$page.url.pathname.startsWith(`${base}/audit-logs`)}
+          href="{base}/audit-logs"
+        >
+          <span>▤</span>Audit log
+        </a>
+        <a
+          class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/settings`)}
           href="{base}/settings/payment"
         >

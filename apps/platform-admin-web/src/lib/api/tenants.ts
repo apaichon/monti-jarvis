@@ -4,6 +4,7 @@ export type TenantListItem = {
   id: string;
   slug: string;
   name: string;
+  logo_url: string;
   status: string;
   registration_id: string;
   admin_email: string;

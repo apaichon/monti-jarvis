@@ -154,14 +154,14 @@ func (s *server) verifyTenantEmail(w http.ResponseWriter, r *http.Request) {
 	s.sendRegistrationCompleteEmail(ctx, user, user.TenantID)
 
 	writeJSON(w, http.StatusOK, registerTenantResponse{
-		TenantID:       user.TenantID,
-		Slug:           user.TenantID,
-		AccessToken:    pair.AccessToken,
-		RefreshToken:   pair.RefreshToken,
-		ExpiresIn:      pair.ExpiresIn,
-		TokenType:      pair.TokenType,
-		User:           pair.User,
-		Message:        "Email verified. You can sign in and complete KYC in the tenant backoffice.",
+		TenantID:     user.TenantID,
+		Slug:         user.TenantID,
+		AccessToken:  pair.AccessToken,
+		RefreshToken: pair.RefreshToken,
+		ExpiresIn:    pair.ExpiresIn,
+		TokenType:    pair.TokenType,
+		User:         pair.User,
+		Message:      "Email verified. You can sign in and complete KYC in the tenant backoffice.",
 	})
 }
 
@@ -186,6 +186,7 @@ func (s *server) listPlatformTenants(w http.ResponseWriter, r *http.Request) {
 			"id":              item.ID,
 			"slug":            item.Slug,
 			"name":            item.Name,
+			"logo_url":        item.LogoURL,
 			"status":          item.Status,
 			"registration_id": item.RegistrationID,
 			"admin_email":     item.AdminEmail,

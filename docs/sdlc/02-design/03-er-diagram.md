@@ -2,8 +2,8 @@
 id: DES-0003
 title: Entity Relationship Diagram
 status: approved
-updated: 2026-07-15
-sprint: SPRINT-027
+updated: 2026-07-16
+sprint: SPRINT-028
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1539,3 +1539,53 @@ The diagram shows logical relationships only. Existing migrations and store boot
 All persisted records retain created_at, updated_at, created_by, and updated_by. The mobile API resolves tenant context from trusted auth/routing context, verifies caller ownership on every call operation, and never treats a request-body tenant_id as authoritative.
 
 See 30-mobile-call-api-sdk-spec.md, 02-workflow.md, 04-api-spec.md, and 05-ux-ui.md.
+
+## Sprint 28 - cross-tenant audit log
+
+Sprint 28 adds no new Postgres domain table. Existing Postgres audit columns and `internal/auditctx` remain the source for row mutation context. The event stream is an immutable ClickHouse projection fed by an instance-local backend spool.
+
+```mermaid
+erDiagram
+  AUDIT_EVENTS {
+    String event_id PK
+    DateTime64 occurred_at
+    String tenant_id
+    String actor_id
+    String actor_type
+    String action
+    String resource_type
+    String resource_id
+    String request_id
+    String source
+    String outcome
+    String metadata_json
+    DateTime64 ingested_at
+  }
+```
+
+`AUDIT_EVENTS` is a logical ClickHouse entity; ClickHouse does not enforce Postgres foreign keys. `event_id` is the logical identity used to make retries safe. The physical table uses `ReplacingMergeTree(ingested_at)` with `ORDER BY (tenant_id, occurred_at, event_id)`, and platform queries use `FINAL` or an equivalent deduplication query.
+
+### Sprint 28 storage contract
+
+| Store | Contract |
+| --- | --- |
+| Postgres | No new table. Existing `created_at`, `updated_at`, `created_by`, `updated_by` columns and `internal/auditctx` provide mutation context. |
+| Backend filesystem | Instance-local `AUDIT_LOG_DIR`; active and closed `audit_log_YYYYMMDD-HH-MM-SS.jsonl` files plus atomic acknowledgement markers. |
+| ClickHouse | New `audit_events` `ReplacingMergeTree` table with allowlisted event fields and redacted `metadata_json`; migration/bootstrap must be idempotent. |
+| Redis | No audit payloads or delivery truth. Existing Redis DB 4 and `monti_jarvis:` prefix remain unchanged. |
+| MinIO | No audit object path. Audit files are local operational spool files, not conversation archives. |
+
+### Local file lifecycle
+
+| State | Representation | Transition |
+| --- | --- | --- |
+| Active | Open `.jsonl` file | Writer appends bounded JSON lines. |
+| Closed | Closed `.jsonl` file | Rotation makes it eligible for worker claim. |
+| Transferring | Exclusive claim/lock | Worker sends all batches to ClickHouse. |
+| Acknowledged | Atomic `.uploaded` marker with count/checksum/time | Complete insert response has been received. |
+| Expired | File and marker older than retention | Worker deletes only after acknowledgement and age checks. |
+| Retained failure | Closed file without valid marker | Retry; never delete because of age alone. |
+
+The ClickHouse schema must be created by the runtime ensure-schema path and have a matching idempotent migration script, for example `scripts/migrations/003_audit_events_clickhouse.sql`, when implementation begins. No audit file or marker is shared between server instances.
+
+See 31-cross-tenant-audit-log-spec.md, 02-workflow.md, 04-api-spec.md, and 05-ux-ui.md.

@@ -2,8 +2,8 @@
 id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
-updated: 2026-07-15
-sprint: SPRINT-027
+updated: 2026-07-16
+sprint: SPRINT-028
 ---
 
 # UX/UI — ASCII Wireframes
@@ -2534,3 +2534,107 @@ Customer taps End call, AI requests timeout close, or quota timer reaches zero
 - Thai and English user-facing status/error labels are host-app concerns; the API returns stable language-neutral codes.
 
 See 30-mobile-call-api-sdk-spec.md, 02-workflow.md §77–79, 03-er-diagram.md, and 04-api-spec.md.
+
+## Sprint 28 - Platform Cross-Tenant Audit Log (A20)
+
+Sprint 28 adds a platform-admin audit surface. Customer and tenant portals have no new user-visible route. The local spool and ClickHouse delivery worker are backend operations and are represented through safe health indicators, never raw file paths or infrastructure details.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| A20-1 Date range | Choose UTC start/end dates | `GET /api/platform/audit-logs?start_date=&end_date=` |
+| A20-2 Tenant filter | Select one tenant or all | `GET /api/platform/audit-logs?tenant_id=` |
+| A20-3 Event filters | Filter actor, action, resource, outcome | `GET /api/platform/audit-logs?actor_id=&action=&resource_type=&outcome=` |
+| A20-4 Results table | Browse bounded event rows | `GET /api/platform/audit-logs?limit=&cursor=` |
+| A20-5 Delivery status | Inspect queue and transfer freshness | `GET /api/platform/audit-logs/health` |
+| A20-6 Next page | Load older matching events | `GET /api/platform/audit-logs?cursor=` |
+
+### Full layout - desktop
+
+~~~text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ MONTI · PLATFORM ADMIN                                      ● System healthy │
+├───────────────┬──────────────────────────────────────────────────────────────┤
+│ Navigation     │ A20  Audit log                                               │
+│                 │ Cross-tenant security and operational history                │
+│ Overview        │                                                              │
+│ Tenants         │ ┌────────────────────────────────────────────────────────┐ │
+│ Avatars         │ │ A20-1 Date       A20-2 Tenant       A20-3 Filters       │ │
+│ Packages        │ │ [start] [end]    [All tenants v]   [action] [outcome v] │ │
+│ Billing         │ │                                      [Apply] [Reset]    │ │
+│ Audit log  <    │ └────────────────────────────────────────────────────────┘ │
+│ Settings        │                                                              │
+│                 │ ┌────────────────────────────────────────────────────────┐ │
+│                 │ │ A20-5 Delivery: Spool · 12 queued · Last transfer 5s  │ │
+│                 │ │ ClickHouse operational · 2 pending files               │ │
+│                 │ └────────────────────────────────────────────────────────┘ │
+│                 │                                                              │
+│                 │ A20-4 Results                                               │
+│                 │ ┌──────────┬──────────┬──────────────┬─────────┬─────────┐ │
+│                 │ │ Time     │ Tenant   │ Actor        │ Action  │ Outcome │ │
+│                 │ ├──────────┼──────────┼──────────────┼─────────┼─────────┤ │
+│                 │ │ 09:10:11│ Libra    │ admin@...    │ Avatar  │ Success │ │
+│                 │ │ 09:08:44│ Demo     │ system       │ Call    │ Success │ │
+│                 │ └──────────┴──────────┴──────────────┴─────────┴─────────┘ │
+│                 │                         [Previous] [Next]                 │
+└───────────────┴──────────────────────────────────────────────────────────────┘
+~~~
+
+The table is dense and scan-oriented. Event details open in a right-side drawer or inline expansion with the same redacted metadata contract. No nested cards, raw database errors, local paths, secrets, tokens, audio, transcripts, or full request bodies are shown.
+
+### Mobile collapse
+
+Below 700px, the navigation collapses to the existing platform shell menu. Filters stack in this order: date range, tenant, action/resource, outcome, Apply. Each result becomes a stable two-column event row with time/action as the primary line and tenant/actor/outcome below. Delivery status remains above the results. Pagination controls wrap below the table without horizontal scrolling.
+
+### Flow A - Platform admin filters audit history
+
+~~~text
+Open Platform / Audit log
+    |
+    +--> Load default UTC range and GET /api/platform/audit-logs
+    +--> GET /api/platform/audit-logs/health in parallel
+    +--> Render loading state with fixed table columns
+    +--> Apply tenant/action/outcome/date filters
+    +--> GET filtered audit logs with cursor reset
+    +--> Render rows or explicit empty state
+~~~
+
+### Flow B - ClickHouse is unavailable
+
+~~~text
+Audit page requests logs
+    |
+    +--> API returns 503 analytics_unavailable
+    +--> Keep filter controls usable
+    +--> Show safe degraded banner and last delivery health if available
+    +--> Offer Retry
+    +--> Never show URL, SQL, local directory, credentials, or raw server error
+~~~
+
+### Flow C - Delivery backlog is present
+
+~~~text
+Health response
+    |
+    +--> mode = spool
+    +--> pending_files > 0 or oldest_pending_file_age_seconds increases
+    +--> Show amber delivery status and last successful transfer
+    +--> Keep audit search independent when ClickHouse reads are healthy
+    +--> Do not offer a destructive delete/replay action in Sprint 28
+~~~
+
+### Component -> file
+
+| Component | Path |
+| --- | --- |
+| Platform audit route | `apps/platform-admin-web/src/routes/audit-logs/+page.svelte` |
+| Audit API client and types | `apps/platform-admin-web/src/lib/api/audit.ts` |
+| Platform navigation entry | `apps/platform-admin-web/src/routes/+layout.svelte` |
+| Audit list handler | `cmd/server/platform_audit.go` |
+| Event contract and writer | `internal/audit/` |
+| ClickHouse audit sink | `internal/clickhouse/audit_events.go` |
+| Spool worker and retention | `internal/audit/spool.go` |
+| Contract/UAT tests | `internal/audit/*_test.go`, platform API tests, `docs/sdlc/06-manual-tests/SPRINT-028-manual.md` |
+
+See 31-cross-tenant-audit-log-spec.md, 02-workflow.md §80–82, 03-er-diagram.md, and 04-api-spec.md.

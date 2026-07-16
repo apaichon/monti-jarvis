@@ -33,6 +33,7 @@ type TenantListItem struct {
 	ID             string
 	Slug           string
 	Name           string
+	LogoURL        string
 	Status         string
 	RegistrationID string
 	AdminEmail     string
@@ -384,7 +385,8 @@ func (s *Store) ListTenants(ctx context.Context, status, kycStatus string, limit
 
 	fromJoin := fmt.Sprintf(`FROM %s.tenants t
 LEFT JOIN %s.tenant_registrations tr ON tr.tenant_id = t.id
-LEFT JOIN %s.tenant_kyc_profiles k ON k.tenant_id = t.id`, schema, schema, schema)
+LEFT JOIN %s.tenant_kyc_profiles k ON k.tenant_id = t.id
+LEFT JOIN %s.brands b ON b.tenant_id = t.id`, schema, schema, schema, schema)
 
 	var total int
 	countQuery := "SELECT COUNT(*) " + fromJoin + whereSQL
@@ -393,7 +395,8 @@ LEFT JOIN %s.tenant_kyc_profiles k ON k.tenant_id = t.id`, schema, schema, schem
 	}
 
 	query := fmt.Sprintf(`
-SELECT t.id, t.slug, t.name, t.status, COALESCE(tr.id, ''), COALESCE(tr.admin_email, ''),
+SELECT t.id, t.slug, t.name, COALESCE(b.logo_url, ''), t.status,
+       COALESCE(tr.id, ''), COALESCE(tr.admin_email, ''),
        COALESCE(k.status, 'draft'), t.created_at
 %s%s ORDER BY t.created_at DESC LIMIT $%d OFFSET $%d`,
 		fromJoin, whereSQL, len(args)+1, len(args)+2)
@@ -408,7 +411,7 @@ SELECT t.id, t.slug, t.name, t.status, COALESCE(tr.id, ''), COALESCE(tr.admin_em
 	out := make([]TenantListItem, 0)
 	for rows.Next() {
 		var item TenantListItem
-		if err := rows.Scan(&item.ID, &item.Slug, &item.Name, &item.Status, &item.RegistrationID, &item.AdminEmail, &item.KYCStatus, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Slug, &item.Name, &item.LogoURL, &item.Status, &item.RegistrationID, &item.AdminEmail, &item.KYCStatus, &item.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		out = append(out, item)

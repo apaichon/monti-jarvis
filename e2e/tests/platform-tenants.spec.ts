@@ -44,6 +44,7 @@ test.describe('Platform tenant list (TASK-0028)', () => {
     expect(found, `tenant "${tenant.slug}" present in pending_kyc list`).toBeTruthy();
     expect(found.status).toBe('pending_kyc');
     expect(found.admin_email).toBe(tenant.email);
+    expect(found).toHaveProperty('logo_url');
   });
 
   test('shows the new pending tenant in the admin UI after login (AC #4)', async ({ page, request, tenant }) => {
