@@ -2430,6 +2430,12 @@ See [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md)
 
 Sprint 27 adds a versioned mobile facade. It reuses existing call sessions, customer authentication, avatar assignment, quota, rate-limit, transcript, archive, and rating behavior. It does not replace /api/calls or /ws/voice.
 
+### Public brand directory
+
+`GET /api/public/brands` is a public JSON directory for mobile tenant selection. It supports `q`, `limit` (default 50, max 100), and `offset`, and returns `{items,total,limit,offset}`. Results include only active tenants with an active brand, approved KYC (or no KYC row in local/demo deployments), `listed=true`, and `platform_listed=true`.
+
+`GET /api/public/brands/{slug}` returns `{item}` for one public brand. Tenant administrators update profile fields with `PUT /api/tenant/brand`; platform administrators can force-unlist with `PUT /api/platform/tenants/{tenant_id}/brand-listing`.
+
 ### Endpoint summary
 
 | Method | Path | Auth | Purpose |

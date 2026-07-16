@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -15,8 +16,8 @@ import (
 var (
 	ErrTenantSlugTaken       = errors.New("slug already taken")
 	ErrTenantEmailRegistered = errors.New("email already registered")
-	ErrTenantNotActive   = errors.New("tenant not active")
-	ErrKYCReviewConflict = errors.New("kyc review conflict")
+	ErrTenantNotActive       = errors.New("tenant not active")
+	ErrKYCReviewConflict     = errors.New("kyc review conflict")
 )
 
 type TenantRegistration struct {
@@ -45,6 +46,28 @@ type TenantSummary struct {
 	Name      string
 	Status    string
 	CreatedAt time.Time
+}
+
+type PublicBrand struct {
+	ID             string   `json:"id"`
+	Slug           string   `json:"slug"`
+	Name           string   `json:"name"`
+	Blurb          string   `json:"blurb,omitempty"`
+	LogoURL        string   `json:"logo_url,omitempty"`
+	Category       string   `json:"category,omitempty"`
+	Languages      []string `json:"languages"`
+	Listed         bool     `json:"listed"`
+	PlatformListed bool     `json:"-"`
+	Status         string   `json:"status"`
+}
+
+type BrandProfileInput struct {
+	Name      string
+	Blurb     string
+	LogoURL   string
+	Category  string
+	Languages []string
+	Listed    *bool
 }
 
 type RegisterTenantInput struct {
@@ -91,8 +114,20 @@ func (s *Store) ensureTenantRegisterSchema(ctx context.Context) error {
   tenant_id text NOT NULL UNIQUE REFERENCES %s.tenants(id) ON DELETE CASCADE,
   name text NOT NULL,
   status text NOT NULL DEFAULT 'active'
-    CHECK (status IN ('active', 'disabled')),%s
+    CHECK (status IN ('active', 'disabled')),
+  blurb text NOT NULL DEFAULT '',
+  logo_url text NOT NULL DEFAULT '',
+  category text NOT NULL DEFAULT '',
+  languages jsonb NOT NULL DEFAULT '["en","th"]'::jsonb,
+  listed boolean NOT NULL DEFAULT true,
+  platform_listed boolean NOT NULL DEFAULT true,%s
 )`, schema, schema, auditColumnsDDL),
+		fmt.Sprintf(`ALTER TABLE %s.brands ADD COLUMN IF NOT EXISTS blurb text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.brands ADD COLUMN IF NOT EXISTS logo_url text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.brands ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.brands ADD COLUMN IF NOT EXISTS languages jsonb NOT NULL DEFAULT '["en","th"]'::jsonb`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.brands ADD COLUMN IF NOT EXISTS listed boolean NOT NULL DEFAULT true`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.brands ADD COLUMN IF NOT EXISTS platform_listed boolean NOT NULL DEFAULT true`, schema),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS tenant_registrations_tenant_idx
 ON %s.tenant_registrations (tenant_id)`, schema),
 		fmt.Sprintf(`ALTER TABLE %s.tenant_registrations
@@ -379,6 +414,170 @@ SELECT t.id, t.slug, t.name, t.status, COALESCE(tr.id, ''), COALESCE(tr.admin_em
 		out = append(out, item)
 	}
 	return out, total, rows.Err()
+}
+
+func (s *Store) ListPublicBrands(ctx context.Context, query string, limit, offset int) ([]PublicBrand, int, error) {
+	if s.pg == nil {
+		return nil, 0, fmt.Errorf("postgres unavailable")
+	}
+	limit, offset = normalizePublicBrandPage(limit, offset)
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	query = strings.TrimSpace(query)
+	args := []any{query}
+	where := fmt.Sprintf(`
+FROM %s.brands b
+JOIN %s.tenants t ON t.id = b.tenant_id
+LEFT JOIN %s.tenant_kyc_profiles k ON k.tenant_id = t.id
+WHERE t.status = 'active'
+  AND b.status = 'active'
+  AND b.listed = true
+  AND b.platform_listed = true
+  AND COALESCE(k.status, 'approved') = 'approved'
+  AND ($1 = '' OR t.slug ILIKE '%%' || $1 || '%%' OR b.name ILIKE '%%' || $1 || '%%' OR b.category ILIKE '%%' || $1 || '%%')`, schema, schema, schema)
+	var total int
+	if err := s.pg.QueryRow(ctx, "SELECT COUNT(*) "+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	args = append(args, limit, offset)
+	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
+SELECT t.id, t.slug, b.name, b.blurb, b.logo_url, b.category, b.languages, b.listed, b.platform_listed, b.status
+%s ORDER BY b.name ASC, t.slug ASC LIMIT $2 OFFSET $3`, where), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	brands := make([]PublicBrand, 0)
+	for rows.Next() {
+		brand, scanErr := scanPublicBrand(rows)
+		if scanErr != nil {
+			return nil, 0, scanErr
+		}
+		brands = append(brands, brand)
+	}
+	return brands, total, rows.Err()
+}
+
+func (s *Store) GetPublicBrand(ctx context.Context, slug string) (PublicBrand, error) {
+	if s.pg == nil {
+		return PublicBrand{}, fmt.Errorf("postgres unavailable")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	where := fmt.Sprintf(`
+FROM %s.brands b
+JOIN %s.tenants t ON t.id = b.tenant_id
+LEFT JOIN %s.tenant_kyc_profiles k ON k.tenant_id = t.id
+WHERE (t.slug = $1 OR t.id = $1)
+  AND t.status = 'active'
+  AND b.status = 'active'
+  AND b.listed = true
+  AND b.platform_listed = true
+  AND COALESCE(k.status, 'approved') = 'approved'`, schema, schema, schema)
+	row := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT t.id, t.slug, b.name, b.blurb, b.logo_url, b.category, b.languages, b.listed, b.platform_listed, b.status
+%s`, where), strings.TrimSpace(slug))
+	brand, err := scanPublicBrand(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicBrand{}, ErrTenantNotFound
+	}
+	return brand, err
+}
+
+func (s *Store) PutBrandProfile(ctx context.Context, tenantID string, in BrandProfileInput) (PublicBrand, error) {
+	if s.pg == nil {
+		return PublicBrand{}, fmt.Errorf("postgres unavailable")
+	}
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		return PublicBrand{}, fmt.Errorf("brand name is required")
+	}
+	languages := normalizeBrandLanguages(in.Languages)
+	raw, _ := json.Marshal(languages)
+	actor := auditctx.ActorID(ctx)
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	listedSQL := "listed"
+	args := []any{tenantID, name, strings.TrimSpace(in.Blurb), strings.TrimSpace(in.LogoURL), strings.TrimSpace(in.Category), raw, actor}
+	if in.Listed != nil {
+		listedSQL = "$8"
+		args = append(args, *in.Listed)
+	}
+	_, err := s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.brands
+SET name=$2, blurb=$3, logo_url=$4, category=$5, languages=$6, listed=%s, updated_by=$7, updated_at=now()
+WHERE tenant_id=$1`, schema, listedSQL), args...)
+	if err != nil {
+		return PublicBrand{}, err
+	}
+	return s.GetBrandForAdmin(ctx, tenantID)
+}
+
+func (s *Store) SetBrandPlatformListed(ctx context.Context, tenantID string, listed bool) error {
+	if s.pg == nil {
+		return fmt.Errorf("postgres unavailable")
+	}
+	actor := auditctx.ActorID(ctx)
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	result, err := s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.brands SET platform_listed=$2, updated_by=$3, updated_at=now() WHERE tenant_id=$1`, schema), tenantID, listed, actor)
+	if err == nil && result.RowsAffected() == 0 {
+		return ErrTenantNotFound
+	}
+	return err
+}
+
+func (s *Store) GetBrandForAdmin(ctx context.Context, tenantID string) (PublicBrand, error) {
+	if s.pg == nil {
+		return PublicBrand{}, fmt.Errorf("postgres unavailable")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	row := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT t.id, t.slug, b.name, b.blurb, b.logo_url, b.category, b.languages, b.listed, b.platform_listed, b.status
+FROM %s.brands b JOIN %s.tenants t ON t.id=b.tenant_id WHERE b.tenant_id=$1`, schema, schema), tenantID)
+	return scanPublicBrand(row)
+}
+
+type publicBrandScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanPublicBrand(row publicBrandScanner) (PublicBrand, error) {
+	var brand PublicBrand
+	var raw []byte
+	if err := row.Scan(&brand.ID, &brand.Slug, &brand.Name, &brand.Blurb, &brand.LogoURL, &brand.Category, &raw, &brand.Listed, &brand.PlatformListed, &brand.Status); err != nil {
+		return PublicBrand{}, err
+	}
+	if err := json.Unmarshal(raw, &brand.Languages); err != nil || len(brand.Languages) == 0 {
+		brand.Languages = []string{"en", "th"}
+	}
+	return brand, nil
+}
+
+func normalizePublicBrandPage(limit, offset int) (int, int) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return limit, offset
+}
+
+func normalizeBrandLanguages(languages []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(languages))
+	for _, language := range languages {
+		language = strings.ToLower(strings.TrimSpace(language))
+		if (language != "en" && language != "th") || seen[language] {
+			continue
+		}
+		seen[language] = true
+		out = append(out, language)
+	}
+	if len(out) == 0 {
+		return []string{"en", "th"}
+	}
+	return out
 }
 
 func newRegistrationID() string {

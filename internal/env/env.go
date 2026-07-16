@@ -89,7 +89,13 @@ type Config struct {
 	CustomerImportMaxBytes int64
 	CustomerImportMaxRows  int
 	MonitoringProbeTimeout time.Duration
-	AppEnv                 string
+	// Mobile Call API and SDK (SPRINT-027)
+	MobileCallAPIEnabled  bool
+	MobileWSMaxFrameBytes int
+	MobilePushEnabled     bool
+	MobilePushProvider    string
+	MobilePushTokenTTL    time.Duration
+	AppEnv                string
 }
 
 func Load() Config {
@@ -182,6 +188,11 @@ func Load() Config {
 		CustomerImportMaxBytes: int64(envInt("CUSTOMER_IMPORT_MAX_BYTES", 2*1024*1024)),
 		CustomerImportMaxRows:  envInt("CUSTOMER_IMPORT_MAX_ROWS", 5000),
 		MonitoringProbeTimeout: envDuration("MONITORING_PROBE_TIMEOUT", 2*time.Second),
+		MobileCallAPIEnabled:   envBool("MOBILE_CALL_API_ENABLED", false),
+		MobileWSMaxFrameBytes:  positiveEnvInt("MOBILE_WS_MAX_FRAME_BYTES", 32768),
+		MobilePushEnabled:      envBool("MOBILE_PUSH_ENABLED", false),
+		MobilePushProvider:     envOr("MOBILE_PUSH_PROVIDER", "auto"),
+		MobilePushTokenTTL:     envDuration("MOBILE_PUSH_TOKEN_TTL", 15*time.Minute),
 		AppEnv:                 appEnv,
 	}
 }
@@ -196,6 +207,14 @@ func envInt(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func positiveEnvInt(key string, fallback int) int {
+	value := envInt(key, fallback)
+	if value <= 0 {
+		return fallback
+	}
+	return value
 }
 
 func envDuration(key string, fallback time.Duration) time.Duration {

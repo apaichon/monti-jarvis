@@ -1,10 +1,10 @@
 ---
 id: FEAT-0029
 title: "Mobile Call API and SDK"
-status: in_progress
+status: shipped
 owner: product
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-07-16
 sprint: SPRINT-027
 ---
 

@@ -15,8 +15,15 @@ import (
 )
 
 type mobileCreateCallRequest struct {
-	AvatarID string `json:"avatar_id"`
-	Locale   string `json:"locale"`
+	AvatarID     string                  `json:"avatar_id"`
+	Locale       string                  `json:"locale"`
+	Notification *mobileNotificationBody `json:"notification,omitempty"`
+}
+
+type mobileNotificationBody struct {
+	Platform   string `json:"platform"`
+	PushToken  string `json:"push_token"`
+	AppVersion string `json:"app_version"`
 }
 
 type mobileRatingRequest struct {
@@ -30,6 +37,16 @@ type mobileCacheEntry struct {
 }
 
 var mobileIdempotency sync.Map
+
+func (s *server) mobileAPI(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.MobileCallAPIEnabled {
+			writeMobileError(w, http.StatusNotFound, "mobile_api_disabled")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 func (s *server) mobileBootstrap(w http.ResponseWriter, r *http.Request) {
 	tenantID, customer, settings, ok := s.mobileContext(w, r, false)
@@ -87,7 +104,7 @@ func (s *server) mobileBootstrap(w http.ResponseWriter, r *http.Request) {
 	}
 	avatarRows := make([]map[string]any, 0, len(agents))
 	for _, agent := range agents {
-		avatarRows = append(avatarRows, mobileAvatar(agent))
+		avatarRows = append(avatarRows, mobileAvatar(agent, agent.ID == selected))
 	}
 	limitsOut := map[string]any{
 		"max_call_seconds":        maxCallSeconds,
@@ -106,11 +123,15 @@ func (s *server) mobileBootstrap(w http.ResponseWriter, r *http.Request) {
 		"version": "v1",
 		"tenant":  map[string]any{"id": tenantID, "display_name": tenantSettings.DisplayName, "slug": tenantID},
 		"auth": map[string]any{
-			"enabled": settings.Enabled, "mode": settings.AuthMode,
-			"required_for_call": settings.Enabled && settings.RequireAuthForWorkforce,
-			"otp_ttl_seconds":   settings.OTPTTLSeconds, "session_ttl_seconds": settings.SessionTTLSeconds,
+			"enabled": settings.Enabled, "mode": mobileAuthMode(settings),
+			"require_auth_for_workforce": settings.Enabled && settings.RequireAuthForWorkforce,
+			"allow_public_no_auth":       !settings.Enabled || !settings.RequireAuthForWorkforce,
+			"otp":                        map[string]any{"channel": "email", "ttl_seconds": settings.OTPTTLSeconds, "resend_after_seconds": 60},
 		},
-		"locale":  map[string]any{"language": locale, "timezone": s.store.TenantTimezone(r.Context(), tenantID)},
+		"locale": map[string]any{
+			"default": tenantSettings.Locale, "customer": customerLocale(customer), "ai_reply": tenantSettings.AIReplyLocale,
+			"language": locale, "supported": []string{"en", "th"}, "timezone": s.store.TenantTimezone(r.Context(), tenantID),
+		},
 		"avatars": avatarRows, "default_avatar_id": selected, "limits": limitsOut,
 	})
 }
@@ -136,6 +157,10 @@ func (s *server) mobileCreateCall(w http.ResponseWriter, r *http.Request) {
 	}
 	if !containsAgent(agents, agentID) {
 		writeMobileError(w, http.StatusForbidden, "avatar_unavailable")
+		return
+	}
+	if req.Notification != nil && !validMobileNotification(req.Notification) {
+		writeMobileError(w, http.StatusBadRequest, "notification_invalid")
 		return
 	}
 	if settings.CustomerMaxCallSeconds > 0 && settings.CustomerDailyCallSeconds > 0 && settings.CustomerMaxCallSeconds > settings.CustomerDailyCallSeconds {
@@ -284,6 +309,8 @@ func (s *server) mobileVoiceWS(w http.ResponseWriter, r *http.Request) {
 	query := req.URL.Query()
 	query.Set("tenant_id", ctx.Session.TenantID)
 	query.Set("agent", ctx.AvatarID)
+	query.Set("call_id", ctx.Session.ID)
+	query.Set("mobile", "1")
 	if locale := r.URL.Query().Get("locale"); locale != "" {
 		query.Set("locale", locale)
 	}
@@ -360,8 +387,30 @@ func mobileCallPayload(ctx store.CallSessionContext) map[string]any {
 	return map[string]any{"call_id": ctx.Session.ID, "status": ctx.Session.Status, "avatar_id": ctx.AvatarID, "started_at": ctx.Session.StartedAt, "ended_at": ctx.Session.EndedAt}
 }
 
-func mobileAvatar(agent workforce.Agent) map[string]any {
-	return map[string]any{"id": agent.ID, "name": agent.Name, "role": agent.Role, "trait": agent.Trait, "voice": agent.Voice, "image": agent.Image, "greeting": agent.Greeting}
+func mobileAvatar(agent workforce.Agent, isDefault bool) map[string]any {
+	return map[string]any{"id": agent.ID, "name": agent.Name, "role": agent.Role, "trait": agent.Trait, "voice": agent.Voice, "image": agent.Image, "image_url": agent.Image, "greeting": agent.Greeting, "status": "active", "is_default": isDefault}
+}
+
+func mobileAuthMode(settings store.CustomerAuthSettings) string {
+	if !settings.Enabled {
+		return "disabled"
+	}
+	return settings.AuthMode
+}
+
+func customerLocale(customer *store.Customer) string {
+	if customer == nil {
+		return ""
+	}
+	return customer.Locale
+}
+
+func validMobileNotification(notification *mobileNotificationBody) bool {
+	if notification == nil {
+		return true
+	}
+	platform := strings.ToLower(strings.TrimSpace(notification.Platform))
+	return (platform == "ios" || platform == "android") && strings.TrimSpace(notification.PushToken) != "" && len(notification.PushToken) <= 4096
 }
 
 func containsAgent(agents []workforce.Agent, id string) bool {

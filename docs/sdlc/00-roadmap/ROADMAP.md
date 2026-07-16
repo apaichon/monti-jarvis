@@ -93,7 +93,7 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 
 - Web embed widget (vanilla `monti-embed.js` + iframe), tenant KM/scope admin, locale/settings/limits, test sandbox, customer tiers
 
-### Phase D+ — Integrator embed SDKs (36)
+### Phase D+ — Integrator embed SDKs (37)
 
 - First-class packages for host apps: **Vue 3**, **React**, **Svelte**, and a **Web Component** (`<monti-embed>`) on top of S14 public resolve + embed surface
 - Shared `@monti/embed-core` + per-framework wrappers; keep zero-dep script tag path
@@ -338,9 +338,9 @@ Sprint: [SPRINT-025.md](../03-sprints/SPRINT-025.md) · Feature: [FEAT-0027](../
 
 Sprint: [SPRINT-026.md](../03-sprints/SPRINT-026.md) · Feature: [FEAT-0028](../01-features/FEAT-0028-tenant-system-performance-monitoring.md)
 
-## Next planned: SPRINT-027 — Mobile Call API and SDK
+## Shipped sprint: SPRINT-027 — Mobile Call API and SDK
 
-**Platform:** Customer / Integrator · **Status:** planned · **Release target:** v2.8.0 · **Depends:** Sprints 1 and 20
+**Closed 2026-07-16.** Customer-safe mobile call API, bounded voice transport, typed SDK core, public brand discovery, and tenant policy enforcement shipped in v2.8.0.
 
 Build a stable mobile integration contract for starting and ending inbound AI voice calls from a mobile application without coupling integrators to the web embed surface.
 
@@ -352,7 +352,9 @@ Build a stable mobile integration contract for starting and ending inbound AI vo
 | Tenant policy enforcement | Apply avatar assignment, customer auth, quota, rate-limit, and tenant isolation rules to mobile sessions |
 | Sample integration | Small mobile reference app, API examples, compatibility matrix, and migration guidance from web embed |
 
-The technical specification must choose native iOS/Android, React Native, Flutter, or a layered core-plus-adapters approach before implementation. Mobile SDKs must not expose provider credentials or raw infrastructure errors.
+Sprint: [SPRINT-027.md](../03-sprints/SPRINT-027.md) · Feature: [FEAT-0029](../01-features/FEAT-0029-mobile-call-api-sdk.md) · Spec: [30-mobile-call-api-sdk-spec.md](../02-design/30-mobile-call-api-sdk-spec.md)
+
+The mobile API is feature-gated for local rollout. Push delivery remains optional and reports `not_configured` until an APNs/FCM provider adapter is deployed.
 
 ## Parallel build sprint: none
 

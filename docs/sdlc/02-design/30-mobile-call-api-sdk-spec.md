@@ -38,9 +38,9 @@ Depends on: 23-customer-auth-spec.md and 24-authenticated-workforce-selection-sp
 | AUTH_DISABLED | Local development may retain the existing public no-auth flow; production tenant policies still enforce their configured customer-auth mode. |
 | MOBILE_CALL_API_ENABLED | Feature gate for /api/mobile/v1 and /ws/mobile/v1; default false until the release is enabled. |
 | MOBILE_WS_MAX_FRAME_BYTES | Maximum decoded audio payload per message; default 32768. Oversized frames return audio_frame_too_large. |
-| MOBILE_PUSH_ENABLED | Optional APNs/FCM notification delivery; default false. Email OTP remains the required authentication channel. |
+| MOBILE_PUSH_ENABLED | Optional APNs/FCM notification delivery; default false. Email OTP remains the required authentication channel. Sprint 27 accepts notification metadata but reports `not_configured` until a provider adapter is deployed. |
 | MOBILE_PUSH_PROVIDER | Server-side provider selection: apns, fcm, or auto. Credentials are never shipped to clients. |
-| MOBILE_PUSH_TOKEN_TTL | Maximum retention for transient active-call notification metadata; default 15m after call end. |
+| MOBILE_PUSH_TOKEN_TTL | Maximum retention for transient active-call notification metadata; default 15m after call end. The retention hook is reserved until provider delivery is enabled. |
 | Idempotency-Key | Required on mobile create; recommended on end and rating. Keys are scoped to tenant, caller, route, and a bounded TTL. |
 | X-Monti-SDK-Version | Client SDK version for support telemetry; never used for authorization. |
 
@@ -169,6 +169,8 @@ During an active call, the SDK may provide the same push token in the create-cal
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
+| GET | /api/public/brands | none | Search active, approved, publicly listed tenant brands. |
+| GET | /api/public/brands/{slug} | none | Read one active, approved, publicly listed brand. |
 | POST | /api/mobile/v1/calls | customer Bearer when required by tenant policy | Create or replay a mobile call session. |
 | GET | /api/mobile/v1/calls/{call_id} | same caller and tenant context | Read safe lifecycle status. |
 | POST | /api/mobile/v1/calls/{call_id}/end | same caller and tenant context | Idempotently request end-call. |
@@ -178,6 +180,8 @@ During an active call, the SDK may provide the same push token in the create-cal
 | POST | /api/customer/auth/request-otp | public tenant context | Send email OTP and optionally queue a non-sensitive APNs/FCM notification. |
 | POST | /api/customer/auth/verify-otp | public tenant context | Verify OTP and issue customer access/refresh tokens. |
 | POST | /api/customer/auth/refresh | refresh token | Rotate customer tokens for mobile session recovery. |
+
+Tenant administrators update their public profile with `PUT /api/tenant/brand`. Platform administrators can force a tenant off the directory with `PUT /api/platform/tenants/{tenant_id}/brand-listing`. Public discovery requires an active tenant, active brand row, approved KYC (or no KYC row for local/demo tenants), tenant `listed=true`, and platform `platform_listed=true`.
 
 Tenant context is derived from the customer token or the existing trusted host/embed development context. tenant_id is never accepted as an authoritative body field. Every call id is checked against both the resolved tenant and caller policy before data is returned.
 

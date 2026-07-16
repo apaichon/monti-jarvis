@@ -108,6 +108,11 @@ make up
 | `EMBED_ALLOW_EMPTY_ORIGINS` | No | `true` — empty tenant allowlist accepts any Origin (dev) |
 | `CUSTOMER_IMPORT_MAX_BYTES` | No | `2097152` — maximum tenant CSV upload bytes |
 | `CUSTOMER_IMPORT_MAX_ROWS` | No | `5000` — maximum customer rows per CSV |
+| `MOBILE_CALL_API_ENABLED` | To enable mobile API | `false` by default; set `true` in local/dev or an enabled release |
+| `MOBILE_WS_MAX_FRAME_BYTES` | No | `32768` decoded PCM audio bytes per mobile WebSocket frame |
+| `MOBILE_PUSH_ENABLED` | No | `false`; APNs/FCM delivery remains disabled until provider integration is configured |
+| `MOBILE_PUSH_PROVIDER` | No | `auto`, `apns`, or `fcm`; currently reserved for provider delivery |
+| `MOBILE_PUSH_TOKEN_TTL` | No | `15m`; currently reserved for bounded notification-token retention |
 
 **Quota Redis keys** (prefix `REDIS_PREFIX`, default `monti_jarvis:`):
 

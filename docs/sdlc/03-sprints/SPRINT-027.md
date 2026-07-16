@@ -1,11 +1,12 @@
 ---
 id: SPRINT-027
-status: in_progress
+status: completed
 start: 2026-07-15
 end: 2026-07-16
-updated: 2026-07-15
+updated: 2026-07-16
 design_pack: approved
 release_target: v2.8.0
+release: v2.8.0
 goal: "Customer / Integrator: expose a stable mobile call API and typed SDK for inbound AI voice integration."
 roadmap_sprint: 27
 platform: Customer / Integrator
@@ -42,7 +43,7 @@ The Sprint 27 technical design pack is approved for implementation. The build is
 
 | Artifact | Planned scope | Status |
 | --- | --- | --- |
-| Feature | [FEAT-0029 - Mobile Call API and SDK](../01-features/FEAT-0029-mobile-call-api-sdk.md) | `in_progress` |
+| Feature | [FEAT-0029 - Mobile Call API and SDK](../01-features/FEAT-0029-mobile-call-api-sdk.md) | `shipped` |
 | Deep spec | [30-mobile-call-api-sdk-spec.md](../02-design/30-mobile-call-api-sdk-spec.md) | `approved` |
 | Workflow | [02-workflow.md](../02-design/02-workflow.md) Sprint 27 | `approved` |
 | ER | [03-er-diagram.md](../02-design/03-er-diagram.md) Sprint 27 | `approved` |
@@ -115,3 +116,7 @@ make build
 - Roadmap: [ROADMAP.md](../00-roadmap/ROADMAP.md) Sprint 27
 - Target: **v2.8.0**
 - Next backlog: Sprint 28 cross-tenant audit log
+
+## Closeout
+
+Sprint 27 shipped the tenant-safe mobile call API, bounded mobile voice WebSocket protocol, typed SDK core, public brand discovery endpoints, and local mobile configuration defaults. Automated Go tests, Go vet, server build, SDK TypeScript compilation, and diff validation passed on 2026-07-16.

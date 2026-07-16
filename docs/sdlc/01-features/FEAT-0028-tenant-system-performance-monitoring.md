@@ -1,10 +1,10 @@
 ---
 id: FEAT-0028
 title: "Tenant System Performance Monitoring"
-status: in_progress
+status: shipped
 owner: product
 created: 2026-07-14
-updated: 2026-07-14
+updated: 2026-07-16
 sprint: SPRINT-026
 ---
 

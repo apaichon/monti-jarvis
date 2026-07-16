@@ -1,11 +1,34 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/libra/monti-jarvis/internal/env"
 	"github.com/libra/monti-jarvis/internal/workforce"
 )
+
+func TestMobileAPIGate(t *testing.T) {
+	s := &server{cfg: env.Config{MobileCallAPIEnabled: false}}
+	recorder := httptest.NewRecorder()
+	s.mobileAPI(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/mobile/v1/bootstrap", nil))
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("disabled mobile API status = %d, want 404", recorder.Code)
+	}
+
+	s.cfg.MobileCallAPIEnabled = true
+	recorder = httptest.NewRecorder()
+	s.mobileAPI(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/mobile/v1/bootstrap", nil))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("enabled mobile API status = %d, want 204", recorder.Code)
+	}
+}
 
 func TestMobileIdempotencyKeyIsScoped(t *testing.T) {
 	first := mobileIdempotencyKey("tenant-a", "customer-a", "create", "same")

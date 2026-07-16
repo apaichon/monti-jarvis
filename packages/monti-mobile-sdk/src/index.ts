@@ -20,7 +20,10 @@ export interface MobileAvatar {
   trait?: string;
   voice?: string;
   image?: string;
+  image_url?: string;
   greeting?: string;
+  status?: "active" | string;
+  is_default?: boolean;
 }
 
 export interface MobileBootstrap {
@@ -28,12 +31,23 @@ export interface MobileBootstrap {
   tenant: { id: string; display_name: string; slug: string };
   auth: {
     enabled: boolean;
-    mode: "optional" | "required";
-    required_for_call: boolean;
-    otp_ttl_seconds: number;
-    session_ttl_seconds: number;
+    mode: "disabled" | "optional" | "required";
+    require_auth_for_workforce: boolean;
+    allow_public_no_auth: boolean;
+    otp: {
+      channel: "email" | string;
+      ttl_seconds: number;
+      resend_after_seconds: number;
+    };
   };
-  locale: { language: Locale; timezone: string };
+  locale: {
+    default: Locale;
+    customer: Locale | string;
+    ai_reply: Locale;
+    language: Locale;
+    supported: Locale[];
+    timezone: string;
+  };
   avatars: MobileAvatar[];
   default_avatar_id: string;
   limits: {
@@ -54,6 +68,18 @@ export interface MobileCall {
   ended_at?: string;
 }
 
+export interface PublicBrand {
+  id: string;
+  slug: string;
+  name: string;
+  blurb?: string;
+  logo_url?: string;
+  category?: string;
+  languages: Locale[];
+  listed: boolean;
+  status: "active" | string;
+}
+
 export interface MobileTurn {
   id: number;
   role: string;
@@ -63,13 +89,14 @@ export interface MobileTurn {
 
 export type MobileEvent =
   | { type: "status"; message?: string }
-  | { type: "ready"; agent_id?: string; agent_name?: string; voice?: string }
-  | { type: "transcript"; role?: "user" | "assistant"; text?: string }
-  | { type: "audio"; data: string }
+  | { type: "ready"; call_id?: string; avatar_id?: string; agent_id?: string; agent_name?: string; voice?: string; encoding?: string }
+  | { type: "transcript"; role?: "user" | "assistant" | "caller"; text?: string; final?: boolean }
+  | { type: "audio"; data?: string; data_base64?: string }
   | { type: "text"; text?: string }
   | { type: "turn_complete" }
+  | { type: "call_status"; status?: "active" | "ending" | "ended" | "failed" | string; message?: string }
   | { type: "customer_end_requested" }
-  | { type: "error"; message?: string; code?: string }
+  | { type: "error"; message?: string; code?: string; retryable?: boolean }
   | Record<string, unknown>;
 
 export interface MobileFetch {
@@ -108,6 +135,7 @@ export interface CallOptions {
   avatarId?: string;
   locale?: Locale;
   idempotencyKey?: string;
+  notification?: { platform: "ios" | "android"; push_token: string; app_version?: string };
 }
 
 export class MobileApiError extends Error {
@@ -147,7 +175,11 @@ export class CallHandle {
   }
 
   sendAudio(base64Pcm16: string): void {
-    this.socket?.send(JSON.stringify({ type: "audio", data: base64Pcm16 }));
+    this.socket?.send(JSON.stringify({ type: "audio", data_base64: base64Pcm16 }));
+  }
+
+  startAudio(sampleRate = 16000, channels = 1): void {
+    this.socket?.send(JSON.stringify({ type: "start_audio", sample_rate: sampleRate, channels, encoding: "pcm_s16le" }));
   }
 
   sendText(text: string): void {
@@ -221,10 +253,19 @@ export class MontiMobileClient {
     return this.request<MobileBootstrap>("/api/mobile/v1/bootstrap");
   }
 
+  async getBrands(query = "", limit = 50, offset = 0): Promise<{ items: PublicBrand[]; total: number; limit: number; offset: number }> {
+    const params = new URLSearchParams({ q: query, limit: String(limit), offset: String(offset) });
+    return this.request(`/api/public/brands?${params.toString()}`, { auth: false });
+  }
+
+  async getBrand(slug: string): Promise<{ item: PublicBrand }> {
+    return this.request<{ item: PublicBrand }>(`/api/public/brands/${encodeURIComponent(slug)}`, { auth: false });
+  }
+
   async createCall(options: CallOptions = {}): Promise<MobileCall> {
     const result = await this.request<{ call_id: string; status: string; avatar_id: string; started_at: string }>("/api/mobile/v1/calls", {
       method: "POST",
-      body: JSON.stringify({ avatar_id: options.avatarId, locale: options.locale }),
+      body: JSON.stringify({ avatar_id: options.avatarId, locale: options.locale, notification: options.notification }),
       headers: { "Idempotency-Key": options.idempotencyKey ?? randomId() },
     });
     return result;
@@ -248,18 +289,18 @@ export class MontiMobileClient {
     return new CallHandle(call, socket, this);
   }
 
-  async endCall(callId: string): Promise<MobileCall> {
+  async endCall(callId: string, idempotencyKey = randomId()): Promise<MobileCall> {
     return this.request<MobileCall>(`/api/mobile/v1/calls/${encodeURIComponent(callId)}/end`, {
       method: "POST",
-      headers: { "Idempotency-Key": randomId() },
+      headers: { "Idempotency-Key": idempotencyKey },
     });
   }
 
-  async rateCall(callId: string, score: 1 | 2 | 3 | 4 | 5, review = ""): Promise<void> {
+  async rateCall(callId: string, score: 1 | 2 | 3 | 4 | 5, review = "", idempotencyKey = randomId()): Promise<void> {
     await this.request(`/api/mobile/v1/calls/${encodeURIComponent(callId)}/rating`, {
       method: "POST",
       body: JSON.stringify({ score, review }),
-      headers: { "Idempotency-Key": randomId() },
+      headers: { "Idempotency-Key": idempotencyKey },
     });
   }
 

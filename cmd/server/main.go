@@ -176,7 +176,7 @@ func main() {
 	entSvc := entitlements.New(st, cfg)
 	quotaSvc := quota.New(entSvc, st, cfg)
 
-	voiceRelay := live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel}, ragSvc)
+	voiceRelay := live.New(live.Config{APIKey: cfg.GeminiAPIKey, Model: cfg.GeminiLiveModel, MobileMaxFrameBytes: cfg.MobileWSMaxFrameBytes}, ragSvc)
 	// S16: tenant AI reply locale preference in voice system prompt.
 	voiceRelay.LocaleHint = func(ctx context.Context, tenantID string) string {
 		if st == nil {
@@ -214,6 +214,10 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /api/infra", s.infra)
+	mux.HandleFunc("GET /api/public/brands", s.publicBrands)
+	mux.HandleFunc("GET /api/public/brands/{slug}", s.publicBrand)
+	mux.Handle("PUT /api/tenant/brand", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantBrand)))
+	mux.Handle("PUT /api/platform/tenants/{tenant_id}/brand-listing", guard.RequirePlatformAdmin(http.HandlerFunc(s.putPlatformBrandListing)))
 	mux.Handle("POST /api/calls", guard.OptionalBearer(http.HandlerFunc(s.createCall)))
 	mux.Handle("GET /api/calls/{id}", guard.OptionalBearer(http.HandlerFunc(s.getCall)))
 	mux.Handle("POST /api/calls/{id}/token", guard.OptionalBearer(http.HandlerFunc(s.issueCallToken)))
@@ -228,12 +232,12 @@ func main() {
 	mux.Handle("GET /api/customer/portal-policy", guard.OptionalBearer(http.HandlerFunc(s.customerPortalPolicy)))
 	mux.Handle("GET /api/customer/workforce", guard.OptionalBearer(http.HandlerFunc(s.customerWorkforce)))
 	mux.Handle("GET /api/customer/quota", guard.OptionalBearer(http.HandlerFunc(s.customerQuota)))
-	mux.Handle("GET /api/mobile/v1/bootstrap", guard.OptionalBearer(http.HandlerFunc(s.mobileBootstrap)))
-	mux.Handle("POST /api/mobile/v1/calls", guard.OptionalBearer(http.HandlerFunc(s.mobileCreateCall)))
-	mux.Handle("GET /api/mobile/v1/calls/{call_id}", guard.OptionalBearer(http.HandlerFunc(s.mobileGetCall)))
-	mux.Handle("GET /api/mobile/v1/calls/{call_id}/transcript", guard.OptionalBearer(http.HandlerFunc(s.mobileTranscript)))
-	mux.Handle("POST /api/mobile/v1/calls/{call_id}/end", guard.OptionalBearer(http.HandlerFunc(s.mobileEndCall)))
-	mux.Handle("POST /api/mobile/v1/calls/{call_id}/rating", guard.OptionalBearer(http.HandlerFunc(s.mobileRateCall)))
+	mux.Handle("GET /api/mobile/v1/bootstrap", s.mobileAPI(guard.OptionalBearer(http.HandlerFunc(s.mobileBootstrap))))
+	mux.Handle("POST /api/mobile/v1/calls", s.mobileAPI(guard.OptionalBearer(http.HandlerFunc(s.mobileCreateCall))))
+	mux.Handle("GET /api/mobile/v1/calls/{call_id}", s.mobileAPI(guard.OptionalBearer(http.HandlerFunc(s.mobileGetCall))))
+	mux.Handle("GET /api/mobile/v1/calls/{call_id}/transcript", s.mobileAPI(guard.OptionalBearer(http.HandlerFunc(s.mobileTranscript))))
+	mux.Handle("POST /api/mobile/v1/calls/{call_id}/end", s.mobileAPI(guard.OptionalBearer(http.HandlerFunc(s.mobileEndCall))))
+	mux.Handle("POST /api/mobile/v1/calls/{call_id}/rating", s.mobileAPI(guard.OptionalBearer(http.HandlerFunc(s.mobileRateCall))))
 	mux.Handle("POST /api/chat", guard.OptionalBearer(http.HandlerFunc(s.chat)))
 	mux.Handle("GET /api/km/agents/{agent_id}", guard.OptionalBearer(http.HandlerFunc(s.getAgentKnowledge)))
 	mux.Handle("GET /api/km/agents/{agent_id}/documents", guard.OptionalBearer(http.HandlerFunc(s.listAgentDocuments)))
@@ -403,7 +407,9 @@ func main() {
 	mux.Handle("GET /api/entitlements/me", guard.RequireTenantAdminOrPlatform(http.HandlerFunc(s.entitlementMe)))
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/usage", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantUsage)))
 	mux.HandleFunc("GET /ws/voice", s.voiceWS)
-	mux.HandleFunc("GET /ws/mobile/v1/calls/{call_id}", s.mobileVoiceWS)
+	mux.Handle("GET /ws/mobile/v1/calls/{call_id}", s.mobileAPI(http.HandlerFunc(s.mobileVoiceWS)))
+	mux.Handle("/api/", http.HandlerFunc(s.apiJSONNotFound))
+	mux.Handle("/ws/", http.HandlerFunc(s.apiJSONNotFound))
 	mux.HandleFunc("GET /legacy", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/legacy/", http.StatusFound)
 	})
@@ -439,6 +445,10 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+}
+
+func (s *server) apiJSONNotFound(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotFound, map[string]any{"error": "route not found", "code": "not_found", "path": r.URL.Path})
 }
 
 func (s *server) health(w http.ResponseWriter, _ *http.Request) {

@@ -2,6 +2,7 @@ package live
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -23,8 +24,9 @@ const (
 )
 
 type Config struct {
-	APIKey string
-	Model  string
+	APIKey              string
+	Model               string
+	MobileMaxFrameBytes int
 }
 
 // LocaleHintFunc returns an optional system-prompt suffix (e.g. preferred reply language).
@@ -98,13 +100,18 @@ func (r *Relay) Handler() http.HandlerFunc {
 
 		_ = send(serverMsg{
 			Type:      "ready",
+			CallID:    req.URL.Query().Get("call_id"),
 			Model:     normalizeModel(r.cfg.Model),
 			Voice:     agent.Voice,
 			AgentID:   agent.ID,
+			AvatarID:  agent.ID,
 			AgentName: agent.Name,
 			StartedAt: time.Now().UnixMilli(),
 			Message:   "Connected — agent is greeting you…",
 		})
+		if req.URL.Query().Get("mobile") == "1" {
+			_ = send(serverMsg{Type: "call_status", Status: "active", Message: "active"})
+		}
 
 		var gemWrite sync.Mutex
 		writeGem := func(value any) error {
@@ -154,7 +161,7 @@ func (r *Relay) Handler() http.HandlerFunc {
 				if sc.ModelTurn != nil {
 					for _, part := range sc.ModelTurn.Parts {
 						if part.InlineData != nil && part.InlineData.Data != "" {
-							_ = send(serverMsg{Type: "audio", Data: part.InlineData.Data})
+							_ = send(serverMsg{Type: "audio", Data: part.InlineData.Data, DataBase64: part.InlineData.Data})
 						}
 						if strings.TrimSpace(part.Text) != "" {
 							_ = send(serverMsg{Type: "text", Text: part.Text})
@@ -180,12 +187,31 @@ func (r *Relay) Handler() http.HandlerFunc {
 				continue
 			}
 			switch msg.Type {
+			case "start_audio":
+				// Mobile clients may explicitly signal microphone readiness before
+				// sending PCM frames. The relay has no separate start transition.
+				continue
 			case "audio":
-				if msg.Data == "" {
+				data := msg.Data
+				if data == "" {
+					data = msg.DataBase64
+				}
+				if data == "" {
 					continue
 				}
+				if req.URL.Query().Get("mobile") == "1" && r.cfg.MobileMaxFrameBytes > 0 {
+					decoded, decodeErr := base64.StdEncoding.DecodeString(data)
+					if decodeErr != nil {
+						_ = send(serverMsg{Type: "error", Code: "invalid_audio_frame", Message: "audio frame is invalid"})
+						continue
+					}
+					if len(decoded) > r.cfg.MobileMaxFrameBytes {
+						_ = send(serverMsg{Type: "error", Code: "audio_frame_too_large", Message: "audio frame is too large"})
+						continue
+					}
+				}
 				err = writeGem(map[string]any{"realtimeInput": map[string]any{
-					"audio": map[string]any{"mimeType": "audio/pcm;rate=16000", "data": msg.Data},
+					"audio": map[string]any{"mimeType": "audio/pcm;rate=16000", "data": data},
 				}})
 			case "text":
 				text := strings.TrimSpace(msg.Text)
@@ -197,6 +223,9 @@ func (r *Relay) Handler() http.HandlerFunc {
 					"turnComplete": true,
 				}})
 			case "end":
+				if req.URL.Query().Get("mobile") == "1" {
+					_ = send(serverMsg{Type: "call_status", CallID: req.URL.Query().Get("call_id"), Status: "ended", Message: "ended"})
+				}
 				return
 			}
 			if err != nil {
@@ -414,22 +443,28 @@ var upgrader = websocket.Upgrader{
 }
 
 type clientMsg struct {
-	Type string `json:"type"`
-	Data string `json:"data,omitempty"`
-	Text string `json:"text,omitempty"`
+	Type       string `json:"type"`
+	Data       string `json:"data,omitempty"`
+	DataBase64 string `json:"data_base64,omitempty"`
+	Text       string `json:"text,omitempty"`
 }
 
 type serverMsg struct {
-	Type      string `json:"type"`
-	Data      string `json:"data,omitempty"`
-	Text      string `json:"text,omitempty"`
-	Message   string `json:"message,omitempty"`
-	Role      string `json:"role,omitempty"`
-	Model     string `json:"model,omitempty"`
-	Voice     string `json:"voice,omitempty"`
-	AgentID   string `json:"agent_id,omitempty"`
-	AgentName string `json:"agent_name,omitempty"`
-	StartedAt int64  `json:"started_at_ms,omitempty"`
+	Type       string `json:"type"`
+	Code       string `json:"code,omitempty"`
+	CallID     string `json:"call_id,omitempty"`
+	Data       string `json:"data,omitempty"`
+	DataBase64 string `json:"data_base64,omitempty"`
+	Text       string `json:"text,omitempty"`
+	Message    string `json:"message,omitempty"`
+	Role       string `json:"role,omitempty"`
+	Model      string `json:"model,omitempty"`
+	Voice      string `json:"voice,omitempty"`
+	AgentID    string `json:"agent_id,omitempty"`
+	AvatarID   string `json:"avatar_id,omitempty"`
+	AgentName  string `json:"agent_name,omitempty"`
+	StartedAt  int64  `json:"started_at_ms,omitempty"`
+	Status     string `json:"status,omitempty"`
 }
 
 type geminiFrame struct {
