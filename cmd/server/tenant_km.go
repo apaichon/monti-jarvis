@@ -31,6 +31,44 @@ func (s *server) tenantKM(r *http.Request) *km.Service {
 	return s.km.WithTenant(tid)
 }
 
+// tenantKMAgentAvailable permits custom avatars only when they are actively
+// assigned to this tenant. Tenants without assignments retain the built-in
+// workforce fallback used by local/demo deployments.
+func (s *server) tenantKMAgentAvailable(r *http.Request, tenantID, agentID string) bool {
+	agentID = strings.ToLower(strings.TrimSpace(agentID))
+	if agentID == "" || s.store == nil {
+		return false
+	}
+	if !s.store.HasTenantAvatarAssignments(r.Context(), tenantID) {
+		return tenantKMAgentIDAllowed(agentID, false, nil)
+	}
+	agents, err := s.customerWorkforceAgents(r, tenantID)
+	if err != nil {
+		return false
+	}
+	assignedIDs := make([]string, 0, len(agents))
+	for _, agent := range agents {
+		assignedIDs = append(assignedIDs, agent.ID)
+	}
+	return tenantKMAgentIDAllowed(agentID, true, assignedIDs)
+}
+
+func tenantKMAgentIDAllowed(agentID string, hasAssignments bool, assignedIDs []string) bool {
+	agentID = strings.ToLower(strings.TrimSpace(agentID))
+	if agentID == "" {
+		return false
+	}
+	if !hasAssignments {
+		return scope.ValidAgent(agentID)
+	}
+	for _, assignedID := range assignedIDs {
+		if agentID == strings.ToLower(strings.TrimSpace(assignedID)) {
+			return true
+		}
+	}
+	return false
+}
+
 // GET /api/tenant/km/scopes
 func (s *server) listTenantKMScopes(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.tenantIDFromAuth(r); !ok {
@@ -113,12 +151,13 @@ func (s *server) listTenantKMAgents(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/tenant/km/agents/{agent_id}/documents
 func (s *server) listTenantKMDocuments(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.tenantIDFromAuth(r); !ok {
+	tenantID, ok := s.tenantIDFromAuth(r)
+	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	agentID := strings.ToLower(strings.TrimSpace(r.PathValue("agent_id")))
-	if !scope.ValidAgent(agentID) {
+	if !s.tenantKMAgentAvailable(r, tenantID, agentID) {
 		writeError(w, http.StatusBadRequest, "unknown agent_id")
 		return
 	}
@@ -147,7 +186,7 @@ func (s *server) uploadTenantKMDocument(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	agentID := strings.ToLower(strings.TrimSpace(r.PathValue("agent_id")))
-	if !scope.ValidAgent(agentID) {
+	if !s.tenantKMAgentAvailable(r, tenantID, agentID) {
 		writeError(w, http.StatusBadRequest, "unknown agent_id")
 		return
 	}
@@ -267,12 +306,13 @@ func (s *server) deleteTenantKMDocument(w http.ResponseWriter, r *http.Request) 
 
 // POST /api/tenant/km/agents/{agent_id}/reset
 func (s *server) resetTenantKMAgent(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.tenantIDFromAuth(r); !ok {
+	tenantID, ok := s.tenantIDFromAuth(r)
+	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	agentID := strings.ToLower(strings.TrimSpace(r.PathValue("agent_id")))
-	if !scope.ValidAgent(agentID) {
+	if !s.tenantKMAgentAvailable(r, tenantID, agentID) {
 		writeError(w, http.StatusBadRequest, "unknown agent_id")
 		return
 	}

@@ -56,7 +56,7 @@ func (s *Service) WithTenant(tenantID string) *Service {
 
 func (s *Service) Ingest(ctx context.Context, agentID, filename string, data []byte, kmScope string) (Document, error) {
 	agentID = strings.ToLower(strings.TrimSpace(agentID))
-	if !scope.ValidAgent(agentID) {
+	if agentID == "" {
 		return Document{}, fmt.Errorf("unknown agent_id %q", agentID)
 	}
 	if kmScope == "" {
@@ -168,7 +168,7 @@ func (s *Service) AgentKnowledge(ctx context.Context, agentID string) (AgentKnow
 
 func (s *Service) ResetAgent(ctx context.Context, agentID string) error {
 	agentID = strings.ToLower(strings.TrimSpace(agentID))
-	if !scope.ValidAgent(agentID) {
+	if agentID == "" {
 		return fmt.Errorf("unknown agent_id %q", agentID)
 	}
 	keys, err := s.store.DeleteAgentKnowledge(ctx, s.tenant, agentID)
