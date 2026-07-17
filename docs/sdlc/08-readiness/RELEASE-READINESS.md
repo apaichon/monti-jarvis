@@ -2,9 +2,9 @@
 id: READINESS-RELEASE
 status: completed
 updated: 2026-07-17
-current_sprint: SPRINT-029
-release_target: v2.10.0
-release: v2.10.0
+current_sprint: SPRINT-030
+release_target: v2.11.0
+release: v2.11.0
 ---
 
 # Release Readiness Checklist
@@ -112,6 +112,14 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] Full Go tests, server build, platform-admin Svelte check/build, authenticated API smoke, authorization/error checks, and `git diff --check` pass.
 - [ ] Manual browser, responsive-layout, ClickHouse failure, and audit-delivery failure UAT evidence; deferred to the next tester run.
 
+### SPRINT-030 (v2.11.0)
+
+- [x] Platform-admin endpoint exposes date-filtered aggregate conversation activity, channel/avatar summaries, satisfaction, package labels, freshness, and bounded tenant rows.
+- [x] Platform call-center statistics enforce platform-admin authorization, inclusive date validation, tenant-safe allowlisted fields, and safe analytics errors.
+- [x] Platform-admin `/admin/call-center` route renders filters, KPIs, breakdowns, freshness, empty/unavailable/retry/session-expiry states, pagination, and responsive tenant rows.
+- [x] Full Go tests, server build, platform-admin Svelte check/build, aggregate contract tests, authorization/error checks, and `git diff --check` pass.
+- [ ] Manual browser, responsive-layout, ClickHouse failure, and enrichment-failure UAT evidence; deferred to the next tester run.
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -125,25 +133,25 @@ curl -fsS http://localhost:8091/api/workforce
 
 | Role | Name | Date | Notes |
 | --- | --- | --- | --- |
-| Dev | Codex release verification | 2026-07-17 | Platform monitoring API/UI, bounded probes, redaction, filters, and unit tests |
-| Tester | Codex release verification | 2026-07-17 | Automated API, authorization, error, and build checks; manual UAT deferred |
-| PM | User-authorized release close | 2026-07-17 | ACs accepted for SPRINT-029 |
-| DevOps | Codex release verification | 2026-07-17 | Build/test/tag verification for v2.10.0 |
+| Dev | Codex release verification | 2026-07-17 | Platform call-center API/UI, aggregate projection, enrichment, and unit tests |
+| Tester | Codex release verification | 2026-07-17 | Automated contract, authorization, error, and build checks; manual UAT deferred |
+| PM | User-authorized release close | 2026-07-17 | ACs accepted for SPRINT-030 |
+| DevOps | Codex release verification | 2026-07-17 | Build/test/tag verification for v2.11.0 |
 
 ## H. Release-cut (PM + DevOps)
 
 After sections A–G are green:
 
 ```bash
-# SPRINT-029 release
-git tag -a v2.10.0 -m "v2.10.0 - SPRINT-029 platform system performance monitoring"
-git push origin v2.10.0
+# SPRINT-030 release
+git tag -a v2.11.0 -m "v2.11.0 - SPRINT-030 platform overall call-center statistics"
+git push origin v2.11.0
 ```
 
 - [x] Tag pushed to `origin`
 - [x] Sprint marked `completed` in `03-sprints/`
 - [x] `_velocity.json` updated
-- [x] ROADMAP sprints 28 and 29 marked shipped and next sprint pointer advanced
+- [x] ROADMAP sprints 28, 29, and 30 marked shipped and next sprint pointer advanced
 
 ## Quick demo script (stakeholder, ~10 min)
 

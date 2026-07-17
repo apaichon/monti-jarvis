@@ -1,9 +1,9 @@
 ---
 id: DES-0003
 title: Entity Relationship Diagram
-status: approved
+status: shipped
 updated: 2026-07-17
-sprint: SPRINT-029
+sprint: SPRINT-030
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1606,3 +1606,59 @@ Sprint 29 introduces no persisted entity. The platform snapshot is a request-tim
 | Audit writer | Read Sprint 28 delivery status and bounded counts; never expose spool paths, marker contents, or event metadata. |
 
 The logical `PLATFORM_PERFORMANCE_SNAPSHOT` is ephemeral and is not a database entity. No migration is required. See 32-platform-system-performance-spec.md, 02-workflow.md §83, 04-api-spec.md, and 05-ux-ui.md.
+
+## Sprint 30 - platform call-center statistics by tenant
+
+Sprint 30 introduces no new persisted entity. The dashboard is an ephemeral aggregate read model composed from the existing ClickHouse call facts and redacted Postgres enrichment sources.
+
+```mermaid
+erDiagram
+  tenants ||--o{ call_center_usage_facts : aggregates
+  conversation_records ||--o{ call_center_usage_facts : projects
+  call_sessions ||--o{ call_center_usage_facts : supplies_source
+  ai_avatars ||--o{ call_center_usage_facts : handled_by
+  tenants ||--o{ conversation_ratings : receives
+  conversation_records ||--o| conversation_ratings : rated_as
+  tenant_entitlements }o--|| tenants : applies_to
+  packages }o--|| tenant_entitlements : defines
+
+  PLATFORM_CALL_CENTER_SNAPSHOT {
+    String range_start_date
+    String range_end_date
+    String timezone
+    String freshness_status
+    DateTime generated_at
+    Integer completed_conversations
+    Integer total_duration_seconds
+    Float average_duration_seconds
+    Integer tenant_total
+    Integer limit
+    Integer offset
+  }
+```
+
+`PLATFORM_CALL_CENTER_SNAPSHOT` is a logical response model only. It is not stored in Postgres, Redis, ClickHouse, MinIO, or a process cache. ClickHouse remains the activity source; Postgres is used only for allowlisted tenant metadata, rating aggregates, and active package labels.
+
+### Sprint 30 storage contract
+
+| Store | Contract |
+| --- | --- |
+| Postgres | Read active tenant identity, tenant timezone fallback, `conversation_ratings` score aggregates, `tenant_entitlements`, and package names. No new table or migration. |
+| Redis | No new statistics key. Existing quota counters remain authoritative for enforcement and are not rewritten by the dashboard. |
+| ClickHouse | Reuse `call_center_usage_facts` with `FINAL`; group by tenant, channel, and avatar over the inclusive `usage_date` range. No new table. |
+| MinIO | No reads or writes. Conversation archive objects are outside the aggregate contract. |
+| Audit writer | No new event is emitted for a read-only dashboard request. Existing platform access logging remains subject to the Sprint 28 policy. |
+
+### Aggregate source rules
+
+| Metric | Source | Rule |
+| --- | --- | --- |
+| Completed conversations, duration, channel, avatar | ClickHouse `call_center_usage_facts` | Count only `status = 'archived'` facts in the requested range using `FINAL`. |
+| Freshness | ClickHouse `max(updated_at)` | Use the latest fact projection timestamp; classify stale after the existing five-minute threshold. |
+| Satisfaction | Postgres `conversation_ratings` joined to completed records | Return reviewed count, average score, completion rate, and 1–5 distribution only. Never return review text. |
+| Package label | Postgres active entitlement/package | Return package name/status only; do not alter entitlements or quota counters. |
+| Range usage | ClickHouse duration aggregate | Expose selected-range call minutes as a reporting metric, separate from current enforcement counters. |
+
+No foreign keys are added because the ClickHouse relationships remain logical cross-store links. Existing audit columns on Postgres records remain unchanged.
+
+See 33-platform-call-center-statistics-spec.md, 02-workflow.md §84, 04-api-spec.md, and 05-ux-ui.md.

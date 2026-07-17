@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/libra/monti-jarvis/internal/auth"
 	"github.com/libra/monti-jarvis/internal/audit"
+	"github.com/libra/monti-jarvis/internal/auth"
 	"github.com/libra/monti-jarvis/internal/calls"
 	"github.com/libra/monti-jarvis/internal/clickhouse"
 	"github.com/libra/monti-jarvis/internal/customerweb"
@@ -274,6 +274,7 @@ func main() {
 	mux.Handle("GET /api/platform/audit-logs", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformAuditLogs)))
 	mux.Handle("GET /api/platform/audit-logs/health", guard.RequirePlatformAdmin(http.HandlerFunc(s.platformAuditHealth)))
 	mux.Handle("GET /api/platform/system-performance", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformSystemPerformance)))
+	mux.Handle("GET /api/platform/call-center/statistics", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformCallCenterStatistics)))
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/kyc", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/approve", guard.RequirePlatformAdmin(http.HandlerFunc(s.approvePlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))

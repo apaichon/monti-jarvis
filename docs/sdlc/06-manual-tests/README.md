@@ -26,6 +26,7 @@ Step-by-step UAT checklists for sprint sign-off. Run **after** `go test ./...` p
 | SPRINT-027 | [SPRINT-027-manual.md](SPRINT-027-manual.md) | v2.8.0 mobile call API/SDK |
 | SPRINT-028 | [SPRINT-028-manual.md](SPRINT-028-manual.md) | v2.9.0 cross-tenant audit log |
 | SPRINT-029 | [SPRINT-029-manual.md](SPRINT-029-manual.md) | v2.10.0 platform system performance |
+| SPRINT-030 | [SPRINT-030-manual.md](SPRINT-030-manual.md) | v2.11.0 platform call-center statistics by tenant |
 
 **Generate new checklists:** `.claude/skills/manual-test-doc/SKILL.md`
 

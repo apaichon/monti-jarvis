@@ -53,7 +53,7 @@
 | **27** | **Customer / Integrator** | **Mobile Call API and SDK for inbound voice integration** | **G** | **1, 20** ✅ v2.8.0 |
 | 28 | Platform | Audit Log | G | 3 ✅ v2.9.0 · [FEAT-0030](../01-features/FEAT-0030-cross-tenant-audit-log.md) |
 | 29 | Platform | Monitoring : System Performance | G | 28 ✅ v2.10.0 · [FEAT-0031](../01-features/FEAT-0031-platform-system-performance-monitoring.md) |
-| 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) |
+| 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) ✅ v2.11.0 · [FEAT-0032](../01-features/FEAT-0032-platform-call-center-statistics.md) |
 | 31 | Platform | Monitoring: Billing, Quota Usages, AI Infra Cost Usage | G | 30 |
 | 32 | Tuning | gRPC switch mode, Cache on Prod | H | 25+ |
 | 33 | Tuning | Partition,Index, Hardening | H | 32 |
@@ -127,7 +127,8 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 - **Sprint 27:** Mobile Call API and SDK for inbound voice integration
 - **Sprint 28:** Cross-tenant audit log — **shipped v2.9.0** · [SPRINT-028](../03-sprints/SPRINT-028.md)
 - **Sprint 29:** Platform system performance monitoring — **shipped v2.10.0** · [SPRINT-029](../03-sprints/SPRINT-029.md)
-- **Sprints 30–31:** Overall dashboards, billing/quota, and AI infrastructure cost usage
+- **Sprint 30:** Platform overall call-center statistics by tenant — **shipped v2.11.0** · [SPRINT-030](../03-sprints/SPRINT-030.md)
+- **Sprint 31:** Platform billing, quota, and AI infrastructure cost usage — planned
 
 ### Phase H — Production tuning (32–33)
 

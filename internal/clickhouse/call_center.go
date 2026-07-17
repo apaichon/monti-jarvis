@@ -50,10 +50,40 @@ type CallCenterBucket struct {
 	AverageDurationSeconds float64
 }
 
+// PlatformCallCenterStats is the aggregate-only projection used by the
+// platform dashboard. It intentionally contains no conversation or customer
+// identifiers beyond the tenant and avatar dimensions needed for grouping.
+type PlatformCallCenterStats struct {
+	CompletedConversations int
+	TotalDurationSeconds   int
+	ByTenant               []PlatformCallCenterBucket
+	ByAvatar               []PlatformCallCenterBucket
+	ByChannel              []PlatformCallCenterBucket
+	LastProjectedAt        time.Time
+}
+
+type PlatformCallCenterBucket struct {
+	TenantID               string
+	AvatarID               string
+	Channel                string
+	CompletedConversations int
+	TotalDurationSeconds   int
+	AverageDurationSeconds float64
+}
+
 type callCenterQueryRow struct {
 	AvatarID     string        `json:"avatar_id"`
 	Channel      string        `json:"channel"`
 	Sessions     clickhouseInt `json:"sessions"`
+	TotalSeconds clickhouseInt `json:"total_duration_seconds"`
+	Freshness    string        `json:"freshness"`
+}
+
+type platformCallCenterQueryRow struct {
+	TenantID     string        `json:"tenant_id"`
+	AvatarID     string        `json:"avatar_id"`
+	Channel      string        `json:"channel"`
+	Completed    clickhouseInt `json:"completed_conversations"`
 	TotalSeconds clickhouseInt `json:"total_duration_seconds"`
 	Freshness    string        `json:"freshness"`
 }
@@ -188,6 +218,111 @@ FORMAT JSON`, quoteIdent(c.db), escape(tenantID), escape(startDate), escape(endD
 		return stats.ByChannel[i].CompletedConversations > stats.ByChannel[j].CompletedConversations
 	})
 	return stats, nil
+}
+
+// QueryPlatformCallCenterStats reads the same archived usage facts as the
+// tenant endpoint, but groups them by tenant as well as avatar and channel.
+// The query is aggregate-only by design and supports an exact tenant filter
+// without changing the caller's platform-level authorization.
+func (c *Client) QueryPlatformCallCenterStats(ctx context.Context, tenantID, startDate, endDate string) (PlatformCallCenterStats, error) {
+	if !c.Enabled() {
+		return PlatformCallCenterStats{}, fmt.Errorf("clickhouse is not configured")
+	}
+	tenantFilter := ""
+	if strings.TrimSpace(tenantID) != "" {
+		tenantFilter = "\n  AND tenant_id = '" + escape(tenantID) + "'"
+	}
+	query := fmt.Sprintf(`
+SELECT tenant_id, avatar_id, channel, count() AS completed_conversations,
+       sum(duration_seconds) AS total_duration_seconds,
+       formatDateTime(max(updated_at), '%%Y-%%m-%%d %%H:%%i:%%s', 'UTC') AS freshness
+FROM %s.call_center_usage_facts FINAL
+WHERE usage_date BETWEEN toDate('%s') AND toDate('%s')
+  AND status = 'archived'%s
+GROUP BY tenant_id, avatar_id, channel
+ORDER BY completed_conversations DESC, tenant_id, avatar_id, channel
+FORMAT JSON`, quoteIdent(c.db), escape(startDate), escape(endDate), tenantFilter)
+	body, err := c.query(ctx, query)
+	if err != nil {
+		return PlatformCallCenterStats{}, err
+	}
+	var parsed struct {
+		Data []platformCallCenterQueryRow `json:"data"`
+	}
+	if err := jsonUnmarshal(body, &parsed); err != nil {
+		return PlatformCallCenterStats{}, err
+	}
+
+	stats := PlatformCallCenterStats{}
+	tenant := make(map[string]*PlatformCallCenterBucket)
+	avatar := make(map[string]*PlatformCallCenterBucket)
+	channel := make(map[string]*PlatformCallCenterBucket)
+	for _, row := range parsed.Data {
+		completed := int(row.Completed)
+		totalSeconds := int(row.TotalSeconds)
+		stats.CompletedConversations += completed
+		stats.TotalDurationSeconds += totalSeconds
+
+		tenantBucket := tenant[row.TenantID]
+		if tenantBucket == nil {
+			tenantBucket = &PlatformCallCenterBucket{TenantID: row.TenantID}
+			tenant[row.TenantID] = tenantBucket
+		}
+		tenantBucket.CompletedConversations += completed
+		tenantBucket.TotalDurationSeconds += totalSeconds
+
+		avatarBucket := avatar[row.AvatarID]
+		if avatarBucket == nil {
+			avatarBucket = &PlatformCallCenterBucket{AvatarID: row.AvatarID}
+			avatar[row.AvatarID] = avatarBucket
+		}
+		avatarBucket.CompletedConversations += completed
+		avatarBucket.TotalDurationSeconds += totalSeconds
+
+		channelBucket := channel[row.Channel]
+		if channelBucket == nil {
+			channelBucket = &PlatformCallCenterBucket{Channel: row.Channel}
+			channel[row.Channel] = channelBucket
+		}
+		channelBucket.CompletedConversations += completed
+		channelBucket.TotalDurationSeconds += totalSeconds
+
+		if parsedTime, parseErr := time.Parse("2006-01-02 15:04:05", row.Freshness); parseErr == nil && parsedTime.After(stats.LastProjectedAt) {
+			stats.LastProjectedAt = parsedTime
+		}
+	}
+	for _, bucket := range tenant {
+		bucket.AverageDurationSeconds = averageSeconds(bucket.TotalDurationSeconds, bucket.CompletedConversations)
+		stats.ByTenant = append(stats.ByTenant, *bucket)
+	}
+	for _, bucket := range avatar {
+		bucket.AverageDurationSeconds = averageSeconds(bucket.TotalDurationSeconds, bucket.CompletedConversations)
+		stats.ByAvatar = append(stats.ByAvatar, *bucket)
+	}
+	for _, bucket := range channel {
+		bucket.AverageDurationSeconds = averageSeconds(bucket.TotalDurationSeconds, bucket.CompletedConversations)
+		stats.ByChannel = append(stats.ByChannel, *bucket)
+	}
+	byActivity := func(a, b PlatformCallCenterBucket) bool {
+		if a.CompletedConversations != b.CompletedConversations {
+			return a.CompletedConversations > b.CompletedConversations
+		}
+		return platformBucketKey(a) < platformBucketKey(b)
+	}
+	sort.Slice(stats.ByTenant, func(i, j int) bool { return byActivity(stats.ByTenant[i], stats.ByTenant[j]) })
+	sort.Slice(stats.ByAvatar, func(i, j int) bool { return byActivity(stats.ByAvatar[i], stats.ByAvatar[j]) })
+	sort.Slice(stats.ByChannel, func(i, j int) bool { return byActivity(stats.ByChannel[i], stats.ByChannel[j]) })
+	return stats, nil
+}
+
+func platformBucketKey(bucket PlatformCallCenterBucket) string {
+	if bucket.TenantID != "" {
+		return bucket.TenantID
+	}
+	if bucket.AvatarID != "" {
+		return bucket.AvatarID
+	}
+	return bucket.Channel
 }
 
 func averageSeconds(total, count int) float64 {
