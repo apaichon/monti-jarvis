@@ -95,6 +95,13 @@
         </a>
         <a
           class="nav-link"
+          class:active={$page.url.pathname.startsWith(`${base}/call-center`)}
+          href="{base}/call-center"
+        >
+          <span>◍</span>Call center
+        </a>
+        <a
+          class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/settings`)}
           href="{base}/settings/payment"
         >

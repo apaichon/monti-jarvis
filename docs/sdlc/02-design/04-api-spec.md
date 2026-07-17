@@ -1,9 +1,9 @@
 ---
 id: DES-0004
 title: API Specification
-status: approved
+status: shipped
 updated: 2026-07-17
-sprint: SPRINT-029
+sprint: SPRINT-030
 ---
 
 # API Specification — Monti Jarvis
@@ -2842,3 +2842,111 @@ Response 200:
 | 503 | `monitoring_unavailable` | Snapshot cannot produce a safe response; raw dependency detail stays server-side. |
 
 See 32-platform-system-performance-spec.md, 02-workflow.md §83, 03-er-diagram.md, and 05-ux-ui.md A21.
+
+## Platform Call Center Statistics (Sprint 30)
+
+Sprint 30 adds a platform-admin aggregate endpoint backed by the existing tenant call-center facts. It does not replace `/api/tenant/call-center/statistics`, `/api/platform/system-performance`, or quota enforcement APIs.
+
+### `GET /api/platform/call-center/statistics`
+
+**Auth:** `platform_admin` only. `AUTH_DISABLED` does not bypass the platform guard.
+
+| Query | Type | Default | Description |
+| --- | --- | --- | --- |
+| `start_date` | `YYYY-MM-DD` | today | Inclusive activity range start in the deployment timezone. |
+| `end_date` | `YYYY-MM-DD` | today | Inclusive activity range end in the deployment timezone. |
+| `tenant_id` | string | empty | Optional exact tenant filter; does not change authorization scope. |
+| `limit` | integer | `50` | Tenant rows per page, maximum `100`. |
+| `offset` | integer | `0` | Non-negative bounded tenant-row offset, maximum `1000000`. |
+
+The endpoint uses the same completed-fact and date-boundary definitions as Sprint 25. Missing dates resolve independently only when both are omitted; a missing one is filled from today. A reversed or invalid range returns `400`.
+
+**Response `200`:**
+
+```json
+{
+  "range": {
+    "start_date": "2026-07-17",
+    "end_date": "2026-07-17",
+    "timezone": "Asia/Bangkok"
+  },
+  "freshness": {
+    "source": "clickhouse",
+    "status": "current",
+    "generated_at": "2026-07-17T05:00:00Z",
+    "last_projected_at": "2026-07-17T04:59:55Z"
+  },
+  "totals": {
+    "completed_conversations": 42,
+    "total_duration_seconds": 5040,
+    "average_duration_seconds": 120,
+    "chat_conversations": 30,
+    "voice_conversations": 12,
+    "range_call_minutes": 84,
+    "reviewed_conversations": 35,
+    "average_satisfaction": 4.4,
+    "review_completion_rate": 83.33,
+    "satisfaction_distribution": {"1": 0, "2": 1, "3": 3, "4": 12, "5": 19}
+  },
+  "by_channel": [
+    {"channel": "chat", "completed": 30, "total_duration_seconds": 2400, "average_duration_seconds": 80},
+    {"channel": "voice", "completed": 12, "total_duration_seconds": 2640, "average_duration_seconds": 220}
+  ],
+  "by_avatar": [
+    {"avatar_id": "ava", "name": "Ava", "completed": 42, "total_duration_seconds": 5040, "average_duration_seconds": 120}
+  ],
+  "package_usage": {
+    "active_package_tenants": 3,
+    "range_call_minutes": 84,
+    "enforcement_counters": "not_included"
+  },
+  "tenants": [
+    {
+      "tenant_id": "tenant_01",
+      "slug": "libra-tech",
+      "name": "Libra Tech Co., Ltd",
+      "logo_url": "https://cdn.example/logo.png",
+      "package": {"name": "Pro", "status": "active"},
+      "analytics_status": "current",
+      "completed_conversations": 20,
+      "total_duration_seconds": 2400,
+      "average_duration_seconds": 120,
+      "range_call_minutes": 40,
+      "reviewed_conversations": 17,
+      "average_satisfaction": 4.5,
+      "review_completion_rate": 85
+    }
+  ],
+  "pagination": {"total": 3, "limit": 50, "offset": 0}
+}
+```
+
+`logo_url` is optional and uses the existing safe tenant brand representation contract. Tenant rows contain aggregate values only. `package_usage.enforcement_counters` is deliberately not a numeric field: current Redis quota counters are tenant-enforcement state, not a historical cross-tenant reporting result, and are never exposed as a misleading aggregate.
+
+An empty valid range returns `200` with zero-valued totals, empty breakdown arrays, `freshness.status = "empty"`, and a tenant page containing active tenants with zero activity only when the tenant filter/pagination contract requests those rows. ClickHouse freshness is independent from package and satisfaction enrichment.
+
+### Status and errors
+
+| HTTP | Code | Contract |
+| ---: | --- | --- |
+| `200` | - | Aggregate is available; freshness may be `current`, `stale`, or `empty`, and enrichment states may be unavailable. |
+| `400` | `validation_error` | Invalid date, reversed range, tenant id, limit, or offset. |
+| `401` | `unauthorized` / `session_expired` | Missing, invalid, or expired platform session. |
+| `403` | `forbidden` | Authenticated caller is not a platform administrator. |
+| `503` | `analytics_unavailable` | ClickHouse is disabled, unavailable, or the bounded activity query cannot complete safely. |
+| `500` | `statistics_unavailable` | Unexpected aggregate or response construction failure. |
+
+If Postgres satisfaction or package enrichment fails while the ClickHouse activity query succeeds, the endpoint returns `200` with activity metrics intact and an explicit `enrichment` object marking the affected section `unavailable`. It never converts an unavailable analytics query into zero values.
+
+### RBAC, isolation, and performance contract
+
+| Action | `platform_admin` | `tenant_admin` | `customer` | Anonymous |
+| --- | --- | --- | --- | --- |
+| Read platform aggregate | yes | no | no | no |
+| Filter one tenant | yes | no | no | no |
+| Read customer records or review text | no | no | no | no |
+| Change quota or entitlement state | no | no | no | no |
+
+The handler derives platform authorization from the existing guard. `tenant_id` is a filter, never a replacement for authorization. ClickHouse queries use a bounded request context, `FINAL`, aggregate projections, and bounded pagination. Postgres enrichment queries return numeric summaries and package labels only. Raw ClickHouse SQL, provider errors, customer identifiers, transcripts, ticket notes, audio paths, credentials, and local filesystem paths are never serialized.
+
+See 33-platform-call-center-statistics-spec.md, 02-workflow.md §84, 03-er-diagram.md, and 05-ux-ui.md A22.

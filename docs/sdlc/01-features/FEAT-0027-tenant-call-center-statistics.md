@@ -24,9 +24,9 @@ Give tenant operators a date-filtered dashboard for call-center activity and pac
 
 ## Out of scope
 
-- Platform-wide or cross-tenant dashboards; planned for Sprint 29.
+- Platform-wide or cross-tenant dashboards; delivered by FEAT-0032 in Sprint 30.
 - System performance monitoring; planned for Sprint 26.
-- Billing, AI infrastructure cost, or overage analytics; planned for Sprint 30.
+- Billing, AI infrastructure cost, or overage analytics; planned for Sprint 31.
 - Raw transcript, contact, or audio data in ClickHouse dashboard facts.
 
 ## Acceptance criteria

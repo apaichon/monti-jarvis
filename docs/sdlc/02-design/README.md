@@ -7,10 +7,10 @@ System design artifacts for Monti Jarvis.
 | # | Doc | Sprint | Description | Status |
 | ---: | --- | --- | --- | --- |
 | 01 | [01-architecture.md](01-architecture.md) | 1+ | Layers, packages, infra topology | `review_pending` |
-| 02 | [02-workflow.md](02-workflow.md) | 1+ | Chat, voice, call, KM, auth, packages, satisfaction, analytics, monitoring sequences | `approved` |
-| 03 | [03-er-diagram.md](03-er-diagram.md) | 1+ | Postgres + ClickHouse + MinIO entities, satisfaction ratings, analytics facts, monitoring storage contract | `approved` |
-| 04 | [04-api-spec.md](04-api-spec.md) | 1+ | REST, WebSocket, SSE, satisfaction, call-center statistics, and monitoring contracts | `approved` |
-| 05 | [05-ux-ui.md](05-ux-ui.md) | 1+ | ASCII wireframes - customer, tenant, platform, analytics, and monitoring surfaces | `approved` |
+| 02 | [02-workflow.md](02-workflow.md) | 1+ | Chat, voice, call, KM, auth, packages, satisfaction, analytics, monitoring sequences | `shipped` |
+| 03 | [03-er-diagram.md](03-er-diagram.md) | 1+ | Postgres + ClickHouse + MinIO entities, satisfaction ratings, analytics facts, monitoring storage contract | `shipped` |
+| 04 | [04-api-spec.md](04-api-spec.md) | 1+ | REST, WebSocket, SSE, satisfaction, call-center statistics, and monitoring contracts | `shipped` |
+| 05 | [05-ux-ui.md](05-ux-ui.md) | 1+ | ASCII wireframes - customer, tenant, platform, analytics, and monitoring surfaces | `shipped` |
 | 06 | [06-auth-spec.md](06-auth-spec.md) | 3 | JWT, RBAC, route policy | `shipped` |
 | 07 | [07-auth-cache-events-spec.md](07-auth-cache-events-spec.md) | 3 | Redis cache, write-behind, NATS auth events | `approved` |
 | 08 | [08-packages-spec.md](08-packages-spec.md) | 4 | Package catalog + tenant entitlements (jsonb rules) | `approved` |
@@ -38,6 +38,7 @@ System design artifacts for Monti Jarvis.
 | 30 | [30-mobile-call-api-sdk-spec.md](30-mobile-call-api-sdk-spec.md) | 27 | Versioned mobile call API, voice transport, and typed SDK contract | `approved` |
 | 31 | [31-cross-tenant-audit-log-spec.md](31-cross-tenant-audit-log-spec.md) | 28 | Cross-tenant audit event contract, local spool, ClickHouse delivery, retention, and platform query | `approved` |
 | 32 | [32-platform-system-performance-spec.md](32-platform-system-performance-spec.md) | 29 | Platform cross-tenant system performance, bounded probes, tenant analytics freshness, and audit delivery health | **`shipped`** v2.10.0 |
+| 33 | [33-platform-call-center-statistics-spec.md](33-platform-call-center-statistics-spec.md) | 30 | Platform aggregate call-center statistics, tenant breakdown, freshness, satisfaction, and package labels | **`shipped`** v2.11.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -56,6 +57,8 @@ System design artifacts for Monti Jarvis.
 **Sprint 28:** Design pack approved and shipped in v2.9.0 — [31-cross-tenant-audit-log-spec.md](31-cross-tenant-audit-log-spec.md); workflow §80–82; API § Platform Audit Log; UX A20. [SPRINT-028](../03-sprints/SPRINT-028.md).
 
 **Sprint 29:** Design pack approved and shipped in v2.10.0 — [32-platform-system-performance-spec.md](32-platform-system-performance-spec.md); workflow §83; API § Platform System Performance; UX A21. [SPRINT-029](../03-sprints/SPRINT-029.md).
+
+**Sprint 30:** Design pack approved and shipped in v2.11.0 — [33-platform-call-center-statistics-spec.md](33-platform-call-center-statistics-spec.md); workflow §84; API § Platform Call Center Statistics; UX A22. [SPRINT-030](../03-sprints/SPRINT-030.md).
 
 **Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 

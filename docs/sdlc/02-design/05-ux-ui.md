@@ -1,9 +1,9 @@
 ---
 id: DES-0005
 title: UX/UI — ASCII Wireframes
-status: approved
+status: shipped
 updated: 2026-07-17
-sprint: SPRINT-029
+sprint: SPRINT-030
 ---
 
 # UX/UI — ASCII Wireframes
@@ -2752,3 +2752,131 @@ Request returns 401/session_expired
 | Contract/UAT tests | `cmd/server/*monitoring*_test.go`, `docs/sdlc/06-manual-tests/SPRINT-029-manual.md` |
 
 See 32-platform-system-performance-spec.md, 02-workflow.md §83, 03-er-diagram.md, and 04-api-spec.md.
+
+## Sprint 30 - Platform Call Center Statistics by Tenant (A22)
+
+Sprint 30 adds a platform-admin reporting surface for aggregate completed-call activity. It uses the existing platform shell and does not change the customer Caller Desk, tenant dashboard, audit-log page, or monitoring route.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| A22-1 Header and scope | Open `/admin/call-center` | `GET /api/platform/call-center/statistics` |
+| A22-2 Date controls | Choose start/end dates or Today | `GET /api/platform/call-center/statistics?start_date=&end_date=` |
+| A22-3 Tenant filter | Select one tenant or All tenants | Same endpoint with `tenant_id=` |
+| A22-4 KPI summary | Scan totals, duration, average, and range minutes | Same response, `totals` |
+| A22-5 Channel/avatar/satisfaction | Compare aggregate breakdowns and rating health | Same response, `by_channel`, `by_avatar`, `totals` |
+| A22-6 Tenant table | Page through tenant aggregates and package labels | Same response with `limit` and `offset` |
+| A22-7 Retry/session expiry | Retry a failed request or recover auth | Repeat endpoint; existing session-expired redirect |
+
+### Full layout - desktop
+
+~~~text
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│ MONTI · PLATFORM ADMIN                                      ● All systems operational │
+├───────────────┬────────────────────────────────────────────────────────────────────┤
+│ Navigation     │ A22  Call center                                  [Platform scoped] │
+│                │ Overall AI conversation activity and package usage                 │
+│ Overview       │                                                                    │
+│ Tenants        │ ┌──────────────────────────────────────────────────────────────┐ │
+│ Avatars        │ │ A22-2 Date range                                               │ │
+│ Packages       │ │ Start [17/07/2026]  End [17/07/2026]  [Apply] [Today]          │ │
+│ Audit log      │ └──────────────────────────────────────────────────────────────┘ │
+│ Monitoring     │                                                                    │
+│ Call center <  │ A22-4 Summary                                                     │
+│ Settings       │ ┌────────────┬────────────┬────────────┬────────────┬──────────┐ │
+│                │ │ Completed  │ Talk time  │ Avg call   │ Range min  │ Reviews  │ │
+│                │ │ 42         │ 1h 24m     │ 2m 00s     │ 84         │ 35 / 42  │ │
+│                │ └────────────┴────────────┴────────────┴────────────┴──────────┘ │
+│                │                                                                    │
+│                │ A22-5 Breakdowns                 A22-3 Tenant filter               │
+│                │ ┌────────────────────────────┐   Tenant [All tenants v] [Apply] │
+│                │ │ Channel  Chat 30 · Voice 12│                                   │
+│                │ │ Satisfaction 4.4 / 5       │   Freshness: Current · 5s ago     │
+│                │ │ Top avatar Ava · 42         │                                   │
+│                │ └────────────────────────────┘                                    │
+│                │                                                                    │
+│                │ A22-6 Tenant statistics                                            │
+│                │ ┌──────────────┬──────────┬───────────┬──────────┬──────────────┐ │
+│                │ │ Tenant       │ Package  │ Completed │ Minutes  │ Satisfaction │ │
+│                │ ├──────────────┼──────────┼───────────┼──────────┼──────────────┤ │
+│                │ │ Libra Tech   │ Pro      │ 20        │ 40       │ 4.5 / 5      │ │
+│                │ │ Demo Tenant  │ Free     │ 22        │ 44       │ 4.3 / 5      │ │
+│                │ └──────────────┴──────────┴───────────┴──────────┴──────────────┘ │
+│                │                                      [Previous] [Next]             │
+└───────────────┴────────────────────────────────────────────────────────────────────┘
+~~~
+
+The page is scan-oriented: filters precede metrics, aggregate KPIs precede detailed breakdowns, and the tenant table stays below the shared summary. The range usage label is distinct from live quota enforcement counters. No customer-level drill-down is offered in Sprint 30.
+
+### State presentation
+
+| State | Presentation | Action |
+| --- | --- | --- |
+| Current | Normal metrics with a small freshness timestamp | Continue scanning. |
+| Stale | Amber freshness label beside the summary | Use Retry; do not hide returned values. |
+| Empty | “No completed conversations in this range.” with zero KPIs | Change dates or choose Today. |
+| Analytics unavailable | Safe error band above the content | Retry; preserve selected filters. |
+| Enrichment unavailable | Activity remains visible; satisfaction/package section shows unavailable | Retry or continue with activity metrics. |
+| Unauthorized/session expired | Existing platform auth recovery state | Clear local auth and return to login without a retry loop. |
+| Loading | Fixed-height KPI and table placeholders | Keep controls stable and prevent layout shift. |
+
+### Mobile collapse
+
+Below 700px, the existing platform navigation collapses. Date controls stack as start, end, Apply, Today. KPI cards use a two-column grid, the breakdown section stacks below them, and each tenant row becomes a fixed two-line item: tenant/package first, completed/minutes/satisfaction second. Pagination wraps beneath the table; no primary metric or control may require horizontal scrolling.
+
+### Flow A - Load and filter
+
+~~~text
+Open Platform / Call center
+    |
+    +--> Resolve today in deployment timezone
+    +--> GET aggregate statistics with limit=50, offset=0
+    +--> Render loading placeholders
+    +--> Show KPIs, breakdowns, freshness, and tenant rows
+    +--> Change date or tenant filter and Apply
+    +--> Reset offset to 0 and replace all result zones atomically
+~~~
+
+### Flow B - Empty and stale analytics
+
+~~~text
+Statistics response
+    |
+    +--> freshness = empty
+    |       +--> Show zero KPIs and “No completed conversations”
+    |
+    +--> freshness = stale
+            +--> Keep values visible
+            +--> Mark freshness amber and offer Retry
+            +--> Never represent stale data as zero activity
+~~~
+
+### Flow C - Safe failure and session expiry
+
+~~~text
+Request fails
+    |
+    +--> 503 analytics_unavailable
+    |       +--> Show safe error band + Retry
+    |       +--> Keep date/tenant controls unchanged
+    |
+    +--> 401 session_expired
+            +--> Clear local auth/session storage
+            +--> Cancel request and navigate to platform login
+            +--> Avoid automatic retry loop
+~~~
+
+### Component -> file
+
+| Component | Path |
+| --- | --- |
+| Platform call-center route | `apps/platform-admin-web/src/routes/call-center/+page.svelte` |
+| Statistics API client and types | `apps/platform-admin-web/src/lib/api/callCenter.ts` |
+| Platform navigation entry | `apps/platform-admin-web/src/routes/+layout.svelte` |
+| Platform statistics handler | `cmd/server/platform_call_center.go` |
+| ClickHouse aggregate client | `internal/clickhouse/call_center_platform.go` or extension of `call_center.go` |
+| Satisfaction/package enrichment | `internal/store/` aggregate read methods |
+| Contract/UAT tests | `cmd/server/platform_call_center_test.go`, `internal/clickhouse/*_test.go`, `docs/sdlc/06-manual-tests/SPRINT-030-manual.md` |
+
+See 33-platform-call-center-statistics-spec.md, 02-workflow.md §84, 03-er-diagram.md, and 04-api-spec.md.

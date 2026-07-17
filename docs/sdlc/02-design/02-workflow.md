@@ -1,9 +1,9 @@
 ---
 id: DES-0002
 title: Workflows
-status: approved
+status: shipped
 updated: 2026-07-17
-sprint: SPRINT-029
+sprint: SPRINT-030
 ---
 
 # Workflows — Monti Jarvis
@@ -2313,3 +2313,60 @@ sequenceDiagram
 Shared dependency probes run once per request and use one bounded deadline. Tenant analytics and audit state are read-only enrichments; their failure changes the normalized status but does not expose raw infrastructure errors. The monitoring route is never called from customer call, voice relay, quota, archive, or chat handlers.
 
 See 32-platform-system-performance-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
+
+## 84. Platform administrator opens overall call-center statistics (Sprint 30)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin
+  participant B as Browser
+  participant G as Go :8091
+  participant X as internal/auth
+  participant P as Postgres callcenter
+  participant C as internal/clickhouse
+  participant H as ClickHouse monti_jarvis
+
+  A->>B: Open /admin/call-center
+  B->>G: GET /api/platform/call-center/statistics?start_date&end_date&tenant_id&limit&offset
+  G->>X: Require platform_admin and validate bounded query
+  alt missing or non-platform session
+    X-->>G: unauthorized or forbidden
+    G-->>B: 401/403 safe error without tenant or customer data
+  else authorized
+    G->>G: Resolve default today range in deployment timezone
+    G->>P: List active tenant metadata for the bounded tenant page
+    G->>C: Query FINAL call_center_usage_facts for overall and tenant aggregates
+    C->>H: Aggregate completed facts by tenant, channel, and avatar
+    H-->>C: Totals, tenant rows, breakdowns, and max updated_at
+    C-->>G: Activity aggregate and freshness
+    G->>P: Read redacted satisfaction and active package metadata
+    alt ClickHouse unavailable or query timeout
+      C-->>G: analytics unavailable
+      G-->>B: 503 analytics_unavailable without provider detail
+    else activity query succeeds
+      alt ratings or package enrichment unavailable
+        P-->>G: Partial enrichment failure
+        G-->>B: 200 aggregate with explicit enrichment unavailable state
+      else all enrichments succeed
+        P-->>G: Satisfaction and package metadata
+        G-->>B: 200 aggregate, tenant rows, freshness, and pagination
+      end
+    end
+    B-->>A: Render KPIs, breakdowns, tenant table, and state
+  end
+```
+
+The activity query and tenant-page query share the same inclusive date range and `FINAL` semantics. Postgres enrichment is aggregate-only: rating scores are reduced to count, average, completion rate, and distribution; package data is limited to package name and range usage labels. No transcript, contact, ticket, audio, or audit payload is read.
+
+### Statistics state transitions
+
+| State | Trigger | UI/API behavior |
+| --- | --- | --- |
+| `loading` | Initial request or filter change | Keep filters stable and show fixed-height placeholders. |
+| `current` | ClickHouse query succeeds and freshness is within the existing 5-minute threshold | Render normal totals and tenant rows. |
+| `stale` | Query succeeds but latest fact projection exceeds the freshness threshold | Return 200 with stale freshness; keep values visible and label them stale. |
+| `empty` | Valid range has no completed facts | Return 200 with zero totals and an explicit empty state. |
+| `unavailable` | ClickHouse is disabled, times out, or rejects the query | Return 503 `analytics_unavailable`; do not present zero activity. |
+| `enrichment_unavailable` | Ratings or package metadata cannot be read while facts are available | Return 200 with activity intact and the affected enrichment marked unavailable. |
+
+See 33-platform-call-center-statistics-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
