@@ -37,6 +37,7 @@ System design artifacts for Monti Jarvis.
 | 29 | [29-tenant-system-performance-spec.md](29-tenant-system-performance-spec.md) | 26 | Tenant-safe dependency health, latency, and analytics freshness | `approved` |
 | 30 | [30-mobile-call-api-sdk-spec.md](30-mobile-call-api-sdk-spec.md) | 27 | Versioned mobile call API, voice transport, and typed SDK contract | `approved` |
 | 31 | [31-cross-tenant-audit-log-spec.md](31-cross-tenant-audit-log-spec.md) | 28 | Cross-tenant audit event contract, local spool, ClickHouse delivery, retention, and platform query | `approved` |
+| 32 | [32-platform-system-performance-spec.md](32-platform-system-performance-spec.md) | 29 | Platform cross-tenant system performance, bounded probes, tenant analytics freshness, and audit delivery health | **`shipped`** v2.10.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -52,7 +53,9 @@ System design artifacts for Monti Jarvis.
 
 **Sprint 27:** Design pack approved — [30-mobile-call-api-sdk-spec.md](30-mobile-call-api-sdk-spec.md); workflow §77–79; API § Mobile Call API and SDK; UX M1. [SPRINT-027](../03-sprints/SPRINT-027.md).
 
-**Sprint 28:** Design pack approved and implementation in progress — [31-cross-tenant-audit-log-spec.md](31-cross-tenant-audit-log-spec.md); workflow §80–82; API § Platform Audit Log; UX A20. [SPRINT-028](../03-sprints/SPRINT-028.md).
+**Sprint 28:** Design pack approved and shipped in v2.9.0 — [31-cross-tenant-audit-log-spec.md](31-cross-tenant-audit-log-spec.md); workflow §80–82; API § Platform Audit Log; UX A20. [SPRINT-028](../03-sprints/SPRINT-028.md).
+
+**Sprint 29:** Design pack approved and shipped in v2.10.0 — [32-platform-system-performance-spec.md](32-platform-system-performance-spec.md); workflow §83; API § Platform System Performance; UX A21. [SPRINT-029](../03-sprints/SPRINT-029.md).
 
 **Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 

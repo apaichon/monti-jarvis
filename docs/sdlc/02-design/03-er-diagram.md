@@ -2,8 +2,8 @@
 id: DES-0003
 title: Entity Relationship Diagram
 status: approved
-updated: 2026-07-16
-sprint: SPRINT-028
+updated: 2026-07-17
+sprint: SPRINT-029
 ---
 
 # ER Diagram — Monti Jarvis
@@ -1589,3 +1589,20 @@ erDiagram
 The ClickHouse schema must be created by the runtime ensure-schema path and have a matching idempotent migration script, for example `scripts/migrations/003_audit_events_clickhouse.sql`, when implementation begins. No audit file or marker is shared between server instances.
 
 See 31-cross-tenant-audit-log-spec.md, 02-workflow.md, 04-api-spec.md, and 05-ux-ui.md.
+
+## Sprint 29 - platform system performance monitoring
+
+Sprint 29 introduces no persisted entity. The platform snapshot is a request-time, bounded read model assembled from existing dependency clients, tenant registry, Sprint 25 analytics projection, Sprint 26 observability service, and Sprint 28 audit writer health.
+
+### Sprint 29 storage contract
+
+| Store | Contract |
+| --- | --- |
+| Postgres | Read active tenant metadata only; no new table or audit columns. |
+| Redis | Existing dependency `PING` probe only; no monitoring keys and no snapshot cache. |
+| ClickHouse | Read existing call-center analytics freshness per tenant; no new table or raw conversation data. |
+| MinIO | Existing configured bucket probe only; no object listing or new path. |
+| NATS / LiveKit / Gemini | Normalize configured/enabled state or bounded probe result; no message, room, prompt, or provider data is serialized. |
+| Audit writer | Read Sprint 28 delivery status and bounded counts; never expose spool paths, marker contents, or event metadata. |
+
+The logical `PLATFORM_PERFORMANCE_SNAPSHOT` is ephemeral and is not a database entity. No migration is required. See 32-platform-system-performance-spec.md, 02-workflow.md §83, 04-api-spec.md, and 05-ux-ui.md.

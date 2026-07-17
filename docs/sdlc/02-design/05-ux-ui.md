@@ -2,8 +2,8 @@
 id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: approved
-updated: 2026-07-16
-sprint: SPRINT-028
+updated: 2026-07-17
+sprint: SPRINT-029
 ---
 
 # UX/UI — ASCII Wireframes
@@ -2638,3 +2638,117 @@ Health response
 | Contract/UAT tests | `internal/audit/*_test.go`, platform API tests, `docs/sdlc/06-manual-tests/SPRINT-028-manual.md` |
 
 See 31-cross-tenant-audit-log-spec.md, 02-workflow.md §80–82, 03-er-diagram.md, and 04-api-spec.md.
+
+## Sprint 29 - Platform System Performance Monitoring (A21)
+
+Sprint 29 adds a platform-admin monitoring route. Customer and tenant-admin surfaces do not change. The screen is read-only, scan-oriented, and distinguishes shared dependency health from tenant analytics freshness and audit delivery state.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| A21-1 Summary | Open monitoring route | `GET /api/platform/system-performance` |
+| A21-2 Filters | Choose tenant, status, page size, or page | `GET /api/platform/system-performance?tenant_id=&status=&limit=&offset=` |
+| A21-3 Dependency matrix | Inspect normalized status and latency | Same snapshot response, `components[]` |
+| A21-4 Audit delivery | Inspect safe queue and transfer state | Same snapshot response, `audit` |
+| A21-5 Tenant table | Scan tenant status and analytics freshness | Same snapshot response, `tenants[]` |
+| A21-6 Retry | Re-run a failed snapshot | Repeat `GET /api/platform/system-performance` |
+
+### Full layout - desktop
+
+~~~text
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│ MONTI · PLATFORM ADMIN                                      ● All systems operational │
+├───────────────┬────────────────────────────────────────────────────────────────────┤
+│ Navigation    │ A21  System performance                         [Platform scoped]   │
+│               │ Shared service health and tenant analytics freshness                │
+│ Overview       │                                                                    │
+│ Tenants        │ ┌──────────────────────────────────────────────────────────────┐ │
+│ Avatars        │ │ A21-2 Filters                                                  │ │
+│ Packages       │ │ Tenant [All tenants v]  Status [All v]  [Apply] [Reset]        │ │
+│ Audit log      │ └──────────────────────────────────────────────────────────────┘ │
+│ Monitoring <   │                                                                    │
+│ Settings       │ A21-1 Summary                                                     │
+│               │ [Operational 2] [Degraded 1] [Unavailable 1] [Checked 5s ago]   │
+│               │                                                                    │
+│               │ A21-3 Shared dependencies        A21-4 Audit delivery              │
+│               │ ┌────────────────────────────┐   ┌────────────────────────────┐ │
+│               │ │ Postgres   Operational 4ms │   │ Spool · Operational         │ │
+│               │ │ Redis      Operational 1ms │   │ 0 pending · 0 failed        │ │
+│               │ │ ClickHouse Degraded  35ms  │   │ Last transfer 5s ago        │ │
+│               │ └────────────────────────────┘   └────────────────────────────┘ │
+│               │                                                                    │
+│               │ A21-5 Tenant health                                               │
+│               │ ┌──────────────┬────────────┬──────────────┬────────────────────┐ │
+│               │ │ Tenant       │ Status     │ Analytics    │ Audit              │ │
+│               │ ├──────────────┼────────────┼──────────────┼────────────────────┤ │
+│               │ │ Libra Tech   │ Operational│ Current      │ Operational        │ │
+│               │ │ Demo Tenant  │ Degraded   │ Stale        │ Operational        │ │
+│               │ └──────────────┴────────────┴──────────────┴────────────────────┘ │
+│               │                                      [Previous] [Next]             │
+└───────────────┴────────────────────────────────────────────────────────────────────┘
+~~~
+
+### Status presentation
+
+| State | Presentation | Action |
+| --- | --- | --- |
+| Operational | Green status text and normal latency | Continue scanning. |
+| Degraded | Amber status text and explicit stale/disabled reason | Inspect the affected row or retry. |
+| Unavailable | Red status text with safe explanation | Retry; do not show raw provider detail. |
+| Loading | Fixed-height skeleton for summary, matrix, and table | Keep filters stable. |
+| Empty | “No tenants match these filters.” | Reset filters. |
+| Unauthorized | Existing session-expired flow | Clear local auth state and return to login smoothly. |
+
+### Mobile collapse
+
+Below 700px, the existing platform navigation collapses. Summary counters become a two-column grid, dependency and audit sections stack, and each tenant row becomes a fixed two-line item: tenant/status first, analytics/audit second. Filters stack in tenant, status, Apply order. No horizontal scrolling is required for the primary monitoring workflow.
+
+### Flow A - Load and filter
+
+~~~text
+Open Platform / Monitoring
+    |
+    +--> Request snapshot with default limit=50
+    +--> Render loading placeholders
+    +--> Show summary, dependency matrix, audit delivery, and tenant rows
+    +--> Select tenant/status and Apply
+    +--> Request with filters and offset=0
+    +--> Replace rows or show explicit empty state
+~~~
+
+### Flow B - Partial degradation
+
+~~~text
+Snapshot contains stale analytics or unavailable component
+    |
+    +--> Keep response and render unaffected sections
+    +--> Mark overall state degraded/unavailable
+    +--> Show safe state label and Retry
+    +--> Never display URL, credentials, SQL, stack trace, or local path
+~~~
+
+### Flow C - Session expiry
+
+~~~text
+Request returns 401/session_expired
+    |
+    +--> Clear local auth/session storage
+    +--> Cancel active monitoring request
+    +--> Navigate to platform login with return path when supported
+    +--> Avoid an infinite retry loop
+~~~
+
+### Component -> file
+
+| Component | Path |
+| --- | --- |
+| Platform monitoring route | `apps/platform-admin-web/src/routes/monitoring/+page.svelte` |
+| Monitoring API client and types | `apps/platform-admin-web/src/lib/api/monitoring.ts` |
+| Platform navigation entry | `apps/platform-admin-web/src/routes/+layout.svelte` |
+| Platform snapshot handler | `cmd/server/platform_monitoring.go` |
+| Shared probe service | `internal/observability/` |
+| Tenant analytics freshness | `cmd/server/tenant_monitoring.go`, `internal/clickhouse/` |
+| Contract/UAT tests | `cmd/server/*monitoring*_test.go`, `docs/sdlc/06-manual-tests/SPRINT-029-manual.md` |
+
+See 32-platform-system-performance-spec.md, 02-workflow.md §83, 03-er-diagram.md, and 04-api-spec.md.

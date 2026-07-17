@@ -273,6 +273,7 @@ func main() {
 	mux.Handle("GET /api/platform/tenants", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformTenants)))
 	mux.Handle("GET /api/platform/audit-logs", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformAuditLogs)))
 	mux.Handle("GET /api/platform/audit-logs/health", guard.RequirePlatformAdmin(http.HandlerFunc(s.platformAuditHealth)))
+	mux.Handle("GET /api/platform/system-performance", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformSystemPerformance)))
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/kyc", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/approve", guard.RequirePlatformAdmin(http.HandlerFunc(s.approvePlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))

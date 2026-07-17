@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: approved
-updated: 2026-07-16
-sprint: SPRINT-028
+updated: 2026-07-17
+sprint: SPRINT-029
 ---
 
 # Workflows — Monti Jarvis
@@ -2264,3 +2264,52 @@ sequenceDiagram
 ```
 
 See 31-cross-tenant-audit-log-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
+
+## 83. Platform administrator opens system performance monitoring (Sprint 29)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin
+  participant B as Browser
+  participant G as Go :8091
+  participant X as internal/auth
+  participant O as internal/observability
+  participant P as Postgres callcenter
+  participant R as Redis monti_jarvis:
+  participant M as MinIO monti-jarvis
+  participant C as ClickHouse monti_jarvis
+  participant L as Audit health state
+
+  A->>B: Open /admin/monitoring
+  B->>G: GET /api/platform/system-performance?filters
+  G->>X: Require platform_admin and validate query bounds
+  alt missing or non-platform session
+    X-->>G: unauthorized or forbidden
+    G-->>B: 401/403 safe error without tenant metadata
+  else authorized
+    G->>O: Start request-time snapshot with bounded deadline
+    par shared dependency probes
+      O->>P: Ping with shared deadline
+      O->>R: PING with shared deadline
+      O->>M: Check configured bucket with shared deadline
+      O->>C: Ping with shared deadline
+    and configured service states
+      O->>O: Normalize NATS, LiveKit, and Gemini state
+    end
+    G->>P: List active tenant metadata with filter and page
+    G->>C: Read allowlisted analytics freshness per tenant
+    G->>L: Read audit delivery health without local paths
+    alt partial probe or analytics failure
+      O-->>G: Safe degraded/unavailable state
+      G-->>B: 200 normalized snapshot with bounded rows
+    else all required checks complete
+      O-->>G: Operational or degraded snapshot
+      G-->>B: 200 snapshot with summary, components, rows, and page
+    end
+    B-->>A: Render health matrix, tenant rows, freshness, and retry action
+  end
+```
+
+Shared dependency probes run once per request and use one bounded deadline. Tenant analytics and audit state are read-only enrichments; their failure changes the normalized status but does not expose raw infrastructure errors. The monitoring route is never called from customer call, voice relay, quota, archive, or chat handlers.
+
+See 32-platform-system-performance-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.

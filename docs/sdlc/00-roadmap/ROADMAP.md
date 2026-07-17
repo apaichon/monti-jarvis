@@ -51,8 +51,8 @@
 | 25 | Tenant | Dashboard : Call Center Statistics, Call Quota Usage | F | 22 (ClickHouse) ✅ v2.6.0 · [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
 | 26 | Tenant | Monitoring : System Performance | F | 25 ✅ v2.7.0 |
 | **27** | **Customer / Integrator** | **Mobile Call API and SDK for inbound voice integration** | **G** | **1, 20** ✅ v2.8.0 |
-| 28 | Platform | Audit Log | G | 3 · [FEAT-0030](../01-features/FEAT-0030-cross-tenant-audit-log.md) ✅ v2.9.0 |
-| 29 | Platform | Monitoring : System Performance | G | 28 |
+| 28 | Platform | Audit Log | G | 3 ✅ v2.9.0 · [FEAT-0030](../01-features/FEAT-0030-cross-tenant-audit-log.md) |
+| 29 | Platform | Monitoring : System Performance | G | 28 ✅ v2.10.0 · [FEAT-0031](../01-features/FEAT-0031-platform-system-performance-monitoring.md) |
 | 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) |
 | 31 | Platform | Monitoring: Billing, Quota Usages, AI Infra Cost Usage | G | 30 |
 | 32 | Tuning | gRPC switch mode, Cache on Prod | H | 25+ |
@@ -125,8 +125,8 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 ### Phase G — Mobile integration and platform operations (27–31)
 
 - **Sprint 27:** Mobile Call API and SDK for inbound voice integration
-- **Sprint 28:** Cross-tenant audit log — **implementation in progress** · [SPRINT-028](../03-sprints/SPRINT-028.md)
-- **Sprint 29:** Platform system performance monitoring
+- **Sprint 28:** Cross-tenant audit log — **shipped v2.9.0** · [SPRINT-028](../03-sprints/SPRINT-028.md)
+- **Sprint 29:** Platform system performance monitoring — **shipped v2.10.0** · [SPRINT-029](../03-sprints/SPRINT-029.md)
 - **Sprints 30–31:** Overall dashboards, billing/quota, and AI infrastructure cost usage
 
 ### Phase H — Production tuning (32–33)
@@ -355,19 +355,6 @@ Build a stable mobile integration contract for starting and ending inbound AI vo
 Sprint: [SPRINT-027.md](../03-sprints/SPRINT-027.md) · Feature: [FEAT-0029](../01-features/FEAT-0029-mobile-call-api-sdk.md) · Spec: [30-mobile-call-api-sdk-spec.md](../02-design/30-mobile-call-api-sdk-spec.md)
 
 The mobile API is feature-gated for local rollout. Push delivery remains optional and reports `not_configured` until an APNs/FCM provider adapter is deployed.
-
-## Shipped sprint: SPRINT-028 — Cross-Tenant Audit Log
-
-**Closed 2026-07-16.** Platform audit events, durable local JSONL spool, ClickHouse delivery and deduplication, retention acknowledgements, platform audit search, delivery health, and tenant logo representation in the platform tenant API shipped in v2.9.0.
-
-| Deliverable | Notes |
-| --- | --- |
-| Audit event contract | Tenant, actor, action, resource, request, outcome, and bounded metadata with allowlisted redaction |
-| Durable delivery | `audit_log_YYYYMMDD-HH-MM-SS.jsonl` spool, configurable five-second transfer interval, retry retention, and acknowledgement markers |
-| Platform operations | Cross-tenant audit API/UI with filters, pagination, ClickHouse health, pending-file visibility, and replay-safe event IDs |
-| Tenant representation | `GET /api/platform/tenants` now includes `logo_url` from the tenant brand profile for mobile/admin display |
-
-Sprint: [SPRINT-028.md](../03-sprints/SPRINT-028.md) · Feature: [FEAT-0030](../01-features/FEAT-0030-cross-tenant-audit-log.md) · Spec: [31-cross-tenant-audit-log-spec.md](../02-design/31-cross-tenant-audit-log-spec.md)
 
 ## Parallel build sprint: none
 

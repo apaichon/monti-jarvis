@@ -1,10 +1,10 @@
 ---
 id: READINESS-RELEASE
 status: completed
-updated: 2026-07-16
-current_sprint: SPRINT-028
-release_target: v2.9.0
-release: v2.9.0
+updated: 2026-07-17
+current_sprint: SPRINT-029
+release_target: v2.10.0
+release: v2.10.0
 ---
 
 # Release Readiness Checklist
@@ -58,7 +58,7 @@ curl -fsS http://localhost:8091/api/infra
 curl -fsS http://localhost:8091/api/workforce
 ```
 
-- [x] `/healthz` → `"ok": true`, sprint flag matches SPRINT-020
+- [x] `/healthz` → `"ok": true`, sprint flag matches the released build
 - [x] `/api/infra` → postgres, redis, minio `ok`; clickhouse `ok` (Sprint 2+)
 - [x] `/api/workforce` → available tenant/demo agents
 
@@ -104,11 +104,19 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] Full Go tests, server build, platform-admin Svelte check/build, and `git diff --check` pass.
 - [ ] Manual browser, ClickHouse outage/recovery, and retention UAT evidence; deferred to the next tester run.
 
+### SPRINT-029 (v2.10.0)
+
+- [x] Platform-admin endpoint exposes bounded cross-tenant dependency health, analytics freshness, audit delivery state, filters, and pagination.
+- [x] Platform monitoring enforces platform-admin authorization and returns normalized, redacted statuses without provider details or local paths.
+- [x] Platform-admin `/admin/monitoring` route renders summary, dependency matrix, audit health, tenant rows, retry, session expiry, and responsive states.
+- [x] Full Go tests, server build, platform-admin Svelte check/build, authenticated API smoke, authorization/error checks, and `git diff --check` pass.
+- [ ] Manual browser, responsive-layout, ClickHouse failure, and audit-delivery failure UAT evidence; deferred to the next tester run.
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
 - [x] Task statuses match implementation (`docs/sdlc/04-tasks/`)
-- [x] Manual test checklist completed ([`06-manual-tests/`](../06-manual-tests/))
+- [x] Manual test checklist recorded; any deferred scenarios are explicitly tracked ([`06-manual-tests/`](../06-manual-tests/))
 - [x] Test matrix scenarios for this sprint marked pass ([`05-test-scenarios/TEST-MATRIX.md`](../05-test-scenarios/TEST-MATRIX.md))
 - [x] `AGENTS.md` current sprint line updated
 - [x] API spec matches shipped routes ([`02-design/04-api-spec.md`](../02-design/04-api-spec.md))
@@ -117,25 +125,25 @@ curl -fsS http://localhost:8091/api/workforce
 
 | Role | Name | Date | Notes |
 | --- | --- | --- | --- |
-| Dev | Codex release verification | 2026-07-16 | Audit pipeline, platform API/UI, tenant logo response + unit tests |
-| Tester | Codex release verification | 2026-07-16 | Automated contract, redaction, retention, and tenant response checks; manual UAT deferred |
-| PM | User-authorized release close | 2026-07-16 | ACs accepted for SPRINT-028 |
-| DevOps | Codex release verification | 2026-07-16 | Build/test/tag verified |
+| Dev | Codex release verification | 2026-07-17 | Platform monitoring API/UI, bounded probes, redaction, filters, and unit tests |
+| Tester | Codex release verification | 2026-07-17 | Automated API, authorization, error, and build checks; manual UAT deferred |
+| PM | User-authorized release close | 2026-07-17 | ACs accepted for SPRINT-029 |
+| DevOps | Codex release verification | 2026-07-17 | Build/test/tag verification for v2.10.0 |
 
 ## H. Release-cut (PM + DevOps)
 
 After sections A–G are green:
 
 ```bash
-# SPRINT-028 release
-git tag -a v2.9.0 -m "v2.9.0 - SPRINT-028 cross-tenant audit log"
-git push origin v2.9.0
+# SPRINT-029 release
+git tag -a v2.10.0 -m "v2.10.0 - SPRINT-029 platform system performance monitoring"
+git push origin v2.10.0
 ```
 
-- [ ] Tag pushed to `origin`
+- [x] Tag pushed to `origin`
 - [x] Sprint marked `completed` in `03-sprints/`
 - [x] `_velocity.json` updated
-- [x] ROADMAP sprint 28 marked shipped and next sprint pointer advanced
+- [x] ROADMAP sprints 28 and 29 marked shipped and next sprint pointer advanced
 
 ## Quick demo script (stakeholder, ~10 min)
 

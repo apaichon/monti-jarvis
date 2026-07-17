@@ -2,8 +2,8 @@
 id: DES-0004
 title: API Specification
 status: approved
-updated: 2026-07-16
-sprint: SPRINT-028
+updated: 2026-07-17
+sprint: SPRINT-029
 ---
 
 # API Specification — Monti Jarvis
@@ -2772,3 +2772,73 @@ Response 200:
 Handlers use the internal audit writer rather than an HTTP client call. The minimum event fields are `event_id`, `occurred_at`, `tenant_id`, `actor_id`, `actor_type`, `action`, `resource_type`, `resource_id`, `request_id`, `source`, `outcome`, and bounded `metadata`. `AUDIT_LOG_MODE=spool` is the default; `AUDIT_LOG_FLUSH_INTERVAL=5s` is the default transfer interval; `AUDIT_LOG_RETENTION=1h` is the default local retention threshold.
 
 See 31-cross-tenant-audit-log-spec.md, 02-workflow.md §80–82, 03-er-diagram.md, and 05-ux-ui.md A20.
+
+## Platform System Performance (Sprint 29)
+
+Sprint 29 adds one platform-admin read endpoint. It returns shared dependency health, tenant-safe analytics freshness, and bounded audit delivery state. It does not replace `/healthz`, `/api/infra`, tenant monitoring, call-center statistics, or the audit event search endpoint.
+
+### `GET /api/platform/system-performance`
+
+**Auth:** `platform_admin` only. `AUTH_DISABLED` does not bypass this guard.
+
+| Query | Type | Default | Description |
+| --- | --- | --- | --- |
+| `tenant_id` | string | empty | Optional exact tenant filter. |
+| `status` | string | empty | Optional derived status: `operational`, `degraded`, or `unavailable`. |
+| `limit` | int | `50` | Maximum `100`; invalid values return `validation_error`. |
+| `offset` | int | `0` | Non-negative bounded page offset. |
+
+Response 200:
+
+~~~json
+{
+  "overall_status": "degraded",
+  "checked_at": "2026-07-16T04:00:00Z",
+  "summary": {
+    "tenants_total": 4,
+    "operational": 2,
+    "degraded": 1,
+    "unavailable": 1
+  },
+  "components": [
+    {"name": "postgres", "status": "operational", "latency_ms": 4, "checked_at": "2026-07-16T04:00:00Z"},
+    {"name": "redis", "status": "operational", "latency_ms": 1, "checked_at": "2026-07-16T04:00:00Z"},
+    {"name": "clickhouse", "status": "degraded", "latency_ms": 35, "checked_at": "2026-07-16T04:00:00Z"}
+  ],
+  "audit": {
+    "mode": "spool",
+    "status": "operational",
+    "pending_files": 0,
+    "failed_files": 0,
+    "oldest_pending_file_age_seconds": 0,
+    "last_successful_transfer": "2026-07-16T03:59:55Z"
+  },
+  "tenants": [
+    {
+      "tenant_id": "tenant_01",
+      "slug": "libra-tech",
+      "name": "Libra Tech Co., Ltd",
+      "status": "operational",
+      "analytics": {"status": "current", "generated_at": "2026-07-16T03:59:50Z", "last_projected_at": "2026-07-16T03:59:50Z"},
+      "audit_status": "operational"
+    }
+  ],
+  "total": 4,
+  "limit": 50,
+  "offset": 0
+}
+~~~
+
+`components` is a stable-name list. `analytics` timestamps are nullable and are returned only when available. `audit` is global to the snapshot; tenant rows contain only the derived `audit_status` label. The API returns allowlisted tenant identity and status fields, never provider URLs, credentials, raw errors, customer data, transcripts, audio paths, audit metadata, or local spool names.
+
+### Status and errors
+
+| HTTP | Code | Contract |
+| ---: | --- | --- |
+| 200 | - | Snapshot may contain `degraded`, `unavailable`, `disabled`, or stale analytics states. |
+| 400 | `validation_error` | Invalid tenant filter, status, limit, or offset. |
+| 401 | `unauthorized` / `session_expired` | No valid platform session. |
+| 403 | `forbidden` | Authenticated caller is not a platform administrator. |
+| 503 | `monitoring_unavailable` | Snapshot cannot produce a safe response; raw dependency detail stays server-side. |
+
+See 32-platform-system-performance-spec.md, 02-workflow.md §83, 03-er-diagram.md, and 05-ux-ui.md A21.
