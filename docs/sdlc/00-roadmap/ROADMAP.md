@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37 embed SDKs + S38 central brand portal + S39 themes + S40 outbound calling)
+# Monti AI Call Center — Roadmap (36 core + S37 embed SDKs + S38 central brand portal + S39 themes + S40 outbound calling + S41 security hardening)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -64,6 +64,7 @@
 | **38** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
 | **39** | **Tenant / Platform** | **Multiple theme color customization** | **D+** | **14, 16** · backlog |
 | **40** | **Tenant / Integrator** | **Outbound calling with Twilio** | **G** | **1, 20, 27** · backlog |
+| **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
 
 ---
 
@@ -419,3 +420,15 @@ Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · B
 | Call lifecycle | Track requested, ringing, connected, completed, failed, and retry-safe outcomes |
 | Consent and enforcement | Apply recipient consent, tenant isolation, quota, rate limits, and operational call-window policies |
 | Privacy and operations | Keep provider payloads bounded, support auditability, and define recording/transcript behavior before implementation |
+
+## Backlog add: SPRINT-041 — AI Call-Center Security Hardening
+
+**Platform:** Security / Platform · **Feature:** Defense-in-depth browser, environment, database, and tenant-isolation controls · **Depends:** 19, 20, 32, 33 · **Status:** backlog
+
+| Deliverable | Notes |
+| --- | --- |
+| Encrypted browser storage | Protect web `localStorage` data with Web Crypto, minimize persisted credentials, and define key/session expiry behavior |
+| Environment and secret hardening | Validate required configuration, keep secrets out of client bundles/logs, and document rotation and production injection controls |
+| Read-only AI/reporting database role | Route AI call-center and reporting read paths through a dedicated least-privilege read-only user; keep writes on separate controlled roles |
+| Injection-resistant data access | Require parameterized, allowlisted queries and bounded inputs; read-only credentials are an additional containment layer, not a substitute for query safety |
+| Tenant database isolation | Enforce tenant-scoped authorization and database policies/RLS where applicable so a tenant can read only its own data; add cross-tenant denial tests |
