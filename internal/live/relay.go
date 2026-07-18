@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -36,11 +37,21 @@ type LocaleHintFunc func(ctx context.Context, tenantID string) string
 // preserves the built-in workforce fallback for legacy deployments.
 type AgentResolver func(ctx context.Context, tenantID, agentID string) (workforce.Agent, bool)
 
+type UsageEvent struct {
+	EventID      string
+	TenantID     string
+	CallID       string
+	Model        string
+	AvatarID     string
+	AudioSeconds uint32
+}
+
 type Relay struct {
 	cfg           Config
 	rag           *rag.Service
 	LocaleHint    LocaleHintFunc
 	AgentResolver AgentResolver
+	UsageSink     func(context.Context, UsageEvent)
 }
 
 func New(cfg Config, ragSvc *rag.Service) *Relay {
@@ -97,10 +108,32 @@ func (r *Relay) Handler() http.HandlerFunc {
 			return
 		}
 		defer gem.Close()
+		started := time.Now()
+		callID := strings.TrimSpace(req.URL.Query().Get("call_id"))
+		if callID == "" {
+			callID = fmt.Sprintf("voice-%d", started.UnixNano())
+		}
+		defer func() {
+			if r.UsageSink == nil {
+				return
+			}
+			seconds := uint32(time.Since(started).Seconds())
+			if seconds == 0 {
+				seconds = 1
+			}
+			r.UsageSink(context.Background(), UsageEvent{
+				EventID:      callID,
+				TenantID:     tenantID,
+				CallID:       callID,
+				Model:        normalizeModel(r.cfg.Model),
+				AvatarID:     agent.ID,
+				AudioSeconds: seconds,
+			})
+		}()
 
 		_ = send(serverMsg{
 			Type:      "ready",
-			CallID:    req.URL.Query().Get("call_id"),
+			CallID:    callID,
 			Model:     normalizeModel(r.cfg.Model),
 			Voice:     agent.Voice,
 			AgentID:   agent.ID,

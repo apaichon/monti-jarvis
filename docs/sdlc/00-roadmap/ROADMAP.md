@@ -128,7 +128,7 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 - **Sprint 28:** Cross-tenant audit log — **shipped v2.9.0** · [SPRINT-028](../03-sprints/SPRINT-028.md)
 - **Sprint 29:** Platform system performance monitoring — **shipped v2.10.0** · [SPRINT-029](../03-sprints/SPRINT-029.md)
 - **Sprint 30:** Platform overall call-center statistics by tenant — **shipped v2.11.0** · [SPRINT-030](../03-sprints/SPRINT-030.md)
-- **Sprint 31:** Platform billing, quota, and AI infrastructure cost usage — planned
+- **Sprint 31:** Platform billing, quota, and AI infrastructure cost usage — **shipped v2.12.0** · [SPRINT-031](../03-sprints/SPRINT-031.md)
 
 ### Phase H — Production tuning (32–33)
 

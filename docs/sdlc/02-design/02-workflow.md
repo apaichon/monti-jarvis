@@ -2370,3 +2370,78 @@ The activity query and tenant-page query share the same inclusive date range and
 | `enrichment_unavailable` | Ratings or package metadata cannot be read while facts are available | Return 200 with activity intact and the affected enrichment marked unavailable. |
 
 See 33-platform-call-center-statistics-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
+
+## 85. Platform administrator opens billing and AI usage (Sprint 31)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin
+  participant B as Browser
+  participant G as Go :8091
+  participant X as internal/auth
+  participant P as Postgres callcenter
+  participant R as Redis DB 4
+  participant C as internal/clickhouse
+  participant H as ClickHouse monti_jarvis
+
+  A->>B: Open /admin/billing/usage
+  B->>G: GET /api/platform/billing/usage?start_date&end_date&tenant_id&limit&offset
+  G->>X: Require platform_admin and validate bounded query
+  alt missing or non-platform session
+    X-->>G: unauthorized or forbidden
+    G-->>B: 401/403 safe error without tenant or cost details
+  else authorized
+    G->>P: Read paid order and active entitlement aggregates
+    G->>R: Read bounded current quota enforcement snapshot
+    G->>C: Query grouped call and AI usage facts
+    C->>H: FINAL aggregate by tenant, provider, model, and measurement state
+    H-->>C: Usage minutes, observed/estimated cost, coverage, and freshness
+    C-->>G: Reporting aggregates
+    alt one source is unavailable
+      G-->>B: 200 partial sections with safe unavailable state
+    else required aggregate succeeds
+      G-->>B: 200 billing, quota, AI cost, reconciliation, and tenant page
+    end
+    B-->>A: Render paid value, quota state, coverage, cost, and warnings
+  end
+```
+
+## 86. Completed interaction emits an AI usage meter event (Sprint 31)
+
+```mermaid
+sequenceDiagram
+  participant I as Chat or voice interaction
+  participant G as Go :8091
+  participant M as internal/metering
+  participant C as internal/clickhouse
+  participant H as ClickHouse monti_jarvis
+
+  I->>G: Complete committed interaction
+  G->>M: Normalize provider usage with deterministic event_id
+  alt provider units returned
+    M->>M: Mark observed and resolve immutable rate_version
+  else units missing but duration fallback configured
+    M->>M: Mark estimated and apply documented fallback rate
+  else no units or applicable rate
+    M->>M: Mark unavailable without pricing at zero
+  end
+  M->>C: Insert or replace ai_cost_usage_facts by event_id
+  C->>H: Idempotent ClickHouse write
+  alt analytics write fails
+    H-->>C: Retryable failure
+    C-->>M: Record bounded replay gap; do not fail interaction
+  else write succeeds
+    H-->>C: Acknowledge one logical fact
+  end
+```
+
+### Billing usage state transitions
+
+| State | Trigger | Reporting behavior |
+| --- | --- | --- |
+| `observed` | Provider units and rate are present | Include in observed cost and coverage. |
+| `estimated` | Documented fallback units and rate are present | Include separately and label as estimated. |
+| `unavailable` | Units or rate are missing | Preserve the gap; never show exact zero cost. |
+| `replay_pending` | ClickHouse write failed after interaction commit | Keep customer path successful and retry by deterministic event id. |
+
+See 34-platform-billing-quota-ai-cost-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.

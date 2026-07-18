@@ -113,7 +113,10 @@ ORDER BY (tenant_id, created_at)`, db),
 	if err := c.EnsureAuditEventsSchema(ctx); err != nil {
 		return err
 	}
-	return c.EnsureCallCenterSchema(ctx)
+	if err := c.EnsureCallCenterSchema(ctx); err != nil {
+		return err
+	}
+	return c.EnsureAIUsageSchema(ctx)
 }
 
 func (c *Client) ensureAuditSchema(ctx context.Context) error {

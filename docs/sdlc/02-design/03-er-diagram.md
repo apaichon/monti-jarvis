@@ -1662,3 +1662,75 @@ erDiagram
 No foreign keys are added because the ClickHouse relationships remain logical cross-store links. Existing audit columns on Postgres records remain unchanged.
 
 See 33-platform-call-center-statistics-spec.md, 02-workflow.md §84, 04-api-spec.md, and 05-ux-ui.md.
+
+## Sprint 31 - platform billing, quota, and AI infrastructure cost usage
+
+Sprint 31 adds a reporting-only ClickHouse projection for normalized AI usage. It does not add a Postgres billing ledger, mutate `payment_orders`, replace Redis quota counters, or persist dashboard snapshots.
+
+```mermaid
+erDiagram
+  tenants ||--o{ call_center_usage_facts : reports
+  tenants ||--o{ ai_cost_usage_facts : meters
+  tenants ||--o{ tenant_entitlements : has
+  packages ||--o{ tenant_entitlements : grants
+  payment_orders }o--|| tenants : paid_by
+  ai_cost_usage_facts }o--|| ai_usage_rates : priced_by
+
+  AI_COST_USAGE_FACTS {
+    String fact_id PK
+    String tenant_id
+    String call_id
+    String conversation_record_id
+    String provider
+    String model
+    String modality
+    String measurement_state
+    UInt64 input_units
+    UInt64 output_units
+    UInt32 audio_seconds
+    String rate_version
+    Int64 cost_microunits
+    String currency
+    Date usage_date
+    DateTime source_updated_at
+    DateTime created_at
+    DateTime updated_at
+  }
+
+  AI_USAGE_RATES {
+    String rate_version PK
+    String provider
+    String model
+    String modality
+    Int64 input_unit_price_microunits
+    Int64 output_unit_price_microunits
+    Int64 audio_second_price_microunits
+    String currency
+    DateTime effective_from
+    DateTime effective_until
+    String status
+  }
+```
+
+`AI_COST_USAGE_FACTS` is a logical ClickHouse entity backed by a `ReplacingMergeTree(updated_at)` projection ordered by `(tenant_id, usage_date, provider, model, fact_id)`. `AI_USAGE_RATES` is a proposed controlled rate catalog; implementation may use a Postgres table with `created_at`, `updated_at`, `created_by`, and `updated_by` audit columns or an explicitly versioned deployment configuration. It must not be an unversioned handler constant.
+
+### Sprint 31 storage contract
+
+| Store | Contract |
+| --- | --- |
+| Postgres | Reuse `payment_orders`, `tenant_entitlements`, `packages`, and `package_limits` as read-only authorities. No payment or entitlement mutation from reporting. |
+| Redis | Read current quota counters from DB 4 using `monti_jarvis:`; no new reporting key and no counter writes. |
+| ClickHouse | Add `ai_cost_usage_facts` with idempotent event identity, measurement state, rate version, and computed micro-units. Existing `call_center_usage_facts` remains activity authority. |
+| MinIO | No reads or writes; raw conversation archives are outside the cost contract. |
+| Gemini/voice relay | Emit normalized provider-neutral meter input without prompts, responses, transcripts, audio, or customer identity. |
+
+### Future entities
+
+| Status | Entity | Boundary |
+| --- | --- | --- |
+| Proposed | `ai_usage_rates` | Versioned provider/model/modality pricing catalog with full Postgres audit columns if persisted. |
+| Proposed | `billing_usage_snapshots` | Not in Sprint 31; no dashboard snapshot persistence or scheduled billing run. |
+
+No foreign key is enforced between Postgres and ClickHouse. All cross-store links are logical `tenant_id`, call/session references, and immutable event/rate versions.
+
+See 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–86, 04-api-spec.md, and 05-ux-ui.md.

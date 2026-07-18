@@ -39,6 +39,7 @@ System design artifacts for Monti Jarvis.
 | 31 | [31-cross-tenant-audit-log-spec.md](31-cross-tenant-audit-log-spec.md) | 28 | Cross-tenant audit event contract, local spool, ClickHouse delivery, retention, and platform query | `approved` |
 | 32 | [32-platform-system-performance-spec.md](32-platform-system-performance-spec.md) | 29 | Platform cross-tenant system performance, bounded probes, tenant analytics freshness, and audit delivery health | **`shipped`** v2.10.0 |
 | 33 | [33-platform-call-center-statistics-spec.md](33-platform-call-center-statistics-spec.md) | 30 | Platform aggregate call-center statistics, tenant breakdown, freshness, satisfaction, and package labels | **`shipped`** v2.11.0 |
+| 34 | [34-platform-billing-quota-ai-cost-spec.md](34-platform-billing-quota-ai-cost-spec.md) | 31 | Platform billing, quota enforcement snapshot, AI usage metering, cost coverage, and reconciliation | `approved` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -59,6 +60,8 @@ System design artifacts for Monti Jarvis.
 **Sprint 29:** Design pack approved and shipped in v2.10.0 — [32-platform-system-performance-spec.md](32-platform-system-performance-spec.md); workflow §83; API § Platform System Performance; UX A21. [SPRINT-029](../03-sprints/SPRINT-029.md).
 
 **Sprint 30:** Design pack approved and shipped in v2.11.0 — [33-platform-call-center-statistics-spec.md](33-platform-call-center-statistics-spec.md); workflow §84; API § Platform Call Center Statistics; UX A22. [SPRINT-030](../03-sprints/SPRINT-030.md).
+
+**Sprint 31:** ✅ Shipped v2.12.0 — [34-platform-billing-quota-ai-cost-spec.md](34-platform-billing-quota-ai-cost-spec.md); workflow §85–86; API § Platform Billing, Quota, and AI Usage; UX A23. [SPRINT-031](../03-sprints/SPRINT-031.md).
 
 **Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 
