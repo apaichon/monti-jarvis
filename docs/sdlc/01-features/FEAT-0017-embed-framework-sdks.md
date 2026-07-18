@@ -1,5 +1,5 @@
 # Feature: Embed Framework SDKs   (FEAT-0017)
-**Sprint:** SPRINT-036   **Owner:** DEV   **Status:** backlog
+**Sprint:** SPRINT-037 (roadmap #37)   **Owner:** DEV   **Status:** shipped · **Release:** v2.14.0
 
 ## Problem
 

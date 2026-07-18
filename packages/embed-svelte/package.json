@@ -1,0 +1,36 @@
+{
+  "name": "@monti/embed-svelte",
+  "version": "0.1.0",
+  "description": "Svelte component for Monti Jarvis web embed",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "svelte": "./src/MontiEmbed.svelte",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./src/MontiEmbed.svelte",
+      "import": "./dist/index.js"
+    },
+    "./MontiEmbed.svelte": "./src/MontiEmbed.svelte"
+  },
+  "files": ["dist", "src", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "svelte": "^4.0.0 || ^5.0.0"
+  },
+  "dependencies": {
+    "@monti/embed-core": "file:../embed-core"
+  },
+  "devDependencies": {
+    "svelte": "^5.0.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": ["monti", "embed", "svelte"],
+  "license": "UNLICENSED",
+  "sideEffects": false
+}

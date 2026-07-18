@@ -145,9 +145,113 @@ Paste **before** `</body>` on every page that should show the widget:
 | `data-base` | No | Override Monti origin if script is proxied from another host |
 | `async` | Recommended | Non-blocking load |
 
-### 4.3 Single-page apps (React / Vue / Svelte / Next)
+### 4.3 Framework SDKs (Vue · React · Svelte · Web Component)
 
-Inject the script once after mount (avoid double-inject on re-renders):
+**Feature:** [FEAT-0017](sdlc/01-features/FEAT-0017-embed-framework-sdks.md) · packages under `packages/embed-*`
+
+Prefer first-class packages over manual script injection. All four wrap **`@monti/embed-core`** and open the same `/embed` iframe surface (origin allowlist still enforced). The vanilla `monti-embed.js` path above remains the zero-dependency option.
+
+| Package | npm | Host |
+| --- | --- | --- |
+| Core | `@monti/embed-core` | Shared resolve + lifecycle |
+| Vue 3 | `@monti/embed-vue` | Composition component + plugin |
+| React | `@monti/embed-react` | Component + `useMontiEmbed` |
+| Svelte | `@monti/embed-svelte` | Svelte 4/5 component |
+| Web Component | `@monti/embed-web-component` | `<monti-embed>` (Angular / plain HTML) |
+
+**Common props:** `embedKey`, `apiBase` (Monti origin), optional `parentOrigin`, `position`, `agentId`, `theme`, `locale`, open/close, `destroy` on unmount.
+
+#### Vue 3
+
+```bash
+npm install @monti/embed-vue @monti/embed-core
+```
+
+```vue
+<script setup>
+import { MontiEmbedVue } from '@monti/embed-vue'
+</script>
+<template>
+  <MontiEmbedVue
+    embed-key="emb_YOUR_KEY"
+    api-base="https://monti.example.com"
+    position="bottom-right"
+    @error="(e) => console.error(e.code, e.message)"
+  />
+</template>
+```
+
+#### React
+
+```bash
+npm install @monti/embed-react @monti/embed-core
+```
+
+```tsx
+import { MontiEmbedReact } from '@monti/embed-react'
+
+export function MontiWidget() {
+  return (
+    <MontiEmbedReact
+      embedKey="emb_YOUR_KEY"
+      apiBase="https://monti.example.com"
+      position="bottom-right"
+      onError={(e) => console.error(e.code, e.message)}
+    />
+  )
+}
+```
+
+#### Svelte
+
+```bash
+npm install @monti/embed-svelte @monti/embed-core
+```
+
+```svelte
+<script>
+  import MontiEmbed from '@monti/embed-svelte/MontiEmbed.svelte'
+</script>
+<MontiEmbed embedKey="emb_YOUR_KEY" apiBase="https://monti.example.com" />
+```
+
+#### Web Component
+
+```bash
+npm install @monti/embed-web-component @monti/embed-core
+```
+
+```html
+<script type="module">
+  import '@monti/embed-web-component'
+</script>
+<monti-embed
+  embed-key="emb_YOUR_KEY"
+  api-base="https://monti.example.com"
+  position="bottom-right"
+></monti-embed>
+```
+
+Events: `monti-open`, `monti-close`, `monti-ready`, `monti-error`, `monti-destroy`.
+
+#### Errors (bad key / origin)
+
+Pre-resolve surfaces clear codes: `embed_not_found`, `embed_disabled`, `origin_not_allowed` (same as public API). Framework packages emit `error` / `monti-error` with `{ code, message, status? }`.
+
+#### Smoke demos
+
+```bash
+cd packages/embed-core && npm i && npm run build && npm test
+cd ../embed-web-component && npm i && npm run build
+npx --yes serve examples/embed-sdks -p 5500
+# open http://localhost:5500/web-component.html?key=emb_…&base=http://localhost:8091
+```
+
+Tenant admin: **Embed → Framework SDKs** tab for copy-paste snippets per framework.
+
+### 4.4 Single-page apps without packages (script inject)
+
+If you cannot add npm packages, inject the loader once after mount (avoid double-inject on re-renders):
 
 ```js
 // React example (useEffect once)
@@ -169,9 +273,9 @@ useEffect(() => {
 }, []);
 ```
 
-Next.js App Router: put the same logic in a client component (`'use client'`), or use `next/script` with `strategy="afterInteractive"` and `data-embed-key`.
+Next.js App Router: put the same logic in a client component (`'use client'`), or use `next/script` with `strategy="afterInteractive"` and `data-embed-key`. Prefer `@monti/embed-react` when possible.
 
-### 4.4 WordPress / CMS
+### 4.5 WordPress / CMS
 
 - **Theme footer:** Appearance → Theme File Editor → `footer.php` before `</body>`, or
 - **Custom HTML block** in footer template, or
@@ -179,7 +283,7 @@ Next.js App Router: put the same logic in a client component (`'use client'`), o
 
 Ensure the published origin matches **Allowed origins** (e.g. `https://yoursite.com` vs `www`).
 
-### 4.5 Direct iframe (advanced)
+### 4.6 Direct iframe (advanced)
 
 If you cannot run the loader script:
 

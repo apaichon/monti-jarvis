@@ -19,6 +19,8 @@
   let loading = $state(true);
   let saving = $state(false);
   let rotating = $state(false);
+  let tab = $state<'snippet' | 'framework'>('snippet');
+  let framework = $state<'vue' | 'react' | 'svelte' | 'wc'>('vue');
 
   onMount(async () => {
     if (!hasRegistrationSession()) {
@@ -89,13 +91,73 @@
       feedback.error('Copy failed — select and copy manually');
     }
   }
+
+  function apiBaseFromConfig(): string {
+    const snippet = cfg?.snippet || '';
+    const m = snippet.match(/src=["'](https?:\/\/[^"']+)\/embed\/monti-embed\.js/i);
+    if (m?.[1]) return m[1];
+    if (typeof window !== 'undefined') return window.location.origin;
+    return 'http://localhost:8091';
+  }
+
+  function frameworkSnippet(kind: 'vue' | 'react' | 'svelte' | 'wc'): string {
+    const key = cfg?.embed_key || 'emb_YOUR_KEY';
+    const api = apiBaseFromConfig();
+    switch (kind) {
+      case 'vue':
+        return `// npm install @monti/embed-vue @monti/embed-core
+<script setup>
+import { MontiEmbedVue } from '@monti/embed-vue'
+</script>
+<template>
+  <MontiEmbedVue
+    embed-key="${key}"
+    api-base="${api}"
+    position="bottom-right"
+  />
+</template>`;
+      case 'react':
+        return `// npm install @monti/embed-react @monti/embed-core
+import { MontiEmbedReact } from '@monti/embed-react'
+
+export function MontiWidget() {
+  return (
+    <MontiEmbedReact
+      embedKey="${key}"
+      apiBase="${api}"
+      position="bottom-right"
+    />
+  )
+}`;
+      case 'svelte':
+        return `<!-- npm install @monti/embed-svelte @monti/embed-core -->
+<script>
+  import MontiEmbed from '@monti/embed-svelte/MontiEmbed.svelte'
+</script>
+<MontiEmbed
+  embedKey="${key}"
+  apiBase="${api}"
+  position="bottom-right"
+/>`;
+      case 'wc':
+        return `<!-- npm install @monti/embed-web-component @monti/embed-core -->
+<script type="module">
+  import '@monti/embed-web-component'
+</script>
+<monti-embed
+  embed-key="${key}"
+  api-base="${api}"
+  position="bottom-right"
+></monti-embed>`;
+    }
+  }
 </script>
 
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
   <div>
     <h1 style="margin:0;font-size:24px">Embed to Web</h1>
     <p style="margin:6px 0 0;color:var(--muted);font-size:13px">
-      Add Monti chat to your website with a copy-paste snippet.
+      Add Monti chat to your website with a copy-paste snippet or framework SDK.
     </p>
   </div>
 </div>
@@ -159,14 +221,80 @@
   </div>
 
   <div class="card">
-    <h2 style="margin:0 0 12px;font-size:16px">Snippet</h2>
-    <pre class="snippet">{cfg.snippet}</pre>
-    <button class="btn" type="button" onclick={() => copyText(cfg!.snippet, 'Snippet')}>
-      Copy snippet
-    </button>
-    <p style="margin:16px 0 0;font-size:12px;color:var(--muted)">
-      Paste before <code>&lt;/body&gt;</code> on your site. Enable embed and save first.
-    </p>
+    <div class="tabs" role="tablist" aria-label="Embed integration">
+      <button
+        type="button"
+        class="tab"
+        class:active={tab === 'snippet'}
+        role="tab"
+        aria-selected={tab === 'snippet'}
+        onclick={() => (tab = 'snippet')}
+      >
+        Script snippet
+      </button>
+      <button
+        type="button"
+        class="tab"
+        class:active={tab === 'framework'}
+        role="tab"
+        aria-selected={tab === 'framework'}
+        onclick={() => (tab = 'framework')}
+      >
+        Framework SDKs
+      </button>
+    </div>
+
+    {#if tab === 'snippet'}
+      <h2 style="margin:16px 0 12px;font-size:16px">Snippet</h2>
+      <pre class="snippet">{cfg.snippet}</pre>
+      <button class="btn" type="button" onclick={() => copyText(cfg!.snippet, 'Snippet')}>
+        Copy snippet
+      </button>
+      <p style="margin:16px 0 0;font-size:12px;color:var(--muted)">
+        Paste before <code>&lt;/body&gt;</code> on your site. Enable embed and save first. Zero
+        npm dependency path.
+      </p>
+    {:else}
+      <h2 style="margin:16px 0 12px;font-size:16px">Framework packages</h2>
+      <p style="margin:0 0 12px;font-size:13px;color:var(--muted)">
+        First-class SDKs share the same public resolve + iframe surface as the script tag. See repo
+        guide <code>docs/EMBED_WEB_INTEGRATION.md</code> § Framework SDKs · packages
+        <code>packages/embed-*</code>.
+      </p>
+      <div class="fw-tabs" role="tablist" aria-label="Framework">
+        {#each [
+          ['vue', 'Vue 3'],
+          ['react', 'React'],
+          ['svelte', 'Svelte'],
+          ['wc', 'Web Component']
+        ] as [id, label]}
+          <button
+            type="button"
+            class="tab sm"
+            class:active={framework === id}
+            role="tab"
+            aria-selected={framework === id}
+            onclick={() => (framework = id as typeof framework)}
+          >
+            {label}
+          </button>
+        {/each}
+      </div>
+      <pre class="snippet">{frameworkSnippet(framework)}</pre>
+      <button
+        class="btn"
+        type="button"
+        onclick={() => copyText(frameworkSnippet(framework), `${framework} snippet`)}
+      >
+        Copy {framework === 'wc' ? 'Web Component' : framework} snippet
+      </button>
+      <p style="margin:16px 0 0;font-size:12px;color:var(--muted)">
+        Add this site's origin (and your shop origin) to <strong>Allowed origins</strong>. Packages:
+        <code>@monti/embed-vue</code>, <code>@monti/embed-react</code>,
+        <code>@monti/embed-svelte</code>, <code>@monti/embed-web-component</code> (+
+        <code>@monti/embed-core</code>).
+      </p>
+    {/if}
   </div>
 {:else}
   <p style="color:var(--muted)">Could not load embed configuration.</p>
@@ -195,5 +323,33 @@
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-all;
+  }
+  .tabs,
+  .fw-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tab {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tab.sm {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .tab.active {
+    border-color: rgba(0, 183, 255, 0.55);
+    background: rgba(0, 132, 255, 0.15);
+  }
+  .fw-tabs {
+    margin-bottom: 12px;
   }
 </style>

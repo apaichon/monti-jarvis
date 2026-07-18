@@ -9,3 +9,9 @@ coverage.out
 apps/customer-web/node_modules
 apps/customer-web/build
 apps/customer-web/.svelte-kit
+node_modules/
+packages/*/node_modules/
+packages/*/dist/
+apps/*/node_modules/
+apps/*/.svelte-kit/
+apps/*/build/

@@ -1,0 +1,35 @@
+{
+  "name": "@monti/embed-react",
+  "version": "0.1.0",
+  "description": "React component and hooks for Monti Jarvis web embed",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "dependencies": {
+    "@monti/embed-core": "file:../embed-core"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "react": "^18.3.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": ["monti", "embed", "react"],
+  "license": "UNLICENSED",
+  "sideEffects": false
+}

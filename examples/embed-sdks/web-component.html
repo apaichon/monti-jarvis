@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Monti &lt;monti-embed&gt; demo</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+        background: #0b1220;
+        color: #e8eef7;
+      }
+      code {
+        background: #1a2438;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>&lt;monti-embed&gt; web component</h1>
+    <p>
+      Params: <code>?key=emb_…&amp;base=http://localhost:8091</code>
+    </p>
+    <p id="status">Loading…</p>
+
+    <script type="module">
+      import "../../packages/embed-web-component/dist/index.js";
+
+      const params = new URLSearchParams(location.search);
+      const embedKey = params.get("key") || "emb_REPLACE_ME";
+      const apiBase = params.get("base") || "http://localhost:8091";
+
+      const el = document.createElement("monti-embed");
+      el.setAttribute("embed-key", embedKey);
+      el.setAttribute("api-base", apiBase);
+      el.setAttribute("position", "bottom-right");
+      el.addEventListener("monti-ready", () => {
+        document.getElementById("status").textContent = "Ready — click the chat launcher.";
+      });
+      el.addEventListener("monti-error", (e) => {
+        document.getElementById("status").textContent =
+          "Error: " + (e.detail?.code || "") + " — " + (e.detail?.message || "");
+      });
+      document.body.appendChild(el);
+    </script>
+  </body>
+</html>

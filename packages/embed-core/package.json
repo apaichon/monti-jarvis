@@ -1,0 +1,35 @@
+{
+  "name": "@monti/embed-core",
+  "version": "0.1.0",
+  "description": "Shared Monti Jarvis web embed core — resolve, iframe widget, open/close lifecycle",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/lifecycle.test.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "monti",
+    "embed",
+    "chat",
+    "widget"
+  ],
+  "license": "UNLICENSED",
+  "sideEffects": false,
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

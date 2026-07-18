@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Monti embed-core demo</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+        background: #0b1220;
+        color: #e8eef7;
+      }
+      code {
+        background: #1a2438;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      button {
+        margin-right: 8px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 0;
+        cursor: pointer;
+        background: #0084ff;
+        color: #fff;
+      }
+      #log {
+        margin-top: 1rem;
+        font-size: 13px;
+        opacity: 0.85;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>@monti/embed-core</h1>
+    <p>
+      Params: <code>?key=emb_…&amp;base=http://localhost:8091</code>
+    </p>
+    <button id="open" type="button">Open</button>
+    <button id="close" type="button">Close</button>
+    <button id="destroy" type="button">Destroy</button>
+    <div id="log"></div>
+
+    <script type="module">
+      import { MontiEmbed } from "../../packages/embed-core/dist/index.js";
+
+      const params = new URLSearchParams(location.search);
+      const embedKey = params.get("key") || "emb_REPLACE_ME";
+      const apiBase = params.get("base") || "http://localhost:8091";
+      const log = (m) => {
+        document.getElementById("log").textContent += m + "\n";
+      };
+
+      const embed = new MontiEmbed({
+        embedKey,
+        apiBase,
+        parentOrigin: location.origin,
+        onOpen: () => log("event: open"),
+        onClose: () => log("event: close"),
+        onReady: (r) => log("event: ready " + (r?.name || "")),
+        onError: (e) => log("event: error " + e.code + " — " + e.message),
+        onDestroy: () => log("event: destroy"),
+      });
+      await embed.mount();
+      log("mounted");
+
+      document.getElementById("open").onclick = () => embed.open();
+      document.getElementById("close").onclick = () => embed.close();
+      document.getElementById("destroy").onclick = () => embed.destroy();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Monti framework embed snippets</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+        background: #0b1220;
+        color: #e8eef7;
+        line-height: 1.5;
+      }
+      pre {
+        background: #121a2b;
+        border: 1px solid #243049;
+        border-radius: 10px;
+        padding: 12px;
+        overflow: auto;
+        font-size: 12px;
+      }
+      h2 {
+        margin-top: 2rem;
+        font-size: 1.1rem;
+        color: #7dd3fc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Framework install snippets</h1>
+    <p>
+      Copy into your host app. Replace <code>emb_YOUR_KEY</code> and Monti base URL. Allowlist this
+      origin in tenant Embed settings.
+    </p>
+
+    <h2>Vue 3</h2>
+    <pre>
+npm install @monti/embed-vue @monti/embed-core
+
+&lt;script setup&gt;
+import { MontiEmbedVue } from '@monti/embed-vue'
+&lt;/script&gt;
+&lt;template&gt;
+  &lt;MontiEmbedVue embed-key="emb_YOUR_KEY" api-base="http://localhost:8091" /&gt;
+&lt;/template&gt;
+</pre>
+
+    <h2>React</h2>
+    <pre>
+npm install @monti/embed-react @monti/embed-core
+
+import { MontiEmbedReact } from '@monti/embed-react'
+
+export function Widget() {
+  return (
+    &lt;MontiEmbedReact embedKey="emb_YOUR_KEY" apiBase="http://localhost:8091" /&gt;
+  )
+}
+</pre>
+
+    <h2>Svelte</h2>
+    <pre>
+npm install @monti/embed-svelte @monti/embed-core
+
+&lt;script&gt;
+  import MontiEmbed from '@monti/embed-svelte/MontiEmbed.svelte'
+&lt;/script&gt;
+&lt;MontiEmbed embedKey="emb_YOUR_KEY" apiBase="http://localhost:8091" /&gt;
+</pre>
+
+    <h2>Web Component</h2>
+    <pre>
+npm install @monti/embed-web-component @monti/embed-core
+
+&lt;script type="module"&gt;
+  import '@monti/embed-web-component'
+&lt;/script&gt;
+&lt;monti-embed embed-key="emb_YOUR_KEY" api-base="http://localhost:8091"&gt;&lt;/monti-embed&gt;
+</pre>
+
+    <h2>Vanilla script (unchanged)</h2>
+    <pre>
+&lt;script
+  src="http://localhost:8091/embed/monti-embed.js"
+  data-embed-key="emb_YOUR_KEY"
+  data-position="bottom-right"
+  async
+&gt;&lt;/script&gt;
+</pre>
+  </body>
+</html>
