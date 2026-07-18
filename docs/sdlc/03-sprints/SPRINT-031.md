@@ -1,11 +1,13 @@
 ---
 id: SPRINT-031
-status: in_progress
+status: completed
 start: 2026-07-17
 end: 2026-07-18
-updated: 2026-07-17
+updated: 2026-07-18
 design_pack: approved
 release_target: v2.12.0
+release: v2.12.0
+closed: 2026-07-18
 goal: "Platform: provide read-only billing, quota, and AI infrastructure cost usage with source reconciliation and explicit measurement coverage."
 roadmap_sprint: 31
 feature: FEAT-0033
@@ -24,7 +26,7 @@ Give platform administrators a safe, read-only operational view of paid package 
 | Window | Points |
 | --- | ---: |
 | Last 3 recorded closed (S28, S29, S30) | 16, 16, 16 -> **avg 16** |
-| **Proposed commitment** | **16** |
+| **Committed / completed** | **16 / 16** |
 
 ## Commitment proposal
 
@@ -35,7 +37,7 @@ Give platform administrators a safe, read-only operational view of paid package 
 | [TASK-0142](../04-tasks/TASK-0142.md) AI instrumentation and usage dashboard | 5 | dev | Gemini usage capture plus responsive platform billing usage surface |
 | [TASK-0143](../04-tasks/TASK-0143.md) Reconciliation and UAT | 2 | tester | Payment, quota, AI coverage, failure-state, and responsive-layout verification |
 
-**Status:** In progress; implementation and automated verification are complete. Manual UAT remains pending per UAT-031.
+**Status:** Completed; all implementation points and automated verification are complete. Manual UAT remains deferred and is carried into Sprint 32 follow-up tasks.
 
 ## Scope boundary
 
@@ -57,7 +59,7 @@ Give platform administrators a safe, read-only operational view of paid package 
 
 | Artifact | Status | Scope |
 | --- | --- | --- |
-| Feature | [FEAT-0033 - Platform Billing, Quota, and AI Cost Usage](../01-features/FEAT-0033-platform-billing-quota-ai-cost-usage.md) | `in_progress` |
+| Feature | [FEAT-0033 - Platform Billing, Quota, and AI Cost Usage](../01-features/FEAT-0033-platform-billing-quota-ai-cost-usage.md) | `completed` |
 | Deep spec | [34-platform-billing-quota-ai-cost-spec.md](../02-design/34-platform-billing-quota-ai-cost-spec.md) | `approved` |
 | Workflow | [02-workflow.md](../02-design/02-workflow.md) Sprint 31 | `approved` |
 | ER | [03-er-diagram.md](../02-design/03-er-diagram.md) Sprint 31 | `approved` |
@@ -76,6 +78,12 @@ git diff --check
 ```
 
 See [34-platform-billing-quota-ai-cost-spec.md](../02-design/34-platform-billing-quota-ai-cost-spec.md) for API, data, workflow, UX, privacy, and reconciliation acceptance criteria.
+
+## Release close
+
+Automated Go tests, server build, platform-admin type checks/build, metering and aggregate contract tests, authorization/error checks, and `git diff --check` passed. Manual browser, responsive-layout, and dependency-failure UAT remains deferred in [SPRINT-031-manual.md](../06-manual-tests/SPRINT-031-manual.md) and is carried into TASK-0144/TASK-0145 for Sprint 32.
+
+**Closed:** 2026-07-18 as release `v2.12.0`.
 
 ## Risks
 

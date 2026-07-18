@@ -1,10 +1,10 @@
 ---
 id: FEAT-0033
 title: "Platform Billing, Quota, and AI Infrastructure Cost Usage"
-status: in_progress
+status: completed
 owner: product
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-18
 sprint: SPRINT-031
 ---
 

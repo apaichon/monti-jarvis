@@ -61,7 +61,7 @@ System design artifacts for Monti Jarvis.
 
 **Sprint 30:** Design pack approved and shipped in v2.11.0 — [33-platform-call-center-statistics-spec.md](33-platform-call-center-statistics-spec.md); workflow §84; API § Platform Call Center Statistics; UX A22. [SPRINT-030](../03-sprints/SPRINT-030.md).
 
-**Sprint 31:** Design pack approved for implementation — [34-platform-billing-quota-ai-cost-spec.md](34-platform-billing-quota-ai-cost-spec.md); workflow §85–86; API § Platform Billing, Quota, and AI Usage; UX A23. [SPRINT-031](../03-sprints/SPRINT-031.md).
+**Sprint 31:** ✅ Shipped v2.12.0 — [34-platform-billing-quota-ai-cost-spec.md](34-platform-billing-quota-ai-cost-spec.md); workflow §85–86; API § Platform Billing, Quota, and AI Usage; UX A23. [SPRINT-031](../03-sprints/SPRINT-031.md).
 
 **Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 
