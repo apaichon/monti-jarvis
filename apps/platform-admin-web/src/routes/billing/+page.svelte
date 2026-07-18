@@ -41,6 +41,7 @@
     <p style="margin:6px 0 0;color:var(--muted);font-size:13px">Cross-tenant payment orders (Sprint 10)</p>
   </div>
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <a class="btn ghost" href="{base}/billing/usage">Usage</a>
     <a class="btn ghost" href="{base}/billing/receipts">Receipts</a>
     <a class="btn ghost" href="{base}/billing/seller">Seller branding</a>
     <label style="font-size:13px;color:var(--muted)">

@@ -2950,3 +2950,59 @@ If Postgres satisfaction or package enrichment fails while the ClickHouse activi
 The handler derives platform authorization from the existing guard. `tenant_id` is a filter, never a replacement for authorization. ClickHouse queries use a bounded request context, `FINAL`, aggregate projections, and bounded pagination. Postgres enrichment queries return numeric summaries and package labels only. Raw ClickHouse SQL, provider errors, customer identifiers, transcripts, ticket notes, audio paths, credentials, and local filesystem paths are never serialized.
 
 See 33-platform-call-center-statistics-spec.md, 02-workflow.md §84, 03-er-diagram.md, and 05-ux-ui.md A22.
+
+## Platform Billing, Quota, and AI Usage (Sprint 31)
+
+**Auth:** `platform_admin` only. `AUTH_DISABLED` does not bypass the platform guard.
+
+### `GET /api/platform/billing/usage`
+
+| Query | Type | Required | Description |
+| --- | --- | --- | --- |
+| `start_date` | `YYYY-MM-DD` | no | Inclusive reporting start; defaults to today in deployment timezone. |
+| `end_date` | `YYYY-MM-DD` | no | Inclusive reporting end; defaults to today; maximum range 366 days. |
+| `tenant_id` | string | no | Exact optional tenant filter; maximum 128 characters. |
+| `limit` | integer | no | Tenant page size, default `50`, maximum `100`. |
+| `offset` | integer | no | Non-negative bounded page offset, maximum `1000000`. |
+
+**Response `200`:**
+
+```json
+{
+  "range": {"start_date": "2026-07-17", "end_date": "2026-07-17", "timezone": "Asia/Bangkok"},
+  "freshness": {"status": "current", "generated_at": "2026-07-17T05:00:00Z", "activity_last_projected_at": "2026-07-17T04:59:55Z"},
+  "billing": {"paid_orders": 3, "paid_amount_minor": 450000, "currency": "THB", "status": "current"},
+  "quota": {"reporting_minutes": 84, "enforcement": {"status": "current", "monthly_used": 84, "monthly_limit": 1000, "daily_used": 84, "daily_limit": 240}},
+  "ai_cost": {"currency": "USD", "observed_cost_microunits": 120000, "estimated_cost_microunits": 30000, "observed_events": 40, "estimated_events": 8, "unavailable_events": 2, "coverage_percent": 95.2, "status": "warning"},
+  "reconciliation": {"activity_quota": "not_comparable", "orders_entitlements": "ok", "ai_coverage": "warning"},
+  "tenants": [],
+  "pagination": {"total": 3, "limit": 50, "offset": 0}
+}
+```
+
+`billing` comes from paid `payment_orders`; `quota.enforcement` is a current Redis snapshot and is never used to reconstruct historical usage. `ai_cost` separates provider-observed and fallback-estimated values. Tenant rows expose only safe tenant identity, package name/status, aggregate minutes, quota state, AI observed/estimated cost, coverage, and reconciliation codes.
+
+### Errors
+
+| Code | When |
+| --- | --- |
+| `400 validation_error` | Invalid date, date order/range, tenant filter, limit, or offset. |
+| `401 unauthorized` / `session_expired` | Missing, invalid, or expired platform session. |
+| `403 forbidden` | Authenticated caller is not a `platform_admin`. |
+| `503 usage_unavailable` | No truthful aggregate can be produced from a required source. |
+| `500 billing_usage_unavailable` | Unexpected safe-response failure. |
+
+Partial source failures return `200` with per-section `status` and a safe reconciliation code when the remaining data is truthful. Raw SQL, Redis keys, provider payloads, credentials, customer identifiers, prompts, responses, transcripts, and audio paths are never serialized.
+
+### RBAC and isolation
+
+| Action | `platform_admin` | `tenant_admin` | `customer` | Anonymous |
+| --- | --- | --- | --- | --- |
+| Read platform billing/usage summary | yes | no | no | no |
+| Filter tenant page | yes | no | no | no |
+| Read event-level AI usage | no | no | no | no |
+| Change order, entitlement, package, or quota | no | no | no | no |
+
+The endpoint uses bounded grouped ClickHouse queries and bounded Postgres/Redis reads. It does not call one analytics query per tenant, persist snapshots, or write enforcement state.
+
+See 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–86, 03-er-diagram.md, and 05-ux-ui.md.
