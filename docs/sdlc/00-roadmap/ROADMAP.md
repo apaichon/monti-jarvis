@@ -54,7 +54,7 @@
 | 28 | Platform | Audit Log | G | 3 ✅ v2.9.0 · [FEAT-0030](../01-features/FEAT-0030-cross-tenant-audit-log.md) |
 | 29 | Platform | Monitoring : System Performance | G | 28 ✅ v2.10.0 · [FEAT-0031](../01-features/FEAT-0031-platform-system-performance-monitoring.md) |
 | 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) ✅ v2.11.0 · [FEAT-0032](../01-features/FEAT-0032-platform-call-center-statistics.md) |
-| 31 | Platform | Monitoring: Billing, Quota Usages, AI Infra Cost Usage | G | 30 |
+| **31** | **Platform** | **Monitoring: Billing, Quota Usages, AI Infra Cost Usage** | **G** | **30** ✅ v2.12.0 · [FEAT-0033](../01-features/FEAT-0033-platform-billing-quota-ai-cost-usage.md) |
 | 32 | Tuning | gRPC switch mode, Cache on Prod | H | 25+ |
 | 33 | Tuning | Partition,Index, Hardening | H | 32 |
 | 34 | Infra | Scale, Auto Scale with k8s | I | 33 |
