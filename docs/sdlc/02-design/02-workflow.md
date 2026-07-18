@@ -2444,4 +2444,96 @@ sequenceDiagram
 | `unavailable` | Units or rate are missing | Preserve the gap; never show exact zero cost. |
 | `replay_pending` | ClickHouse write failed after interaction commit | Keep customer path successful and retry by deterministic event id. |
 
-See 34-platform-billing-quota-ai-cost-spec.md, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
+## 87. Sprint 32 verifies platform billing usage and resets isolated fixtures
+
+Sprint 32 adds no customer or platform product flow. It defines the controlled verification flow for the already-shipped Sprint 31 reporting contract and keeps fixture activity outside production-like tenant authorities.
+
+```mermaid
+sequenceDiagram
+  actor T as Tester / CI
+  participant F as Fixture runner
+  participant P as Postgres callcenter
+  participant R as Redis DB 4
+  participant C as ClickHouse monti_jarvis
+  participant B as Browser
+  participant G as Go :8091
+  participant X as internal/auth + billing usage handler
+
+  T->>F: Create isolated fixture scope (uat-s31-*)
+  F->>P: Insert controlled paid/unpaid orders and entitlements
+  F->>R: Seed read-only quota counters in DB 4
+  F->>C: Insert activity and AI usage facts with deterministic ids
+  T->>B: Open /admin/billing/usage as platform_admin
+  B->>G: GET /api/platform/billing/usage?start_date&end_date&limit&offset
+  G->>X: Authorize and normalize bounded query
+  X->>P: Read paid-order and active-tenant aggregates
+  X->>R: Read current quota snapshot; never write counters
+  X->>C: Read activity and AI aggregates with latest-row semantics
+  alt source failure or stale projection
+    X-->>G: Safe section status or 503 usage_unavailable
+    G-->>B: Preserve truthful sections and show retry state
+  else all required sources available
+    X-->>G: Aggregate response with reconciliation and freshness
+    G-->>B: Render expected tenant-safe results
+  end
+  T->>F: Assert response, redaction, boundaries, and duplicate semantics
+  F->>P: Reset isolated fixture rows
+  F->>R: Reset isolated quota keys
+  F->>C: Remove isolated facts by fixture scope
+```
+
+### Verification states
+
+| State | Trigger | Required result |
+| --- | --- | --- |
+| `fixture_ready` | All isolated facts and counters load | Record fixture scope and effective dates; do not touch shared tenants. |
+| `reconciled` | API totals and tenant rows match expected fixtures | Attach response evidence to UAT-031. |
+| `warning` | Entitlement mismatch, quota divergence, or estimated AI usage | Preserve source values and show the explicit reconciliation state. |
+| `unavailable` | Required source outage or unsafe fixture dependency | Return safe retry/unavailable behavior; never convert missing data to zero. |
+| `reset` | Scenario completes or fails | Remove only fixture-scoped rows/keys and verify no shared authority changed. |
+
+## 88. Sprint 32 defines reversible transport and cache rollout gates
+
+The roadmap tuning track is design-only in Sprint 32. No gRPC or production-cache switch is enabled by this sprint; implementation must preserve the current HTTP/WebSocket and Redis authority paths until separately approved.
+
+```mermaid
+sequenceDiagram
+  actor O as Operator
+  participant G as Go :8091
+  participant A as Internal transport adapter
+  participant H as Existing HTTP path
+  participant R as Redis DB 4
+  participant P as Postgres / ClickHouse authority
+
+  O->>G: Deploy GRPC_MODE and CACHE_PROD_ENABLED profile
+  G->>A: Resolve bounded mode and caller deadline
+  alt disabled or gRPC unavailable
+    A->>H: Use existing internal HTTP path
+    H->>P: Read authoritative data
+    H->>R: Optional cache-aside read/write by approved namespace
+  else shadow
+    A->>H: Execute authoritative HTTP request
+    A->>A: Run bounded comparison probe; emit normalized metrics only
+    H-->>G: Return HTTP result
+  else preferred
+    A->>A: Call gRPC within deadline
+    alt timeout, transport error, or incompatible response
+      A->>H: Fall back to existing path
+    else compatible response
+      A-->>G: Return normalized gRPC result
+    end
+  end
+  G-->>O: Health/metrics state without targets, keys, or customer data
+```
+
+### Tuning rollout states
+
+| State | Trigger | Required behavior |
+| --- | --- | --- |
+| `disabled` | Default or rollback | Existing HTTP/WebSocket and current Redis paths remain authoritative. |
+| `shadow` | Comparison observation | HTTP result is returned; gRPC is bounded and non-authoritative. |
+| `preferred` | Evidence-approved rollout | gRPC is preferred; HTTP fallback remains available and observable. |
+| `required` | Future hard cutover | Only after separate approval, soak evidence, and rollback validation. |
+| `cache_bypass` | Cache disabled, miss, or error | Read the source authority; never fail a customer path for cache unavailability. |
+
+See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.

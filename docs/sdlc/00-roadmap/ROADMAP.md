@@ -55,7 +55,7 @@
 | 29 | Platform | Monitoring : System Performance | G | 28 ✅ v2.10.0 · [FEAT-0031](../01-features/FEAT-0031-platform-system-performance-monitoring.md) |
 | 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) ✅ v2.11.0 · [FEAT-0032](../01-features/FEAT-0032-platform-call-center-statistics.md) |
 | **31** | **Platform** | **Monitoring: Billing, Quota Usages, AI Infra Cost Usage** | **G** | **30** ✅ v2.12.0 · [FEAT-0033](../01-features/FEAT-0033-platform-billing-quota-ai-cost-usage.md) |
-| 32 | Tuning | gRPC switch mode, Cache on Prod | H | 25+ |
+| **32** | **Tuning** | **gRPC switch mode, Cache on Prod** | **H** | **25+** · planned · [SPRINT-032](../03-sprints/SPRINT-032.md) |
 | 33 | Tuning | Partition,Index, Hardening | H | 32 |
 | 34 | Infra | Scale, Auto Scale with k8s | I | 33 |
 | 35 | Infra | Canary Deployment | I | 34 |

@@ -1733,4 +1733,30 @@ erDiagram
 
 No foreign key is enforced between Postgres and ClickHouse. All cross-store links are logical `tenant_id`, call/session references, and immutable event/rate versions.
 
-See 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–86, 04-api-spec.md, and 05-ux-ui.md.
+### Sprint 32 verification storage contract
+
+Sprint 32 introduces no durable Postgres table, ClickHouse production entity, Redis enforcement key, or MinIO object path. Verification data is isolated by fixture scope and is removed after each scenario.
+
+| Store | Fixture boundary | Authority rule |
+| --- | --- | --- |
+| Postgres `callcenter` | Dedicated `uat-s31-*` tenant ids with controlled `payment_orders`, `tenant_entitlements`, `packages`, and `package_limits` rows | Read-only reporting queries; fixture setup/reset must not run against shared production tenants. |
+| Redis DB 4 | `monti_jarvis:quota:uat-s31-*:*` keys | Seed only in an isolated test profile; the production handler remains read-only. |
+| ClickHouse `monti_jarvis` | Activity and AI facts carrying fixture-scoped tenant ids and deterministic fact ids | Use latest-row semantics and remove only fixture-scoped facts after assertions. |
+| MinIO | No fixture objects | Conversation archives remain outside billing usage verification. |
+
+There is no new ER entity or migration in Sprint 32. The existing `AI_COST_USAGE_FACTS`, payment, entitlement, activity, and quota authorities from Sprint 31 remain unchanged.
+
+### Sprint 32 tuning storage boundary
+
+The gRPC switch and production-cache track adds no durable entity or migration. Cache state is operational Redis data and must remain separate from enforcement and authentication namespaces.
+
+| Boundary | Contract |
+| --- | --- |
+| Transport configuration | Deployment configuration only: `GRPC_MODE`, `GRPC_FALLBACK_ENABLED`, `GRPC_TIMEOUT`, and `GRPC_TARGET`; never persisted in Postgres or returned to browsers. |
+| Generic cache namespace | Proposed `monti_jarvis:cache:{domain}:...` in Redis DB 4; existing `quota`, `rl`, auth, OAuth, and active-call keys remain unchanged. |
+| Cache authority | Postgres, ClickHouse, and existing Redis enforcement data remain authoritative; cache misses/errors bypass to source. |
+| Cache lifecycle | TTL and explicit invalidation; no durable cache snapshot table, no MinIO objects, and no cross-tenant key reuse. |
+
+No ER entity is added in Sprint 32. If a future implementation requires a persistent rate or rollout catalog, it must return through a new design/task with standard Postgres audit columns.
+
+See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 04-api-spec.md, and 05-ux-ui.md.

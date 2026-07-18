@@ -3005,4 +3005,47 @@ Partial source failures return `200` with per-section `status` and a safe reconc
 
 The endpoint uses bounded grouped ClickHouse queries and bounded Postgres/Redis reads. It does not call one analytics query per tenant, persist snapshots, or write enforcement state.
 
-See 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–86, 03-er-diagram.md, and 05-ux-ui.md.
+## Sprint 32 — Billing usage verification contract
+
+Sprint 32 adds no endpoint or response-field change. It verifies the shipped read-only endpoint below against isolated fixture scopes and the acceptance assertions in UAT-031.
+
+### `GET /api/platform/billing/usage`
+
+**Auth:** `platform_admin` only. `AUTH_DISABLED=true` does not bypass the platform-admin guard for this route.
+
+**Verification request**
+
+```bash
+curl -fsS \
+  -H "Authorization: Bearer $PLATFORM_ADMIN_TOKEN" \
+  "http://localhost:8091/api/platform/billing/usage?start_date=2026-07-18&end_date=2026-07-18&limit=50&offset=0"
+```
+
+| Assertion | Expected contract |
+| --- | --- |
+| Inclusive dates | Paid orders and reporting facts on both boundary dates are included. |
+| Paid status | Unpaid orders do not contribute to `billing`; entitlements do not imply payment. |
+| Reconciliation | Entitlement mismatch and quota divergence remain warnings, not mutations. |
+| AI duplicate | Re-delivery of one deterministic fact id contributes once after latest-row aggregation. |
+| Measurement states | `observed`, `estimated`, and `unavailable` counts/costs remain separate; missing rate is not exact zero. |
+| Redaction | No prompt, response, transcript, audio, customer identifier, SQL, Redis key, or provider payload is returned. |
+| Failure model | Required source outage returns `503 usage_unavailable`; truthful partial AI failure remains a section-level unavailable state. |
+| Pagination/RBAC | `limit` is `1..100`, `offset` is bounded, platform admin succeeds, tenant admin/anonymous receives `401`/`403`. |
+
+No fixture setup or reset endpoint is public. TASK-0145 owns the isolated runner and reset contract; UAT-031 records the evidence.
+
+## Sprint 32 tuning track — API compatibility
+
+The gRPC switch and production-cache design introduces no public endpoint, request field, response field, or RBAC change. Browser HTTP/JSON and voice WebSocket contracts remain stable.
+
+| Concern | Contract |
+| --- | --- |
+| Internal transport | Deployment-only mode selection; no browser-supplied target or mode. |
+| Fallback | `disabled`/`shadow`/fallback returns the existing HTTP result with normalized errors and bounded deadlines. |
+| Cache | Cache-aside is internal and best-effort; cache misses/errors read the source authority. |
+| Health | A future implementation may add normalized state to `/api/infra`; raw target, Redis key, SQL, and dependency payloads are forbidden. |
+| Authorization | Existing platform-admin guard, tenant scope, and customer auth behavior are unchanged. |
+
+The only Sprint 32 verification endpoint remains `GET /api/platform/billing/usage`, documented above. gRPC/cache implementation requires separately approved task IDs; no endpoint is invented by this design.
+
+See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, and 05-ux-ui.md.

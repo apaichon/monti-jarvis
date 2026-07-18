@@ -2982,4 +2982,122 @@ Usage response
 | ClickHouse usage projection | `internal/clickhouse/ai_usage.go` |
 | Contract/UAT tests | `cmd/server/*billing*usage*_test.go`, `internal/clickhouse/*usage*_test.go`, Sprint 31 manual UAT |
 
-See 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–86, 03-er-diagram.md, and 04-api-spec.md.
+## Sprint 32 — Platform Billing Usage Readiness
+
+No customer or platform UI behavior changes in Sprint 32. The existing A23 Billing & Usage screen is the verification surface; the new work is controlled fixture setup, evidence capture, and explicit reset/readiness checks.
+
+### Screen map → API
+
+| UI zone | Tester action | API / WS |
+| --- | --- | --- |
+| A23-1 Billing tabs | Open Billing → Usage as platform admin | `GET /api/platform/billing/usage` |
+| A23-2 Date controls | Select fixture boundary dates and Apply | Same endpoint with `start_date` / `end_date` |
+| A23-4 Billing KPI | Compare paid-only fixture amount and order count | Response `billing` |
+| A23-5 Quota KPI | Compare historical minutes with current fixture snapshot | Response `quota.enforcement` |
+| A23-6 AI coverage | Verify observed, estimated, unavailable, and duplicate-event states | Response `ai_cost` |
+| A23-7 Reconciliation | Trigger entitlement mismatch and quota divergence fixtures | Response `reconciliation` |
+| A23-8 Tenant table | Verify pagination, tenant isolation, and redaction | Same endpoint with `limit` / `offset` |
+| A23-9 Failure/recovery | Exercise outage, retry, mobile, and session expiry | Existing safe error and auth recovery flows |
+
+### Operator layout
+
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│ Sprint 32 verification · Billing & Usage                           │
+├────────────────────────────────────────────────────────────────────┤
+│ Fixture scope: [uat-s31-demo]  Dates: [18/07]–[18/07] [Apply]      │
+│ Auth: [platform admin ✓]        Fixture status: READY / RESET      │
+├────────────────────────────────────────────────────────────────────┤
+│ Paid-only check │ Range/quota check │ AI states │ Reconciliation   │
+│ expected / got  │ expected / got    │ O/E/U      │ OK / warning     │
+├────────────────────────────────────────────────────────────────────┤
+│ Tenant rows: expected aggregate = actual aggregate                  │
+│ [tenant] [package] [paid] [minutes/quota] [AI coverage] [state]     │
+├────────────────────────────────────────────────────────────────────┤
+│ Evidence: [response JSON] [screenshot] [reset verified]             │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Fixture-driven acceptance
+
+```text
+Load isolated fixture scope
+    │
+    ├─► Open A23 Usage and request the inclusive date range
+    ├─► Compare billing, quota, AI, reconciliation, and tenant rows
+    ├─► Capture response/screenshot evidence in UAT-031
+    └─► Reset fixture scope and verify shared tenants are unchanged
+```
+
+### Flow B — Warning and unavailable states
+
+```text
+Inject mismatch, stale projection, or source outage
+    │
+    ├─► Keep truthful sections visible
+    ├─► Show warning/unavailable state and Retry
+    ├─► Never show missing cost or quota as exact zero
+    └─► Restore dependency, retry, and capture recovery evidence
+```
+
+### Mobile collapse
+
+Below 700px, retain the existing A23 behavior: stack date and fixture controls, use the two-column KPI grid, wrap reconciliation badges, and render tenant rows as two-line items. Fixture evidence controls must remain reachable without horizontal scrolling.
+
+There is no new Svelte component or route in Sprint 32. The implementation surface remains `apps/platform-admin-web/src/routes/billing/usage/+page.svelte`; fixture runner and evidence are tracked by TASK-0144/TASK-0145.
+
+## Sprint 32 tuning track — Operator controls and observability
+
+No customer-facing UI changes are proposed. Transport mode and cache enablement are deployment controls, not browser controls; operators verify them through normalized health/metrics and rollback configuration.
+
+### Screen map → API / operations
+
+| UI/ops zone | Operator action | API / operation |
+| --- | --- | --- |
+| T32-1 Deployment profile | Set `GRPC_MODE` and `GRPC_FALLBACK_ENABLED` | Deployment configuration; not browser input |
+| T32-2 Cache profile | Set `CACHE_PROD_ENABLED` and approved TTL profile | Deployment configuration; Redis DB 4 only |
+| T32-3 Health | Inspect normalized dependency/transport/cache status | Existing `GET /api/infra` when implementation exposes the safe fields |
+| T32-4 Billing compatibility | Run the shipped usage contract after a profile change | `GET /api/platform/billing/usage` |
+| T32-5 Rollback | Set gRPC disabled and cache disabled, then retry | Deployment rollback; existing HTTP/source paths |
+
+### Operator layout
+
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│ Sprint 32 tuning verification                                      │
+├────────────────────────────────────────────────────────────────────┤
+│ Transport: DISABLED / SHADOW / PREFERRED     Cache: OFF / ON      │
+│ Fallback: enabled     Deadline: bounded      Namespace: validated  │
+├────────────────────────────────────────────────────────────────────┤
+│ Health: HTTP path ✓  gRPC probe —  Cache hit/miss —  Redis DB 4 ✓  │
+│ Billing compatibility: PASS / WARNING / UNAVAILABLE                │
+├────────────────────────────────────────────────────────────────────┤
+│ Rollback: GRPC_MODE=disabled · CACHE_PROD_ENABLED=false            │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Shadow-to-preferred gate
+
+```text
+Set shadow mode
+    │
+    ├─► Compare normalized result/latency without changing response authority
+    ├─► Confirm tenant scope, deadline, fallback, and redaction metrics
+    ├─► Run billing usage and existing smoke checks
+    └─► Approve preferred mode only when evidence is clean
+```
+
+### Flow B — Cache rollback
+
+```text
+Cache hit/miss/error anomaly
+    │
+    ├─► Set CACHE_PROD_ENABLED=false
+    ├─► Verify source reads and customer paths remain healthy
+    ├─► Confirm no quota/auth/payment keys were changed
+    └─► Re-enable only after isolated TTL/namespace tests pass
+```
+
+There is no new Svelte route or customer control. The implementation surface remains the existing admin monitoring/usage surfaces plus deployment and metrics tooling described by DES-0035.
+
+See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, and 04-api-spec.md.

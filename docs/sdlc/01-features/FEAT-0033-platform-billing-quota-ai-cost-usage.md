@@ -40,5 +40,6 @@ Give platform administrators a read-only operational view of paid package value,
 ## Design links
 
 - Sprint: [SPRINT-031](../03-sprints/SPRINT-031.md)
+- Sprint 32 readiness follow-up: [SPRINT-032](../03-sprints/SPRINT-032.md)
 - Deep spec: [DES-0034 - Platform Billing, Quota, and AI Infrastructure Cost Usage](../02-design/34-platform-billing-quota-ai-cost-spec.md)
 - [API specification](../02-design/04-api-spec.md) - Platform Billing Usage
