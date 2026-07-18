@@ -2880,3 +2880,106 @@ Request fails
 | Contract/UAT tests | `cmd/server/platform_call_center_test.go`, `internal/clickhouse/*_test.go`, `docs/sdlc/06-manual-tests/SPRINT-030-manual.md` |
 
 See 33-platform-call-center-statistics-spec.md, 02-workflow.md §84, 03-er-diagram.md, and 04-api-spec.md.
+
+## Sprint 31 - Platform Billing, Quota, and AI Infrastructure Cost Usage
+
+Sprint 31 adds a platform-admin Usage view under billing. It does not change the customer portal or tenant dashboard. Paid value, historical reporting minutes, current enforcement quota, and AI cost coverage are visually separate.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| A23-1 Billing tabs | Open `/admin/billing/usage` or select Usage | `GET /api/platform/billing/usage` |
+| A23-2 Date controls | Set start/end or choose Today | Same endpoint with `start_date` and `end_date` |
+| A23-3 Tenant filter | Filter one tenant or all tenants | Same endpoint with `tenant_id` |
+| A23-4 Billing KPI | Inspect paid orders and paid value | Response `billing` |
+| A23-5 Quota KPI | Compare range minutes with current enforcement snapshot | Response `quota` |
+| A23-6 AI cost coverage | Inspect observed, estimated, unavailable, and coverage | Response `ai_cost` |
+| A23-7 Reconciliation | Inspect order/entitlement, quota, and AI warnings | Response `reconciliation` |
+| A23-8 Tenant table | Page through aggregate usage | Same endpoint with `limit` and `offset` |
+| A23-9 Retry/session expiry | Retry source failures or recover auth | Repeat endpoint; existing session-expired redirect |
+
+### Full layout - desktop
+
+~~~text
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│ MONTI · PLATFORM ADMIN                                      ● All systems operational │
+├───────────────┬────────────────────────────────────────────────────────────────────┤
+│ Navigation     │ A23  Billing & Usage                         [Orders] [Usage <]      │
+│                │ Paid package value, quota enforcement, and AI cost coverage        │
+│ Overview       │                                                                    │
+│ Tenants        │ ┌──────────────────────────────────────────────────────────────┐ │
+│ Packages       │ │ A23-2 Date range                                              │ │
+│ Billing <      │ │ Start [17/07/2026] End [17/07/2026] [Apply] [Today]            │ │
+│ Audit log      │ └──────────────────────────────────────────────────────────────┘ │
+│ Monitoring     │                                                                    │
+│ Call center    │ A23-4 / A23-5 / A23-6 Summary                                    │
+│ Settings       │ ┌──────────────┬──────────────┬──────────────┬─────────────────┐ │
+│                │ │ Paid value   │ Usage minutes│ Quota state  │ AI cost         │ │
+│                │ │ THB 4,500    │ 84 range     │ 84 / 1,000   │ USD 0.15        │ │
+│                │ │ 3 orders     │ historical   │ current      │ 95% coverage    │ │
+│                │ └──────────────┴──────────────┴──────────────┴─────────────────┘ │
+│                │                                                                    │
+│                │ A23-3 Tenant filter [All tenants v] [Apply]                       │
+│                │ A23-7 Reconciliation: Orders OK · Quota comparable · AI Warning   │
+│                │                                                                    │
+│                │ A23-8 Tenant usage                                               │
+│                │ ┌──────────────┬──────────┬───────────┬──────────┬──────────────┐ │
+│                │ │ Tenant       │ Package  │ Paid      │ Quota    │ AI cost/state │ │
+│                │ ├──────────────┼──────────┼───────────┼──────────┼──────────────┤ │
+│                │ │ Libra Tech   │ Pro      │ THB ...   │ 40 / 240 │ $... observed│ │
+│                │ │ Demo Tenant  │ Starter  │ THB ...   │ 44 / 240 │ $... estimate│ │
+│                │ └──────────────┴──────────┴───────────┴──────────┴──────────────┘ │
+│                │                                      [Previous] [Next]             │
+└───────────────┴────────────────────────────────────────────────────────────────────┘
+~~~
+
+### Flow A - Load and filter
+
+~~~text
+Open Billing / Usage
+    |
+    +--> Resolve today in deployment timezone
+    +--> GET platform billing usage with limit=50, offset=0
+    +--> Render fixed-height loading placeholders
+    +--> Show billing, quota, AI coverage, reconciliation, and tenant rows
+    +--> Change date or tenant and Apply
+    +--> Reset offset and replace result zones atomically
+~~~
+
+### Flow B - Partial data and coverage
+
+~~~text
+Usage response
+    |
+    +--> AI observed + estimated
+    |       +--> Show observed as primary, estimated as separate warning
+    |
+    +--> Source unavailable
+            +--> Keep truthful sections visible
+            +--> Mark affected section unavailable and offer Retry
+            +--> Never show missing cost or quota as exact zero
+~~~
+
+### Flow C - Session expiry and mobile collapse
+
+~~~text
+401 session_expired                         Below 700px
+    |                                       |
+    +--> Clear auth and go to login         +--> Stack date controls
+    +--> Preserve return path                +--> Use two-column KPI grid
+    +--> Avoid retry loop                   +--> Convert tenant rows to two lines
+~~~
+
+### Component -> file
+
+| Component | Path |
+| --- | --- |
+| Platform billing Usage route/tab | `apps/platform-admin-web/src/routes/billing/usage/+page.svelte` or existing billing route tab |
+| Billing usage API client/types | `apps/platform-admin-web/src/lib/api/billingUsage.ts` |
+| Platform usage handler | `cmd/server/platform_billing_usage.go` |
+| AI usage meter boundary | `internal/metering/` or provider adapter package |
+| ClickHouse usage projection | `internal/clickhouse/ai_usage.go` |
+| Contract/UAT tests | `cmd/server/*billing*usage*_test.go`, `internal/clickhouse/*usage*_test.go`, Sprint 31 manual UAT |
+
+See 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–86, 03-er-diagram.md, and 04-api-spec.md.

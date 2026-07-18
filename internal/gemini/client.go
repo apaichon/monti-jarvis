@@ -24,6 +24,18 @@ type Message struct {
 	Content string `json:"content"`
 }
 
+type UsageMetadata struct {
+	PromptTokenCount     uint64 `json:"promptTokenCount"`
+	CandidatesTokenCount uint64 `json:"candidatesTokenCount"`
+	TotalTokenCount      uint64 `json:"totalTokenCount"`
+}
+
+type ReplyResult struct {
+	Text  string
+	Usage UsageMetadata
+	Model string
+}
+
 func New(apiKey, model, embedModel string) *Client {
 	return &Client{
 		apiKey:     apiKey,
@@ -38,15 +50,23 @@ func (c *Client) Enabled() bool {
 }
 
 func (c *Client) Reply(ctx context.Context, systemPrompt string, history []Message) (string, error) {
+	result, err := c.ReplyWithUsage(ctx, systemPrompt, history)
+	if err != nil {
+		return "", err
+	}
+	return result.Text, nil
+}
+
+func (c *Client) ReplyWithUsage(ctx context.Context, systemPrompt string, history []Message) (ReplyResult, error) {
 	if c.apiKey == "" {
-		return "", errors.New("GEMINI_API_KEY is not configured")
+		return ReplyResult{}, errors.New("GEMINI_API_KEY is not configured")
 	}
 	if c.model == "" {
 		c.model = "gemini-flash-latest"
 	}
 	systemPrompt = strings.TrimSpace(systemPrompt)
 	if systemPrompt == "" {
-		return "", errors.New("system prompt is required")
+		return ReplyResult{}, errors.New("system prompt is required")
 	}
 
 	reqBody := generateRequest{
@@ -62,7 +82,7 @@ func (c *Client) Reply(ctx context.Context, systemPrompt string, history []Messa
 	}
 	payload, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", err
+		return ReplyResult{}, err
 	}
 
 	endpoint := fmt.Sprintf(
@@ -72,25 +92,25 @@ func (c *Client) Reply(ctx context.Context, systemPrompt string, history []Messa
 	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return "", err
+		return ReplyResult{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", err
+		return ReplyResult{}, err
 	}
 	defer resp.Body.Close()
 
 	var out generateResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return "", err
+		return ReplyResult{}, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if out.Error.Message != "" {
-			return "", fmt.Errorf("gemini: %s", out.Error.Message)
+			return ReplyResult{}, fmt.Errorf("gemini: %s", out.Error.Message)
 		}
-		return "", fmt.Errorf("gemini: http %d", resp.StatusCode)
+		return ReplyResult{}, fmt.Errorf("gemini: http %d", resp.StatusCode)
 	}
 	for _, candidate := range out.Candidates {
 		var chunks []string
@@ -100,10 +120,14 @@ func (c *Client) Reply(ctx context.Context, systemPrompt string, history []Messa
 			}
 		}
 		if len(chunks) > 0 {
-			return strings.TrimSpace(strings.Join(chunks, "\n")), nil
+			return ReplyResult{
+				Text:  strings.TrimSpace(strings.Join(chunks, "\n")),
+				Usage: out.UsageMetadata,
+				Model: c.model,
+			}, nil
 		}
 	}
-	return "", errors.New("gemini returned no text")
+	return ReplyResult{}, errors.New("gemini returned no text")
 }
 
 func toGeminiContents(history []Message) []content {
@@ -153,4 +177,5 @@ type generateResponse struct {
 	Error struct {
 		Message string `json:"message"`
 	} `json:"error"`
+	UsageMetadata UsageMetadata `json:"usageMetadata"`
 }

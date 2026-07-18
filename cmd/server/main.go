@@ -23,6 +23,7 @@ import (
 	"github.com/libra/monti-jarvis/internal/km"
 	"github.com/libra/monti-jarvis/internal/live"
 	"github.com/libra/monti-jarvis/internal/lktoken"
+	"github.com/libra/monti-jarvis/internal/metering"
 	"github.com/libra/monti-jarvis/internal/natsbus"
 	"github.com/libra/monti-jarvis/internal/observability"
 	"github.com/libra/monti-jarvis/internal/payment"
@@ -61,6 +62,7 @@ type server struct {
 	tenantOAuth     *tenantoauth.Service
 	monitoring      *observability.Service
 	audit           *audit.Writer
+	aiMeter         *metering.Recorder
 }
 
 type chatRequest struct {
@@ -116,6 +118,13 @@ func main() {
 			log.Printf("infra warning: clickhouse ping: %v", err)
 		}
 	}
+	aiMeter := metering.NewRecorder(ch, metering.RateCard{
+		Version:                cfg.AIUsageRateVersion,
+		Currency:               cfg.AIUsageCurrency,
+		InputUnitPriceMicros:   cfg.AIUsageInputPriceMicros,
+		OutputUnitPriceMicros:  cfg.AIUsageOutputPriceMicros,
+		AudioSecondPriceMicros: cfg.AIUsageAudioPriceMicros,
+	})
 	auditWriter, err := audit.New(audit.Config{
 		Mode: cfg.AuditLogMode, Dir: cfg.AuditLogDir, FlushInterval: cfg.AuditLogFlushInterval,
 		Retention: cfg.AuditLogRetention, BatchSize: cfg.AuditLogBatchSize, QueueSize: cfg.AuditLogQueueSize,
@@ -196,6 +205,17 @@ func main() {
 		}
 		return st.AIReplyLocaleHint(ctx, tenantID)
 	}
+	voiceRelay.UsageSink = func(ctx context.Context, event live.UsageEvent) {
+		if strings.TrimSpace(event.EventID) == "" {
+			event.EventID = metering.StableEventID("voice", event.TenantID, event.CallID, event.Model)
+		} else {
+			event.EventID = metering.StableEventID("voice", event.TenantID, event.EventID, event.Model)
+		}
+		_ = aiMeter.Record(ctx, metering.UsageEvent{
+			EventID: event.EventID, TenantID: event.TenantID, CallID: event.CallID,
+			Provider: "gemini", Model: event.Model, Modality: "voice", AudioSeconds: event.AudioSeconds,
+		})
+	}
 
 	s := &server{
 		cfg:             cfg,
@@ -220,6 +240,7 @@ func main() {
 		tenantOAuth:     tenantOAuth,
 		monitoring:      newMonitoringService(st, ch, bus, ai, cfg),
 		audit:           auditWriter,
+		aiMeter:         aiMeter,
 	}
 	s.backfillCallCenterAnalytics(rootCtx)
 	voiceRelay.AgentResolver = s.resolveAssignedWorkforceAgent
@@ -275,6 +296,7 @@ func main() {
 	mux.Handle("GET /api/platform/audit-logs/health", guard.RequirePlatformAdmin(http.HandlerFunc(s.platformAuditHealth)))
 	mux.Handle("GET /api/platform/system-performance", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformSystemPerformance)))
 	mux.Handle("GET /api/platform/call-center/statistics", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformCallCenterStatistics)))
+	mux.Handle("GET /api/platform/billing/usage", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformBillingUsage)))
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/kyc", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/approve", guard.RequirePlatformAdmin(http.HandlerFunc(s.approvePlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))
@@ -658,11 +680,12 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		prompt = ragSvc.AugmentPrompt(prompt, agent.ID, topic, req.Message, ragResult)
 	}
 
-	reply, err := s.ai.Reply(ctx, prompt, history)
+	replyResult, err := s.ai.ReplyWithUsage(ctx, prompt, history)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	reply := replyResult.Text
 
 	s.store.SaveExchange(context.Background(), sessionID, agent.ID, req.Message, reply)
 	var conversationID string
@@ -679,6 +702,7 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		})
 		if err == nil {
 			conversationID = rec.ID
+			s.recordAIUsage(tenantID, sessionID, conversationID, req.Message, replyResult, len(history))
 			_, _ = s.store.ArchiveConversationTranscript(r.Context(), tenantID, sessionID, map[string]any{
 				"session_id": sessionID, "tenant_id": tenantID, "agent_id": agent.ID, "topic": topic,
 				"question": req.Message, "reply": reply, "sources": ragResult.Sources,

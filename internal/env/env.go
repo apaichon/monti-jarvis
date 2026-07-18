@@ -11,52 +11,58 @@ import (
 )
 
 type Config struct {
-	Port                    string
-	GeminiAPIKey            string
-	GeminiModel             string
-	GeminiLiveModel         string
-	Voice                   string
-	PostgresURL             string
-	PostgresSchema          string
-	RedisURL                string
-	RedisPrefix             string
-	MinioEndpoint           string
-	MinioAccessKey          string
-	MinioSecretKey          string
-	MinioBucket             string
-	MinioPrefix             string
-	MinioUseSSL             bool
-	DemoTenantID            string
-	LegacyUIEnabled         bool
-	NATSURL                 string
-	LiveKitURL              string
-	LiveKitAPIKey           string
-	LiveKitAPISecret        string
-	CustomerWebDir          string
-	PlatformAdminWebDir     string
-	ClickHouseURL           string
-	ClickHouseDB            string
-	ClickHouseUser          string
-	ClickHousePassword      string
-	GeminiEmbedModel        string
-	AuthDisabled            bool
-	JWTSecret               string
-	JWTAccessTTL            time.Duration
-	JWTRefreshTTL           time.Duration
-	AuthCacheEnabled        bool
-	AuthWriteBehindEnabled  bool
-	AuthEventsEnabled       bool
-	AuthUserCacheTTL        time.Duration
-	EntitlementCacheEnabled bool
-	EntitlementCacheTTL     time.Duration
-	TenantRegisterEnabled   bool
-	TenantRegisterRateLimit int
-	TenantWebDir            string
-	PublicBaseURL           string
-	ResendAPIKey            string
-	ResendFromEmail         string
-	GoogleOAuthClientID     string
-	GoogleOAuthClientSecret string
+	Port                     string
+	GeminiAPIKey             string
+	GeminiModel              string
+	GeminiLiveModel          string
+	Voice                    string
+	PostgresURL              string
+	PostgresSchema           string
+	RedisURL                 string
+	RedisPrefix              string
+	MinioEndpoint            string
+	MinioAccessKey           string
+	MinioSecretKey           string
+	MinioBucket              string
+	MinioPrefix              string
+	MinioUseSSL              bool
+	DemoTenantID             string
+	LegacyUIEnabled          bool
+	NATSURL                  string
+	LiveKitURL               string
+	LiveKitAPIKey            string
+	LiveKitAPISecret         string
+	CustomerWebDir           string
+	PlatformAdminWebDir      string
+	ClickHouseURL            string
+	ClickHouseDB             string
+	ClickHouseUser           string
+	ClickHousePassword       string
+	GeminiEmbedModel         string
+	AIUsageRateVersion       string
+	AIUsagePricingAsOf       string
+	AIUsageCurrency          string
+	AIUsageInputPriceMicros  int64
+	AIUsageOutputPriceMicros int64
+	AIUsageAudioPriceMicros  int64
+	AuthDisabled             bool
+	JWTSecret                string
+	JWTAccessTTL             time.Duration
+	JWTRefreshTTL            time.Duration
+	AuthCacheEnabled         bool
+	AuthWriteBehindEnabled   bool
+	AuthEventsEnabled        bool
+	AuthUserCacheTTL         time.Duration
+	EntitlementCacheEnabled  bool
+	EntitlementCacheTTL      time.Duration
+	TenantRegisterEnabled    bool
+	TenantRegisterRateLimit  int
+	TenantWebDir             string
+	PublicBaseURL            string
+	ResendAPIKey             string
+	ResendFromEmail          string
+	GoogleOAuthClientID      string
+	GoogleOAuthClientSecret  string
 	// Optional full redirect URI override (must match Google Console exactly).
 	// Prefer http://localhost:PORT/... for local HTTP — Google rejects http://*.local.
 	GoogleOAuthRedirectURL   string
@@ -117,52 +123,58 @@ func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Port:                    envOr("PORT", "8091"),
-		GeminiAPIKey:            os.Getenv("GEMINI_API_KEY"),
-		GeminiModel:             envOr("GEMINI_MODEL", "gemini-flash-latest"),
-		GeminiLiveModel:         envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
-		Voice:                   envOr("VOICE", "Aoede"),
-		PostgresURL:             os.Getenv("POSTGRES_URL"),
-		PostgresSchema:          envOr("POSTGRES_SCHEMA", "callcenter"),
-		RedisURL:                os.Getenv("REDIS_URL"),
-		RedisPrefix:             envOr("REDIS_PREFIX", "monti_jarvis:"),
-		MinioEndpoint:           os.Getenv("MINIO_ENDPOINT"),
-		MinioAccessKey:          os.Getenv("MINIO_ACCESS_KEY"),
-		MinioSecretKey:          os.Getenv("MINIO_SECRET_KEY"),
-		MinioBucket:             envOr("MINIO_BUCKET", "monti-jarvis"),
-		MinioPrefix:             envOr("MINIO_PREFIX", "calls/"),
-		MinioUseSSL:             envBool("MINIO_USE_SSL", false),
-		DemoTenantID:            envOr("DEMO_TENANT_ID", "demo"),
-		LegacyUIEnabled:         envBool("LEGACY_UI_ENABLED", false),
-		NATSURL:                 envOr("NATS_URL", "nats://localhost:4222"),
-		LiveKitURL:              envOr("LIVEKIT_URL", "ws://localhost:7880"),
-		LiveKitAPIKey:           envOr("LIVEKIT_API_KEY", "devkey"),
-		LiveKitAPISecret:        envOr("LIVEKIT_API_SECRET", "secret"),
-		CustomerWebDir:          envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
-		PlatformAdminWebDir:     envOr("PLATFORM_ADMIN_WEB_DIR", "apps/platform-admin-web/build"),
-		ClickHouseURL:           envOr("CLICKHOUSE_URL", "http://localhost:8123"),
-		ClickHouseDB:            envOr("CLICKHOUSE_DB", "monti_jarvis"),
-		ClickHouseUser:          envOr("CLICKHOUSE_USER", "monti"),
-		ClickHousePassword:      envOr("CLICKHOUSE_PASSWORD", "monti"),
-		GeminiEmbedModel:        envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
-		AuthDisabled:            envBool("AUTH_DISABLED", true),
-		JWTSecret:               os.Getenv("JWT_SECRET"),
-		JWTAccessTTL:            envDuration("JWT_ACCESS_TTL", 15*time.Minute),
-		JWTRefreshTTL:           envDuration("JWT_REFRESH_TTL", 168*time.Hour),
-		AuthCacheEnabled:        envBool("AUTH_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
-		AuthWriteBehindEnabled:  envBool("AUTH_WRITE_BEHIND_ENABLED", os.Getenv("REDIS_URL") != ""),
-		AuthEventsEnabled:       envBool("AUTH_EVENTS_ENABLED", envOr("NATS_URL", "nats://localhost:4222") != ""),
-		AuthUserCacheTTL:        envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
-		EntitlementCacheEnabled: envBool("ENTITLEMENT_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
-		EntitlementCacheTTL:     envDuration("ENTITLEMENT_CACHE_TTL", 15*time.Minute),
-		TenantRegisterEnabled:   envBool("TENANT_REGISTER_ENABLED", true),
-		TenantRegisterRateLimit: envInt("TENANT_REGISTER_RATE_LIMIT", 5),
-		TenantWebDir:            envOr("TENANT_WEB_DIR", "apps/tenant-web/build"),
-		PublicBaseURL:           envOr("APP_PUBLIC_URL", "http://localhost:8091"),
-		ResendAPIKey:            resolveResendAPIKey(),
-		ResendFromEmail:         resolveResendFrom(),
-		GoogleOAuthClientID:     os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
-		GoogleOAuthClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+		Port:                     envOr("PORT", "8091"),
+		GeminiAPIKey:             os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:              envOr("GEMINI_MODEL", "gemini-flash-latest"),
+		GeminiLiveModel:          envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
+		Voice:                    envOr("VOICE", "Aoede"),
+		PostgresURL:              os.Getenv("POSTGRES_URL"),
+		PostgresSchema:           envOr("POSTGRES_SCHEMA", "callcenter"),
+		RedisURL:                 os.Getenv("REDIS_URL"),
+		RedisPrefix:              envOr("REDIS_PREFIX", "monti_jarvis:"),
+		MinioEndpoint:            os.Getenv("MINIO_ENDPOINT"),
+		MinioAccessKey:           os.Getenv("MINIO_ACCESS_KEY"),
+		MinioSecretKey:           os.Getenv("MINIO_SECRET_KEY"),
+		MinioBucket:              envOr("MINIO_BUCKET", "monti-jarvis"),
+		MinioPrefix:              envOr("MINIO_PREFIX", "calls/"),
+		MinioUseSSL:              envBool("MINIO_USE_SSL", false),
+		DemoTenantID:             envOr("DEMO_TENANT_ID", "demo"),
+		LegacyUIEnabled:          envBool("LEGACY_UI_ENABLED", false),
+		NATSURL:                  envOr("NATS_URL", "nats://localhost:4222"),
+		LiveKitURL:               envOr("LIVEKIT_URL", "ws://localhost:7880"),
+		LiveKitAPIKey:            envOr("LIVEKIT_API_KEY", "devkey"),
+		LiveKitAPISecret:         envOr("LIVEKIT_API_SECRET", "secret"),
+		CustomerWebDir:           envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
+		PlatformAdminWebDir:      envOr("PLATFORM_ADMIN_WEB_DIR", "apps/platform-admin-web/build"),
+		ClickHouseURL:            envOr("CLICKHOUSE_URL", "http://localhost:8123"),
+		ClickHouseDB:             envOr("CLICKHOUSE_DB", "monti_jarvis"),
+		ClickHouseUser:           envOr("CLICKHOUSE_USER", "monti"),
+		ClickHousePassword:       envOr("CLICKHOUSE_PASSWORD", "monti"),
+		GeminiEmbedModel:         envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
+		AIUsageRateVersion:       envOr("AI_USAGE_RATE_VERSION", "unconfigured"),
+		AIUsagePricingAsOf:       envOr("AI_USAGE_PRICING_AS_OF", ""),
+		AIUsageCurrency:          envOr("AI_USAGE_CURRENCY", "USD"),
+		AIUsageInputPriceMicros:  envInt64("AI_USAGE_INPUT_PRICE_MICROS", 0),
+		AIUsageOutputPriceMicros: envInt64("AI_USAGE_OUTPUT_PRICE_MICROS", 0),
+		AIUsageAudioPriceMicros:  envInt64("AI_USAGE_AUDIO_PRICE_MICROS", 0),
+		AuthDisabled:             envBool("AUTH_DISABLED", true),
+		JWTSecret:                os.Getenv("JWT_SECRET"),
+		JWTAccessTTL:             envDuration("JWT_ACCESS_TTL", 15*time.Minute),
+		JWTRefreshTTL:            envDuration("JWT_REFRESH_TTL", 168*time.Hour),
+		AuthCacheEnabled:         envBool("AUTH_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
+		AuthWriteBehindEnabled:   envBool("AUTH_WRITE_BEHIND_ENABLED", os.Getenv("REDIS_URL") != ""),
+		AuthEventsEnabled:        envBool("AUTH_EVENTS_ENABLED", envOr("NATS_URL", "nats://localhost:4222") != ""),
+		AuthUserCacheTTL:         envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
+		EntitlementCacheEnabled:  envBool("ENTITLEMENT_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
+		EntitlementCacheTTL:      envDuration("ENTITLEMENT_CACHE_TTL", 15*time.Minute),
+		TenantRegisterEnabled:    envBool("TENANT_REGISTER_ENABLED", true),
+		TenantRegisterRateLimit:  envInt("TENANT_REGISTER_RATE_LIMIT", 5),
+		TenantWebDir:             envOr("TENANT_WEB_DIR", "apps/tenant-web/build"),
+		PublicBaseURL:            envOr("APP_PUBLIC_URL", "http://localhost:8091"),
+		ResendAPIKey:             resolveResendAPIKey(),
+		ResendFromEmail:          resolveResendFrom(),
+		GoogleOAuthClientID:      os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
+		GoogleOAuthClientSecret:  os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
 		GoogleOAuthRedirectURL: envOr(
 			"GOOGLE_OAUTH_REDIRECT_URL",
 			envOr("OAUTH_GOOGLE_REDIRECT_URL", ""),
@@ -218,6 +230,18 @@ func envInt(key string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envInt64(key string, fallback int64) int64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
 		return fallback
 	}
