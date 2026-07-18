@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37 embed SDKs + S38 central brand portal)
+# Monti AI Call Center — Roadmap (36 core + S37 embed SDKs + S38 central brand portal + S39 themes)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -62,6 +62,7 @@
 | 36 | Infra | Backup Restore Archive | I | 34 |
 | **37** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **D+** | **14** · [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · backlog |
 | **38** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
+| **39** | **Tenant / Platform** | **Multiple theme color customization** | **D+** | **14, 16** · backlog |
 
 ---
 
@@ -394,3 +395,14 @@ Feature: [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · Builds
 | Routes | e.g. `/brands`, `/brands/{slug}` → conversation pre-bound |
 
 Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · Blueprint §5.1 · Complements [FEAT-0014](../01-features/FEAT-0014-embed-to-web.md) (per-site embed)
+
+## Backlog add: SPRINT-039 — Multiple Theme Color Customization
+
+**Platform:** Tenant / Platform · **Feature:** Configurable theme palettes across supported Monti surfaces · **Depends:** 14, 16 · **Status:** backlog
+
+| Deliverable | Notes |
+| --- | --- |
+| Theme presets | Light, dark, and branded preset palettes with safe defaults |
+| Color token editor | Configure primary, accent, surface, text, and status colors without editing application code |
+| Preview and contrast checks | Preview customer/admin surfaces and flag inaccessible color combinations before publish |
+| Scope and rollout | Apply themes per tenant and embed instance with reset, draft, and publish behavior |
