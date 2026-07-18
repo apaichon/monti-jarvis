@@ -3049,3 +3049,115 @@ The gRPC switch and production-cache design introduces no public endpoint, reque
 The only Sprint 32 verification endpoint remains `GET /api/platform/billing/usage`, documented above. gRPC/cache implementation requires separately approved task IDs; no endpoint is invented by this design.
 
 See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, and 05-ux-ui.md.
+
+
+## Theme Color Customization (Sprint 39)
+
+**Feature:** FEAT-0035 · **Spec:** [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md)
+
+### Tenant theme
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| `GET` | `/api/tenant/theme` | tenant_admin active |
+| `PUT` | `/api/tenant/theme` | tenant_admin active |
+| `POST` | `/api/tenant/theme/publish` | tenant_admin active |
+| `POST` | `/api/tenant/theme/reset` | tenant_admin active |
+
+#### `GET /api/tenant/theme` 200
+
+```json
+{
+  "tenant_id": "demo",
+  "preset": "dark",
+  "draft_tokens": {
+    "primary": "#2375ff",
+    "accent": "#16c7ff",
+    "surface": "#0c1425",
+    "background": "#050814",
+    "text": "#f4f7ff",
+    "muted": "#8390aa",
+    "line": "#5b78b1",
+    "success": "#3dd68c",
+    "warn": "#f0b83f",
+    "danger": "#ff5c7a"
+  },
+  "published_tokens": {},
+  "published_at": null,
+  "draft_updated_at": "2026-07-18T12:00:00Z",
+  "contrast_report": {
+    "ok": true,
+    "pairs": [
+      { "pair": "text_on_surface", "ratio": 12.1, "pass": true }
+    ]
+  }
+}
+```
+
+#### `PUT /api/tenant/theme` body
+
+```json
+{
+  "preset": "branded",
+  "tokens": {
+    "primary": "#ff5500",
+    "accent": "#ffaa00",
+    "surface": "#1a1008",
+    "background": "#0d0804",
+    "text": "#fff8f0",
+    "muted": "#c4a882",
+    "line": "#8a6040",
+    "success": "#3dd68c",
+    "warn": "#f0b83f",
+    "danger": "#ff5c7a"
+  }
+}
+```
+
+#### `POST /api/tenant/theme/publish` body
+
+```json
+{ "confirm_low_contrast": false }
+```
+
+| HTTP | code |
+| ---: | --- |
+| 400 | `invalid_theme_tokens`, `invalid_preset` |
+| 409 | `contrast_confirmation_required` |
+| 401/403 | unauthorized / inactive |
+
+#### `POST /api/tenant/theme/reset` body
+
+```json
+{ "preset": "dark" }
+```
+
+Resets **draft** to preset defaults. Does not change published until publish.
+
+### Public theme
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| `GET` | `/api/public/theme/{tenant_id}` | public |
+
+200 returns `{ "tenant_id", "preset", "tokens" }` for **published** only. If none published, return system dark defaults with `"source": "system_default"`.
+
+### Embed resolve extension
+
+`GET /api/public/embed/{embed_key}` may include:
+
+```json
+"theme": { "preset": "branded", "tokens": { "primary": "#ff5500" } }
+```
+
+when the tenant has published tokens. Omitted or null when system default.
+
+### Platform admin
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| `GET` | `/api/admin/tenants/{tenant_id}/theme` | platform_admin |
+
+Read-only: preset, published_at, contrast ok flag, token keys present (not necessarily full secret-sensitive — tokens are public brand colors).
+
+See DES-0037, workflow §89–90, UX Sprint 39.

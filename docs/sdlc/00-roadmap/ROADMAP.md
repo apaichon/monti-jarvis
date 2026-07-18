@@ -62,7 +62,7 @@
 | 36 | Infra | Backup Restore Archive | I | 34 |
 | **37** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **D+** | **14** · [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) ✅ v2.14.0 · [SPRINT-037](../03-sprints/SPRINT-037.md) |
 | **38** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
-| **39** | **Tenant / Platform** | **Multiple theme color customization** | **D+** | **14, 16** · backlog |
+| **39** | **Tenant / Platform** | **Multiple theme color customization** | **D+** | **14, 16** · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md) · planned · [SPRINT-039](../03-sprints/SPRINT-039.md) |
 | **40** | **Tenant / Integrator** | **Outbound calling with Twilio** | **G** | **1, 20, 27** · backlog |
 | **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
 
@@ -398,9 +398,9 @@ Feature: [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · Builds
 
 Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · Blueprint §5.1 · Complements [FEAT-0014](../01-features/FEAT-0014-embed-to-web.md) (per-site embed)
 
-## Backlog add: SPRINT-039 — Multiple Theme Color Customization
+## Planned: SPRINT-039 — Multiple Theme Color Customization
 
-**Platform:** Tenant / Platform · **Feature:** Configurable theme palettes across supported Monti surfaces · **Depends:** 14, 16 · **Status:** backlog
+**Platform:** Tenant / Platform · **Feature:** Configurable theme palettes across supported Monti surfaces · **Depends:** 14, 16 · **Status:** planned · [SPRINT-039](../03-sprints/SPRINT-039.md) · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md) · DES-0037
 
 | Deliverable | Notes |
 | --- | --- |
@@ -408,6 +408,7 @@ Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · B
 | Color token editor | Configure primary, accent, surface, text, and status colors without editing application code |
 | Preview and contrast checks | Preview customer/admin surfaces and flag inaccessible color combinations before publish |
 | Scope and rollout | Apply themes per tenant and embed instance with reset, draft, and publish behavior |
+| Commitment | 14 pts · TASK-0149–0152 · release target v2.15.0 |
 
 ## Backlog add: SPRINT-040 — Outbound Calling with Twilio
 

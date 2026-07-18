@@ -40,6 +40,8 @@ System design artifacts for Monti Jarvis.
 | 32 | [32-platform-system-performance-spec.md](32-platform-system-performance-spec.md) | 29 | Platform cross-tenant system performance, bounded probes, tenant analytics freshness, and audit delivery health | **`shipped`** v2.10.0 |
 | 33 | [33-platform-call-center-statistics-spec.md](33-platform-call-center-statistics-spec.md) | 30 | Platform aggregate call-center statistics, tenant breakdown, freshness, satisfaction, and package labels | **`shipped`** v2.11.0 |
 | 34 | [34-platform-billing-quota-ai-cost-spec.md](34-platform-billing-quota-ai-cost-spec.md) | 31 | Platform billing, quota enforcement snapshot, AI usage metering, cost coverage, and reconciliation | `approved` |
+| 35 | [35-production-transport-cache-tuning-spec.md](35-production-transport-cache-tuning-spec.md) | 32 | Production transport/cache tuning design track | `review_pending` |
+| 37 | [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md) | 39 | Tenant theme tokens, draft/publish, contrast, customer+embed CSS vars | `review_pending` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -64,6 +66,8 @@ System design artifacts for Monti Jarvis.
 **Sprint 31:** ✅ Shipped v2.12.0 — [34-platform-billing-quota-ai-cost-spec.md](34-platform-billing-quota-ai-cost-spec.md); workflow §85–86; API § Platform Billing, Quota, and AI Usage; UX A23. [SPRINT-031](../03-sprints/SPRINT-031.md).
 
 **Sprint 32:** ✅ Shipped v2.13.0 — [DES-0035](35-production-transport-cache-tuning-spec.md) remains a design-only roadmap track; [workflow](02-workflow.md) §87–88, [ER/fixture boundary](03-er-diagram.md), [API verification contract](04-api-spec.md), and [UX/UAT operator surface](05-ux-ui.md) support [SPRINT-032](../03-sprints/SPRINT-032.md), reusing [DES-0034](34-platform-billing-quota-ai-cost-spec.md). Manual UAT carries into Sprint 33.
+
+**Sprint 39:** Design pack `review_pending` — [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md); workflow §89–90; API § Theme Color Customization; UX T20. [SPRINT-039](../03-sprints/SPRINT-039.md) · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md).
 
 **Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 

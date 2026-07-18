@@ -3101,3 +3101,74 @@ Cache hit/miss/error anomaly
 There is no new Svelte route or customer control. The implementation surface remains the existing admin monitoring/usage surfaces plus deployment and metrics tooling described by DES-0035.
 
 See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, and 04-api-spec.md.
+
+
+## Sprint 39 — Theme color customization (T20)
+
+Sprint 39 adds a **tenant Theme** admin surface and applies published CSS tokens on **customer** and **embed** chrome. No change to package/billing flows.
+
+### Screen map → API
+
+| UI zone | User action | API |
+| --- | --- | --- |
+| T20 Theme · Preset | Select dark / light / branded | client-only until save |
+| T20 Theme · Token pickers | Change primary/accent/… | client preview |
+| T20 Theme · Save draft | Click Save draft | `PUT /api/tenant/theme` |
+| T20 Theme · Publish | Click Publish (+ confirm if contrast warn) | `POST /api/tenant/theme/publish` |
+| T20 Theme · Reset | Reset to preset | `POST /api/tenant/theme/reset` |
+| T20 Theme · Load | Open page | `GET /api/tenant/theme` |
+| C17 Customer / Embed | Apply tokens on load | `GET /api/public/theme/{id}` or embed resolve `theme` |
+| A24 Platform tenant detail | View theme summary | `GET /api/admin/tenants/{id}/theme` |
+
+### T20 — Tenant Theme editor (desktop)
+
+```text
+┌─ Tenant shell ─────────────────────────────────────────────────────┐
+│ Nav: Dashboard · Embed · KM · Settings · **Theme** · …             │
+├────────────────────────────────────────────────────────────────────┤
+│ Theme colors                                                       │
+│ Configure brand palette for caller desk and embed.                 │
+│                                                                    │
+│ Preset  (• Dark)  ( Light )  ( Branded )                           │
+│                                                                    │
+│ ┌─ Tokens ──────────────────┐  ┌─ Live preview ─────────────────┐ │
+│ │ Primary  [#2375ff] ■      │  │ ┌────────────────────────────┐ │ │
+│ │ Accent   [#16c7ff] ■      │  │ │  [Logo]  Support           │ │ │
+│ │ Surface  [#0c1425] ■      │  │ │  Agent card · message bubble│ │ │
+│ │ Background …              │  │ │  [Start call]  primary btn  │ │ │
+│ │ Text / Muted / Line …     │  │ └────────────────────────────┘ │ │
+│ │ Success / Warn / Danger   │  │ Embed mini-launcher preview    │ │
+│ └───────────────────────────┘  └────────────────────────────────┘ │
+│                                                                    │
+│ Contrast: text/surface ✓ 12.1 · primary/surface ⚠ 3.2             │
+│                                                                    │
+│ [ Save draft ]  [ Publish ]  [ Reset to preset ]                   │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Publish branded theme
+
+```text
+Open Theme → Select Branded → Edit primary → Save draft
+  → Contrast report
+  → Publish (confirm if warnings)
+  → Open customer desk / embed → tokens applied
+```
+
+### Flow B — Reset
+
+```text
+Reset to Dark → draft becomes dark defaults → Publish → public returns dark
+```
+
+### Component → file (planned)
+
+| Zone | Planned path |
+| --- | --- |
+| Theme page | `apps/tenant-web/src/routes/theme/+page.svelte` |
+| API client | `apps/tenant-web/src/lib/api/theme.ts` |
+| Customer apply | `apps/customer-web` layout / theme util |
+| Embed apply | `apps/customer-web/src/routes/embed/+page.svelte` |
+| Platform summary | `apps/platform-admin-web` tenant detail panel |
+
+See DES-0037, 02-workflow.md §89–90, 03-er-diagram.md, 04-api-spec.md.

@@ -2537,3 +2537,79 @@ sequenceDiagram
 | `cache_bypass` | Cache disabled, miss, or error | Read the source authority; never fail a customer path for cache unavailability. |
 
 See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
+
+## 89. Tenant administrator configures and publishes a theme (Sprint 39)
+
+```mermaid
+sequenceDiagram
+  actor A as Tenant admin
+  participant B as Browser tenant-web
+  participant G as Go :8091
+  participant P as Postgres callcenter
+  participant R as Redis DB 4 (optional)
+
+  A->>B: Open /tenant/theme
+  B->>G: GET /api/tenant/theme
+  G->>P: Load tenant_themes for tenant_id
+  P-->>G: draft + published tokens
+  G-->>B: theme JSON + contrast_report
+  A->>B: Edit tokens / select preset
+  B->>B: Live preview (client CSS vars)
+  A->>B: Save draft
+  B->>G: PUT /api/tenant/theme
+  G->>G: Validate tokens + contrast
+  G->>P: Upsert draft_tokens
+  P-->>G: ok
+  G-->>B: draft saved
+  A->>B: Publish
+  B->>G: POST /api/tenant/theme/publish
+  alt contrast fail and no confirm
+    G-->>B: 409 contrast_confirmation_required
+  else ok or confirm_low_contrast
+    G->>P: Copy draft → published_tokens
+    opt cache
+      G->>R: SET monti_jarvis:theme:pub:{tenant_id}
+    end
+    G-->>B: published
+  end
+```
+
+### Theme lifecycle states
+
+| State | Meaning |
+| --- | --- |
+| `default_system` | No row or empty published → clients use built-in dark preset |
+| `draft_dirty` | Draft differs from published |
+| `published` | published_tokens applied to customer/embed |
+| `reset` | Draft reloaded from preset defaults; publish still required to affect public |
+
+## 90. Customer or embed loads published theme (Sprint 39)
+
+```mermaid
+sequenceDiagram
+  actor C as Caller
+  participant B as Browser customer/embed
+  participant G as Go :8091
+  participant P as Postgres
+  participant R as Redis optional
+
+  C->>B: Open caller desk or embed iframe
+  alt embed key path
+    B->>G: GET /api/public/embed/{key}?parent_origin=…
+    G->>P: Resolve embed + tenant
+    G->>P: Load published theme for tenant
+    G-->>B: config + theme.tokens?
+  else known tenant_id
+    B->>G: GET /api/public/theme/{tenant_id}
+    opt cache hit
+      G->>R: GET theme:pub
+    end
+    G->>P: published_tokens
+    G-->>B: { preset, tokens }
+  end
+  B->>B: Apply --mj-* CSS variables on :root
+  B-->>C: Themed chrome
+```
+
+See DES-0037, 37-theme-color-customization-spec.md, 02-workflow.md §89–90, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
+

@@ -1760,3 +1760,50 @@ The gRPC switch and production-cache track adds no durable entity or migration. 
 No ER entity is added in Sprint 32. If a future implementation requires a persistent rate or rollout catalog, it must return through a new design/task with standard Postgres audit columns.
 
 See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 04-api-spec.md, and 05-ux-ui.md.
+
+
+## Sprint 39 — Theme color customization
+
+### `tenant_themes`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| tenant_id | text PK | FK → tenants.id ON DELETE CASCADE |
+| preset | text | dark \| light \| branded |
+| draft_tokens | jsonb | full token map |
+| published_tokens | jsonb | public snapshot |
+| published_at | timestamptz null | |
+| draft_updated_at | timestamptz | |
+| created_at / updated_at / created_by / updated_by | audit | required |
+
+```mermaid
+erDiagram
+  tenants ||--o| tenant_themes : "has theme"
+  tenant_themes {
+    text tenant_id PK
+    text preset
+    jsonb draft_tokens
+    jsonb published_tokens
+    timestamptz published_at
+    timestamptz draft_updated_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Redis (optional)
+
+| Key | Value | TTL |
+| --- | --- | --- |
+| `monti_jarvis:theme:pub:{tenant_id}` | JSON published tokens | 60s |
+
+Fail-open to Postgres. Never cache draft tokens publicly.
+
+### Future entities
+
+| Entity | Status |
+| --- | --- |
+| tenant_themes | **Sprint 39** |
+| theme_templates (marketplace) | future |
