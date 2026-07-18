@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37 embed SDKs + S38 central brand portal + S39 themes)
+# Monti AI Call Center — Roadmap (36 core + S37 embed SDKs + S38 central brand portal + S39 themes + S40 outbound calling)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -63,6 +63,7 @@
 | **37** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **D+** | **14** · [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) · backlog |
 | **38** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
 | **39** | **Tenant / Platform** | **Multiple theme color customization** | **D+** | **14, 16** · backlog |
+| **40** | **Tenant / Integrator** | **Outbound calling with Twilio** | **G** | **1, 20, 27** · backlog |
 
 ---
 
@@ -406,3 +407,15 @@ Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · B
 | Color token editor | Configure primary, accent, surface, text, and status colors without editing application code |
 | Preview and contrast checks | Preview customer/admin surfaces and flag inaccessible color combinations before publish |
 | Scope and rollout | Apply themes per tenant and embed instance with reset, draft, and publish behavior |
+
+## Backlog add: SPRINT-040 — Outbound Calling with Twilio
+
+**Platform:** Tenant / Integrator · **Feature:** Provider-backed outbound AI voice calls · **Depends:** 1, 20, 27 · **Status:** backlog
+
+| Deliverable | Notes |
+| --- | --- |
+| Outbound call initiation | Tenant-authorized recipient and AI workforce selection with explicit call status |
+| Twilio voice adapter | Isolate Twilio setup, credentials, number configuration, and provider callbacks behind a bounded internal adapter |
+| Call lifecycle | Track requested, ringing, connected, completed, failed, and retry-safe outcomes |
+| Consent and enforcement | Apply recipient consent, tenant isolation, quota, rate limits, and operational call-window policies |
+| Privacy and operations | Keep provider payloads bounded, support auditability, and define recording/transcript behavior before implementation |
