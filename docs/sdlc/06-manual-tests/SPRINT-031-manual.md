@@ -2,7 +2,7 @@
 id: UAT-031
 title: Sprint 31 Platform Billing, Quota, and AI Usage UAT
 status: deferred_uat
-updated: 2026-07-17
+updated: 2026-07-18
 sprint: SPRINT-031
 release: v2.12.0
 ---
@@ -27,6 +27,19 @@ Use a platform-admin session with two active tenants and controlled Postgres, Re
 | S31-U12 | Repeat call, voice, archive, quota, payment callback, audit, and tenant-statistics smoke checks | Existing customer and enforcement paths remain compatible | pending |
 
 See [DES-0034](../02-design/34-platform-billing-quota-ai-cost-spec.md), [SPRINT-031](../03-sprints/SPRINT-031.md), and [05-ux-ui.md](../02-design/05-ux-ui.md) A23.
+
+## Sprint 32 fixture-backed execution
+
+The controlled harness for TASK-0145 provisions two isolated tenants across Postgres, Redis DB 4, and ClickHouse, then removes the fixture rows and keys on reset:
+
+```bash
+export POSTGRES_URL='postgres://...'
+export PLATFORM_ADMIN_TOKEN='...'
+FIXTURE_SCOPE=uat-s31-demo \
+  scripts/sprint32-usage-uat.sh
+```
+
+The runner checks the primary tenant's paid/unpaid boundary, duplicate AI delivery, observed/estimated/unavailable states, reporting minutes, and Redis divergence. It also checks a second paid-but-unentitled tenant and writes response evidence under `var/uat/sprint32/`. Run `scripts/sprint32-usage-fixtures.sh reset` if a run is interrupted. Browser, responsive, outage, session-expiry, and existing-regression scenarios remain pending until tester execution; the harness does not mark them passed.
 
 ## Verification note
 

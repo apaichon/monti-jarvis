@@ -2,10 +2,10 @@
 id: READINESS-RELEASE
 status: completed
 updated: 2026-07-18
-current_sprint: SPRINT-031
-release_target: v2.12.0
-release: v2.12.0
-git_tag: v2.12.0
+current_sprint: SPRINT-032
+release_target: v2.13.0
+release: v2.13.0
+git_tag: v2.13.0
 ---
 
 # Release Readiness Checklist
@@ -128,6 +128,14 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] Full Go tests, server build, platform-admin Svelte check/build, aggregate contract tests, authorization/error checks, and `git diff --check` pass.
 - [ ] Manual browser, responsive-layout, dependency-failure, and controlled cross-store fixture UAT evidence; deferred to TASK-0144/TASK-0145.
 
+### SPRINT-032 (v2.13.0)
+
+- [x] Scope-guarded Postgres, Redis DB 4, and ClickHouse fixture load/reset harness is committed.
+- [x] Live fixture-backed billing usage UAT verifies paid/unpaid boundaries, mismatch, quota divergence, duplicate AI delivery, and observed/estimated/unavailable states.
+- [x] Fixture cleanup is verified across Postgres, Redis, and ClickHouse; unsafe scope is rejected before writes.
+- [x] Source-error behavior is covered by focused ClickHouse client regression coverage.
+- [ ] Manual browser, responsive-layout, dependency-failure, session-expiry, and existing-regression UAT evidence; carried over as TASK-0144.
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -143,23 +151,23 @@ curl -fsS http://localhost:8091/api/workforce
 | --- | --- | --- | --- |
 | Dev | Codex release verification | 2026-07-18 | Platform billing usage API/UI, AI metering, aggregate projection, and unit tests |
 | Tester | Codex release verification | 2026-07-18 | Automated contract, authorization, error, and build checks; manual UAT deferred |
-| PM | User-authorized release close | 2026-07-18 | ACs accepted for SPRINT-031 |
-| DevOps | Codex release verification | 2026-07-18 | Build/test/tag verification for v2.12.0 |
+| PM | User-authorized release close | 2026-07-18 | Sprint 32 release accepted with TASK-0144 manual-UAT carry-over |
+| DevOps | Codex release verification | 2026-07-18 | Build/test/tag verification for v2.13.0 |
 
 ## H. Release-cut (PM + DevOps)
 
 After sections A–G are green:
 
 ```bash
-# SPRINT-031 release
-git tag -a v2.12.0 -m "v2.12.0 - SPRINT-031 platform billing, quota, and AI usage"
-git push origin v2.12.0
+# SPRINT-032 release
+git tag -a v2.13.0 -m "v2.13.0 - SPRINT-032 billing usage readiness and reconciliation"
+git push origin v2.13.0
 ```
 
-- [x] Tag pushed to `origin`
+- [ ] Tag pushed to `origin`
 - [x] Sprint marked `completed` in `03-sprints/`
 - [x] `_velocity.json` updated
-- [x] ROADMAP sprints 28, 29, 30, and 31 marked shipped and next sprint pointer advanced
+- [x] ROADMAP Sprint 32 marked shipped and next sprint pointer advanced to Sprint 33
 
 ## Quick demo script (stakeholder, ~10 min)
 

@@ -89,3 +89,15 @@ func TestQueryPlatformCallCenterStatsAggregatesTenants(t *testing.T) {
 		t.Fatalf("unexpected dimensions: avatars=%+v channels=%+v", stats.ByAvatar, stats.ByChannel)
 	}
 }
+
+func TestQueryPlatformCallCenterStatsReturnsSourceError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "clickhouse unavailable", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	_, err := New(server.URL, "monti_jarvis", "", "").QueryPlatformCallCenterStats(context.Background(), "tenant-1", "2026-07-18", "2026-07-18")
+	if err == nil {
+		t.Fatal("expected ClickHouse source error")
+	}
+}
