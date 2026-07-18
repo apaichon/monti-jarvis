@@ -63,7 +63,7 @@ System design artifacts for Monti Jarvis.
 
 **Sprint 31:** ✅ Shipped v2.12.0 — [34-platform-billing-quota-ai-cost-spec.md](34-platform-billing-quota-ai-cost-spec.md); workflow §85–86; API § Platform Billing, Quota, and AI Usage; UX A23. [SPRINT-031](../03-sprints/SPRINT-031.md).
 
-**Sprint 32:** Technical verification pack review pending — [DES-0035](35-production-transport-cache-tuning-spec.md) defines the roadmap gRPC/cache tuning track; [workflow](02-workflow.md) §87–88, [ER/fixture boundary](03-er-diagram.md), [API verification contract](04-api-spec.md), and [UX/UAT operator surface](05-ux-ui.md) for [SPRINT-032](../03-sprints/SPRINT-032.md), reusing [DES-0034](34-platform-billing-quota-ai-cost-spec.md).
+**Sprint 32:** ✅ Shipped v2.13.0 — [DES-0035](35-production-transport-cache-tuning-spec.md) remains a design-only roadmap track; [workflow](02-workflow.md) §87–88, [ER/fixture boundary](03-er-diagram.md), [API verification contract](04-api-spec.md), and [UX/UAT operator surface](05-ux-ui.md) support [SPRINT-032](../03-sprints/SPRINT-032.md), reusing [DES-0034](34-platform-billing-quota-ai-cost-spec.md). Manual UAT carries into Sprint 33.
 
 **Sprint 21:** Design pack approved; implementation in progress — [24-authenticated-workforce-selection-spec.md](24-authenticated-workforce-selection-spec.md); workflow §64–65; API § Authenticated Workforce Selection & Customer Quota; UX C14/T14. [SPRINT-021](../03-sprints/SPRINT-021.md).
 

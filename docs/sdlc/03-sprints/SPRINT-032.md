@@ -1,11 +1,13 @@
 ---
 id: SPRINT-032
-status: planned
+status: completed
 start: 2026-07-18
 end: 2026-07-20
 updated: 2026-07-18
 design_pack: existing
 release_target: v2.13.0
+release: v2.13.0
+closed: 2026-07-18
 goal: "Close Sprint 31 reporting readiness gaps with controlled reconciliation fixtures and deferred platform billing usage UAT."
 roadmap_sprint: 32
 feature: FEAT-0033
@@ -50,6 +52,8 @@ Sprint planning found no unassigned `proposed`/`approved` task files. The commit
 
 **Committed:** 5 points · **Task IDs:** TASK-0144–TASK-0145.
 
+**Status:** Completed at 3 of 5 points. TASK-0145 is complete; TASK-0144 remains in progress as a carry-over for manual browser, responsive-layout, dependency-failure, and session-expiry UAT.
+
 ## Scope boundary
 
 **In**
@@ -81,3 +85,9 @@ Manual evidence must be attached to [SPRINT-031-manual.md](../06-manual-tests/SP
 | UAT remains deferred after another release | Make TASK-0144 the tester's primary commitment and require evidence links for completion. |
 | Cross-store fixtures contaminate shared data | Use isolated tenant IDs, explicit reset commands, and read-only production-like authorities. |
 | Reconciliation differences are mistaken for defects | Label historical ClickHouse range data separately from current Redis enforcement snapshots. |
+
+## Release close
+
+Automated Go tests, server build, platform-admin build, live fixture-backed API UAT, fixture cleanup verification, focused source-error coverage, and `git diff --check` passed. Manual browser, responsive-layout, dependency-failure, and session-expiry scenarios remain explicitly deferred in [SPRINT-031-manual.md](../06-manual-tests/SPRINT-031-manual.md) and carry into Sprint 33.
+
+**Closed:** 2026-07-18 as release `v2.13.0`.

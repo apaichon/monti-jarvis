@@ -55,8 +55,8 @@
 | 29 | Platform | Monitoring : System Performance | G | 28 ✅ v2.10.0 · [FEAT-0031](../01-features/FEAT-0031-platform-system-performance-monitoring.md) |
 | 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) ✅ v2.11.0 · [FEAT-0032](../01-features/FEAT-0032-platform-call-center-statistics.md) |
 | **31** | **Platform** | **Monitoring: Billing, Quota Usages, AI Infra Cost Usage** | **G** | **30** ✅ v2.12.0 · [FEAT-0033](../01-features/FEAT-0033-platform-billing-quota-ai-cost-usage.md) |
-| **32** | **Tuning** | **gRPC switch mode, Cache on Prod** | **H** | **25+** · planned · [SPRINT-032](../03-sprints/SPRINT-032.md) |
-| 33 | Tuning | Partition,Index, Hardening | H | 32 |
+| **32** | **Tuning** | **gRPC switch mode, Cache on Prod** | **H** | **25+** ✅ v2.13.0 · [SPRINT-032](../03-sprints/SPRINT-032.md) |
+| **33** | **Tuning** | **Partition, Index, Hardening** | **H** | **32** · planned |
 | 34 | Infra | Scale, Auto Scale with k8s | I | 33 |
 | 35 | Infra | Canary Deployment | I | 34 |
 | 36 | Infra | Backup Restore Archive | I | 34 |
@@ -129,10 +129,13 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 - **Sprint 29:** Platform system performance monitoring — **shipped v2.10.0** · [SPRINT-029](../03-sprints/SPRINT-029.md)
 - **Sprint 30:** Platform overall call-center statistics by tenant — **shipped v2.11.0** · [SPRINT-030](../03-sprints/SPRINT-030.md)
 - **Sprint 31:** Platform billing, quota, and AI infrastructure cost usage — **shipped v2.12.0** · [SPRINT-031](../03-sprints/SPRINT-031.md)
+- **Sprint 32:** Platform billing usage readiness and reconciliation — **shipped v2.13.0** · [SPRINT-032](../03-sprints/SPRINT-032.md)
 
 ### Phase H — Production tuning (32–33)
 
 - gRPC internal APIs, Redis 8 cache strategy, ClickHouse partitioning, security hardening
+
+Sprint 32 shipped the controlled billing-usage reconciliation harness and automated source-error coverage. Manual browser/responsive/session-expiry UAT carries into Sprint 33; gRPC and production-cache implementation remain outside the shipped scope.
 
 ### Phase I — Infra scale (34–36)
 
