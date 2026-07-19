@@ -65,7 +65,7 @@
 | **39** | **Tenant / Platform** | **Theme branding & color customization** | **D+** | **14, 16** · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md) ✅ v2.15.0 · [SPRINT-039](../03-sprints/SPRINT-039.md) |
 | **40** | **Tenant / Integrator** | **Outbound calling with Twilio** | **G** | **1, 20, 27** · backlog |
 | **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
-| **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · backlog |
+| **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) · planned · [SPRINT-042](../03-sprints/SPRINT-042.md) |
 | **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · backlog |
 
 ---
@@ -437,9 +437,9 @@ Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · B
 | Injection-resistant data access | Require parameterized, allowlisted queries and bounded inputs; read-only credentials are an additional containment layer, not a substitute for query safety |
 | Tenant database isolation | Enforce tenant-scoped authorization and database policies/RLS where applicable so a tenant can read only its own data; add cross-tenant denial tests |
 
-## Backlog add: SPRINT-042 — Bug Fix (Quality / Tenant UX)
+## Planned: SPRINT-042 — Bug Fix (Quality / Tenant UX)
 
-**Platform:** Quality / Tenant · **Feature:** Fix session, first-login menu, navigation, and document scope defects · **Depends:** 3, 15, 20 · **Status:** backlog  
+**Platform:** Quality / Tenant · **Feature:** Fix session, first-login menu, navigation, and document scope defects · **Depends:** 3, 15, 20 · **Status:** planned · [SPRINT-042](../03-sprints/SPRINT-042.md) · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) · DES-0038 · **12 pts** TASK-0154–0157  
 
 Dedicated **bug-fix sprint** (not mixed with new product features). Prioritize production UX blockers first.
 

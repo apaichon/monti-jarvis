@@ -3179,3 +3179,29 @@ Resets draft tokens to preset. If `reset_branding: true`, clears branding fields
 Read-only: brand_name, has_logo, preset, published_at, contrast ok.
 
 See DES-0037, workflow §89–90, UX Sprint 39 T20.
+
+## Tenant UX Bug Fix (Sprint 42)
+
+**Feature:** FEAT-0036 · **Spec:** [38-tenant-ux-bugfix-spec.md](38-tenant-ux-bugfix-spec.md)
+
+### Auth / session (no new routes)
+
+| Behavior | Contract |
+| --- | --- |
+| Expired / invalid JWT on tenant routes | **401** JSON `{ "error": "…" }` |
+| Client | Redirect `/tenant/login?reason=session_expired&next=` |
+
+Refresh endpoint remains as already implemented (if present); Sprint 42 does not redesign token TTLs.
+
+### KM documents — scope fields
+
+Extend existing tenant KM document create/list/patch:
+
+| Field / query | Notes |
+| --- | --- |
+| `scope_id` (body/multipart) | Optional on create/update |
+| `scope_id` (list query) | Optional filter |
+
+Errors: `400` invalid scope for tenant; `403` cross-tenant; `404` document not found.
+
+See DES-0038, workflow §91–92, UX T21.

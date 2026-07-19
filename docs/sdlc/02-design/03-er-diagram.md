@@ -1817,3 +1817,27 @@ Fail-open to Postgres. Never cache draft.
 | --- | --- |
 | tenant_themes | **Sprint 39** |
 | theme_templates (marketplace) | future |
+
+## Sprint 42 — Document scope on KM
+
+### Knowledge documents (delta)
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| scope_id | text null | Optional; null = unscoped / tenant default (non-breaking) |
+
+If the table already stores scope in JSON metadata, document the canonical field name in implementation and keep ER in sync.
+
+```mermaid
+erDiagram
+  tenant_scopes ||--o{ knowledge_documents : "scopes"
+  knowledge_documents {
+    text id PK
+    text tenant_id
+    text scope_id
+    text agent_id
+    text object_key
+  }
+```
+
+No new tables required for session/nav bugs (client-only).

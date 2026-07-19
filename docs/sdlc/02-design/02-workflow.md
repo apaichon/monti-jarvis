@@ -2613,3 +2613,53 @@ sequenceDiagram
 
 See DES-0037, 37-theme-color-customization-spec.md, 02-workflow.md §89–90, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
 
+## 91. Tenant session expires during console use (Sprint 42)
+
+```mermaid
+sequenceDiagram
+  actor A as Tenant admin
+  participant B as Browser tenant-web
+  participant G as Go :8091
+
+  A->>B: Click nav / load page
+  B->>G: API with expired access_token
+  G-->>B: 401
+  alt refresh available
+    B->>G: POST refresh
+    alt refresh ok
+      G-->>B: new tokens
+      B->>G: retry original request
+    else refresh fail
+      B->>B: clearSession
+      B-->>A: /login?reason=session_expired&next=…
+    end
+  else no refresh
+    B->>B: clearSession
+    B-->>A: /login?reason=session_expired&next=…
+  end
+  A->>B: Re-login
+  B->>G: POST /api/auth/login
+  G-->>B: tokens
+  B-->>A: navigate to next (safe path)
+```
+
+## 92. Tenant assigns document scope on KM upload (Sprint 42)
+
+```mermaid
+sequenceDiagram
+  actor A as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant P as Postgres
+  participant M as MinIO
+
+  A->>B: KM upload + select scope_id
+  B->>G: POST /api/tenant/km/.../documents (scope_id)
+  G->>P: insert document + scope_id
+  G->>M: put object
+  G-->>B: 200 document
+  Note over G,P: Later chat/RAG filters by agent scopes
+```
+
+See DES-0038, 38-tenant-ux-bugfix-spec.md, 02-workflow.md §91–92, 03-er-diagram.md, 04-api-spec.md, 05-ux-ui.md.
+

@@ -3167,3 +3167,48 @@ Set brand name "Libra Tech Co.,Ltd"
 | Apply CSS vars | shared util e.g. `$lib/theme/applyTheme.ts` |
 
 See DES-0037, 02-workflow.md §89–90, 03-er-diagram.md, 04-api-spec.md.
+
+## Sprint 42 — Tenant UX bug fix (T21)
+
+### Screen map → API
+
+| UI zone | User action | API / client |
+| --- | --- | --- |
+| Any tenant page | API 401 expired | clearSession → login?reason=session_expired&next= |
+| Login | Submit after expiry | POST login → goto next |
+| Login success first time | Land in shell | session write → layout shows nav |
+| Sidebar | Scroll / open group | client CSS only |
+| KM upload | Pick scope | POST documents + scope_id |
+| KM list | Filter scope | GET documents?scope_id= |
+
+### T21 — Grouped scrollable nav (ASCII)
+
+```text
+┌─ aside ──────────────────┐
+│ MONTI TENANT             │  (fixed)
+│ Workspace                │
+│ ┌─ nav (scroll) ───────┐ │
+│ │ Operations           │ │
+│ │  Overview            │ │
+│ │  Call center         │ │
+│ │  …                   │ │
+│ │ Knowledge            │ │
+│ │  Knowledge · Gaps    │ │
+│ │ Commerce             │ │
+│ │ Channels             │ │
+│ │  Embed · Theme       │ │
+│ │ Directory · Settings │ │
+│ │  … (scroll)          │ │
+│ └──────────────────────┘ │
+│ plan / account (fixed)   │
+└──────────────────────────┘
+```
+
+### Flow — session expired
+
+```text
+Working on /tenant/km → token expires → click Gaps
+  → 401 → login banner "session expired" → login → back to /tenant/knowledge-gaps
+```
+
+See DES-0038, 02-workflow.md §91–92.
