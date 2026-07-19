@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37 embed SDKs + S38 central brand portal + S39 themes + S40 outbound calling + S41 security hardening)
+# Monti AI Call Center — Roadmap (36 core + S37–S41 product/security + S42 bug fix + S43 tenant AI & config)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -57,14 +57,16 @@
 | **31** | **Platform** | **Monitoring: Billing, Quota Usages, AI Infra Cost Usage** | **G** | **30** ✅ v2.12.0 · [FEAT-0033](../01-features/FEAT-0033-platform-billing-quota-ai-cost-usage.md) |
 | **32** | **Tuning** | **gRPC switch mode, Cache on Prod** | **H** | **25+** ✅ v2.13.0 · [SPRINT-032](../03-sprints/SPRINT-032.md) |
 | **33** | **Tuning** | **Partition, Index, Hardening** | **H** | **32** · planned |
-| 34 | Infra | Scale, Auto Scale with k8s | I | 33 |
-| 35 | Infra | Canary Deployment | I | 34 |
-| 36 | Infra | Backup Restore Archive | I | 34 |
+| 34 | Infra | Design Large Scale Control multiple tenant servers, Auto Scale with k8s | I | 33 |
+| 35 | Infra | Canary Deployment, A/B Testing launch feature to tenant selected | I | 34 |
+| 36 | Infra | Backup Restore Archive, Full,select range,Incremental, by admin platform , by tenant | I | 34 |
 | **37** | **Tenant / Integrator** | **Embed SDKs: Vue · React · Svelte · Web Component** | **D+** | **14** · [FEAT-0017](../01-features/FEAT-0017-embed-framework-sdks.md) ✅ v2.14.0 · [SPRINT-037](../03-sprints/SPRINT-037.md) |
 | **38** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
 | **39** | **Tenant / Platform** | **Theme branding & color customization** | **D+** | **14, 16** · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md) ✅ v2.15.0 · [SPRINT-039](../03-sprints/SPRINT-039.md) |
 | **40** | **Tenant / Integrator** | **Outbound calling with Twilio** | **G** | **1, 20, 27** · backlog |
 | **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
+| **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · backlog |
+| **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · backlog |
 
 ---
 
@@ -434,3 +436,46 @@ Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · B
 | Read-only AI/reporting database role | Route AI call-center and reporting read paths through a dedicated least-privilege read-only user; keep writes on separate controlled roles |
 | Injection-resistant data access | Require parameterized, allowlisted queries and bounded inputs; read-only credentials are an additional containment layer, not a substitute for query safety |
 | Tenant database isolation | Enforce tenant-scoped authorization and database policies/RLS where applicable so a tenant can read only its own data; add cross-tenant denial tests |
+
+## Backlog add: SPRINT-042 — Bug Fix (Quality / Tenant UX)
+
+**Platform:** Quality / Tenant · **Feature:** Fix session, first-login menu, navigation, and document scope defects · **Depends:** 3, 15, 20 · **Status:** backlog  
+
+Dedicated **bug-fix sprint** (not mixed with new product features). Prioritize production UX blockers first.
+
+| Deliverable | Notes |
+| --- | --- |
+| Session expired | Clear handling when JWT/session expires: redirect to login, no silent failure, preserve `next` path, consistent toast/copy across tenant (and customer if same bug) |
+| Login first time — menu missing | After first successful login, nav/menu must render without requiring a full page refresh |
+| Tenant menu grouping + scroll | Group tenant nav items (e.g. Ops / Knowledge / Commerce / Settings); sidebar must scroll when items overflow without requiring click on last item to reveal rest |
+| Add document scope | Fix/complete document ↔ scope assignment on tenant KM (upload or edit document can set scope; list/filter respects scope; no orphan docs outside allowlist) |
+
+**Acceptance sketch**
+
+1. Expire access token → next protected navigation returns to login with reason; re-login returns to intended page.  
+2. Fresh browser / cleared storage → login → full tenant nav visible on first paint.  
+3. Narrow viewport / long nav → scroll the sidebar; grouped sections remain usable.  
+4. Tenant can attach a KM document to a scope; agent chat only retrieves in-scope docs.
+
+## Backlog add: SPRINT-043 — Embed Auth, Config Groups & Tenant AI Extensibility
+
+**Platform:** Tenant / Platform · **Feature:** Embed auth toggle, lean env config, per-tenant Gemini + prompts/tools/skills · **Depends:** 14, 15, 16, 39 · **Status:** backlog  
+
+| Deliverable | Notes |
+| --- | --- |
+| Embed mode auth | Per-tenant (or embed config) flag `auth: true \| false` — when true, embed/caller requires customer auth (OTP/session) before workforce/chat; when false, keep public embed path |
+| Manage configuration groups | Split env/config into groups: **core infra only** in primary env (Postgres, ClickHouse, Redis, LiveKit + minimal app bind); other parameters (AI pricing, audit spool, email, feature flags, etc.) in named groups or secondary config so operators do not mix secrets with app knobs |
+| Tenant Gemini API key | Active tenant can store **their own** Gemini key (encrypted at rest); runtime uses tenant key when set, else platform default; never expose raw key after save |
+| Tenant custom system prompt | Tenant-editable system prompt (or per-agent override) applied to chat/voice within safety bounds (length, no secret exfil instructions) |
+| Tenant call tools | Tenant can enable/configure call-time **tools** (function calling) for the AI workforce — allowlist of tool defs, enable/disable, scoped to tenant |
+| Tenant custom skills | Tenant-defined **skills** packages (prompt + tool bundles + optional KM hints) assignable to agents; CRUD in tenant admin |
+
+**Acceptance sketch**
+
+1. Embed with `auth=true` blocks chat/voice until customer authenticated; `auth=false` matches current public embed.  
+2. Documented config groups: infra keys live in core env; non-infra keys load from grouped sources without breaking `make restart`.  
+3. Tenant saves Gemini key → subsequent AI calls for that tenant use it; platform admin cannot read plaintext.  
+4. Custom system prompt appears in orchestrator for that tenant’s agents.  
+5. At least one tool + one skill can be registered and invoked under tenant isolation tests.
+
+**Out (unless pulled in):** Full marketplace of third-party skills; multi-provider LLM switcher beyond Gemini; replacing platform-wide Gemini entirely for all tenants.
