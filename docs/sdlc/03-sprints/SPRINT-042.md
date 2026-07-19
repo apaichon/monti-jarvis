@@ -1,10 +1,10 @@
 ---
 id: SPRINT-042
-status: planned
+status: in_progress
 start: 2026-07-21
 end: 2026-07-23
 updated: 2026-07-19
-design_pack: review_pending
+design_pack: approved
 release_target: v2.16.0
 goal: "Quality: fix tenant session expiry, first-login menu, nav grouping/scroll, and KM document scope."
 roadmap_sprint: 42
@@ -33,10 +33,10 @@ Commitment sits near the mixed average: four focused bug slices, no Twilio/AI pr
 
 | Work package | Points | Owner | Status | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0154](../04-tasks/TASK-0154.md) Session expired redirect + next | 3 | dev | todo | Consistent 401 → login with reason + deep-link restore |
-| [TASK-0155](../04-tasks/TASK-0155.md) First-login menu paints without refresh | 3 | dev | todo | Shell/nav reactive to session after login |
-| [TASK-0156](../04-tasks/TASK-0156.md) Tenant nav groups + scroll | 3 | dev | todo | Grouped IA + overflow scroll sidebar |
-| [TASK-0157](../04-tasks/TASK-0157.md) KM document scope assign/filter | 3 | dev | todo | Scope on document CRUD + list; RAG respects scope |
+| [TASK-0154](../04-tasks/TASK-0154.md) Session expired redirect + next | 3 | dev | completed | Consistent 401 → login with reason + deep-link restore |
+| [TASK-0155](../04-tasks/TASK-0155.md) First-login menu paints without refresh | 3 | dev | completed | Shell/nav reactive to session after login |
+| [TASK-0156](../04-tasks/TASK-0156.md) Tenant nav groups + scroll | 3 | dev | completed | Grouped IA + overflow scroll sidebar |
+| [TASK-0157](../04-tasks/TASK-0157.md) KM document scope assign/filter | 3 | dev | completed | Scope on document CRUD + list; RAG respects scope |
 
 **Committed:** 12 points · **Task IDs:** TASK-0154–TASK-0157.
 

@@ -171,6 +171,21 @@ func (s *server) listTenantKMDocuments(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	// Optional filter: ?scope=general|billing|technical (SPRINT-042)
+	filterScope := strings.TrimSpace(r.URL.Query().Get("scope"))
+	if filterScope != "" && filterScope != "all" {
+		if !scope.ValidScope(filterScope) {
+			writeError(w, http.StatusBadRequest, "invalid scope")
+			return
+		}
+		filtered := docs[:0]
+		for _, d := range docs {
+			if d.KMScope == filterScope {
+				filtered = append(filtered, d)
+			}
+		}
+		docs = filtered
+	}
 	pub := make([]map[string]any, 0, len(docs))
 	for _, d := range docs {
 		pub = append(pub, km.PublicDocument(d))

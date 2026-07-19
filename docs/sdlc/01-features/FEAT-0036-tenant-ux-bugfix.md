@@ -1,5 +1,5 @@
 # Feature: Tenant UX Bug Fix Pack   (FEAT-0036)
-**Sprint:** SPRINT-042   **Owner:** DEV   **Status:** planned
+**Sprint:** SPRINT-042   **Owner:** DEV   **Status:** in_progress
 
 ## Problem
 

@@ -49,9 +49,12 @@ export function listAgents() {
   return apiFetch<{ agents: KMAgent[] }>('/api/tenant/km/agents');
 }
 
-export function listDocuments(agentId: string) {
+export function listDocuments(agentId: string, scopeId?: string) {
+  const q = new URLSearchParams();
+  if (scopeId && scopeId !== 'all') q.set('scope', scopeId);
+  const qs = q.toString();
   return apiFetch<{ agent_id: string; documents: KMDocument[] }>(
-    `/api/tenant/km/agents/${encodeURIComponent(agentId)}/documents`
+    `/api/tenant/km/agents/${encodeURIComponent(agentId)}/documents${qs ? `?${qs}` : ''}`
   );
 }
 

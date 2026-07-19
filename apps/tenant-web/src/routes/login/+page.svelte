@@ -5,7 +5,13 @@
   import { login } from '$lib/api/auth';
   import { ApiError } from '$lib/api/http';
   import { onMount } from 'svelte';
-  import { getStoredUser, hasRegistrationSession, saveSession, type TokenPair } from '$lib/auth/session';
+  import {
+    getStoredUser,
+    hasRegistrationSession,
+    safeTenantNextPath,
+    saveSession,
+    type TokenPair
+  } from '$lib/auth/session';
   import { fetchOAuthProviders, oauthStartURL } from '$lib/api/register';
   import OAuthButton from '$lib/components/OAuthButton.svelte';
   import { feedback } from '$lib/feedback.svelte';
@@ -15,14 +21,10 @@
   let loading = $state(false);
   let user = $state(getStoredUser());
   let providers = $state<string[]>([]);
+  let sessionExpired = $state(false);
 
   function safeNextPath(): string {
-    const next = $page.url.searchParams.get('next') || '';
-    // Only allow relative tenant paths (open redirect guard).
-    if (next.startsWith(`${base}/`) || next.startsWith('/tenant/')) {
-      return next;
-    }
-    return `${base}/backoffice`;
+    return safeTenantNextPath($page.url.searchParams.get('next'), base, `${base}/backoffice`);
   }
 
   function consumeOAuthCallback(): boolean {
@@ -58,21 +60,24 @@
     const dest = safeNextPath();
     // Drop tokens from the URL so they are not left in history.
     history.replaceState({}, '', `${base}/login`);
-    goto(dest);
+    void goto(dest, { invalidateAll: true });
     return true;
   }
 
   onMount(async () => {
     if (consumeOAuthCallback()) return;
     if ($page.url.searchParams.get('reason') === 'session_expired') {
+      sessionExpired = true;
       feedback.info('Your session expired. Please sign in again.', 'Session expired');
     }
-    // Already signed in + return from payment → continue to next.
+    // Already signed in + return from payment / deep link → continue to next.
     if (hasRegistrationSession()) {
       const next = $page.url.searchParams.get('next');
-      if (next) {
-        goto(safeNextPath());
-        return;
+      if (next || !sessionExpired) {
+        if (next) {
+          goto(safeNextPath());
+          return;
+        }
       }
     }
     try {
@@ -96,8 +101,11 @@
         feedback.error('This portal is for tenant administrators');
         return;
       }
+      // Persist session before navigation so layout shell paints on first tick.
       saveSession(pair, pair.user.tenant_id);
-      goto(safeNextPath());
+      user = pair.user;
+      sessionExpired = false;
+      await goto(safeNextPath(), { invalidateAll: true });
     } catch (err) {
       feedback.error(err instanceof ApiError ? err.message : 'Sign in failed');
     } finally {
@@ -116,9 +124,15 @@
       </div>
     </div>
 
+    {#if sessionExpired}
+      <div class="session-banner" role="status">
+        Your session expired. Sign in again to continue.
+      </div>
+    {/if}
+
     {#if hasRegistrationSession() && user}
       <p style="margin:0 0 12px">You're already signed in as <strong>{user.display_name}</strong>.</p>
-      <a class="btn" href="{base}/backoffice" style="display:inline-block;text-decoration:none;margin-bottom:12px">Open backoffice</a>
+      <a class="btn" href={safeNextPath()} style="display:inline-block;text-decoration:none;margin-bottom:12px">Continue</a>
     {/if}
 
     {#if providers.length > 0}
@@ -179,5 +193,16 @@
 
   .divider span {
     white-space: nowrap;
+  }
+
+  .session-banner {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgb(240 184 63 / 35%);
+    background: rgb(240 184 63 / 12%);
+    color: #f0d9a0;
+    font-size: 13px;
+    line-height: 1.4;
   }
 </style>

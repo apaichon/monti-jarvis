@@ -30,9 +30,13 @@
   let loading = $state(true);
   let busy = $state(false);
   let uploadScope = $state('general');
+  let filterScope = $state('all');
   let fileInput: HTMLInputElement | undefined = $state();
 
   const selected = $derived(agents.find((a) => a.id === selectedId) || null);
+  const visibleDocuments = $derived(
+    filterScope === 'all' ? documents : documents.filter((d) => d.km_scope === filterScope)
+  );
 
   // Keep upload scope aligned with the selected agent's primary retrieval scope.
   $effect(() => {
@@ -247,10 +251,25 @@
   </section>
 
   <section class="card">
-    <div class="label">Documents {selected ? `· ${selected.name}` : ''}</div>
+    <div class="docs-head">
+      <div class="label" style="margin:0">Documents {selected ? `· ${selected.name}` : ''}</div>
+      <label class="filter-scope">
+        <span>Filter scope</span>
+        <select bind:value={filterScope} disabled={busy}>
+          <option value="all">All scopes</option>
+          {#each scopes as s}
+            <option value={s.id}>{s.label}</option>
+          {/each}
+        </select>
+      </label>
+    </div>
     {#if !documents.length}
       <p class="empty">
         No documents for {selected?.name || 'this agent'} yet. Upload a Markdown FAQ to ground answers.
+      </p>
+    {:else if !visibleDocuments.length}
+      <p class="empty">
+        No documents in scope <strong>{filterScope}</strong>. Change filter or upload with that scope.
       </p>
     {:else}
       <div class="table-wrap">
@@ -265,7 +284,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each documents as doc}
+            {#each visibleDocuments as doc}
               <tr>
                 <td>{doc.filename}</td>
                 <td>
@@ -372,6 +391,29 @@
     letter-spacing: 0.04em;
     color: var(--muted);
     margin-bottom: 10px;
+  }
+  .docs-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .filter-scope {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .filter-scope select {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
   }
   .chips {
     display: flex;
