@@ -3,10 +3,10 @@ id: SPRINT-039
 status: planned
 start: 2026-07-21
 end: 2026-07-24
-updated: 2026-07-18
+updated: 2026-07-19
 design_pack: review_pending
 release_target: v2.15.0
-goal: "Tenant / Platform: configurable theme color tokens (presets, draft/publish, contrast, customer+embed application)."
+goal: "Tenant / Platform: configurable caller brand chrome (name, logo, subtitle) and full color theme with draft/publish."
 roadmap_sprint: 39
 feature: FEAT-0035
 platform: Tenant / Platform
@@ -17,7 +17,7 @@ depends_on: [SPRINT-014, SPRINT-016]
 
 ## Goal
 
-Let tenants configure and publish brand color palettes that apply consistently to the **customer caller desk** and **web embed**, with draft/publish safety, contrast warnings, and reset-to-preset — without forking CSS per host site.
+Let tenants configure and publish **brand name, logo, subtitle, and full color theme** for the customer caller desk and web embed chrome (screenshot-aligned header + CTAs), with draft/publish, contrast warnings, and reset — without forking the app.
 
 ## Velocity
 
@@ -33,10 +33,10 @@ Commitment sits slightly above the 11-pt average because token model + multi-sur
 
 | Work package | Points | Owner | Status | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0149](../04-tasks/TASK-0149.md) Theme schema, validation, tenant APIs | 4 | dev | todo | `tenant_themes` (+ audit), draft/publish/reset, contrast helper, RBAC |
-| [TASK-0150](../04-tasks/TASK-0150.md) CSS token runtime on customer + embed | 4 | dev | todo | Published tokens → CSS variables; public resolve; default dark parity |
-| [TASK-0151](../04-tasks/TASK-0151.md) Tenant Theme editor UI + live preview | 4 | dev | todo | Presets, pickers, preview pane, warn-on-contrast, publish/reset |
-| [TASK-0152](../04-tasks/TASK-0152.md) Platform read view, UAT, docs | 2 | tester/dev | todo | Support summary, manual UAT, integrator notes |
+| [TASK-0149](../04-tasks/TASK-0149.md) Theme schema, branding+tokens APIs | 4 | dev | todo | `tenant_themes` branding+tokens, draft/publish/reset, logo upload, contrast, RBAC |
+| [TASK-0150](../04-tasks/TASK-0150.md) Apply branding + CSS on customer + embed | 4 | dev | todo | Header logo/name/subtitle + CSS vars; public/embed resolve; dark default parity |
+| [TASK-0151](../04-tasks/TASK-0151.md) Tenant Theme editor (brand + colors + preview) | 4 | dev | todo | Brand fields, logo upload, color pickers, screenshot-like preview, publish/reset |
+| [TASK-0152](../04-tasks/TASK-0152.md) Platform read view, UAT, docs | 2 | tester/dev | todo | Support summary, UAT for brand+colors, docs |
 
 **Committed:** 14 points · **Task IDs:** TASK-0149–TASK-0152.
 
@@ -44,21 +44,21 @@ Commitment sits slightly above the 11-pt average because token model + multi-sur
 
 **In**
 
-- Presets: light, dark, branded (custom tokens).
-- Tokens: primary, accent, surface, text, muted, line, success, warn, danger (exact list locked in DES-0037).
-- Per-tenant draft vs published document; reset to preset.
-- Apply published theme on customer portal + embed iframe surfaces.
-- Tenant Theme admin UI with preview and contrast flags.
-- Public published-theme resolve for client bootstrap.
-- Platform admin read-only tenant theme summary (support).
+- Brand chrome: **brand name**, **logo** (upload/URL), **subtitle** (caller/embed header).
+- Presets: light, dark, branded.
+- Full color tokens (primary, primary_text, accent, background, surface, surface_elevated, text, muted, line, success, warn, danger) — DES-0037.
+- Draft vs published; reset; contrast soft-gate on publish.
+- Apply published branding + colors on customer desk + embed (header + CTAs + panels).
+- Tenant Theme admin with live preview matching caller chrome screenshot.
+- Public / embed resolve of published payload only.
+- Platform admin read-only summary.
 
 **Out**
 
-- Logo/font packs, full white-label CNAME, Storybook DS productization.
-- Mobile native theme APIs (may consume tokens later).
-- Per-page or per-component CSS upload.
-- Bulk multi-tenant theme templates marketplace.
-- Changing S14 security model or embed key semantics.
+- White-label CNAME; arbitrary CSS/HTML injection; Storybook DS productization.
+- Agent portrait/name/role editing (workforce product).
+- Mobile native theme APIs (may consume published payload later).
+- Template marketplace; changing S14 embed security model.
 
 ## Design pack
 

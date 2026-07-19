@@ -3051,9 +3051,11 @@ The only Sprint 32 verification endpoint remains `GET /api/platform/billing/usag
 See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, and 05-ux-ui.md.
 
 
-## Theme Color Customization (Sprint 39)
+## Theme Branding & Color Customization (Sprint 39)
 
 **Feature:** FEAT-0035 · **Spec:** [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md)
+
+Caller/embed chrome (header brand + full palette) is tenant-configurable.
 
 ### Tenant theme
 
@@ -3063,34 +3065,38 @@ See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–8
 | `PUT` | `/api/tenant/theme` | tenant_admin active |
 | `POST` | `/api/tenant/theme/publish` | tenant_admin active |
 | `POST` | `/api/tenant/theme/reset` | tenant_admin active |
+| `POST` | `/api/tenant/theme/logo` | tenant_admin active (multipart) |
 
 #### `GET /api/tenant/theme` 200
 
 ```json
 {
   "tenant_id": "demo",
-  "preset": "dark",
+  "preset": "branded",
+  "draft_branding": {
+    "brand_name": "Libra Tech Co.,Ltd",
+    "subtitle": "AI · text & voice",
+    "logo_url": "https://monti.example/theme/demo/logo.png",
+    "logo_alt": "Libra Tech"
+  },
+  "published_branding": {},
   "draft_tokens": {
-    "primary": "#2375ff",
-    "accent": "#16c7ff",
-    "surface": "#0c1425",
+    "primary": "#3b9eff",
+    "primary_text": "#ffffff",
+    "accent": "#8b5cf6",
     "background": "#050814",
+    "surface": "#0c1425",
+    "surface_elevated": "#121c30",
     "text": "#f4f7ff",
     "muted": "#8390aa",
-    "line": "#5b78b1",
+    "line": "#3d5a80",
     "success": "#3dd68c",
     "warn": "#f0b83f",
     "danger": "#ff5c7a"
   },
   "published_tokens": {},
   "published_at": null,
-  "draft_updated_at": "2026-07-18T12:00:00Z",
-  "contrast_report": {
-    "ok": true,
-    "pairs": [
-      { "pair": "text_on_surface", "ratio": 12.1, "pass": true }
-    ]
-  }
+  "contrast_report": { "ok": true, "pairs": [] }
 }
 ```
 
@@ -3099,40 +3105,37 @@ See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–8
 ```json
 {
   "preset": "branded",
-  "tokens": {
-    "primary": "#ff5500",
-    "accent": "#ffaa00",
-    "surface": "#1a1008",
-    "background": "#0d0804",
-    "text": "#fff8f0",
-    "muted": "#c4a882",
-    "line": "#8a6040",
-    "success": "#3dd68c",
-    "warn": "#f0b83f",
-    "danger": "#ff5c7a"
-  }
+  "branding": {
+    "brand_name": "Libra Tech Co.,Ltd",
+    "subtitle": "AI · text & voice",
+    "logo_url": "https://monti.example/theme/demo/logo.png",
+    "logo_alt": "Libra Tech"
+  },
+  "tokens": { "primary": "#3b9eff", "primary_text": "#ffffff" }
 }
 ```
 
-#### `POST /api/tenant/theme/publish` body
+All required token keys listed in DES-0037 must be present on publish (PUT may merge partial draft if documented; prefer full map).
+
+#### `POST /api/tenant/theme/logo`
+
+Multipart field `file` (png/jpeg/webp, max 1MB). Returns `{ "logo_url": "…" }` and optionally updates draft branding logo_url.
+
+#### `POST /api/tenant/theme/publish`
 
 ```json
 { "confirm_low_contrast": false }
 ```
 
-| HTTP | code |
-| ---: | --- |
-| 400 | `invalid_theme_tokens`, `invalid_preset` |
-| 409 | `contrast_confirmation_required` |
-| 401/403 | unauthorized / inactive |
+Copies draft branding + tokens → published.
 
-#### `POST /api/tenant/theme/reset` body
+#### `POST /api/tenant/theme/reset`
 
 ```json
-{ "preset": "dark" }
+{ "preset": "dark", "reset_branding": false }
 ```
 
-Resets **draft** to preset defaults. Does not change published until publish.
+Resets draft tokens to preset. If `reset_branding: true`, clears branding fields to empty (fallback chain).
 
 ### Public theme
 
@@ -3140,17 +3143,32 @@ Resets **draft** to preset defaults. Does not change published until publish.
 | --- | --- | --- |
 | `GET` | `/api/public/theme/{tenant_id}` | public |
 
-200 returns `{ "tenant_id", "preset", "tokens" }` for **published** only. If none published, return system dark defaults with `"source": "system_default"`.
+```json
+{
+  "tenant_id": "demo",
+  "preset": "branded",
+  "source": "published",
+  "branding": {
+    "brand_name": "Libra Tech Co.,Ltd",
+    "subtitle": "AI · text & voice",
+    "logo_url": "https://…/logo.png",
+    "logo_alt": "Libra Tech"
+  },
+  "tokens": { "primary": "#3b9eff" }
+}
+```
 
 ### Embed resolve extension
 
-`GET /api/public/embed/{embed_key}` may include:
+`GET /api/public/embed/{embed_key}` includes when published:
 
 ```json
-"theme": { "preset": "branded", "tokens": { "primary": "#ff5500" } }
+"theme": {
+  "preset": "branded",
+  "branding": { "brand_name": "Libra Tech Co.,Ltd", "subtitle": "AI · text & voice", "logo_url": "…" },
+  "tokens": { "primary": "#3b9eff" }
+}
 ```
-
-when the tenant has published tokens. Omitted or null when system default.
 
 ### Platform admin
 
@@ -3158,6 +3176,6 @@ when the tenant has published tokens. Omitted or null when system default.
 | --- | --- | --- |
 | `GET` | `/api/admin/tenants/{tenant_id}/theme` | platform_admin |
 
-Read-only: preset, published_at, contrast ok flag, token keys present (not necessarily full secret-sensitive — tokens are public brand colors).
+Read-only: brand_name, has_logo, preset, published_at, contrast ok.
 
-See DES-0037, workflow §89–90, UX Sprint 39.
+See DES-0037, workflow §89–90, UX Sprint 39 T20.

@@ -1762,7 +1762,7 @@ No ER entity is added in Sprint 32. If a future implementation requires a persis
 See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 04-api-spec.md, and 05-ux-ui.md.
 
 
-## Sprint 39 — Theme color customization
+## Sprint 39 — Theme branding & color customization
 
 ### `tenant_themes`
 
@@ -1770,7 +1770,9 @@ See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–8
 | --- | --- | --- |
 | tenant_id | text PK | FK → tenants.id ON DELETE CASCADE |
 | preset | text | dark \| light \| branded |
-| draft_tokens | jsonb | full token map |
+| draft_branding | jsonb | brand_name, subtitle, logo_url, logo_alt |
+| published_branding | jsonb | public snapshot |
+| draft_tokens | jsonb | full color map |
 | published_tokens | jsonb | public snapshot |
 | published_at | timestamptz null | |
 | draft_updated_at | timestamptz | |
@@ -1782,6 +1784,8 @@ erDiagram
   tenant_themes {
     text tenant_id PK
     text preset
+    jsonb draft_branding
+    jsonb published_branding
     jsonb draft_tokens
     jsonb published_tokens
     timestamptz published_at
@@ -1793,13 +1797,19 @@ erDiagram
   }
 ```
 
+### Object storage (MinIO)
+
+| Prefix | Content |
+| --- | --- |
+| `theme/{tenant_id}/logo.*` | Uploaded brand mark |
+
 ### Redis (optional)
 
 | Key | Value | TTL |
 | --- | --- | --- |
-| `monti_jarvis:theme:pub:{tenant_id}` | JSON published tokens | 60s |
+| `monti_jarvis:theme:pub:{tenant_id}` | JSON published branding+tokens | 60s |
 
-Fail-open to Postgres. Never cache draft tokens publicly.
+Fail-open to Postgres. Never cache draft.
 
 ### Future entities
 

@@ -1,160 +1,247 @@
 ---
 id: DES-0037
-title: Theme Color Customization Specification
+title: Theme Branding and Color Customization Specification
 status: review_pending
-updated: 2026-07-18
+updated: 2026-07-19
 sprint: SPRINT-039
 owner: SA
 release_target: v2.15.0
 ---
 
-# Theme Color Customization — Design Spec
+# Theme Branding & Color Customization — Design Spec
 
 **Sprint:** SPRINT-039 · **Release target:** v2.15.0  
 **Feature:** [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md)  
-**Depends on:** [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md)
+**Depends on:** [17-embed-to-web-spec.md](17-embed-to-web-spec.md), [19-tenant-settings-limits-spec.md](19-tenant-settings-limits-spec.md)  
+**UI reference:** Customer/embed caller chrome (header brand mark + name + subtitle, agent orb, Start call, chat, Send) — screenshot 2026-07-19
 
 ## 1. Goals
 
-1. Per-tenant **draft** and **published** color token documents.  
-2. **Presets**: `dark` (default, pre-S39 parity), `light`, `branded` (custom).  
-3. Apply **published** tokens as CSS custom properties on **customer** and **embed** surfaces.  
-4. Tenant admin editor with **live preview**, **contrast warnings**, publish confirmation.  
-5. Public resolve of published theme only (never draft).  
-6. Platform admin **read-only** summary for support.
+1. Let tenants customize the **caller-facing brand chrome** shown in customer desk and embed:
+   - **Brand name** (e.g. `Libra Tech Co.,Ltd`)
+   - **Logo** (header mark)
+   - **Subtitle** (e.g. `AI · text & voice`)
+2. Let tenants customize the **full color theme** for that surface (background, panels, borders, primary buttons, accents, text, status).
+3. **Draft / publish / reset** with live preview that mirrors the screenshot layout.
+4. Public resolve returns **published** branding + colors only (never draft).
+5. Platform admin **read-only** summary for support.
 
 ## 2. Non-goals
 
 | Out | Notes |
 | --- | --- |
-| Logo / font system | Existing branding fields only |
-| White-label CNAME | Separate backlog |
-| Mobile theme API | Future consumer of same tokens |
-| Arbitrary CSS upload | Token JSON only |
-| Full platform theme marketplace | Out |
+| White-label custom domain CNAME | Separate backlog |
+| Changing agent portrait/name/role | Workforce/avatar product (already separate) |
+| Arbitrary CSS / HTML injection | Structured fields + tokens only |
+| Full design-system / Storybook product | Out |
+| Mobile native theme API | Future consumer of same published payload |
+| Replacing `brands` portal listing fields for S38 | May *read* logo/name as defaults; theme publish is source of truth for caller chrome |
 
-## 3. Token model
+## 3. Surface map (from screenshot)
 
-### 3.1 Required tokens
+```text
+┌─ embed / caller chrome ─────────────────────────────────────┐
+│ [agent ▾]          [LOGO] Brand Name                     [×] │  ← brand_name, logo_url, subtitle
+│                         Subtitle                             │
+│                                                              │
+│                    (agent orb / portrait)                    │  ← agent product, not theme
+│                    Agent name / trait                        │
+│                    waveform (uses accent/primary)            │
+│                                                              │
+│  [00:00:00]     [ Start call  primary button ]               │  ← primary / on-primary
+│  status panel (surface + line + muted text)                  │
+│  chat bubbles (surface-elevated + text)                      │
+│  [ Type a message… ]                    [ Send ]             │  ← input line; Send = primary
+└──────────────────────────────────────────────────────────────┘
+```
 
-| Token key | CSS variable | Purpose |
+**Theme-owned:** logo, brand name, subtitle, all colors.  
+**Not theme-owned:** agent list, portraits, transcripts, call timer logic.
+
+## 4. Branding model
+
+| Field | Type | Limits | UI mapping |
+| --- | --- | --- | --- |
+| `brand_name` | text | 1–80 chars when set; empty → fall back tenant/workspace name | Header strong title |
+| `subtitle` | text | 0–120 chars | Header `.sub` under name |
+| `logo_url` | text URL | https or same-origin path; max 2048; empty → default Monti mark | Header brand-mark `img` |
+| `logo_alt` | text | 0–80 | `alt` on logo |
+
+Logo upload (preferred for tenant admin):
+
+1. `POST /api/tenant/theme/logo` multipart → MinIO `monti-jarvis` prefix `theme/{tenant_id}/logo.*`  
+2. Response `logo_url` public or signed GET path served by app.  
+3. PUT draft may also accept an existing absolute `logo_url` (https only).
+
+**Fallback chain (published empty fields):**
+
+| Field | Fallback |
+| --- | --- |
+| `brand_name` | `tenants.name` / workspace name / `Monti` |
+| `subtitle` | `AI · text & voice` |
+| `logo_url` | `/images/monti-logo.png` |
+
+## 5. Color token model
+
+### 5.1 Required tokens → CSS variables
+
+| Token key | CSS variable | Screenshot role |
 | --- | --- | --- |
-| `primary` | `--mj-primary` | Buttons, launcher gradient start, focus |
-| `accent` | `--mj-accent` | Secondary highlight / gradient end |
-| `surface` | `--mj-surface` | Panel / card background |
-| `background` | `--mj-background` | Page background |
+| `primary` | `--mj-primary` | Start call, Send, focus rings |
+| `primary_text` | `--mj-primary-text` | Label on primary buttons (usually `#ffffff`) |
+| `accent` | `--mj-accent` | Waveform, halo, secondary highlight |
+| `background` | `--mj-background` | Page / shell background |
+| `surface` | `--mj-surface` | Cards, status panel, header bar |
+| `surface_elevated` | `--mj-surface-elevated` | Chat bubbles, inputs |
 | `text` | `--mj-text` | Primary ink |
-| `muted` | `--mj-muted` | Secondary text |
-| `line` | `--mj-line` | Borders |
+| `muted` | `--mj-muted` | Subtitle, secondary labels |
+| `line` | `--mj-line` | Borders, agent select outline |
 | `success` | `--mj-success` | Positive status |
-| `warn` | `--mj-warn` | Warning status |
-| `danger` | `--mj-danger` | Errors / destructive |
+| `warn` | `--mj-warn` | Warnings (mic blocked, etc.) |
+| `danger` | `--mj-danger` | Errors, End call emphasis |
+| `overlay` | `--mj-overlay` | Dim scrim if needed (optional; default `rgba` derived) |
 
-Format: `#RRGGBB` (preferred) or `#RGB` expanded server-side. Reject alpha / named CSS colors in v1.
+Format: `#RRGGBB` preferred; `#RGB` expanded. Reject named colors and arbitrary `url()`.
 
-### 3.2 Presets
+### 5.2 Presets
 
 | Preset | Notes |
 | --- | --- |
-| `dark` | Default; maps from current Monti dark palette (document exact hex in migration seed). |
-| `light` | Light surface/background, dark text; primary/accent retain brand-safe blues unless overridden. |
-| `branded` | Starts from dark or last draft; all tokens editable. |
+| `dark` | Default; pre-S39 Monti dark parity (screenshot baseline). |
+| `light` | Light surfaces, dark text; primary/accent brand-safe. |
+| `branded` | Custom tokens + branding fields are source of truth. |
 
-`preset` field on the row indicates which base was last applied; `branded` means custom edits are the source of truth.
+### 5.3 Contrast rules
 
-### 3.3 Contrast rules
-
-Compute relative luminance per WCAG 2.x and contrast ratio:
-
-| Pair | Minimum for “pass” |
+| Pair | Min ratio |
 | --- | --- |
 | `text` on `surface` | 4.5 |
 | `text` on `background` | 4.5 |
-| `primary` on `surface` (for button label white/black auto-pick) | document chosen algorithm |
+| `primary_text` on `primary` | 4.5 |
+| `muted` on `surface` | 3.0 (AA large / UI) |
 
-**Publish policy:** If any required pair fails, API returns `contrast_warnings[]`. Client must send `confirm_low_contrast: true` on publish to proceed (soft gate). Log audit on override.
+**Publish:** if any pair fails → `409 contrast_confirmation_required` unless `confirm_low_contrast: true`.
 
-## 4. Data model
+## 6. Data model
 
 ### `tenant_themes`
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `tenant_id` | text PK FK | → `tenants.id` ON DELETE CASCADE |
-| `preset` | text | `dark` \| `light` \| `branded` |
-| `draft_tokens` | jsonb | required keys object |
-| `published_tokens` | jsonb | published snapshot; empty/`null` = use system dark default |
-| `published_at` | timestamptz null | last successful publish |
-| `draft_updated_at` | timestamptz | last draft save |
-| audit | | `created_at`, `updated_at`, `created_by`, `updated_by` |
+| `tenant_id` | text PK FK | → tenants |
+| `preset` | text | dark \| light \| branded |
+| `draft_branding` | jsonb | `{ brand_name, subtitle, logo_url, logo_alt }` |
+| `published_branding` | jsonb | public snapshot |
+| `draft_tokens` | jsonb | full color map |
+| `published_tokens` | jsonb | public snapshot |
+| `published_at` | timestamptz null | |
+| `draft_updated_at` | timestamptz | |
+| audit | | created_at, updated_at, created_by, updated_by |
 
-Redis (optional): `monti_jarvis:theme:pub:{tenant_id}` TTL 60s — fail-open to Postgres.
+Optional Redis: `monti_jarvis:theme:pub:{tenant_id}` TTL 60s — published payload only.
 
-Migration: `scripts/migrations/` or `ensureThemeSchema` alongside settings pattern.
-
-## 5. API summary
-
-Auth: active `tenant_admin` unless noted.
+## 7. API summary
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| `GET` | `/api/tenant/theme` | tenant_admin | Draft + published + contrast report on draft |
-| `PUT` | `/api/tenant/theme` | tenant_admin | Save draft (`preset`, `tokens`) |
-| `POST` | `/api/tenant/theme/publish` | tenant_admin | Publish draft → published; body may include `confirm_low_contrast` |
-| `POST` | `/api/tenant/theme/reset` | tenant_admin | Reset draft to preset defaults (`preset` in body) |
-| `GET` | `/api/public/theme/{tenant_id}` | public | Published tokens only |
-| `GET` | `/api/public/embed/{embed_key}` | public | Extend existing response with `theme: { preset, tokens }?` when published |
+| `GET` | `/api/tenant/theme` | tenant_admin | Draft + published branding/tokens + contrast |
+| `PUT` | `/api/tenant/theme` | tenant_admin | Save draft branding + tokens + preset |
+| `POST` | `/api/tenant/theme/publish` | tenant_admin | Publish draft |
+| `POST` | `/api/tenant/theme/reset` | tenant_admin | Reset draft colors (± branding) to preset |
+| `POST` | `/api/tenant/theme/logo` | tenant_admin | Upload logo → URL |
+| `GET` | `/api/public/theme/{tenant_id}` | public | Published branding + tokens |
+| `GET` | `/api/public/embed/{embed_key}` | public | Extend with `theme: { branding, tokens, preset }` |
 | `GET` | `/api/admin/tenants/{id}/theme` | platform_admin | Read-only summary |
 
-### Errors
+### PUT body (draft)
 
-| HTTP | code |
-| ---: | --- |
-| 400 | `invalid_theme_tokens`, `invalid_preset` |
-| 409 | `contrast_confirmation_required` (when warnings and no confirm flag) |
-| 401/403 | auth / inactive tenant |
-| 404 | tenant not found (admin) |
-
-## 6. Application surfaces
-
-```text
-Published tokens
-  → customer-web :root / [data-mj-theme] style attribute
-  → embed route same map
-  → launcher button in monti-embed.js may stay default OR read CSS vars if injected into host (host injection out of scope for vanilla loader; iframe interior uses tokens)
+```json
+{
+  "preset": "branded",
+  "branding": {
+    "brand_name": "Libra Tech Co.,Ltd",
+    "subtitle": "AI · text & voice",
+    "logo_url": "https://…/theme/demo/logo.png",
+    "logo_alt": "Libra Tech"
+  },
+  "tokens": {
+    "primary": "#3b9eff",
+    "primary_text": "#ffffff",
+    "accent": "#8b5cf6",
+    "background": "#050814",
+    "surface": "#0c1425",
+    "surface_elevated": "#121c30",
+    "text": "#f4f7ff",
+    "muted": "#8390aa",
+    "line": "#3d5a80",
+    "success": "#3dd68c",
+    "warn": "#f0b83f",
+    "danger": "#ff5c7a"
+  }
+}
 ```
 
-**Vanilla loader:** outer launcher chrome remains Monti default unless future host CSS hooks; **iframe interior** must use tenant published theme.
+### Public 200
 
-**Framework SDKs:** `theme` prop remains optional string hint; server published tokens win for iframe content.
+```json
+{
+  "tenant_id": "demo",
+  "preset": "branded",
+  "source": "published",
+  "branding": {
+    "brand_name": "Libra Tech Co.,Ltd",
+    "subtitle": "AI · text & voice",
+    "logo_url": "https://…/logo.png",
+    "logo_alt": "Libra Tech"
+  },
+  "tokens": { "primary": "#3b9eff" }
+}
+```
 
-## 7. RBAC
+## 8. Client application
+
+1. On customer desk + embed load, resolve published theme (embed resolve extension preferred).  
+2. Set CSS variables on shell root (`:root` or `.embed-shell`).  
+3. Bind header: `logo_url` → img, `brand_name` → title, `subtitle` → sub line.  
+4. Primary buttons / Send use `var(--mj-primary)` and `var(--mj-primary-text)`.  
+5. Waveform/halo prefer `var(--mj-accent)` with agent color as optional override only if product keeps agent-specific accent.
+
+**Vanilla `monti-embed.js`:** outer launcher may stay default; **iframe interior** must apply branding + tokens.
+
+## 9. Tenant admin UX
+
+Theme editor (T20) has two columns:
+
+1. **Brand identity** — name, subtitle, logo upload/preview  
+2. **Colors** — preset + token pickers  
+3. **Live preview** — miniature of screenshot chrome (header, orb placeholder, Start call, chat, Send)
+
+## 10. RBAC
 
 | Role | Capability |
 | --- | --- |
-| `tenant_admin` (active) | Full draft/publish/reset for own tenant |
-| `platform_admin` | Read summary only |
-| Public | Published tokens for known tenant_id or via embed key resolve |
-| Customer end-user | No theme write |
+| tenant_admin active | Full draft/publish/reset/logo |
+| platform_admin | Read summary |
+| public | Published branding + tokens only |
+| customer | No write |
 
-## 8. Verification (curl sketch)
+## 11. Verification
 
 ```bash
-# Login tenant admin → TOKEN
-curl -sS -H "Authorization: Bearer $TOKEN" "$MONTI/api/tenant/theme" | jq .
-
+# Save branded chrome matching screenshot identity
 curl -sS -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"preset":"branded","tokens":{"primary":"#ff5500", ...}}' \
-  "$MONTI/api/tenant/theme" | jq .
+  -d '{"preset":"branded","branding":{"brand_name":"Libra Tech Co.,Ltd","subtitle":"AI · text & voice","logo_url":"https://example.com/logo.png"},"tokens":{...}}' \
+  "$MONTI/api/tenant/theme"
 
-curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"confirm_low_contrast":true}' \
-  "$MONTI/api/tenant/theme/publish" | jq .
+curl -sS -X POST -H "Authorization: Bearer $TOKEN" -d '{}' \
+  "$MONTI/api/tenant/theme/publish"
 
-curl -sS "$MONTI/api/public/theme/$TENANT_ID" | jq .
+curl -sS "$MONTI/api/public/theme/$TENANT_ID" | jq .branding,.tokens
 ```
 
-## 9. See also
+Manual: publish → open embed → header shows custom logo/name/subtitle; Start call / Send use primary; second tenant unchanged.
+
+## 12. See also
 
 - [02-workflow.md](02-workflow.md) §89–90  
 - [03-er-diagram.md](03-er-diagram.md) Sprint 39  

@@ -3103,72 +3103,67 @@ There is no new Svelte route or customer control. The implementation surface rem
 See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, and 04-api-spec.md.
 
 
-## Sprint 39 — Theme color customization (T20)
+## Sprint 39 — Theme branding & colors (T20)
 
-Sprint 39 adds a **tenant Theme** admin surface and applies published CSS tokens on **customer** and **embed** chrome. No change to package/billing flows.
+Sprint 39 makes the **caller/embed chrome** fully brandable: logo, brand name, subtitle, and all colors (screenshot-aligned). Agent portraits remain workforce-owned.
 
 ### Screen map → API
 
 | UI zone | User action | API |
 | --- | --- | --- |
-| T20 Theme · Preset | Select dark / light / branded | client-only until save |
-| T20 Theme · Token pickers | Change primary/accent/… | client preview |
-| T20 Theme · Save draft | Click Save draft | `PUT /api/tenant/theme` |
-| T20 Theme · Publish | Click Publish (+ confirm if contrast warn) | `POST /api/tenant/theme/publish` |
-| T20 Theme · Reset | Reset to preset | `POST /api/tenant/theme/reset` |
-| T20 Theme · Load | Open page | `GET /api/tenant/theme` |
-| C17 Customer / Embed | Apply tokens on load | `GET /api/public/theme/{id}` or embed resolve `theme` |
-| A24 Platform tenant detail | View theme summary | `GET /api/admin/tenants/{id}/theme` |
+| T20 Brand · Name | Edit brand name | draft until save |
+| T20 Brand · Subtitle | Edit subtitle | draft until save |
+| T20 Brand · Logo | Upload / clear logo | `POST /api/tenant/theme/logo` |
+| T20 Colors · Preset | dark / light / branded | client |
+| T20 Colors · Pickers | Edit tokens | client |
+| T20 · Save draft | Persist branding+tokens | `PUT /api/tenant/theme` |
+| T20 · Publish | Publish | `POST /api/tenant/theme/publish` |
+| T20 · Reset | Reset colors (± branding) | `POST /api/tenant/theme/reset` |
+| T20 · Load | Open page | `GET /api/tenant/theme` |
+| C17/E1 Customer & Embed header | Apply branding + CSS vars | embed resolve `theme` or `GET /api/public/theme/{id}` |
+| A24 Platform tenant | View summary | `GET /api/admin/tenants/{id}/theme` |
 
-### T20 — Tenant Theme editor (desktop)
+### T20 — Tenant Theme editor
 
 ```text
-┌─ Tenant shell ─────────────────────────────────────────────────────┐
-│ Nav: Dashboard · Embed · KM · Settings · **Theme** · …             │
-├────────────────────────────────────────────────────────────────────┤
-│ Theme colors                                                       │
-│ Configure brand palette for caller desk and embed.                 │
+┌─ Tenant · Theme ───────────────────────────────────────────────────┐
+│ Brand the caller desk & embed (name, logo, subtitle, colors).      │
 │                                                                    │
-│ Preset  (• Dark)  ( Light )  ( Branded )                           │
-│                                                                    │
-│ ┌─ Tokens ──────────────────┐  ┌─ Live preview ─────────────────┐ │
-│ │ Primary  [#2375ff] ■      │  │ ┌────────────────────────────┐ │ │
-│ │ Accent   [#16c7ff] ■      │  │ │  [Logo]  Support           │ │ │
-│ │ Surface  [#0c1425] ■      │  │ │  Agent card · message bubble│ │ │
-│ │ Background …              │  │ │  [Start call]  primary btn  │ │ │
-│ │ Text / Muted / Line …     │  │ └────────────────────────────┘ │ │
-│ │ Success / Warn / Danger   │  │ Embed mini-launcher preview    │ │
-│ └───────────────────────────┘  └────────────────────────────────┘ │
-│                                                                    │
-│ Contrast: text/surface ✓ 12.1 · primary/surface ⚠ 3.2             │
-│                                                                    │
-│ [ Save draft ]  [ Publish ]  [ Reset to preset ]                   │
+│ ┌─ Brand identity ─────────────┐  ┌─ Live preview (embed chrome) ─┐│
+│ │ Brand name  [Libra Tech … ]  │  │ [agent▾] [logo] Brand Name  [×]││
+│ │ Subtitle    [AI · text & …]  │  │              Subtitle          ││
+│ │ Logo [Upload] [preview img]  │  │         (orb placeholder)      ││
+│ └──────────────────────────────┘  │  [00:00] [ Start call ]        ││
+│ ┌─ Colors ─────────────────────┐  │  status / chat bubble          ││
+│ │ Preset (•Dark)(Light)(Brand) │  │  [ Type… ]            [Send]   ││
+│ │ Primary / Primary text       │  └────────────────────────────────┘│
+│ │ Accent / Background          │                                    │
+│ │ Surface / Surface elevated   │  Contrast: text/surface ✓ …        │
+│ │ Text / Muted / Line          │                                    │
+│ │ Success / Warn / Danger      │  [Save draft] [Publish] [Reset]    │
+│ └──────────────────────────────┘                                    │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-### Flow A — Publish branded theme
+### Flow A — Brand like screenshot
 
 ```text
-Open Theme → Select Branded → Edit primary → Save draft
-  → Contrast report
-  → Publish (confirm if warnings)
-  → Open customer desk / embed → tokens applied
-```
-
-### Flow B — Reset
-
-```text
-Reset to Dark → draft becomes dark defaults → Publish → public returns dark
+Set brand name "Libra Tech Co.,Ltd"
+  → subtitle "AI · text & voice"
+  → upload logo
+  → adjust primary/accent
+  → Save draft → Publish
+  → Open embed → header + Start call + Send match theme
 ```
 
 ### Component → file (planned)
 
-| Zone | Planned path |
+| Zone | Path |
 | --- | --- |
 | Theme page | `apps/tenant-web/src/routes/theme/+page.svelte` |
 | API client | `apps/tenant-web/src/lib/api/theme.ts` |
-| Customer apply | `apps/customer-web` layout / theme util |
-| Embed apply | `apps/customer-web/src/routes/embed/+page.svelte` |
-| Platform summary | `apps/platform-admin-web` tenant detail panel |
+| Embed header bind | `apps/customer-web/src/routes/embed/+page.svelte` |
+| Customer brand header | `apps/customer-web/src/routes/+page.svelte` |
+| Apply CSS vars | shared util e.g. `$lib/theme/applyTheme.ts` |
 
 See DES-0037, 02-workflow.md §89–90, 03-er-diagram.md, 04-api-spec.md.

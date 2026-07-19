@@ -2538,7 +2538,7 @@ sequenceDiagram
 
 See DES-0035, 34-platform-billing-quota-ai-cost-spec.md, 02-workflow.md §85–88, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.
 
-## 89. Tenant administrator configures and publishes a theme (Sprint 39)
+## 89. Tenant administrator configures branding and theme colors (Sprint 39)
 
 ```mermaid
 sequenceDiagram
@@ -2553,12 +2553,12 @@ sequenceDiagram
   G->>P: Load tenant_themes for tenant_id
   P-->>G: draft + published tokens
   G-->>B: theme JSON + contrast_report
-  A->>B: Edit tokens / select preset
+  A->>B: Edit brand name, logo, subtitle, tokens / preset
   B->>B: Live preview (client CSS vars)
   A->>B: Save draft
   B->>G: PUT /api/tenant/theme
-  G->>G: Validate tokens + contrast
-  G->>P: Upsert draft_tokens
+  G->>G: Validate branding + tokens + contrast
+  G->>P: Upsert draft_branding + draft_tokens
   P-->>G: ok
   G-->>B: draft saved
   A->>B: Publish
@@ -2566,7 +2566,7 @@ sequenceDiagram
   alt contrast fail and no confirm
     G-->>B: 409 contrast_confirmation_required
   else ok or confirm_low_contrast
-    G->>P: Copy draft → published_tokens
+    G->>P: Copy draft branding+tokens → published_*
     opt cache
       G->>R: SET monti_jarvis:theme:pub:{tenant_id}
     end
@@ -2583,7 +2583,7 @@ sequenceDiagram
 | `published` | published_tokens applied to customer/embed |
 | `reset` | Draft reloaded from preset defaults; publish still required to affect public |
 
-## 90. Customer or embed loads published theme (Sprint 39)
+## 90. Customer or embed loads published branding + theme (Sprint 39)
 
 ```mermaid
 sequenceDiagram
@@ -2607,8 +2607,8 @@ sequenceDiagram
     G->>P: published_tokens
     G-->>B: { preset, tokens }
   end
-  B->>B: Apply --mj-* CSS variables on :root
-  B-->>C: Themed chrome
+  B->>B: Apply branding header + --mj-* CSS variables on shell
+  B-->>C: Branded + themed chrome
 ```
 
 See DES-0037, 37-theme-color-customization-spec.md, 02-workflow.md §89–90, 03-er-diagram.md, 04-api-spec.md, and 05-ux-ui.md.

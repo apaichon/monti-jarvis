@@ -41,7 +41,7 @@ System design artifacts for Monti Jarvis.
 | 33 | [33-platform-call-center-statistics-spec.md](33-platform-call-center-statistics-spec.md) | 30 | Platform aggregate call-center statistics, tenant breakdown, freshness, satisfaction, and package labels | **`shipped`** v2.11.0 |
 | 34 | [34-platform-billing-quota-ai-cost-spec.md](34-platform-billing-quota-ai-cost-spec.md) | 31 | Platform billing, quota enforcement snapshot, AI usage metering, cost coverage, and reconciliation | `approved` |
 | 35 | [35-production-transport-cache-tuning-spec.md](35-production-transport-cache-tuning-spec.md) | 32 | Production transport/cache tuning design track | `review_pending` |
-| 37 | [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md) | 39 | Tenant theme tokens, draft/publish, contrast, customer+embed CSS vars | `review_pending` |
+| 37 | [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md) | 39 | Tenant brand chrome (name/logo/subtitle) + color tokens, draft/publish, customer+embed | `review_pending` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
