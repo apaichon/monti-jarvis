@@ -247,8 +247,16 @@
       "velocity": 14,
       "closed": "2026-07-18",
       "release": "v2.14.0"
+    },
+    {
+      "id": "SPRINT-039",
+      "committed_points": 14,
+      "completed_points": 14,
+      "velocity": 14,
+      "closed": "2026-07-19",
+      "release": "v2.15.0"
     }
   ],
-  "average_velocity": 15.5,
-  "note": "S37 embed framework SDKs shipped v2.14.0. S32 billing usage readiness and reconciliation shipped v2.13.0 with TASK-0144 manual UAT carried over. S31 platform billing, quota, and AI usage shipped v2.12.0. S30 platform overall call-center statistics shipped v2.11.0. S29 platform system performance monitoring shipped v2.10.0. S28 cross-tenant audit log shipped v2.9.0. S27 mobile call API and SDK shipped v2.8.0. S26 tenant system performance monitoring shipped v2.7.0. S25 tenant call-center statistics shipped v2.6.0. S24 customer satisfaction shipped v2.5.0. S23 tickets/human escalation shipped v2.4.0. S20 customer auth shipped v2.1.0. S19 customer account import shipped v2.0.0. S18 customer tiers shipped v1.9.0. S15 tenant KM shipped v1.6.0. S14 embed v1.5.0. S13 quota v1.4.0. S8-S12 commerce v1.3.0 + v1.3.1 harden."
+  "average_velocity": 15.4,
+  "note": "S39 theme branding & colors shipped v2.15.0. S37 embed framework SDKs shipped v2.14.0. S32 billing usage readiness and reconciliation shipped v2.13.0 with TASK-0144 manual UAT carried over. S31 platform billing, quota, and AI usage shipped v2.12.0. S30 platform overall call-center statistics shipped v2.11.0. S29 platform system performance monitoring shipped v2.10.0. S28 cross-tenant audit log shipped v2.9.0. S27 mobile call API and SDK shipped v2.8.0. S26 tenant system performance monitoring shipped v2.7.0. S25 tenant call-center statistics shipped v2.6.0. S24 customer satisfaction shipped v2.5.0. S23 tickets/human escalation shipped v2.4.0. S20 customer auth shipped v2.1.0. S19 customer account import shipped v2.0.0. S18 customer tiers shipped v1.9.0. S15 tenant KM shipped v1.6.0. S14 embed v1.5.0. S13 quota v1.4.0. S8-S12 commerce v1.3.0 + v1.3.1 harden."
 }

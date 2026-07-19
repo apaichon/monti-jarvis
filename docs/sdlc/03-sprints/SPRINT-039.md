@@ -1,11 +1,13 @@
 ---
 id: SPRINT-039
-status: in_progress
+status: completed
 start: 2026-07-21
 end: 2026-07-24
 updated: 2026-07-19
 design_pack: approved
 release_target: v2.15.0
+release: v2.15.0
+closed: 2026-07-19
 goal: "Tenant / Platform: configurable caller brand chrome (name, logo, subtitle) and full color theme with draft/publish."
 roadmap_sprint: 39
 feature: FEAT-0035
@@ -65,13 +67,12 @@ Commitment sits slightly above the 11-pt average because token model + multi-sur
 | Artifact | Status | Scope |
 | --- | --- | --- |
 | Feature | [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md) | `planned` |
-| Deep spec | [DES-0037](../02-design/37-theme-color-customization-spec.md) | `review_pending` |
-| Workflow | [02-workflow.md](../02-design/02-workflow.md) §89–90 | `review_pending` |
-| ER | [03-er-diagram.md](../02-design/03-er-diagram.md) Sprint 39 | `review_pending` |
-| API | [04-api-spec.md](../02-design/04-api-spec.md) Sprint 39 Theme | `review_pending` |
-| UX | [05-ux-ui.md](../02-design/05-ux-ui.md) Sprint 39 T20 | `review_pending` |
-
-Implementation starts when DES-0037 + API sections are **approved**.
+| Deep spec | [DES-0037](../02-design/37-theme-color-customization-spec.md) | `shipped` |
+| Workflow | [02-workflow.md](../02-design/02-workflow.md) §89–90 | `shipped` |
+| ER | [03-er-diagram.md](../02-design/03-er-diagram.md) Sprint 39 | `shipped` |
+| API | [04-api-spec.md](../02-design/04-api-spec.md) Sprint 39 Theme | `shipped` |
+| UX | [05-ux-ui.md](../02-design/05-ux-ui.md) Sprint 39 T20 | `shipped` |
+| Manual UAT | [SPRINT-039-manual.md](../06-manual-tests/SPRINT-039-manual.md) | `ready` |
 
 ## Context
 
@@ -105,4 +106,4 @@ cd apps/customer-web && npm run check && npm run build
 
 ## Release
 
-Target **v2.15.0** when verified (minor feature).
+**v2.15.0** — Theme branding & color customization (FEAT-0035). Caller/embed header brand name, logo, subtitle, and full CSS token theme with draft/publish/reset.

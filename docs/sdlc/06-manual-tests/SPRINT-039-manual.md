@@ -4,7 +4,7 @@ sprint: SPRINT-039
 release_target: v2.15.0
 feature: FEAT-0035
 updated: 2026-07-19
-status: draft
+status: ready
 ---
 
 # SPRINT-039 Manual UAT — Theme Branding & Colors (v2.15.0)

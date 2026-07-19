@@ -1,5 +1,5 @@
 # Feature: Theme Branding & Color Customization   (FEAT-0035)
-**Sprint:** SPRINT-039   **Owner:** DEV   **Status:** in_progress
+**Sprint:** SPRINT-039   **Owner:** DEV   **Status:** shipped · **Release:** v2.15.0
 
 ## Problem
 

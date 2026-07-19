@@ -1,7 +1,7 @@
 ---
 id: DES-0037
 title: Theme Branding and Color Customization Specification
-status: review_pending
+status: shipped
 updated: 2026-07-19
 sprint: SPRINT-039
 owner: SA
