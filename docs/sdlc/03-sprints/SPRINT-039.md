@@ -92,6 +92,8 @@ cd apps/customer-web && npm run check && npm run build
 # Manual: draft → publish → customer/embed colors; tenant isolation; reset preset
 ```
 
+**Manual UAT:** [SPRINT-039-manual.md](../06-manual-tests/SPRINT-039-manual.md)
+
 ## Risks
 
 | Risk | Mitigation |
