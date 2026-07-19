@@ -56,7 +56,7 @@
 | 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) ✅ v2.11.0 · [FEAT-0032](../01-features/FEAT-0032-platform-call-center-statistics.md) |
 | **31** | **Platform** | **Monitoring: Billing, Quota Usages, AI Infra Cost Usage** | **G** | **30** ✅ v2.12.0 · [FEAT-0033](../01-features/FEAT-0033-platform-billing-quota-ai-cost-usage.md) |
 | **32** | **Tuning** | **gRPC switch mode, Cache on Prod** | **H** | **25+** ✅ v2.13.0 · [SPRINT-032](../03-sprints/SPRINT-032.md) |
-| **33** | **Tuning** | **Partition, Index, Hardening** | **H** | **32** ✅ v2.16.0 · [SPRINT-033](../03-sprints/SPRINT-033.md) · TASK-0144 UAT carry-over |
+| **33** | **Tuning** | **Partition, Index, Hardening** | **H** | **32** · planned · TASK-0144 UAT carry-over |
 | 34 | Infra | Design Large Scale Control multiple tenant servers, Auto Scale with k8s | I | 33 |
 | 35 | Infra | Canary Deployment, A/B Testing launch feature to tenant selected | I | 34 |
 | 36 | Infra | Backup Restore Archive, Full,select range,Incremental, by admin platform , by tenant | I | 34 |
@@ -65,7 +65,7 @@
 | **39** | **Tenant / Platform** | **Theme branding & color customization** | **D+** | **14, 16** · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md) ✅ v2.15.0 · [SPRINT-039](../03-sprints/SPRINT-039.md) |
 | **40** | **Tenant / Integrator** | **Outbound calling with Twilio** | **G** | **1, 20, 27** · backlog |
 | **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
-| **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) · planned · [SPRINT-042](../03-sprints/SPRINT-042.md) |
+| **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) ✅ v2.16.0 · [SPRINT-042](../03-sprints/SPRINT-042.md) |
 | **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · backlog |
 
 ---
@@ -140,7 +140,7 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 
 - gRPC internal APIs, Redis 8 cache strategy, ClickHouse partitioning, security hardening
 
-Sprint 32 shipped the controlled billing-usage reconciliation harness and automated source-error coverage. Sprint 33 shipped partitioning, hot-path indexes, and query hardening in v2.16.0; manual browser/responsive/session-expiry UAT remains carried over in TASK-0144. gRPC and production-cache implementation remain outside the shipped scope.
+Sprint 32 shipped the controlled billing-usage reconciliation harness and automated source-error coverage. Sprint 33 (partition/index/hardening) remains **planned**. Manual browser/responsive UAT carry-over in TASK-0144. gRPC and production-cache implementation remain outside shipped scope. **v2.16.0** is SPRINT-042 tenant UX bugfix.
 
 ### Phase I — Infra scale (34–36)
 
@@ -437,9 +437,9 @@ Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · B
 | Injection-resistant data access | Require parameterized, allowlisted queries and bounded inputs; read-only credentials are an additional containment layer, not a substitute for query safety |
 | Tenant database isolation | Enforce tenant-scoped authorization and database policies/RLS where applicable so a tenant can read only its own data; add cross-tenant denial tests |
 
-## Planned: SPRINT-042 — Bug Fix (Quality / Tenant UX)
+## Shipped: SPRINT-042 — Bug Fix (Quality / Tenant UX)
 
-**Platform:** Quality / Tenant · **Feature:** Fix session, first-login menu, navigation, and document scope defects · **Depends:** 3, 15, 20 · **Status:** planned · [SPRINT-042](../03-sprints/SPRINT-042.md) · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) · DES-0038 · **12 pts** TASK-0154–0157  
+**Platform:** Quality / Tenant · **Feature:** Fix session, first-login menu, navigation, and document scope defects · **Depends:** 3, 15, 20 · **Status:** shipped **v2.16.0** · [SPRINT-042](../03-sprints/SPRINT-042.md) · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) · DES-0038 · **12 pts** TASK-0154–0157  
 
 Dedicated **bug-fix sprint** (not mixed with new product features). Prioritize production UX blockers first.
 

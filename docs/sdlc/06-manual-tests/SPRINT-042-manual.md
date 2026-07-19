@@ -4,7 +4,7 @@ sprint: SPRINT-042
 release_target: v2.16.0
 feature: FEAT-0036
 updated: 2026-07-19
-status: draft
+status: ready
 ---
 
 # SPRINT-042 Manual UAT — Tenant UX Bug Fix

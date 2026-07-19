@@ -1,11 +1,13 @@
 ---
 id: SPRINT-042
-status: in_progress
+status: completed
 start: 2026-07-21
 end: 2026-07-23
 updated: 2026-07-19
-design_pack: approved
+design_pack: shipped
 release_target: v2.16.0
+release: v2.16.0
+closed: 2026-07-19
 goal: "Quality: fix tenant session expiry, first-login menu, nav grouping/scroll, and KM document scope."
 roadmap_sprint: 42
 feature: FEAT-0036
@@ -64,11 +66,11 @@ UAT checklist is produced at VERIFY ([manual-test-doc](../../.claude/skills/manu
 | Artifact | Status | Scope |
 | --- | --- | --- |
 | Feature | [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) | `planned` |
-| Deep spec | [DES-0038](../02-design/38-tenant-ux-bugfix-spec.md) | `review_pending` |
-| Workflow | [02-workflow.md](../02-design/02-workflow.md) §91–92 | `review_pending` |
-| ER | [03-er-diagram.md](../02-design/03-er-diagram.md) Sprint 42 (document scope) | `review_pending` |
-| API | [04-api-spec.md](../02-design/04-api-spec.md) Sprint 42 | `review_pending` |
-| UX | [05-ux-ui.md](../02-design/05-ux-ui.md) Sprint 42 T21 | `review_pending` |
+| Deep spec | [DES-0038](../02-design/38-tenant-ux-bugfix-spec.md) | `shipped` |
+| Workflow | [02-workflow.md](../02-design/02-workflow.md) §91–92 | `shipped` |
+| ER | [03-er-diagram.md](../02-design/03-er-diagram.md) Sprint 42 (document scope) | `shipped` |
+| API | [04-api-spec.md](../02-design/04-api-spec.md) Sprint 42 | `shipped` |
+| UX | [05-ux-ui.md](../02-design/05-ux-ui.md) Sprint 42 T21 | `shipped` |
 
 Implementation starts when DES-0038 + API deltas are **approved** (nav/session can start under UX approval alone if store schema unchanged).
 

@@ -1,7 +1,7 @@
 ---
 id: DES-0038
 title: Tenant UX Bug Fix Specification
-status: review_pending
+status: shipped
 updated: 2026-07-19
 sprint: SPRINT-042
 owner: SA
