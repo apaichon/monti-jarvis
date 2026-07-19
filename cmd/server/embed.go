@@ -93,7 +93,7 @@ func (s *server) getPublicEmbed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agents := s.embedAgentsJSON(r, cfg.TenantID)
-	writeJSON(w, http.StatusOK, map[string]any{
+	out := map[string]any{
 		"tenant_id":        cfg.TenantID,
 		"slug":             tenant.Slug,
 		"name":             tenant.Name,
@@ -101,7 +101,11 @@ func (s *server) getPublicEmbed(w http.ResponseWriter, r *http.Request) {
 		"enabled":          cfg.Enabled,
 		"default_agent_id": cfg.DefaultAgentID,
 		"agents":           agents,
-	})
+	}
+	if theme := s.publicThemeForTenant(r.Context(), cfg.TenantID); theme != nil {
+		out["theme"] = theme
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *server) getTenantEmbed(w http.ResponseWriter, r *http.Request) {

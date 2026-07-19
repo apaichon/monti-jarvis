@@ -1,10 +1,10 @@
 ---
 id: SPRINT-039
-status: planned
+status: in_progress
 start: 2026-07-21
 end: 2026-07-24
 updated: 2026-07-19
-design_pack: review_pending
+design_pack: approved
 release_target: v2.15.0
 goal: "Tenant / Platform: configurable caller brand chrome (name, logo, subtitle) and full color theme with draft/publish."
 roadmap_sprint: 39
@@ -33,10 +33,10 @@ Commitment sits slightly above the 11-pt average because token model + multi-sur
 
 | Work package | Points | Owner | Status | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0149](../04-tasks/TASK-0149.md) Theme schema, branding+tokens APIs | 4 | dev | todo | `tenant_themes` branding+tokens, draft/publish/reset, logo upload, contrast, RBAC |
-| [TASK-0150](../04-tasks/TASK-0150.md) Apply branding + CSS on customer + embed | 4 | dev | todo | Header logo/name/subtitle + CSS vars; public/embed resolve; dark default parity |
-| [TASK-0151](../04-tasks/TASK-0151.md) Tenant Theme editor (brand + colors + preview) | 4 | dev | todo | Brand fields, logo upload, color pickers, screenshot-like preview, publish/reset |
-| [TASK-0152](../04-tasks/TASK-0152.md) Platform read view, UAT, docs | 2 | tester/dev | todo | Support summary, UAT for brand+colors, docs |
+| [TASK-0149](../04-tasks/TASK-0149.md) Theme schema, branding+tokens APIs | 4 | dev | completed | `tenant_themes` branding+tokens, draft/publish/reset, logo upload, contrast, RBAC |
+| [TASK-0150](../04-tasks/TASK-0150.md) Apply branding + CSS on customer + embed | 4 | dev | completed | Header logo/name/subtitle + CSS vars; public/embed resolve; dark default parity |
+| [TASK-0151](../04-tasks/TASK-0151.md) Tenant Theme editor (brand + colors + preview) | 4 | dev | completed | Brand fields, logo upload, color pickers, screenshot-like preview, publish/reset |
+| [TASK-0152](../04-tasks/TASK-0152.md) Platform read view, UAT, docs | 2 | tester/dev | completed | Support summary, UAT for brand+colors, docs |
 
 **Committed:** 14 points · **Task IDs:** TASK-0149–TASK-0152.
 

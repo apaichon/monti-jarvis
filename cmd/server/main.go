@@ -375,6 +375,22 @@ func main() {
 	mux.Handle("GET /api/tenant/call-limits", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCallLimits)))
 	mux.Handle("PUT /api/tenant/call-limits", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantCallLimits)))
 
+	// SPRINT-039 — theme branding & colors
+	mux.Handle("GET /api/tenant/theme", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantTheme)))
+	mux.Handle("PUT /api/tenant/theme", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantTheme)))
+	mux.Handle("POST /api/tenant/theme/publish", guard.RequireTenantAdminActive(http.HandlerFunc(s.publishTenantTheme)))
+	mux.Handle("POST /api/tenant/theme/reset", guard.RequireTenantAdminActive(http.HandlerFunc(s.resetTenantTheme)))
+	mux.Handle("POST /api/tenant/theme/logo", guard.RequireTenantAdminActive(http.HandlerFunc(s.uploadTenantThemeLogo)))
+	mux.HandleFunc("GET /api/public/theme/{tenant_id}", s.getPublicTheme)
+	mux.HandleFunc("OPTIONS /api/public/theme/{tenant_id}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("GET /api/assets/theme/{tenant_id}/{file}", s.serveThemeAsset)
+	mux.Handle("GET /api/admin/tenants/{tenant_id}/theme", guard.RequirePlatformAdmin(http.HandlerFunc(s.getAdminTenantTheme)))
+
 	// SPRINT-017 — tenant test / preview sandbox
 	mux.Handle("GET /api/tenant/preview/scenarios", guard.RequireTenantAdminActive(http.HandlerFunc(s.listPreviewScenarios)))
 	mux.Handle("POST /api/tenant/preview/chat", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantPreviewChat)))

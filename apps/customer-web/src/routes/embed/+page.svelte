@@ -19,6 +19,12 @@
     customerConfirmedEnd,
     CUSTOMER_END_COUNTDOWN_SECONDS
   } from '$lib/voice/end-call';
+  import {
+    applyThemeTokens,
+    resolveBranding,
+    type PublicTheme,
+    type ThemeBranding
+  } from '$lib/theme/applyTheme';
 
   type EmbedConfig = {
     tenant_id: string;
@@ -27,6 +33,7 @@
     embed_key: string;
     default_agent_id?: string;
     agents?: Array<{ id: string; name: string; role?: string; image?: string }>;
+    theme?: PublicTheme;
   };
 
   type UiMsg = {
@@ -40,6 +47,8 @@
   let key = $state('');
   let tenantId = $state('');
   let workspace = $state('');
+  let brand = $state(resolveBranding(null));
+  let shellEl: HTMLElement | undefined = $state();
   let agents = $state<Agent[]>([]);
   let selected = $state<Agent | null>(null);
   let messages = $state<UiMsg[]>([]);
@@ -360,6 +369,10 @@
       }
       tenantId = data.tenant_id;
       workspace = data.name || data.slug || data.tenant_id;
+      const theme = data.theme;
+      brand = resolveBranding(theme?.branding as ThemeBranding | undefined, workspace);
+      await tick();
+      applyThemeTokens(shellEl ?? document.documentElement, theme ?? null);
 
       // Full agent portraits / expressions from workforce API
       try {
@@ -467,7 +480,7 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<div class="embed-shell">
+<div class="embed-shell" bind:this={shellEl}>
   {#if loading}
     <p class="muted center">Loading…</p>
   {:else if error && !tenantId}
@@ -475,10 +488,10 @@
   {:else}
     <header class="embed-hdr">
       <div class="brand">
-        <img class="brand-mark" src="/images/monti-logo.png" width="28" height="28" alt="" />
+        <img class="brand-mark" src={brand.logo_url} width="28" height="28" alt={brand.logo_alt} />
         <div>
-          <strong>{workspace || 'Monti'}</strong>
-          <span class="sub">AI · text & voice</span>
+          <strong>{brand.brand_name}</strong>
+          <span class="sub">{brand.subtitle}</span>
         </div>
       </div>
       {#if agents.length > 1}
@@ -584,8 +597,8 @@
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
-    background: #05101f;
-    color: #f7fbff;
+    background: var(--mj-background, var(--bg, #05101f));
+    color: var(--mj-text, var(--ink, #f7fbff));
     font-family: Inter, system-ui, sans-serif;
   }
   .embed-hdr {
@@ -594,8 +607,8 @@
     justify-content: space-between;
     gap: 8px;
     padding: 12px 48px 10px 14px; /* room for host-page close button */
-    border-bottom: 1px solid rgb(0 183 255 / 18%);
-    background: rgb(8 20 36 / 95%);
+    border-bottom: 1px solid color-mix(in srgb, var(--mj-line, #3d5a80) 55%, transparent);
+    background: color-mix(in srgb, var(--mj-surface, #05101f) 95%, #000);
     flex-shrink: 0;
   }
   .brand {
@@ -614,16 +627,16 @@
   .brand .sub {
     display: block;
     font-size: 10px;
-    color: #8fa5bf;
+    color: var(--mj-muted, #8fa5bf);
   }
   .brand-mark {
     border-radius: 50%;
     flex-shrink: 0;
   }
   .agent-sel {
-    background: #0c1a2e;
-    color: #f7fbff;
-    border: 1px solid rgb(0 183 255 / 30%);
+    background: var(--mj-surface-elevated, #0c1a2e);
+    color: var(--mj-text, #f7fbff);
+    border: 1px solid color-mix(in srgb, var(--mj-line, #3d5a80) 70%, transparent);
     border-radius: 8px;
     padding: 6px 8px;
     font-size: 12px;
@@ -666,14 +679,14 @@
   .agent-meta p {
     margin: 2px 0 0;
     font-size: 11px;
-    color: #8fa5bf;
+    color: var(--mj-muted, #8fa5bf);
   }
   .voice-card {
     margin: 4px 12px 8px;
     padding: 10px;
     border-radius: 12px;
-    border: 1px solid rgb(0 183 255 / 22%);
-    background: rgb(8 20 36 / 80%);
+    border: 1px solid color-mix(in srgb, var(--mj-line, #3d5a80) 55%, transparent);
+    background: color-mix(in srgb, var(--mj-surface, #081424) 90%, transparent);
     flex-shrink: 0;
   }
   .voice-row {
@@ -700,11 +713,16 @@
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
-    color: #fff;
-    background: linear-gradient(135deg, #0084ff, #00b7ff);
+    color: var(--mj-primary-text, #fff);
+    background: linear-gradient(
+      135deg,
+      var(--mj-primary, #0084ff),
+      var(--mj-accent, #00b7ff)
+    );
   }
   .voice-button.live {
-    background: linear-gradient(135deg, #c0392b, #e74c3c);
+    background: linear-gradient(135deg, var(--mj-danger, #c0392b), #e74c3c);
+    color: #fff;
   }
   .voice-button:disabled {
     opacity: 0.5;
@@ -782,9 +800,9 @@
   .composer input {
     flex: 1;
     border-radius: 10px;
-    border: 1px solid rgb(0 183 255 / 30%);
-    background: #0a1628;
-    color: #f7fbff;
+    border: 1px solid color-mix(in srgb, var(--mj-line, #3d5a80) 70%, transparent);
+    background: var(--mj-surface-elevated, #0a1628);
+    color: var(--mj-text, #f7fbff);
     padding: 10px 12px;
     font-size: 14px;
   }
@@ -792,8 +810,12 @@
     border: 0;
     border-radius: 10px;
     padding: 0 14px;
-    background: linear-gradient(135deg, #0084ff, #00b7ff);
-    color: #fff;
+    background: linear-gradient(
+      135deg,
+      var(--mj-primary, #0084ff),
+      var(--mj-accent, #00b7ff)
+    );
+    color: var(--mj-primary-text, #fff);
     font-weight: 600;
     cursor: pointer;
     min-width: 64px;

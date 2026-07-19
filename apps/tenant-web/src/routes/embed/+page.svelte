@@ -103,52 +103,63 @@
   function frameworkSnippet(kind: 'vue' | 'react' | 'svelte' | 'wc'): string {
     const key = cfg?.embed_key || 'emb_YOUR_KEY';
     const api = apiBaseFromConfig();
+    // Svelte compiler closes on the literal sequence less-than slash script greater-than.
+    const close = ['<', '/', 'script', '>'].join('');
+    const open = ['<', 'script'].join('');
     switch (kind) {
       case 'vue':
-        return `// npm install @monti/embed-vue @monti/embed-core
-<script setup>
-import { MontiEmbedVue } from '@monti/embed-vue'
-</script>
-<template>
-  <MontiEmbedVue
-    embed-key="${key}"
-    api-base="${api}"
-    position="bottom-right"
-  />
-</template>`;
+        return [
+          '// npm install @monti/embed-vue @monti/embed-core',
+          open + ' setup>',
+          "import { MontiEmbedVue } from '@monti/embed-vue'",
+          close,
+          '<template>',
+          '  <MontiEmbedVue',
+          `    embed-key="${key}"`,
+          `    api-base="${api}"`,
+          '    position="bottom-right"',
+          '  />',
+          '</template>'
+        ].join('\n');
       case 'react':
-        return `// npm install @monti/embed-react @monti/embed-core
-import { MontiEmbedReact } from '@monti/embed-react'
-
-export function MontiWidget() {
-  return (
-    <MontiEmbedReact
-      embedKey="${key}"
-      apiBase="${api}"
-      position="bottom-right"
-    />
-  )
-}`;
+        return [
+          '// npm install @monti/embed-react @monti/embed-core',
+          "import { MontiEmbedReact } from '@monti/embed-react'",
+          '',
+          'export function MontiWidget() {',
+          '  return (',
+          '    <MontiEmbedReact',
+          `      embedKey="${key}"`,
+          `      apiBase="${api}"`,
+          '      position="bottom-right"',
+          '    />',
+          '  )',
+          '}'
+        ].join('\n');
       case 'svelte':
-        return `<!-- npm install @monti/embed-svelte @monti/embed-core -->
-<script>
-  import MontiEmbed from '@monti/embed-svelte/MontiEmbed.svelte'
-</script>
-<MontiEmbed
-  embedKey="${key}"
-  apiBase="${api}"
-  position="bottom-right"
-/>`;
+        return [
+          '<!-- npm install @monti/embed-svelte @monti/embed-core -->',
+          open + '>',
+          "  import MontiEmbed from '@monti/embed-svelte/MontiEmbed.svelte'",
+          close,
+          '<MontiEmbed',
+          `  embedKey="${key}"`,
+          `  apiBase="${api}"`,
+          '  position="bottom-right"',
+          '/>'
+        ].join('\n');
       case 'wc':
-        return `<!-- npm install @monti/embed-web-component @monti/embed-core -->
-<script type="module">
-  import '@monti/embed-web-component'
-</script>
-<monti-embed
-  embed-key="${key}"
-  api-base="${api}"
-  position="bottom-right"
-></monti-embed>`;
+        return [
+          '<!-- npm install @monti/embed-web-component @monti/embed-core -->',
+          open + ' type="module">',
+          "  import '@monti/embed-web-component'",
+          close,
+          '<monti-embed',
+          `  embed-key="${key}"`,
+          `  api-base="${api}"`,
+          '  position="bottom-right"',
+          '></monti-embed>'
+        ].join('\n');
     }
   }
 </script>

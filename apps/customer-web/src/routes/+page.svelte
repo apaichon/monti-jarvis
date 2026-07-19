@@ -34,6 +34,12 @@
     type CustomerQuotaSummary,
     type CustomerProfile
   } from '$lib/api/customerAuth';
+  import {
+    applyThemeTokens,
+    fetchPublicTheme,
+    resolveBranding,
+    type ThemeBranding
+  } from '$lib/theme/applyTheme';
 
   type UiMessage = {
     id: string;
@@ -78,6 +84,7 @@
   let infraStatus = $state('checking infra');
   let chatEl: HTMLElement | undefined = $state();
   let tenantId = $state('');
+  let brand = $state(resolveBranding(null));
   let customer = $state<CustomerProfile | null>(null);
   let customerEmail = $state('');
   let customerName = $state('');
@@ -118,6 +125,11 @@
   onMount(async () => {
     tenantId = new URLSearchParams(window.location.search).get('tenant_id')?.trim() || '';
     customer = getStoredCustomer();
+    if (tenantId) {
+      const theme = await fetchPublicTheme(window.location.origin, tenantId);
+      brand = resolveBranding(theme?.branding as ThemeBranding | undefined);
+      applyThemeTokens(document.documentElement, theme);
+    }
     void loadCustomerMe().then((profile) => {
       if (profile) customer = profile;
       void refreshPortalState();
@@ -713,10 +725,10 @@
     class:live-expanded={callStarted && callControlsExpanded}
   >
     <header class="brand">
-      <img class="brand-mark" src="/images/monti-logo.png" width="46" height="46" alt="Monti AI Ambassadors" />
+      <img class="brand-mark" src={brand.logo_url} width="46" height="46" alt={brand.logo_alt} />
       <div>
-        <h1>MONTI</h1>
-        <p>Inbound Call Center · AI Workforce</p>
+        <h1>{brand.brand_name}</h1>
+        <p>{brand.subtitle}</p>
         {#if tenantId}
           <p>Tenant · {tenantId}</p>
         {/if}

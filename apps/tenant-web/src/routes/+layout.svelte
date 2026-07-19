@@ -53,6 +53,11 @@
         >
         <a
           class="nav-link"
+          href="{base}/theme"
+          class:active={$page.url.pathname.includes('/theme')}><span>◈</span>Theme</a
+        >
+        <a
+          class="nav-link"
           href="{base}/km"
           class:active={$page.url.pathname.includes('/km')}><span>◫</span>Knowledge</a
         >
