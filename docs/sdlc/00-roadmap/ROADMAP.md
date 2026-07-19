@@ -56,7 +56,7 @@
 | 30 | Platform | Dashboard: Overall Call Center Statistics and by Tenants | G | 29 (ClickHouse) ✅ v2.11.0 · [FEAT-0032](../01-features/FEAT-0032-platform-call-center-statistics.md) |
 | **31** | **Platform** | **Monitoring: Billing, Quota Usages, AI Infra Cost Usage** | **G** | **30** ✅ v2.12.0 · [FEAT-0033](../01-features/FEAT-0033-platform-billing-quota-ai-cost-usage.md) |
 | **32** | **Tuning** | **gRPC switch mode, Cache on Prod** | **H** | **25+** ✅ v2.13.0 · [SPRINT-032](../03-sprints/SPRINT-032.md) |
-| **33** | **Tuning** | **Partition, Index, Hardening** | **H** | **32** · planned |
+| **33** | **Tuning** | **Partition, Index, Hardening** | **H** | **32** ✅ v2.16.0 · [SPRINT-033](../03-sprints/SPRINT-033.md) · TASK-0144 UAT carry-over |
 | 34 | Infra | Design Large Scale Control multiple tenant servers, Auto Scale with k8s | I | 33 |
 | 35 | Infra | Canary Deployment, A/B Testing launch feature to tenant selected | I | 34 |
 | 36 | Infra | Backup Restore Archive, Full,select range,Incremental, by admin platform , by tenant | I | 34 |
@@ -140,7 +140,7 @@ Onboarding and monetization (one chain — see [15-commerce-chain-plan.md](../02
 
 - gRPC internal APIs, Redis 8 cache strategy, ClickHouse partitioning, security hardening
 
-Sprint 32 shipped the controlled billing-usage reconciliation harness and automated source-error coverage. Manual browser/responsive/session-expiry UAT carries into Sprint 33; gRPC and production-cache implementation remain outside the shipped scope.
+Sprint 32 shipped the controlled billing-usage reconciliation harness and automated source-error coverage. Sprint 33 shipped partitioning, hot-path indexes, and query hardening in v2.16.0; manual browser/responsive/session-expiry UAT remains carried over in TASK-0144. gRPC and production-cache implementation remain outside the shipped scope.
 
 ### Phase I — Infra scale (34–36)
 
