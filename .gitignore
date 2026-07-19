@@ -14,4 +14,4 @@ packages/*/node_modules/
 packages/*/dist/
 apps/*/node_modules/
 apps/*/.svelte-kit/
-apps/*/build/
+apps/*/build/var/
