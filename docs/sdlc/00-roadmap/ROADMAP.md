@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S41 product/security + S42 bug fix + S43 tenant AI & config)
+# Monti AI Call Center — Roadmap (36 core + S37–S42 shipped tracks + S43 tenant AI + S44 customer generative AI)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -67,6 +67,7 @@
 | **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
 | **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) ✅ v2.16.0 · [SPRINT-042](../03-sprints/SPRINT-042.md) |
 | **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · backlog |
+| **44** | **Customer / Tenant** | **Customer generative AI (Claude · Codex · Antigravity · Grok CLI) → HTML/image/canvas/link/report/doc** | **K** | **1, 20, 21, 43** · backlog |
 
 ---
 
@@ -479,3 +480,66 @@ Dedicated **bug-fix sprint** (not mixed with new product features). Prioritize p
 5. At least one tool + one skill can be registered and invoked under tenant isolation tests.
 
 **Out (unless pulled in):** Full marketplace of third-party skills; multi-provider LLM switcher beyond Gemini; replacing platform-wide Gemini entirely for all tenants.
+
+## Backlog add: SPRINT-044 — Customer Generative AI (Multi-Provider CLI & Artifact Outputs)
+
+**Platform:** Customer / Tenant · **Feature:** Customers generate artifacts via Claude, Codex, Antigravity, Grok CLI using API key or subscription login · **Depends:** 1, 20, 21, 43 · **Status:** backlog  
+
+First-class **customer** generative workspace (not voice call-center only): authenticate a provider, run generation jobs, and receive structured outputs stored under the tenant/customer boundary.
+
+### Providers / runtimes
+
+| Provider | Role |
+| --- | --- |
+| **Claude** (API / CLI) | Text + long-form generation, code, HTML, reports |
+| **Codex** (API / CLI) | Code-first generation and tool-using agent tasks |
+| **Antigravity** | Agent/runtime adapter (bounded server-side invoke; no raw secrets to browser) |
+| **Grok CLI** | xAI Grok CLI/API path for generation jobs |
+
+### Credential modes
+
+| Mode | Notes |
+| --- | --- |
+| **API key** | Customer or tenant stores encrypted key; server-side use only; never echo plaintext after save |
+| **Login / subscription** | OAuth or provider session/subscription token where the product supports it; refresh + expiry UX; revoke from settings |
+
+Prefer **tenant-managed** keys for B2B call-center embeds; allow **customer-owned** keys when customer auth is required (align with S20/S21). Platform default keys optional and quota-metered.
+
+### Output artifact types
+
+| Output | Notes |
+| --- | --- |
+| **HTML template** | Stored snippet or full page template; preview sandbox; download |
+| **Image** | Generated image asset → MinIO under tenant/customer prefix; gallery link |
+| **Canvas** | Structured canvas/JSON or image export for design surfaces |
+| **Link** | Shareable public or signed URL to artifact / result page |
+| **Report** | PDF/Markdown report package (transcript-adjacent or free-form brief) |
+| **Doc** | Document export (Markdown/DOCX/PDF as available); versioned object |
+
+### Deliverables
+
+| Deliverable | Notes |
+| --- | --- |
+| Provider adapter layer | Server-side adapters for Claude / Codex / Antigravity / Grok CLI; unified job API (`create` → `status` → `result`) |
+| Credential vault UX | Customer (and/or tenant admin) settings: set API key **or** connect subscription login; test connection; revoke |
+| Generate job UI | Customer portal surface: pick provider, prompt, output type(s), run job, show progress/errors |
+| Artifact store | Persist outputs to Postgres metadata + MinIO objects; tenant isolation; optional retention |
+| Safety & quota | Rate limits, max payload size, content policy hooks, usage events for billing/AI cost (ties S31/S43) |
+| Audit | Who ran what provider/job; no secret leakage in logs |
+
+### Acceptance sketch
+
+1. Customer (or tenant-configured path) can save a **Claude** or **Grok** API key encrypted and run a generation that returns at least one of: HTML template, image, report, doc.  
+2. At least one provider supports **subscription/login** connect (or documented stub + API key fallback if OAuth not available).  
+3. **Codex** and **Antigravity** adapters appear in provider list with bounded invoke and failure codes when not configured.  
+4. Outputs for **HTML, image, canvas, link, report, doc** have explicit types in API/UI; files land in tenant-scoped storage.  
+5. Tenant A cannot read Tenant B jobs/artifacts/keys; keys never returned in full after save.  
+6. Usage/quota path records generation events without provider raw bodies in audit logs.
+
+### Phase K — Customer generative workspace (44)
+
+- Multi-provider generative jobs for authenticated customers  
+- Artifact outputs beyond live voice/chat transcript  
+- Complements S43 (tenant Gemini for call agents) without replacing inbound call AI  
+
+**Out (unless pulled in):** Training custom models; unrestricted shell on customer devices; free unlimited generation without quota; replacing Gemini voice pipeline for calls.
