@@ -335,6 +335,9 @@ func (s *server) parseCustomerBearer(r *http.Request) (auth.AuthContext, error) 
 }
 
 func (s *server) publicCustomerTenantID(r *http.Request) string {
+	if tenantID, _, err := s.requestTenantContext(r); err == nil && tenantID != "" {
+		return tenantID
+	}
 	return auth.ResolveTenant(r.Context(), r.Header.Get("X-Tenant-Id"), s.cfg.AuthDisabled, s.cfg.DemoTenantID)
 }
 

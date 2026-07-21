@@ -123,6 +123,16 @@ func (s *server) enforceCustomerPortalAccess(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "customer auth required", "code": "customer_auth_required"})
 		return nil, settings, false
 	}
+	if embedCfg, err := s.resolveEmbedContext(r); err != nil {
+		writeEmbedContextError(w, err)
+		return nil, settings, false
+	} else if embedCfg != nil && embedCfg.AuthRequired && !settings.Enabled {
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "customer auth is not configured", "code": "customer_auth_not_configured"})
+		return nil, settings, false
+	} else if embedCfg != nil && embedCfg.AuthRequired && customer == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "customer auth required", "code": "customer_auth_required"})
+		return nil, settings, false
+	}
 	if !s.agentAvailableForTenant(r, tenantID, agentID) {
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": "avatar unavailable", "code": "avatar_unavailable"})
 		return nil, settings, false

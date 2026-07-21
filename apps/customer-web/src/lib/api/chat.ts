@@ -34,10 +34,12 @@ export async function sendChat(
     message: string;
     history: ChatMessage[];
   },
-  opts?: { tenantId?: string }
+  opts?: { tenantId?: string; embedKey?: string; parentOrigin?: string }
 ): Promise<ChatResponse> {
   const headers: Record<string, string> = customerAuthHeaders({ 'content-type': 'application/json' });
   if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  if (opts?.embedKey) headers['X-Monti-Embed-Key'] = opts.embedKey;
+  if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers,

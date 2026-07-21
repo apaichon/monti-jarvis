@@ -43,6 +43,7 @@ System design artifacts for Monti Jarvis.
 | 35 | [35-production-transport-cache-tuning-spec.md](35-production-transport-cache-tuning-spec.md) | 32 | Production transport/cache tuning design track | `review_pending` |
 | 37 | [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md) | 39 | Tenant brand chrome (name/logo/subtitle) + color tokens, draft/publish, customer+embed | **`shipped`** v2.15.0 |
 | 38 | [38-tenant-ux-bugfix-spec.md](38-tenant-ux-bugfix-spec.md) | 42 | Session expiry, first-login menu, nav groups/scroll, KM document scope | **`shipped`** v2.16.0 |
+| 39 | [39-tenant-ai-config-extensibility-spec.md](39-tenant-ai-config-extensibility-spec.md) | 43 | Embed auth, grouped config, encrypted tenant Gemini key, prompts, tools, and skills | `review_pending` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -69,6 +70,8 @@ System design artifacts for Monti Jarvis.
 **Sprint 32:** ✅ Shipped v2.13.0 — [DES-0035](35-production-transport-cache-tuning-spec.md) remains a design-only roadmap track; [workflow](02-workflow.md) §87–88, [ER/fixture boundary](03-er-diagram.md), [API verification contract](04-api-spec.md), and [UX/UAT operator surface](05-ux-ui.md) support [SPRINT-032](../03-sprints/SPRINT-032.md), reusing [DES-0034](34-platform-billing-quota-ai-cost-spec.md). Manual UAT carries into Sprint 33.
 
 **Sprint 42:** ✅ Shipped v2.16.0 — [38-tenant-ux-bugfix-spec.md](38-tenant-ux-bugfix-spec.md); workflow §91–92; API § Tenant UX Bug Fix; UX T21. [SPRINT-042](../03-sprints/SPRINT-042.md) · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md).
+
+**Sprint 43:** Design pack drafted and review-pending — [39-tenant-ai-config-extensibility-spec.md](39-tenant-ai-config-extensibility-spec.md); workflow §93–96; API § Tenant AI Configuration and Embed Auth; UX T22. [SPRINT-043](../03-sprints/SPRINT-043.md) · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md).
 
 **Sprint 39:** ✅ Shipped v2.15.0 — [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md); workflow §89–90; API § Theme Color Customization; UX T20. [SPRINT-039](../03-sprints/SPRINT-039.md) · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md).
 

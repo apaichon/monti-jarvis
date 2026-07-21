@@ -3,6 +3,7 @@
 .env.*
 !infra/.env.example
 !infra/.env.dev.example
+!infra/.env.*.example
 .run/
 monti-jarvis
 coverage.out

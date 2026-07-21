@@ -88,7 +88,11 @@ type Config struct {
 	RateLimitVoicePerMin int
 	QuotaConcurrentTTL   time.Duration
 	// Embed (SPRINT-014)
-	EmbedAllowEmptyOrigins bool
+	EmbedAllowEmptyOrigins    bool
+	TenantSecretEncryptionKey string
+	TenantSecretKeyVersion    string
+	ConfigGroups              []string
+	ConfigError               string
 	// Preview sandbox (SPRINT-017)
 	PreviewMaxConcurrent int
 	// Customer import (SPRINT-019)
@@ -117,10 +121,7 @@ func Load() Config {
 	if appEnv == "" {
 		appEnv = "dev"
 	}
-	_ = godotenv.Load("infra/.env." + appEnv)
-	_ = godotenv.Load("infra/.env")
-	_ = godotenv.Load(".env." + appEnv)
-	_ = godotenv.Load()
+	configError := loadConfigFiles(appEnv)
 
 	return Config{
 		Port:                     envOr("PORT", "8091"),
@@ -196,32 +197,103 @@ func Load() Config {
 		PaymentCallbackDevBypass: envBool("PAYMENT_CALLBACK_DEV_BYPASS", false),
 		PaymentMockAutoFulfill:   envBool("PAYMENT_MOCK_AUTO_FULFILL", false),
 		// Default on when Redis is configured (same pattern as entitlement cache).
-		QuotaEnabled:           envBool("QUOTA_ENABLED", os.Getenv("REDIS_URL") != ""),
-		QuotaFailOpen:          envBool("QUOTA_FAIL_OPEN", true),
-		RateLimitEnabled:       envBool("RATE_LIMIT_ENABLED", os.Getenv("REDIS_URL") != ""),
-		RateLimitChatPerMin:    envInt("RATE_LIMIT_CHAT_PER_MIN", 60),
-		RateLimitKMPerMin:      envInt("RATE_LIMIT_KM_PER_MIN", 30),
-		RateLimitVoicePerMin:   envInt("RATE_LIMIT_VOICE_PER_MIN", 20),
-		QuotaConcurrentTTL:     envDuration("QUOTA_CONCURRENT_TTL", 2*time.Hour),
-		EmbedAllowEmptyOrigins: envBool("EMBED_ALLOW_EMPTY_ORIGINS", true),
-		PreviewMaxConcurrent:   envInt("PREVIEW_MAX_CONCURRENT", 2),
-		CustomerImportMaxBytes: int64(envInt("CUSTOMER_IMPORT_MAX_BYTES", 2*1024*1024)),
-		CustomerImportMaxRows:  envInt("CUSTOMER_IMPORT_MAX_ROWS", 5000),
-		MonitoringProbeTimeout: envDuration("MONITORING_PROBE_TIMEOUT", 2*time.Second),
-		MobileCallAPIEnabled:   envBool("MOBILE_CALL_API_ENABLED", false),
-		MobileWSMaxFrameBytes:  positiveEnvInt("MOBILE_WS_MAX_FRAME_BYTES", 32768),
-		MobilePushEnabled:      envBool("MOBILE_PUSH_ENABLED", false),
-		MobilePushProvider:     envOr("MOBILE_PUSH_PROVIDER", "auto"),
-		MobilePushTokenTTL:     envDuration("MOBILE_PUSH_TOKEN_TTL", 15*time.Minute),
-		AuditLogMode:           envOr("AUDIT_LOG_MODE", "spool"),
-		AuditLogDir:            envOr("AUDIT_LOG_DIR", "./var/audit"),
-		AuditLogFlushInterval:  envDuration("AUDIT_LOG_FLUSH_INTERVAL", 5*time.Second),
-		AuditLogRetention:      envDuration("AUDIT_LOG_RETENTION", time.Hour),
-		AuditLogBatchSize:      positiveEnvInt("AUDIT_LOG_BATCH_SIZE", 500),
-		AuditLogQueueSize:      positiveEnvInt("AUDIT_LOG_QUEUE_SIZE", 10000),
-		AuditLogRetryBackoff:   envDuration("AUDIT_LOG_RETRY_BACKOFF", time.Second),
-		AppEnv:                 appEnv,
+		QuotaEnabled:              envBool("QUOTA_ENABLED", os.Getenv("REDIS_URL") != ""),
+		QuotaFailOpen:             envBool("QUOTA_FAIL_OPEN", true),
+		RateLimitEnabled:          envBool("RATE_LIMIT_ENABLED", os.Getenv("REDIS_URL") != ""),
+		RateLimitChatPerMin:       envInt("RATE_LIMIT_CHAT_PER_MIN", 60),
+		RateLimitKMPerMin:         envInt("RATE_LIMIT_KM_PER_MIN", 30),
+		RateLimitVoicePerMin:      envInt("RATE_LIMIT_VOICE_PER_MIN", 20),
+		QuotaConcurrentTTL:        envDuration("QUOTA_CONCURRENT_TTL", 2*time.Hour),
+		EmbedAllowEmptyOrigins:    envBool("EMBED_ALLOW_EMPTY_ORIGINS", true),
+		TenantSecretEncryptionKey: os.Getenv("TENANT_SECRET_ENCRYPTION_KEY"),
+		TenantSecretKeyVersion:    envOr("TENANT_SECRET_KEY_VERSION", "v1"),
+		ConfigGroups:              splitConfigGroups(os.Getenv("CONFIG_GROUPS")),
+		ConfigError:               configError,
+		PreviewMaxConcurrent:      envInt("PREVIEW_MAX_CONCURRENT", 2),
+		CustomerImportMaxBytes:    int64(envInt("CUSTOMER_IMPORT_MAX_BYTES", 2*1024*1024)),
+		CustomerImportMaxRows:     envInt("CUSTOMER_IMPORT_MAX_ROWS", 5000),
+		MonitoringProbeTimeout:    envDuration("MONITORING_PROBE_TIMEOUT", 2*time.Second),
+		MobileCallAPIEnabled:      envBool("MOBILE_CALL_API_ENABLED", false),
+		MobileWSMaxFrameBytes:     positiveEnvInt("MOBILE_WS_MAX_FRAME_BYTES", 32768),
+		MobilePushEnabled:         envBool("MOBILE_PUSH_ENABLED", false),
+		MobilePushProvider:        envOr("MOBILE_PUSH_PROVIDER", "auto"),
+		MobilePushTokenTTL:        envDuration("MOBILE_PUSH_TOKEN_TTL", 15*time.Minute),
+		AuditLogMode:              envOr("AUDIT_LOG_MODE", "spool"),
+		AuditLogDir:               envOr("AUDIT_LOG_DIR", "./var/audit"),
+		AuditLogFlushInterval:     envDuration("AUDIT_LOG_FLUSH_INTERVAL", 5*time.Second),
+		AuditLogRetention:         envDuration("AUDIT_LOG_RETENTION", time.Hour),
+		AuditLogBatchSize:         positiveEnvInt("AUDIT_LOG_BATCH_SIZE", 500),
+		AuditLogQueueSize:         positiveEnvInt("AUDIT_LOG_QUEUE_SIZE", 10000),
+		AuditLogRetryBackoff:      envDuration("AUDIT_LOG_RETRY_BACKOFF", time.Second),
+		AppEnv:                    appEnv,
 	}
+}
+
+var configGroupNames = map[string]bool{
+	"ai": true, "ops": true, "email": true, "features": true,
+}
+
+// loadConfigFiles preserves the legacy dotenv lookup while adding explicit
+// per-environment groups. Existing process values always win.
+func loadConfigFiles(appEnv string) string {
+	files := []string{"infra/.env." + appEnv, "infra/.env", ".env." + appEnv, ".env"}
+	for _, file := range files {
+		if err := loadOptionalEnvFile(file); err != nil {
+			return err.Error()
+		}
+	}
+	groups := splitConfigGroups(os.Getenv("CONFIG_GROUPS"))
+	seen := map[string]string{}
+	for _, group := range groups {
+		if !configGroupNames[group] {
+			return fmt.Sprintf("unknown CONFIG_GROUPS value %q", group)
+		}
+		file := "infra/.env." + appEnv + "." + group
+		values, err := godotenv.Read(file)
+		if err != nil {
+			return fmt.Sprintf("config group %s: %v", group, err)
+		}
+		for key, value := range values {
+			if previous, ok := seen[key]; ok && previous != group {
+				return fmt.Sprintf("config key %s defined in groups %s and %s", key, previous, group)
+			}
+			seen[key] = group
+			if _, exists := os.LookupEnv(key); !exists {
+				_ = os.Setenv(key, value)
+			}
+		}
+	}
+	return ""
+}
+
+func loadOptionalEnvFile(file string) error {
+	values, err := godotenv.Read(file)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for key, value := range values {
+		if _, exists := os.LookupEnv(key); !exists {
+			_ = os.Setenv(key, value)
+		}
+	}
+	return nil
+}
+
+func splitConfigGroups(raw string) []string {
+	seen := map[string]bool{}
+	var groups []string
+	for _, value := range strings.Split(raw, ",") {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		groups = append(groups, value)
+	}
+	return groups
 }
 
 func envInt(key string, fallback int) int {

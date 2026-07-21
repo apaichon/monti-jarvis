@@ -3212,3 +3212,141 @@ Working on /tenant/km → token expires → click Gaps
 ```
 
 See DES-0038, 02-workflow.md §91–92.
+
+## Sprint 43 — Embed auth and tenant AI extensibility (T22)
+
+Sprint 43 adds a tenant-admin configuration surface and a customer-facing
+authentication gate inside the existing embed. The default public embed remains
+unchanged when `auth_required` is off. No platform-admin screen exposes tenant
+Gemini secrets or editable tenant prompts.
+
+### Screen map → API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| T22-A Embed access | Toggle “Require customer login / บังคับลูกค้าเข้าสู่ระบบ” | `GET/PUT /api/tenant/embed` |
+| T22-B Provider key | Save/replace/remove Gemini key; show configured + last4 | `GET/PUT/DELETE /api/tenant/ai/gemini-key` |
+| T22-C Agent prompt | Select agent; edit bounded prompt; enable/clear | `GET/PUT /api/tenant/ai/prompts/{agent_id}` |
+| T22-D Tools | List, create, enable, edit, delete allowlisted tools | `GET/POST /api/tenant/ai/tools`, `PUT/DELETE /api/tenant/ai/tools/{id}` |
+| T22-E Skills | Create skill; assign agents/tools; enable/disable | `GET/POST /api/tenant/ai/skills`, `PUT/DELETE /api/tenant/ai/skills/{id}`, `PUT .../assignment` |
+| T22-F Config operations | Operator selects `APP_ENV` + `CONFIG_GROUPS` before restart | `make restart` / startup logs; no browser API |
+| E2-A Embed resolve | Host loads widget policy | `GET /api/public/embed/{embed_key}` |
+| E2-B Auth gate | Customer requests/verifies OTP | `POST /api/customer/auth/request-otp`, `POST /api/customer/auth/verify-otp` with embed headers |
+| E2-C Conversation | Send text or open voice after gate | `POST /api/chat` with `X-Monti-Embed-Key`; `GET /ws/voice?embed_key=…` |
+
+### T22 — Tenant AI configuration (desktop)
+
+```text
+┌─ Tenant · AI configuration / การตั้งค่า AI ───────────────────────────────┐
+│ Configure embed access and tenant-scoped AI behavior.  [Save changes]      │
+│                                                                            │
+│ ┌─ A. Embed access / การเข้าถึง Embed ───────────────────────────────────┐ │
+│ │ Embed enabled       [ On ]                                             │ │
+│ │ Require customer login / บังคับลูกค้าเข้าสู่ระบบ   [ Off ▾ ]           │ │
+│ │ Allowed origins     https://shop.example                               │ │
+│ │ [Save embed settings]     Public mode: unauthenticated                 │ │
+│ └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│ ┌─ B. Gemini provider / ผู้ให้บริการ Gemini ─────────────────────────────┐ │
+│ │ Tenant key          [••••••••9abc]  Configured                         │ │
+│ │ [Replace key] [Remove key]   Never shown again after save               │ │
+│ └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│ ┌─ C. Agent behavior / พฤติกรรม Agent ───────┐ ┌─ Preview ───────────────┐ │
+│ │ Agent [ Ava ▾ ]                             │ │ Safety policy locked     │ │
+│ │ System prompt (max 8,000)                  │ │ Agent: Ava               │ │
+│ │ [Use approved support tone…              ] │ │ Skills: billing-followup │ │
+│ │ [ ] Enabled              3,412 chars       │ │ Tools: 1 enabled         │ │
+│ │ [Save prompt] [Clear override]             │ │ [Test preview]           │ │
+│ └────────────────────────────────────────────┘ └──────────────────────────┘ │
+│                                                                            │
+│ ┌─ D. Tools ───────────────┐ ┌─ E. Skills ──────────────────────────────┐ │
+│ │ [+ Add tool]              │ │ [+ Add skill]                            │ │
+│ │ create_support_ticket On  │ │ Billing follow-up · Ava · 1 tool · On    │ │
+│ │ handler: create_ticket    │ │ [Edit] [Disable]                         │ │
+│ └──────────────────────────┘ └───────────────────────────────────────────┘ │
+│ Status: Saved  •  Tenant isolated  •  Secrets never displayed             │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### T22 — Embed authentication gate
+
+```text
+┌─ Monti caller / ผู้ช่วย AI ────────────────────────┐
+│ [logo] Demo Workspace                               │
+│                                                     │
+│       Sign in to continue / เข้าสู่ระบบก่อนใช้งาน  │
+│       This workspace requires customer login.       │
+│       Email [________________________]              │
+│       [Send OTP / ส่งรหัส OTP]                      │
+│                                                     │
+│       Chat and voice controls are disabled          │
+│       until your session is verified.               │
+└─────────────────────────────────────────────────────┘
+```
+
+After successful verification the same existing caller shell is revealed. A
+public embed (`auth_required=false`) skips this gate and renders the existing
+agent/chat/voice controls unchanged.
+
+### Flow A — Save a tenant Gemini key safely
+
+```text
+Tenant admin opens AI settings
+  → GET metadata (configured=false; no secret)
+  → paste key into transient password field
+  → PUT key over HTTPS
+  → server encrypts + stores ciphertext/nonce/last4
+  → response shows “Configured · ••••9abc”
+  → browser clears input; no localStorage/sessionStorage write
+```
+
+### Flow B — Required-auth embed
+
+```text
+Host loads embed key
+  → resolve returns auth_required=true
+  → iframe renders OTP gate
+  → request OTP → verify OTP → customer session
+  → chat sends X-Monti-Embed-Key + customer Bearer
+  → server rechecks origin, tenant, policy, and quota
+  → conversation starts
+```
+
+### Flow C — Configure skill and invoke an allowlisted tool
+
+```text
+Create tool schema + handler key
+  → enable tool
+  → create skill prompt + select tool
+  → assign skill to Ava
+  → preview validates tenant/agent/tool ownership
+  → runtime receives Gemini function call
+  → validate args → run compiled handler → return redacted result
+```
+
+### Mobile / narrow layout
+
+- Stack sections A–E vertically; keep the auth toggle and Save action sticky at
+  the bottom of the viewport.
+- Mask the key field and never persist it in browser storage.
+- Tools and skills become accordion rows showing handler/assignment metadata;
+  schema editing opens a full-width dialog with validation errors.
+- Embed auth gate remains centered and keyboard-friendly at widths ≤ 640px.
+
+### Component → file (planned)
+
+| Zone | Path |
+| --- | --- |
+| AI settings route | `apps/tenant-web/src/routes/ai/+page.svelte` |
+| Embed settings API extension | `apps/tenant-web/src/lib/api/embed.ts` |
+| AI config API client | `apps/tenant-web/src/lib/api/ai.ts` |
+| Tool/skill editor components | `apps/tenant-web/src/lib/components/ai/` |
+| Tenant nav entry | `apps/tenant-web/src/routes/+layout.svelte` |
+| Embed auth gate | `apps/customer-web/src/routes/embed/+page.svelte` |
+| Embed context helper | `apps/customer-web/src/lib/api/embed.ts` |
+| Chat context header | `apps/customer-web/src/lib/api/chat.ts` |
+| Voice context query | `apps/customer-web/src/lib/voice/gemini.ts` |
+
+See DES-0039, 39-tenant-ai-config-extensibility-spec.md, workflow §93–96,
+ER Sprint 43, and API Sprint 43.

@@ -3205,3 +3205,256 @@ Extend existing tenant KM document create/list/patch:
 Errors: `400` invalid scope for tenant; `403` cross-tenant; `404` document not found.
 
 See DES-0038, workflow §91–92, UX T21.
+
+## Tenant AI Configuration and Embed Auth (Sprint 43)
+
+**Feature:** [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md) · **Deep spec:** [DES-0039](39-tenant-ai-config-extensibility-spec.md)
+
+Tenant-admin routes require an active `tenant_admin` Bearer token. `AUTH_DISABLED`
+does not bypass tenant-admin protection. Public embed context is origin-bound
+and does not expose tenant AI configuration or secrets.
+
+### Embed auth mode
+
+#### `GET /api/tenant/embed`
+
+Existing response adds:
+
+```json
+{
+  "tenant_id": "tenant_01",
+  "embed_key": "emb_…",
+  "enabled": true,
+  "allowed_origins": ["https://shop.example"],
+  "default_agent_id": "ava",
+  "auth_required": true
+}
+```
+
+`embed_key` remains visible to the tenant administrator because it is required
+to install the widget. It is never returned by tenant AI config endpoints or
+written to logs.
+
+#### `PUT /api/tenant/embed`
+
+Existing body adds `auth_required`:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `auth_required` | boolean | no | Defaults to `false`; when true, customer auth is required for this embed's chat/voice. |
+
+```json
+{
+  "enabled": true,
+  "allowed_origins": ["https://shop.example"],
+  "default_agent_id": "ava",
+  "auth_required": true
+}
+```
+
+#### `GET /api/public/embed/{embed_key}`
+
+Headers: `Origin` and/or `X-Embed-Parent-Origin` (or `parent_origin` query)
+when an origin allowlist is configured.
+
+The public response adds only the policy flag:
+
+```json
+{
+  "tenant_id": "tenant_01",
+  "embed_key": "emb_…",
+  "enabled": true,
+  "auth_required": true,
+  "default_agent_id": "ava",
+  "agents": [{ "id": "ava", "name": "Ava", "role": "General Support" }],
+  "theme": { "preset": "branded", "branding": {}, "tokens": {} }
+}
+```
+
+The response never includes Gemini keys, prompt text, tool schemas, skill text,
+or environment values. Existing `404 embed_disabled` and `403
+origin_not_allowed` behavior is unchanged.
+
+### Embed context for chat, voice, and customer auth
+
+For an embed-originated HTTP request, the client sends:
+
+| Header | Required | Description |
+| --- | --- | --- |
+| `X-Monti-Embed-Key` | yes | Public embed key used to re-resolve tenant and policy |
+| `X-Embed-Parent-Origin` | when configured | Host origin checked against the embed allowlist |
+| `Authorization` | when `auth_required=true` | Existing customer Bearer token |
+
+The server may accept `X-Tenant-Id` only as the existing `AUTH_DISABLED` local
+compatibility hint. When `X-Monti-Embed-Key` is present, the resolved key wins;
+a conflicting tenant hint is rejected with `403 tenant_context_mismatch`.
+
+For browser WebSocket clients, use:
+
+`GET /ws/voice?embed_key=emb_…&parent_origin=https%3A%2F%2Fshop.example&agent=ava`
+
+The same origin and customer-auth checks run before the WebSocket upgrade. A
+missing customer session for a required embed returns `401
+customer_auth_required`.
+
+Customer OTP requests and verification from an embed send the same two context
+headers. The body never contains a tenant id.
+
+### Tenant Gemini key
+
+#### `GET /api/tenant/ai/gemini-key`
+
+Returns metadata only.
+
+```json
+{
+  "configured": true,
+  "last4": "9abc",
+  "key_version": "v1",
+  "updated_at": "2026-07-19T10:00:00Z"
+}
+```
+
+#### `PUT /api/tenant/ai/gemini-key`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `api_key` | string | yes | 20–512 characters; encrypted immediately and never persisted plaintext |
+
+```json
+{ "api_key": "AIza…tenant-secret" }
+```
+
+Response `200` is the masked metadata object above. `DELETE` at the same path
+removes the tenant key and restores platform-key resolution.
+
+### Tenant system prompts
+
+#### `GET /api/tenant/ai/prompts/{agent_id}`
+
+Returns the tenant's prompt metadata and bounded prompt text for the tenant
+administrator. The platform safety prompt is not returned or editable.
+
+```json
+{
+  "agent_id": "ava",
+  "enabled": true,
+  "system_prompt": "Use our approved support tone…",
+  "max_length": 8000,
+  "updated_at": "2026-07-19T10:02:00Z"
+}
+```
+
+#### `PUT /api/tenant/ai/prompts/{agent_id}`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `system_prompt` | string | yes | 0–8,000 characters; empty clears the override |
+| `enabled` | boolean | no | Defaults to true |
+
+Unknown or unassigned agent ids return `404 agent_not_found`. Unsafe or
+oversized content returns `400 prompt_invalid`.
+
+### Tenant call tools
+
+#### `GET /api/tenant/ai/tools`
+
+Returns only the current tenant's tools, ordered by `display_name`.
+
+#### `POST /api/tenant/ai/tools`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `tool_key` | string | yes | Tenant-unique lowercase key |
+| `display_name` | string | yes | 1–120 characters |
+| `description` | string | yes | 1–500 characters |
+| `handler_key` | string | yes | Must be a compiled server allowlist key |
+| `input_schema` | object | yes | Bounded JSON Schema subset, max 32 KiB |
+| `enabled` | boolean | no | Defaults to false |
+
+```json
+{
+  "tool_key": "create_support_ticket",
+  "display_name": "Create support ticket",
+  "description": "Create a ticket after the caller confirms human follow-up.",
+  "handler_key": "create_ticket",
+  "input_schema": {
+    "type": "object",
+    "required": ["subject", "description", "category"],
+    "properties": {
+      "subject": { "type": "string", "maxLength": 160 },
+      "description": { "type": "string", "maxLength": 2000 },
+      "category": { "type": "string", "enum": ["general", "billing", "technical", "other"] }
+    }
+  },
+  "enabled": true
+}
+```
+
+#### `PUT /api/tenant/ai/tools/{id}` and `DELETE /api/tenant/ai/tools/{id}`
+
+Update or disable/delete only a tool owned by the current tenant. A tool in use
+by an enabled skill cannot be deleted until unassigned; return `409 tool_in_use`.
+
+The first handler is `create_ticket`. It reuses the existing customer-confirmed
+ticket contract and must not create a ticket without an explicit confirmation
+state. Implementations may expose additional handlers only after adding them to
+the server allowlist and design review.
+
+### Tenant skills
+
+#### `GET /api/tenant/ai/skills`
+
+Returns skills with assigned agent ids and tool keys, never other-tenant rows.
+
+#### `POST /api/tenant/ai/skills`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `slug` | string | yes | Tenant-unique `[a-z][a-z0-9-]{1,63}` |
+| `name` | string | yes | 1–120 characters |
+| `prompt` | string | yes | 0–8,000 characters |
+| `tool_ids` | string[] | no | Existing enabled tools from the same tenant, max 20 |
+| `agent_ids` | string[] | no | Assigned workforce agents from the same tenant |
+| `enabled` | boolean | no | Defaults to true |
+
+```json
+{
+  "slug": "billing-followup",
+  "name": "Billing follow-up",
+  "prompt": "Use the billing escalation checklist…",
+  "tool_ids": ["tool_01"],
+  "agent_ids": ["max"],
+  "enabled": true
+}
+```
+
+#### `PUT /api/tenant/ai/skills/{id}` and `DELETE /api/tenant/ai/skills/{id}`
+
+Update or disable/delete the current tenant's skill. `DELETE` removes its join
+assignments in the same transaction and does not delete tools or conversation
+history.
+
+#### `PUT /api/tenant/ai/skills/{id}/assignment`
+
+Replaces assignments atomically:
+
+```json
+{ "agent_ids": ["ava", "max"], "tool_ids": ["tool_01"] }
+```
+
+Cross-tenant ids, disabled tools, unknown agents, and duplicate ids return `400
+validation_error` or `404 not_found` without partial writes.
+
+### AI runtime errors
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `validation_error` / `prompt_invalid` | Invalid bounded payload or schema |
+| 401 | `customer_auth_required` / `unauthorized` | Required customer session missing/invalid |
+| 403 | `forbidden` / `tenant_context_mismatch` | Wrong role or conflicting tenant context |
+| 404 | `not_found` / `agent_not_found` | Missing or cross-tenant resource |
+| 409 | `tool_in_use` / `duplicate_key` | Unsafe delete or tenant-unique conflict |
+| 502 | `ai_provider_unavailable` | Tenant key decryption/provider failure; no silent fallback |
+
+See DES-0039, workflow §93–96, ER Sprint 43, and UX T22.

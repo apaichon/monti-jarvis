@@ -66,7 +66,7 @@
 | **40** | **Tenant / Integrator** | **Outbound calling with Twilio** | **G** | **1, 20, 27** · backlog |
 | **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
 | **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) ✅ v2.16.0 · [SPRINT-042](../03-sprints/SPRINT-042.md) |
-| **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · backlog |
+| **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md) · [SPRINT-043](../03-sprints/SPRINT-043.md) · planned |
 
 ---
 
@@ -457,9 +457,9 @@ Dedicated **bug-fix sprint** (not mixed with new product features). Prioritize p
 3. Narrow viewport / long nav → scroll the sidebar; grouped sections remain usable.  
 4. Tenant can attach a KM document to a scope; agent chat only retrieves in-scope docs.
 
-## Backlog add: SPRINT-043 — Embed Auth, Config Groups & Tenant AI Extensibility
+## Planned: SPRINT-043 — Embed Auth, Config Groups & Tenant AI Extensibility
 
-**Platform:** Tenant / Platform · **Feature:** Embed auth toggle, lean env config, per-tenant Gemini + prompts/tools/skills · **Depends:** 14, 15, 16, 39 · **Status:** backlog  
+**Platform:** Tenant / Platform · **Feature:** Embed auth toggle, lean env config, per-tenant Gemini + prompts/tools/skills · **Depends:** 14, 15, 16, 39 · **Status:** planned · [SPRINT-043](../03-sprints/SPRINT-043.md)
 
 | Deliverable | Notes |
 | --- | --- |

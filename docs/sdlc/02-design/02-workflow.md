@@ -2663,3 +2663,153 @@ sequenceDiagram
 
 See DES-0038, 38-tenant-ux-bugfix-spec.md, 02-workflow.md §91–92, 03-er-diagram.md, 04-api-spec.md, 05-ux-ui.md.
 
+## 93. Tenant configures embed auth and AI runtime (Sprint 43)
+
+```mermaid
+sequenceDiagram
+  actor A as Tenant admin
+  participant B as Browser tenant-web
+  participant G as Go :8091
+  participant S as internal/store
+  participant K as Secret encryptor
+  participant P as Postgres callcenter
+  participant L as Audit writer
+
+  A->>B: Open /tenant/ai
+  B->>G: GET /api/tenant/embed + AI metadata
+  G->>S: Load own tenant config rows
+  S->>P: SELECT tenant-scoped config
+  P-->>S: config metadata, no plaintext key
+  S-->>G: masked metadata + policies
+  G-->>B: settings, configured flags, last4 only
+  A->>B: Save auth mode, key, prompt, tool, or skill
+  B->>G: PUT/POST /api/tenant/ai/*
+  G->>G: Require active tenant_admin; validate tenant ownership
+  alt Gemini key write
+    G->>K: Encrypt with TENANT_SECRET_ENCRYPTION_KEY
+    K-->>G: ciphertext + nonce + version + last4
+    G->>P: Upsert tenant_ai_configs
+  else prompt/tool/skill write
+    G->>P: Validate and upsert bounded tenant rows
+  else invalid or cross-tenant reference
+    G-->>B: 400 validation_error / 404 not_found
+  end
+  G->>L: Audit event with metadata only
+  G-->>B: 200 masked config or 201 resource
+```
+
+## 94. Embed resolves auth mode and starts a customer interaction (Sprint 43)
+
+```mermaid
+sequenceDiagram
+  actor C as Caller
+  participant H as Host page
+  participant E as Embed iframe
+  participant G as Go :8091
+  participant P as Postgres
+  participant A as Customer auth/session
+
+  C->>H: Open tenant website
+  H->>G: GET /api/public/embed/{embed_key} + parent origin
+  G->>P: Resolve key, enabled state, origins, auth_required
+  alt origin not allowed or disabled
+    G-->>H: 403 origin_not_allowed / 404 embed_disabled
+  else resolved
+    G-->>H: tenant, agents, theme, auth_required
+    H->>E: Open iframe with embed context
+    alt auth_required=true and no customer session
+      E-->>C: Show sign-in gate; disable chat/voice
+      C->>E: Request and verify OTP
+      E->>G: POST /api/customer/auth/* + embed context
+      G->>A: Validate tenant policy and issue customer session
+      A-->>E: customer session
+    else auth_required=false or valid session
+      E-->>C: Show workforce/chat controls
+    end
+    E->>G: POST /api/chat with X-Monti-Embed-Key
+    G->>P: Re-resolve key and auth policy; never trust X-Tenant-Id
+    G-->>E: reply or customer_auth_required
+  end
+```
+
+## 95. Tenant-scoped AI runtime resolves prompt, key, skills, and tools (Sprint 43)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser customer/embed
+  participant G as Go :8091
+  participant C as Tenant context resolver
+  participant S as internal/store
+  participant K as Secret decryptor
+  participant O as AI orchestrator
+  participant R as RAG / scope
+  participant M as Gemini
+  participant T as Allowlisted tool handler
+
+  B->>G: POST /api/chat or GET /ws/voice with embed context
+  G->>C: Resolve tenant, customer, agent, auth policy
+  C-->>G: trusted tenant context
+  G->>S: Load agent prompt, enabled skills/tools, AI metadata
+  alt tenant key configured
+    S-->>K: ciphertext + nonce + version
+    K-->>O: request-scoped tenant key
+  else no tenant key
+    O->>O: Use platform Gemini key
+  end
+  O->>R: Retrieve tenant/agent-scoped KM context
+  R-->>O: delimited sources
+  O->>O: Compose immutable safety + agent + tenant + skill + RAG prompt
+  O->>M: Generate content with allowlisted tool schemas
+  alt Gemini requests function call
+    M-->>O: function name + JSON arguments
+    O->>O: Validate schema, tenant, customer, and 3-call limit
+    O->>T: Dispatch compiled handler with trusted context
+    T-->>O: Redacted tool result
+    O->>M: Continue with tool result
+  else provider/decrypt failure
+    O-->>G: ai_provider_unavailable; no platform fallback for tenant key
+  end
+  M-->>G: text/voice response + usage metadata
+  G->>S: Save conversation/metering metadata without secrets
+  G-->>B: reply or live audio events
+```
+
+### AI runtime states
+
+| State | Meaning | Customer-visible behavior |
+| --- | --- | --- |
+| `platform_key` | Tenant has no key configured | Use platform Gemini default |
+| `tenant_key` | Tenant key decrypted for this request/session | Use tenant provider credentials |
+| `key_invalid` | Ciphertext cannot decrypt or key version unsupported | Fail closed with `ai_provider_unavailable` |
+| `tool_pending` | Gemini requested an enabled allowlisted handler | Validate and execute within timeout/call cap |
+| `tool_rejected` | Unknown, disabled, invalid, or cross-tenant tool | Return safe tool error to model; do not execute |
+
+## 96. Operator loads grouped environment configuration (Sprint 43)
+
+```mermaid
+sequenceDiagram
+  actor O as Operator
+  participant M as make restart
+  participant G as Go :8091
+  participant E as internal/env
+  participant F as Config files
+  participant H as Health/metrics
+
+  O->>M: APP_ENV=dev CONFIG_GROUPS=ai,ops make restart
+  M->>G: Start process with APP_ENV and group list
+  G->>E: Load core infra file
+  E->>F: Read infra/.env.dev
+  E->>F: Read infra/.env.dev.ai and .ops
+  alt unknown group, duplicate key, or malformed secret key
+    E-->>G: startup configuration error
+    G-->>O: process exits with redacted reason
+  else valid
+    E->>E: Apply process-environment precedence
+    E-->>G: typed Config
+    G->>H: Publish group states only
+    G-->>O: server ready; no values or file paths exposed
+  end
+```
+
+See DES-0039, 39-tenant-ai-config-extensibility-spec.md, 03-er-diagram.md,
+04-api-spec.md, and 05-ux-ui.md for the Sprint 43 contracts.

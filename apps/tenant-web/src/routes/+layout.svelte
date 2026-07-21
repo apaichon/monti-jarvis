@@ -114,6 +114,9 @@
           <a class="nav-link" href="{base}/theme" class:active={active('/theme')}
             ><span>◈</span>Theme</a
           >
+          <a class="nav-link" href="{base}/ai" class:active={active('/ai')}
+            ><span>✦</span>AI config</a
+          >
         </div>
 
         <div class="nav-group">
