@@ -25,6 +25,7 @@ type TenantEmbedConfig struct {
 	TenantID       string    `json:"tenant_id"`
 	EmbedKey       string    `json:"embed_key"`
 	Enabled        bool      `json:"enabled"`
+	AuthRequired   bool      `json:"auth_required"`
 	AllowedOrigins []string  `json:"allowed_origins"`
 	DefaultAgentID string    `json:"default_agent_id,omitempty"`
 	CreatedAt      time.Time `json:"created_at,omitempty"`
@@ -44,6 +45,7 @@ func (s *Store) ensureEmbedSchema(ctx context.Context) error {
   allowed_origins jsonb NOT NULL DEFAULT '[]'::jsonb,
   default_agent_id text,%s
 )`, schema, schema, auditColumnsDDL),
+		fmt.Sprintf(`ALTER TABLE %s.tenant_embed_configs ADD COLUMN IF NOT EXISTS auth_required boolean NOT NULL DEFAULT false`, schema),
 		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS tenant_embed_configs_embed_key_uidx
 ON %s.tenant_embed_configs (embed_key)`, schema),
 	}
@@ -71,7 +73,7 @@ func (s *Store) GetEmbedConfigByTenant(ctx context.Context, tenantID string) (*T
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	return s.scanEmbedConfig(ctx, fmt.Sprintf(`
-SELECT tenant_id, embed_key, enabled, allowed_origins, COALESCE(default_agent_id, ''), created_at, updated_at
+SELECT tenant_id, embed_key, enabled, auth_required, allowed_origins, COALESCE(default_agent_id, ''), created_at, updated_at
 FROM %s.tenant_embed_configs WHERE tenant_id = $1`, schema), tenantID)
 }
 
@@ -82,7 +84,7 @@ func (s *Store) GetEmbedConfigByKey(ctx context.Context, embedKey string) (*Tena
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	return s.scanEmbedConfig(ctx, fmt.Sprintf(`
-SELECT tenant_id, embed_key, enabled, allowed_origins, COALESCE(default_agent_id, ''), created_at, updated_at
+SELECT tenant_id, embed_key, enabled, auth_required, allowed_origins, COALESCE(default_agent_id, ''), created_at, updated_at
 FROM %s.tenant_embed_configs WHERE embed_key = $1`, schema), embedKey)
 }
 
@@ -161,6 +163,21 @@ WHERE tenant_id = $1`, schema), tenantID, enabled, raw, agent, actor)
 	return s.GetEmbedConfigByTenant(ctx, tenantID)
 }
 
+func (s *Store) UpdateEmbedAuthRequired(ctx context.Context, tenantID string, required bool) (*TenantEmbedConfig, error) {
+	if s.pg == nil {
+		return nil, fmt.Errorf("postgres is not available")
+	}
+	if _, err := s.GetOrCreateEmbedConfig(ctx, tenantID); err != nil {
+		return nil, err
+	}
+	actor := auditctx.ActorID(ctx)
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	if _, err := s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.tenant_embed_configs SET auth_required=$2, updated_by=$3, updated_at=now() WHERE tenant_id=$1`, schema), tenantID, required, actor); err != nil {
+		return nil, err
+	}
+	return s.GetEmbedConfigByTenant(ctx, tenantID)
+}
+
 // RotateEmbedKey issues a new public key; old key stops resolving.
 func (s *Store) RotateEmbedKey(ctx context.Context, tenantID string) (*TenantEmbedConfig, error) {
 	if _, err := s.GetOrCreateEmbedConfig(ctx, tenantID); err != nil {
@@ -189,7 +206,7 @@ func (s *Store) scanEmbedConfig(ctx context.Context, q string, arg any) (*Tenant
 	var c TenantEmbedConfig
 	var originsRaw []byte
 	err := s.pg.QueryRow(ctx, q, arg).Scan(
-		&c.TenantID, &c.EmbedKey, &c.Enabled, &originsRaw, &c.DefaultAgentID, &c.CreatedAt, &c.UpdatedAt,
+		&c.TenantID, &c.EmbedKey, &c.Enabled, &c.AuthRequired, &originsRaw, &c.DefaultAgentID, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrEmbedNotFound

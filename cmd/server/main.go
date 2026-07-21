@@ -84,6 +84,9 @@ type chatResponse struct {
 
 func main() {
 	cfg := env.Load()
+	if cfg.ConfigError != "" {
+		log.Fatalf("configuration: %s", cfg.ConfigError)
+	}
 	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -205,6 +208,25 @@ func main() {
 		}
 		return st.AIReplyLocaleHint(ctx, tenantID)
 	}
+	voiceRelay.APIKeyResolver = func(ctx context.Context, tenantID string) (string, error) {
+		if st == nil || strings.TrimSpace(tenantID) == "" {
+			return cfg.GeminiAPIKey, nil
+		}
+		key, err := st.TenantGeminiKey(ctx, tenantID)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(key) == "" {
+			return cfg.GeminiAPIKey, nil
+		}
+		return key, nil
+	}
+	voiceRelay.PromptResolver = func(ctx context.Context, tenantID, agentID string) (string, error) {
+		if st == nil || strings.TrimSpace(tenantID) == "" {
+			return "", nil
+		}
+		return st.TenantAgentPrompt(ctx, tenantID, agentID)
+	}
 	voiceRelay.UsageSink = func(ctx context.Context, event live.UsageEvent) {
 		if strings.TrimSpace(event.EventID) == "" {
 			event.EventID = metering.StableEventID("voice", event.TenantID, event.CallID, event.Model)
@@ -244,6 +266,38 @@ func main() {
 	}
 	s.backfillCallCenterAnalytics(rootCtx)
 	voiceRelay.AgentResolver = s.resolveAssignedWorkforceAgent
+	voiceRelay.ToolResolver = func(ctx context.Context, tenantID, agentID string) ([]live.ToolDeclaration, error) {
+		if st == nil || strings.TrimSpace(tenantID) == "" {
+			return nil, nil
+		}
+		items, err := st.ListTenantAgentTools(ctx, tenantID, agentID)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]live.ToolDeclaration, 0, len(items))
+		for _, item := range items {
+			if !item.Enabled {
+				continue
+			}
+			out = append(out, live.ToolDeclaration{Name: item.ToolKey, Description: item.Description, Parameters: item.InputSchema})
+		}
+		return out, nil
+	}
+	voiceRelay.ToolExecutor = func(ctx context.Context, tenantID, agentID, callID, name string, args map[string]any) map[string]any {
+		if st == nil {
+			return map[string]any{"status": "rejected", "reason": "store is not available"}
+		}
+		items, err := st.ListTenantAgentTools(ctx, tenantID, agentID)
+		if err != nil {
+			return map[string]any{"status": "failed", "reason": "tool configuration unavailable"}
+		}
+		for _, item := range items {
+			if item.ToolKey == name && item.Enabled {
+				return s.executeTenantAITool(ctx, tenantID, callID, nil, item, gemini.FunctionCall{Name: name, Args: args})
+			}
+		}
+		return map[string]any{"status": "rejected", "reason": "tool is not enabled"}
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
@@ -350,13 +404,28 @@ func main() {
 	mux.HandleFunc("GET /api/public/embed/{embed_key}", s.getPublicEmbed)
 	mux.HandleFunc("OPTIONS /api/public/embed/{embed_key}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Tenant-Id, X-Embed-Parent-Origin")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-Id, X-Monti-Embed-Key, X-Embed-Parent-Origin")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.Handle("GET /api/tenant/embed", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantEmbed)))
 	mux.Handle("PUT /api/tenant/embed", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantEmbed)))
 	mux.Handle("POST /api/tenant/embed/rotate-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.rotateTenantEmbedKey)))
+	// SPRINT-043 — tenant AI configuration, encrypted provider key, prompts, tools, and skills.
+	mux.Handle("GET /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantGeminiKey)))
+	mux.Handle("PUT /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantGeminiKey)))
+	mux.Handle("DELETE /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantGeminiKey)))
+	mux.Handle("GET /api/tenant/ai/prompts/{agent_id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantPrompt)))
+	mux.Handle("PUT /api/tenant/ai/prompts/{agent_id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantPrompt)))
+	mux.Handle("GET /api/tenant/ai/tools", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantTools)))
+	mux.Handle("POST /api/tenant/ai/tools", guard.RequireTenantAdminActive(http.HandlerFunc(s.createTenantTool)))
+	mux.Handle("PUT /api/tenant/ai/tools/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.updateTenantTool)))
+	mux.Handle("DELETE /api/tenant/ai/tools/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantTool)))
+	mux.Handle("GET /api/tenant/ai/skills", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantSkills)))
+	mux.Handle("POST /api/tenant/ai/skills", guard.RequireTenantAdminActive(http.HandlerFunc(s.createTenantSkill)))
+	mux.Handle("PUT /api/tenant/ai/skills/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.updateTenantSkill)))
+	mux.Handle("DELETE /api/tenant/ai/skills/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantSkill)))
+	mux.Handle("PUT /api/tenant/ai/skills/{id}/assignment", guard.RequireTenantAdminActive(http.HandlerFunc(s.assignTenantSkill)))
 	// SPRINT-015 — tenant KM + knowledge gaps
 	mux.Handle("GET /api/tenant/km/scopes", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKMScopes)))
 	mux.Handle("GET /api/tenant/km/agents", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantKMAgents)))
@@ -638,7 +707,11 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := s.quotaTenant(r)
+	tenantID, _, tenantErr := s.requestTenantContext(r)
+	if tenantErr != nil {
+		writeEmbedContextError(w, tenantErr)
+		return
+	}
 	agent := s.resolveWorkforceAgent(r.Context(), tenantID, req.AgentID)
 	customer, _, ok := s.enforceCustomerPortalAccess(w, r, tenantID, agent.ID, "chat")
 	if !ok {
@@ -687,6 +760,12 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	prompt := workforce.SystemPrompt(agent)
+	if tenantPrompt, err := s.tenantPrompt(ctx, tenantID, agent.ID); err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "tenant AI provider unavailable", "code": "ai_provider_unavailable"})
+		return
+	} else {
+		prompt = appendTenantPrompt(prompt, tenantPrompt)
+	}
 	if s.store != nil && tenantID != "" {
 		if hint := s.store.AIReplyLocaleHint(ctx, tenantID); hint != "" {
 			prompt += "\n\n" + hint
@@ -696,10 +775,57 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 		prompt = ragSvc.AugmentPrompt(prompt, agent.ID, topic, req.Message, ragResult)
 	}
 
-	replyResult, err := s.ai.ReplyWithUsage(ctx, prompt, history)
+	aiClient, err := s.tenantAIClient(ctx, tenantID)
+	if err != nil || aiClient == nil || !aiClient.Enabled() {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "tenant AI provider unavailable", "code": "ai_provider_unavailable"})
+		return
+	}
+	var configuredTools []store.TenantCallTool
+	var toolDeclarations []gemini.ToolDeclaration
+	var replyResult gemini.ReplyResult
+	if s.store != nil && tenantID != "" {
+		configuredTools, err = s.store.ListTenantAgentTools(ctx, tenantID, agent.ID)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": "tenant AI provider unavailable", "code": "ai_provider_unavailable"})
+			return
+		}
+		toolDeclarations = tenantToolDeclarations(configuredTools)
+	}
+	if len(toolDeclarations) > 0 {
+		replyResult, err = aiClient.ReplyWithTools(ctx, prompt, history, toolDeclarations)
+	} else {
+		replyResult, err = aiClient.ReplyWithUsage(ctx, prompt, history)
+	}
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
+	}
+	for round := 0; len(replyResult.FunctionCalls) > 0 && round < 3; round++ {
+		for _, call := range replyResult.FunctionCalls {
+			var tool store.TenantCallTool
+			for _, candidate := range configuredTools {
+				if candidate.ToolKey == call.Name {
+					tool = candidate
+					break
+				}
+			}
+			result := map[string]any{"status": "rejected", "reason": "tool is not enabled"}
+			if tool.ID != "" {
+				result = s.executeTenantAITool(ctx, tenantID, sessionID, customer, tool, call)
+			}
+			history = append(history,
+				gemini.Message{Role: "model", FunctionCall: &call},
+				gemini.Message{Role: "user", FunctionResponse: &gemini.FunctionResponse{Name: call.Name, ID: call.ID, Response: result}},
+			)
+		}
+		if round == 2 {
+			break
+		}
+		replyResult, err = aiClient.ReplyWithTools(ctx, prompt, history, toolDeclarations)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
 	}
 	reply := replyResult.Text
 
@@ -812,7 +938,7 @@ func withCommonHeaders(next http.Handler) http.Handler {
 
 func withCORS(_ bool, next http.Handler) http.Handler {
 	// Include embed parent-origin header so host-page preflight from Vue/etc. succeeds.
-	allowHeaders := "Content-Type, X-Tenant-Id, Authorization, X-Embed-Parent-Origin"
+	allowHeaders := "Content-Type, X-Tenant-Id, Authorization, X-Monti-Embed-Key, X-Embed-Parent-Origin"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")

@@ -20,8 +20,30 @@ type Client struct {
 }
 
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role             string            `json:"role"`
+	Content          string            `json:"content,omitempty"`
+	FunctionCall     *FunctionCall     `json:"function_call,omitempty"`
+	FunctionResponse *FunctionResponse `json:"function_response,omitempty"`
+}
+
+// ToolDeclaration is the provider-neutral subset of a Gemini function
+// declaration that the server exposes to the model.
+type ToolDeclaration struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
+}
+
+type FunctionCall struct {
+	Name string         `json:"name"`
+	Args map[string]any `json:"args,omitempty"`
+	ID   string         `json:"id,omitempty"`
+}
+
+type FunctionResponse struct {
+	Name     string         `json:"name"`
+	Response map[string]any `json:"response,omitempty"`
+	ID       string         `json:"id,omitempty"`
 }
 
 type UsageMetadata struct {
@@ -31,9 +53,10 @@ type UsageMetadata struct {
 }
 
 type ReplyResult struct {
-	Text  string
-	Usage UsageMetadata
-	Model string
+	Text          string
+	Usage         UsageMetadata
+	Model         string
+	FunctionCalls []FunctionCall
 }
 
 func New(apiKey, model, embedModel string) *Client {
@@ -58,6 +81,14 @@ func (c *Client) Reply(ctx context.Context, systemPrompt string, history []Messa
 }
 
 func (c *Client) ReplyWithUsage(ctx context.Context, systemPrompt string, history []Message) (ReplyResult, error) {
+	return c.replyWithTools(ctx, systemPrompt, history, nil)
+}
+
+func (c *Client) ReplyWithTools(ctx context.Context, systemPrompt string, history []Message, tools []ToolDeclaration) (ReplyResult, error) {
+	return c.replyWithTools(ctx, systemPrompt, history, tools)
+}
+
+func (c *Client) replyWithTools(ctx context.Context, systemPrompt string, history []Message, tools []ToolDeclaration) (ReplyResult, error) {
 	if c.apiKey == "" {
 		return ReplyResult{}, errors.New("GEMINI_API_KEY is not configured")
 	}
@@ -79,6 +110,9 @@ func (c *Client) ReplyWithUsage(ctx context.Context, systemPrompt string, histor
 			TopP:            0.95,
 			MaxOutputTokens: 900,
 		},
+	}
+	if len(tools) > 0 {
+		reqBody.Tools = []toolBundle{{FunctionDeclarations: tools}}
 	}
 	payload, err := json.Marshal(reqBody)
 	if err != nil {
@@ -114,10 +148,22 @@ func (c *Client) ReplyWithUsage(ctx context.Context, systemPrompt string, histor
 	}
 	for _, candidate := range out.Candidates {
 		var chunks []string
+		var calls []FunctionCall
 		for _, p := range candidate.Content.Parts {
 			if strings.TrimSpace(p.Text) != "" {
 				chunks = append(chunks, p.Text)
 			}
+			if p.FunctionCall != nil && strings.TrimSpace(p.FunctionCall.Name) != "" {
+				calls = append(calls, *p.FunctionCall)
+			}
+		}
+		if len(calls) > 0 {
+			return ReplyResult{
+				Text:          strings.TrimSpace(strings.Join(chunks, "\n")),
+				FunctionCalls: calls,
+				Usage:         out.UsageMetadata,
+				Model:         c.model,
+			}, nil
 		}
 		if len(chunks) > 0 {
 			return ReplyResult{
@@ -134,17 +180,24 @@ func toGeminiContents(history []Message) []content {
 	contents := make([]content, 0, len(history))
 	for _, msg := range history {
 		text := strings.TrimSpace(msg.Content)
-		if text == "" {
+		if text == "" && msg.FunctionCall == nil && msg.FunctionResponse == nil {
 			continue
 		}
 		role := "user"
 		if msg.Role == "assistant" || msg.Role == "model" {
 			role = "model"
 		}
-		contents = append(contents, content{
-			Role:  role,
-			Parts: []part{{Text: text}},
-		})
+		item := content{Role: role}
+		if text != "" {
+			item.Parts = append(item.Parts, part{Text: text})
+		}
+		if msg.FunctionCall != nil {
+			item.Parts = append(item.Parts, part{FunctionCall: msg.FunctionCall})
+		}
+		if msg.FunctionResponse != nil {
+			item.Parts = append(item.Parts, part{FunctionResponse: msg.FunctionResponse})
+		}
+		contents = append(contents, item)
 	}
 	return contents
 }
@@ -153,6 +206,11 @@ type generateRequest struct {
 	SystemInstruction content          `json:"system_instruction"`
 	Contents          []content        `json:"contents"`
 	GenerationConfig  generationConfig `json:"generationConfig"`
+	Tools             []toolBundle     `json:"tools,omitempty"`
+}
+
+type toolBundle struct {
+	FunctionDeclarations []ToolDeclaration `json:"function_declarations"`
 }
 
 type generationConfig struct {
@@ -167,7 +225,9 @@ type content struct {
 }
 
 type part struct {
-	Text string `json:"text"`
+	Text             string            `json:"text,omitempty"`
+	FunctionCall     *FunctionCall     `json:"functionCall,omitempty"`
+	FunctionResponse *FunctionResponse `json:"functionResponse,omitempty"`
 }
 
 type generateResponse struct {

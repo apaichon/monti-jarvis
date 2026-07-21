@@ -20,6 +20,12 @@
     CUSTOMER_END_COUNTDOWN_SECONDS
   } from '$lib/voice/end-call';
   import {
+    loadCustomerMe,
+    requestCustomerOTP,
+    storeCustomerSession,
+    verifyCustomerOTP
+  } from '$lib/api/customerAuth';
+  import {
     applyThemeTokens,
     resolveBranding,
     type PublicTheme,
@@ -34,6 +40,7 @@
     default_agent_id?: string;
     agents?: Array<{ id: string; name: string; role?: string; image?: string }>;
     theme?: PublicTheme;
+    auth_required?: boolean;
   };
 
   type UiMsg = {
@@ -46,6 +53,7 @@
 
   let key = $state('');
   let tenantId = $state('');
+  let parentOrigin = $state('');
   let workspace = $state('');
   let brand = $state(resolveBranding(null));
   let shellEl: HTMLElement | undefined = $state();
@@ -58,6 +66,14 @@
   let busy = $state(false);
   let error = $state('');
   let loading = $state(true);
+  let authRequired = $state(false);
+  let authChecking = $state(false);
+  let customerAuthenticated = $state(false);
+  let authEmail = $state('');
+  let authOTP = $state('');
+  let authChallengeId = $state('');
+  let authBusy = $state(false);
+  let authMessage = $state('');
 
   let session = $state<CallSession | null>(null);
   let voice = $state<GeminiVoice | null>(null);
@@ -185,6 +201,10 @@
   }
 
   async function startCall() {
+    if (authRequired && !customerAuthenticated) {
+      error = 'Sign in before starting a call.';
+      return;
+    }
     if (!selected || !tenantId) {
       error = 'Select an AI agent first.';
       return;
@@ -235,7 +255,7 @@
             voiceState = message;
           }
         },
-        { tenantId, lang: 'auto' }
+        { tenantId, embedKey: key, parentOrigin, lang: 'auto' }
       );
 
       voice = gemini;
@@ -353,7 +373,7 @@
       return;
     }
     try {
-      const parentOrigin = resolveParentOrigin();
+      parentOrigin = resolveParentOrigin();
       const qs = new URLSearchParams();
       if (parentOrigin) qs.set('parent_origin', parentOrigin);
       const q = qs.toString();
@@ -368,6 +388,7 @@
         return;
       }
       tenantId = data.tenant_id;
+      authRequired = !!data.auth_required;
       workspace = data.name || data.slug || data.tenant_id;
       const theme = data.theme;
       brand = resolveBranding(theme?.branding as ThemeBranding | undefined, workspace);
@@ -412,6 +433,20 @@
           : `Ready to call ${selected.name}.`;
         showTone(welcome);
       }
+      if (authRequired) {
+        authChecking = true;
+        try {
+          customerAuthenticated = !!(await loadCustomerMe({
+            tenantId,
+            embedKey: key,
+            parentOrigin
+          }));
+        } catch {
+          customerAuthenticated = false;
+        } finally {
+          authChecking = false;
+        }
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load embed';
     } finally {
@@ -420,6 +455,10 @@
   });
 
   async function send() {
+    if (authRequired && !customerAuthenticated) {
+      error = 'Sign in before sending a message.';
+      return;
+    }
     const text = input.trim();
     if (!text || !selected || !tenantId || busy || live) return;
     busy = true;
@@ -449,7 +488,7 @@
           message: text,
           history: payloadHistory
         },
-        { tenantId }
+        { tenantId, embedKey: key, parentOrigin }
       );
       sessionId = res.session_id || sessionId;
       history = [...history, { role: 'assistant', content: res.reply }];
@@ -471,6 +510,46 @@
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void send();
+    }
+  }
+
+  async function requestOTP() {
+    if (!authEmail.trim() || authBusy) return;
+    authBusy = true;
+    authMessage = '';
+    error = '';
+    try {
+      const result = await requestCustomerOTP(
+        { tenant_id: tenantId, email: authEmail.trim() },
+        { tenantId, embedKey: key, parentOrigin }
+      );
+      authChallengeId = result.challenge_id;
+      authMessage = `A one-time code was sent to ${result.delivery.to}.`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Could not send sign-in code';
+    } finally {
+      authBusy = false;
+    }
+  }
+
+  async function verifyOTP() {
+    if (!authChallengeId || authOTP.trim().length < 4 || authBusy) return;
+    authBusy = true;
+    authMessage = '';
+    error = '';
+    try {
+      const result = await verifyCustomerOTP(
+        { tenant_id: tenantId, challenge_id: authChallengeId, otp: authOTP.trim() },
+        { tenantId, embedKey: key, parentOrigin }
+      );
+      storeCustomerSession(result);
+      customerAuthenticated = true;
+      authOTP = '';
+      authMessage = 'Signed in. You can now use this AI agent.';
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Invalid sign-in code';
+    } finally {
+      authBusy = false;
     }
   }
 </script>
@@ -512,6 +591,39 @@
       {/if}
     </header>
 
+    {#if authRequired && !customerAuthenticated}
+      <section class="auth-gate">
+        <div class="auth-icon">✦</div>
+        <h2>Sign in to continue</h2>
+        <p>
+          This workspace requires customer sign-in before you can chat with an AI agent or start a
+          call.
+        </p>
+        {#if authChecking}
+          <div class="voice-state loading">Checking your session…</div>
+        {:else if !authChallengeId}
+          <label>
+            Email address
+            <input type="email" bind:value={authEmail} placeholder="you@example.com" disabled={authBusy} />
+          </label>
+          <button type="button" class="send auth-submit" onclick={requestOTP} disabled={authBusy || !authEmail.trim()}>
+            {authBusy ? 'Sending…' : 'Send sign-in code'}
+          </button>
+        {:else}
+          <label>
+            One-time code
+            <input inputmode="numeric" autocomplete="one-time-code" bind:value={authOTP} placeholder="Enter your code" disabled={authBusy} />
+          </label>
+          <button type="button" class="send auth-submit" onclick={verifyOTP} disabled={authBusy || authOTP.trim().length < 4}>
+            {authBusy ? 'Verifying…' : 'Verify and continue'}
+          </button>
+          <button type="button" class="auth-link" onclick={() => (authChallengeId = '')} disabled={authBusy}>
+            Use a different email
+          </button>
+        {/if}
+        {#if authMessage}<p class="auth-message">{authMessage}</p>{/if}
+      </section>
+    {:else}
     {#if selected}
       <section class="orb">
         <div class="halo" style="--assistant-color:{selected.color || '#00b7ff'}">
@@ -582,6 +694,7 @@
         {busy ? '…' : 'Send'}
       </button>
     </footer>
+    {/if}
   {/if}
 </div>
 
@@ -611,6 +724,23 @@
     background: color-mix(in srgb, var(--mj-surface, #05101f) 95%, #000);
     flex-shrink: 0;
   }
+  .auth-gate {
+    width: min(440px, calc(100% - 32px));
+    margin: auto;
+    padding: 28px;
+    border: 1px solid color-mix(in srgb, var(--mj-line, #3d5a80) 70%, transparent);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--mj-surface, #0b1d35) 94%, #000);
+    box-shadow: 0 18px 60px rgb(0 0 0 / 25%);
+  }
+  .auth-gate h2 { margin: 8px 0; }
+  .auth-gate p { color: var(--mj-muted, #9bb0c9); line-height: 1.5; }
+  .auth-gate label { display: grid; gap: 6px; margin-top: 18px; color: var(--mj-muted, #9bb0c9); font-size: 0.9rem; }
+  .auth-gate input { width: 100%; box-sizing: border-box; }
+  .auth-icon { color: var(--mj-accent, #00b7ff); font-size: 1.4rem; }
+  .auth-submit { width: 100%; margin-top: 18px; }
+  .auth-link { display: block; margin: 14px auto 0; border: 0; background: transparent; color: var(--mj-accent, #00b7ff); cursor: pointer; }
+  .auth-message { color: var(--mj-accent, #00b7ff) !important; }
   .brand {
     display: flex;
     align-items: center;

@@ -27,6 +27,9 @@ echo "==> Applying Postgres migrations (schema=$POSTGRES_SCHEMA)..."
 psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -v POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
   -f "$ROOT_DIR/scripts/migrations/001_audit_columns_postgres.sql"
 
+psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -v POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
+  -f "$ROOT_DIR/scripts/migrations/028_tenant_ai_extensibility.sql"
+
 if curl -fsS "$CLICKHOUSE_URL/ping" >/dev/null 2>&1; then
   echo "==> Applying ClickHouse audit columns (db=$CLICKHOUSE_DB)..."
   CH_HAS_TABLES=0

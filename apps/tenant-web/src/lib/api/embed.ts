@@ -4,6 +4,7 @@ export type EmbedConfig = {
   tenant_id: string;
   embed_key: string;
   enabled: boolean;
+  auth_required?: boolean;
   allowed_origins: string[];
   default_agent_id?: string;
   snippet: string;
@@ -17,6 +18,7 @@ export function getEmbedConfig() {
 
 export function putEmbedConfig(body: {
   enabled?: boolean;
+  auth_required?: boolean;
   allowed_origins?: string[];
   default_agent_id?: string;
 }) {

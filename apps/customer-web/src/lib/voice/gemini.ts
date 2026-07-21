@@ -91,7 +91,13 @@ export class GeminiVoice {
     agentId: string,
     topic: string,
     callbacks: VoiceCallbacks,
-    opts?: { tenantId?: string; preferredLang?: PreferredLang; lang?: PreferredLang | 'auto' }
+    opts?: {
+      tenantId?: string;
+      embedKey?: string;
+      parentOrigin?: string;
+      preferredLang?: PreferredLang;
+      lang?: PreferredLang | 'auto';
+    }
   ) {
     const blocked = micAvailabilityError();
     if (blocked) throw new Error(blocked);
@@ -156,6 +162,8 @@ export class GeminiVoice {
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
     const params = new URLSearchParams({ agent: agentId, topic: topic || 'general' });
     if (opts?.tenantId) params.set('tenant_id', opts.tenantId);
+    if (opts?.embedKey) params.set('embed_key', opts.embedKey);
+    if (opts?.parentOrigin) params.set('parent_origin', opts.parentOrigin);
     const lang = opts?.lang || opts?.preferredLang;
     if (lang) params.set('lang', lang);
     this.ws = new WebSocket(`${scheme}://${location.host}/ws/voice?${params}`);

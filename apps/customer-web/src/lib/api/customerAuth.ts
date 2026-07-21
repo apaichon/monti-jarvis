@@ -105,9 +105,11 @@ export async function requestCustomerOTP(body: {
   email: string;
   display_name?: string;
   locale?: string;
-}, opts?: { tenantId?: string }) {
+}, opts?: { tenantId?: string; embedKey?: string; parentOrigin?: string }) {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  if (opts?.embedKey) headers['X-Monti-Embed-Key'] = opts.embedKey;
+  if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const res = await fetch('/api/customer/auth/request-otp', {
     method: 'POST',
     headers,
@@ -120,9 +122,11 @@ export async function verifyCustomerOTP(body: {
   tenant_id?: string;
   challenge_id: string;
   otp: string;
-}, opts?: { tenantId?: string }) {
+}, opts?: { tenantId?: string; embedKey?: string; parentOrigin?: string }) {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  if (opts?.embedKey) headers['X-Monti-Embed-Key'] = opts.embedKey;
+  if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const res = await fetch('/api/customer/auth/verify-otp', {
     method: 'POST',
     headers,
@@ -143,11 +147,15 @@ export async function logoutCustomer() {
   clearCustomerSession();
 }
 
-export async function loadCustomerMe() {
+export async function loadCustomerMe(opts?: { tenantId?: string; embedKey?: string; parentOrigin?: string }) {
   const token = getCustomerAccessToken();
   if (!token) return null;
+  const headers: Record<string, string> = {};
+  if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  if (opts?.embedKey) headers['X-Monti-Embed-Key'] = opts.embedKey;
+  if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const res = await fetch('/api/customer/me', {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: customerAuthHeaders(headers)
   });
   if (res.status === 401 || res.status === 403) {
     clearCustomerSession();
@@ -164,9 +172,11 @@ export function customerAuthHeaders(headers: Record<string, string> = {}) {
   return headers;
 }
 
-export async function loadCustomerPortalPolicy(opts?: { tenantId?: string }) {
+export async function loadCustomerPortalPolicy(opts?: { tenantId?: string; embedKey?: string; parentOrigin?: string }) {
   const headers: Record<string, string> = {};
   if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  if (opts?.embedKey) headers['X-Monti-Embed-Key'] = opts.embedKey;
+  if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const qs = opts?.tenantId ? `?tenant_id=${encodeURIComponent(opts.tenantId)}` : '';
   const res = await fetch(`/api/customer/portal-policy${qs}`, {
     headers: customerAuthHeaders(headers)
@@ -174,9 +184,11 @@ export async function loadCustomerPortalPolicy(opts?: { tenantId?: string }) {
   return parseJSON<CustomerPortalPolicy>(res);
 }
 
-export async function loadCustomerQuota(opts?: { tenantId?: string }) {
+export async function loadCustomerQuota(opts?: { tenantId?: string; embedKey?: string; parentOrigin?: string }) {
   const headers: Record<string, string> = {};
   if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
+  if (opts?.embedKey) headers['X-Monti-Embed-Key'] = opts.embedKey;
+  if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const qs = opts?.tenantId ? `?tenant_id=${encodeURIComponent(opts.tenantId)}` : '';
   const res = await fetch(`/api/customer/quota${qs}`, {
     headers: customerAuthHeaders(headers)

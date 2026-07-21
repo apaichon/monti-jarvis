@@ -13,6 +13,7 @@ import (
 
 type putEmbedBody struct {
 	Enabled        *bool    `json:"enabled"`
+	AuthRequired   *bool    `json:"auth_required"`
 	AllowedOrigins []string `json:"allowed_origins"`
 	DefaultAgentID *string  `json:"default_agent_id"`
 }
@@ -84,7 +85,7 @@ func (s *server) getPublicEmbed(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Vary", "Origin")
 	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Tenant-Id, X-Embed-Parent-Origin")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-Id, X-Monti-Embed-Key, X-Embed-Parent-Origin")
 
 	tenant, err := s.store.GetTenant(r.Context(), cfg.TenantID)
 	if err != nil {
@@ -99,6 +100,7 @@ func (s *server) getPublicEmbed(w http.ResponseWriter, r *http.Request) {
 		"name":             tenant.Name,
 		"embed_key":        cfg.EmbedKey,
 		"enabled":          cfg.Enabled,
+		"auth_required":    cfg.AuthRequired,
 		"default_agent_id": cfg.DefaultAgentID,
 		"agents":           agents,
 	}
@@ -155,6 +157,13 @@ func (s *server) putTenantEmbed(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeEmbedError(w, err)
 		return
+	}
+	if body.AuthRequired != nil {
+		cfg, err = s.store.UpdateEmbedAuthRequired(r.Context(), ac.TenantID, *body.AuthRequired)
+		if err != nil {
+			writeEmbedError(w, err)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, embedConfigJSON(cfg, s.cfg.PublicBaseURL))
 }

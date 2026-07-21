@@ -70,7 +70,12 @@ func (s *server) quotaTenant(r *http.Request) string {
 
 // voiceWS enforces package quotas (rate, concurrent, monthly + S16 daily/per-call), then relays.
 func (s *server) voiceWS(w http.ResponseWriter, r *http.Request) {
-	s.voiceWithPackageQuota(w, r, s.quotaTenant(r))
+	tenantID, _, err := s.requestTenantContext(r)
+	if err != nil {
+		writeEmbedContextError(w, err)
+		return
+	}
+	s.voiceWithPackageQuota(w, r, tenantID)
 }
 
 // voiceWithPackageQuota applies the same package metering as production voice

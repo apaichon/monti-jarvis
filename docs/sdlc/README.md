@@ -16,13 +16,13 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** Sprint 33 — Partition, Index, and Hardening (**planned**)
+**Current sprint:** Sprint 43 — Embed Auth, Config Groups, and Tenant AI Extensibility (**planned**)
 
 **Parallel build:** _none_
 
-**Latest shipped:** [`SPRINT-032`](03-sprints/SPRINT-032.md) — Platform billing usage readiness and reconciliation · **v2.13.0**
+**Latest shipped:** [`SPRINT-042`](03-sprints/SPRINT-042.md) — Tenant UX bugfix · **v2.16.0**
 
-**Planned next:** Sprint 33 — Partition, Index, and Hardening
+**Planned next:** Sprint 43 — Embed Auth, Config Groups, and Tenant AI Extensibility
 
 **Shipped:** v2.13.0 [`SPRINT-032`](03-sprints/SPRINT-032.md) · v2.12.0 [`SPRINT-031`](03-sprints/SPRINT-031.md) · v2.11.0 [`SPRINT-030`](03-sprints/SPRINT-030.md) · v2.10.0 [`SPRINT-029`](03-sprints/SPRINT-029.md) · v2.9.0 [`SPRINT-028`](03-sprints/SPRINT-028.md) · v2.8.0 [`SPRINT-027`](03-sprints/SPRINT-027.md) · v2.7.0 [`SPRINT-026`](03-sprints/SPRINT-026.md) · v2.6.0 [`SPRINT-025`](03-sprints/SPRINT-025.md) · v2.5.0 [`SPRINT-024`](03-sprints/SPRINT-024.md) · v2.4.0 [`SPRINT-023`](03-sprints/SPRINT-023.md) · v2.3.0 [`SPRINT-022`](03-sprints/SPRINT-022.md) · v2.2.0 [`SPRINT-021`](03-sprints/SPRINT-021.md) · v2.1.0 [`SPRINT-020`](03-sprints/SPRINT-020.md) · v2.0.0 [`SPRINT-019`](03-sprints/SPRINT-019.md) · v1.9.0 [`SPRINT-018`](03-sprints/SPRINT-018.md) · v1.8.0 [`SPRINT-017`](03-sprints/SPRINT-017.md) · v1.7.0 [`SPRINT-016`](03-sprints/SPRINT-016.md) · v1.6.0 [`SPRINT-015`](03-sprints/SPRINT-015.md) · v1.5.0 [`SPRINT-014`](03-sprints/SPRINT-014.md) · v1.4.0 [`SPRINT-013`](03-sprints/SPRINT-013.md) · v1.3.0 SPRINT-008–012 · v0.8.0 [`SPRINT-007`](03-sprints/SPRINT-007.md) · v0.2.0 [`SPRINT-001`](03-sprints/SPRINT-001.md)
 

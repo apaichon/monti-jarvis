@@ -1841,3 +1841,155 @@ erDiagram
 ```
 
 No new tables required for session/nav bugs (client-only).
+
+## Sprint 43 — Embed auth and tenant AI configuration
+
+### Existing table delta: `tenant_embed_configs`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `auth_required` | boolean not null default false | Customer auth gate for chat/voice initiated with this embed. |
+
+### Tenant AI tables
+
+| Table | Purpose | Tenant boundary |
+| --- | --- | --- |
+| `tenant_ai_configs` | One encrypted Gemini key and key metadata per tenant | PK `tenant_id`; no plaintext column |
+| `tenant_agent_configs` | Bounded custom system prompt per tenant/agent | Composite PK `(tenant_id, agent_id)` |
+| `tenant_call_tools` | Declarative tool schema plus compiled handler key | Unique `(tenant_id, tool_key)` |
+| `tenant_skills` | Bounded prompt/tool bundle | Unique `(tenant_id, slug)` |
+| `tenant_skill_tools` | Skill → tool references | Both foreign keys must share `tenant_id` |
+| `tenant_agent_skills` | Agent → skill assignments | Assignment is tenant + agent scoped |
+
+```mermaid
+erDiagram
+  tenants ||--o| tenant_embed_configs : "has embed policy"
+  tenants ||--o| tenant_ai_configs : "has provider metadata"
+  tenants ||--o{ tenant_agent_configs : "customizes agents"
+  tenants ||--o{ tenant_call_tools : "owns tools"
+  tenants ||--o{ tenant_skills : "owns skills"
+  tenant_skills ||--o{ tenant_skill_tools : "contains"
+  tenant_call_tools ||--o{ tenant_skill_tools : "is referenced"
+  tenant_skills ||--o{ tenant_agent_skills : "assigned"
+  tenant_agent_configs }o--o{ tenant_agent_skills : "uses"
+
+  tenant_embed_configs {
+    text tenant_id PK
+    boolean auth_required
+    text embed_key
+    boolean enabled
+    jsonb allowed_origins
+    text default_agent_id
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_ai_configs {
+    text tenant_id PK
+    bytea gemini_key_ciphertext
+    bytea gemini_key_nonce
+    text gemini_key_version
+    text gemini_key_last4
+    timestamptz gemini_key_updated_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_agent_configs {
+    text tenant_id PK
+    text agent_id PK
+    text system_prompt
+    boolean enabled
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_call_tools {
+    text id PK
+    text tenant_id
+    text tool_key
+    text handler_key
+    jsonb input_schema
+    boolean enabled
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_skills {
+    text id PK
+    text tenant_id
+    text slug
+    text prompt
+    boolean enabled
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_skill_tools {
+    text tenant_id PK
+    text skill_id PK
+    text tool_id PK
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_agent_skills {
+    text tenant_id PK
+    text agent_id PK
+    text skill_id PK
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Encryption and indexes
+
+`tenant_ai_configs.gemini_key_ciphertext` is AES-256-GCM output and
+`gemini_key_nonce` is generated for each write. The deployment key is read only
+from `TENANT_SECRET_ENCRYPTION_KEY`; it is not stored in Postgres, Redis,
+MinIO, browser storage, or audit metadata.
+
+Required indexes and constraints:
+
+- unique `(tenant_id, tool_key)` and `(tenant_id, slug)`;
+- unique `(tenant_id, skill_id, tool_id)` and `(tenant_id, agent_id, skill_id)`;
+- index `tenant_agent_configs (tenant_id, agent_id)`;
+- foreign-key checks or transaction-time validation prevent a tool/skill join
+  from referencing another tenant;
+- all writes use the existing audit-column trigger pattern.
+
+### Redis / MinIO boundary
+
+| Store | Sprint 43 contract |
+| --- | --- |
+| Redis DB 4 | Optional `monti_jarvis:ai:config:{tenant_id}` metadata cache only; no key plaintext, prompt text, schemas, or arguments. |
+| MinIO | No new objects; tenant secrets and AI configuration stay in Postgres. |
+
+### Future entities
+
+| Entity | Status | Boundary |
+| --- | --- | --- |
+| `tenant_ai_configs` | **Sprint 43** | Encrypted provider key metadata |
+| `tenant_agent_configs` | **Sprint 43** | Tenant/agent prompt override |
+| `tenant_call_tools` | **Sprint 43** | Declarative schema + compiled handler allowlist |
+| `tenant_skills` | **Sprint 43** | Prompt/tool bundle |
+| `tenant_skill_tools` | **Sprint 43** | Same-tenant skill/tool join |
+| `tenant_agent_skills` | **Sprint 43** | Same-tenant agent/skill assignment |
+| `skill_marketplace_items` | future | Explicitly out of Sprint 43 |
+
+See DES-0039, 39-tenant-ai-config-extensibility-spec.md, 02-workflow.md
+§93–96, 04-api-spec.md, and 05-ux-ui.md.
