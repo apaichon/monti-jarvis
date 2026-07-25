@@ -333,6 +333,8 @@ func main() {
 	mux.Handle("POST /api/km/agents/{agent_id}/reset", guard.RequireKMWrite(http.HandlerFunc(s.resetAgentKnowledge)))
 	mux.Handle("POST /api/km/seed", guard.RequirePlatformAdmin(http.HandlerFunc(s.seedKnowledge)))
 	mux.HandleFunc("POST /api/public/tenant/register", s.registerTenant)
+	mux.Handle("GET /api/tenant/referral", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantReferralCode)))
+	mux.Handle("GET /api/tenant/referrals", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantReferrals)))
 	mux.HandleFunc("GET /api/public/tenant/verify-email", s.verifyTenantEmail)
 	mux.HandleFunc("POST /api/public/tenant/verify-email", s.verifyTenantEmail)
 	// Shared tenant OAuth (login + register): one start/callback per provider.
@@ -356,6 +358,7 @@ func main() {
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/kyc", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/approve", guard.RequirePlatformAdmin(http.HandlerFunc(s.approvePlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))
+	mux.Handle("POST /api/platform/referrals/{id}/qualify", guard.RequirePlatformAdmin(http.HandlerFunc(s.qualifyPlatformReferral)))
 	mux.HandleFunc("GET /api/tenant/kyc", s.getTenantKYC)
 	mux.HandleFunc("PUT /api/tenant/kyc", s.updateTenantKYC)
 	mux.HandleFunc("POST /api/tenant/kyc/photo", s.uploadTenantKYCPhoto)

@@ -82,6 +82,7 @@ type RegisterTenantInput struct {
 	EmailVerified       bool
 	OAuthProvider       string
 	OAuthProviderUserID string
+	ReferralCode        string
 }
 
 type RegisterTenantResult struct {
@@ -332,6 +333,12 @@ INSERT INTO %s.user_oauth_identities (provider, provider_user_id, user_id, email
 VALUES ($1, $2, $3, $4, $5, $5)`, schema),
 			in.OAuthProvider, in.OAuthProviderUserID, userID, normalized.AdminEmail, actor)
 		if err != nil {
+			return nil, err
+		}
+	}
+
+	if strings.TrimSpace(in.ReferralCode) != "" {
+		if _, err := s.attributeReferralTx(ctx, tx, in.ReferralCode, slug, "tenant_registration"); err != nil {
 			return nil, err
 		}
 	}

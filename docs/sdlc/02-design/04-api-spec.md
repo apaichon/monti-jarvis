@@ -2,7 +2,7 @@
 id: DES-0004
 title: API Specification
 status: shipped
-updated: 2026-07-17
+updated: 2026-07-25
 sprint: SPRINT-030
 ---
 
@@ -550,6 +550,7 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
 | `admin_email` | string | yes | First tenant_admin email (unique) |
 | `admin_password` | string | yes | min 8 characters |
 | `admin_display_name` | string | yes | Shown in profile (1–80 chars) |
+| `referral_code` | string | no | Tenant referral code; captured once during registration |
 
 **Response 201:**
 
@@ -573,6 +574,23 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
 ```
 
 **Errors:** `400` validation · `409` slug/email conflict · `429` rate limit · `503` registration disabled or Postgres down
+
+## Tenant referrals (Sprint 46 foundation)
+
+Referral data is tenant-scoped. This foundation captures one attribution at
+registration and records qualification state; it does not grant or consume
+bonus quota.
+
+| Method | Path | Role | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/tenant/referral` | `tenant_admin` | Get or create the active tenant's stable referral code |
+| `GET` | `/api/tenant/referrals` | `tenant_admin` | List referrals attributed to the authenticated tenant |
+| `POST` | `/api/platform/referrals/{id}/qualify` | `platform_admin` | Evaluate active status, approved KYC, and paid non-voided order |
+
+Referral states are `clicked`, `attributed`, `pending`, `qualified`,
+`rejected`, and `reversed`. Repeated qualification is idempotent. A pending
+qualification returns `409` with `error: referral_not_qualified` and the
+current referral record.
 
 ### `GET /api/platform/tenants`
 

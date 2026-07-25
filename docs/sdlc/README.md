@@ -16,7 +16,7 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** Sprint 46 — Tenant Referral Affiliate Program and Bonus Quota (**backlog**)
+**Current sprint:** Sprint 46 — Tenant Referral Affiliate Program and Bonus Quota (**in_progress**)
 
 **Parallel build:** _none_
 

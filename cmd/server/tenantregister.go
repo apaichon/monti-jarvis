@@ -22,6 +22,7 @@ type registerTenantRequest struct {
 	AdminEmail       string `json:"admin_email"`
 	AdminPassword    string `json:"admin_password"`
 	AdminDisplayName string `json:"admin_display_name"`
+	ReferralCode     string `json:"referral_code"`
 }
 
 type registerTenantResponse struct {
@@ -84,6 +85,7 @@ func (s *server) registerTenant(w http.ResponseWriter, r *http.Request) {
 		PasswordHash:     hash,
 		AuthProvider:     "email",
 		EmailVerified:    false,
+		ReferralCode:     req.ReferralCode,
 	})
 	if err != nil {
 		writeRegisterError(w, err)
@@ -213,6 +215,12 @@ func writeRegisterError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "slug already taken")
 	case errors.Is(err, store.ErrTenantEmailRegistered):
 		writeError(w, http.StatusConflict, "email already registered")
+	case errors.Is(err, store.ErrReferralSelf):
+		writeError(w, http.StatusBadRequest, "self-referral is not allowed")
+	case errors.Is(err, store.ErrReferralAlreadyAttributed):
+		writeError(w, http.StatusConflict, "tenant already has a referral attribution")
+	case errors.Is(err, store.ErrReferralInvalid):
+		writeError(w, http.StatusBadRequest, "referral code is invalid")
 	case errors.Is(err, store.ErrOAuthIdentityInUse):
 		writeError(w, http.StatusConflict, "account already linked")
 	case errors.Is(err, errOAuthUserInactive):
