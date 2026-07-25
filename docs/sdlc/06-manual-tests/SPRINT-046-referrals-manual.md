@@ -1,6 +1,6 @@
 ---
 id: UAT-SPRINT-046-TASK-0169
-status: ready
+status: deferred
 updated: 2026-07-25
 sprint: SPRINT-046
 task: TASK-0169
@@ -8,6 +8,10 @@ owner: tester
 ---
 
 # Sprint 46 referral foundation — manual UAT
+
+> **Deferred at sprint close:** test later. This checklist remains the required
+> manual verification before the referral foundation is treated as fully UAT
+> accepted.
 
 This runbook verifies the Sprint 46 referral attribution and qualification
 foundation. It covers referral code creation, transactional signup attribution,

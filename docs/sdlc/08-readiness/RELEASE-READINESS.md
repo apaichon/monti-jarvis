@@ -2,10 +2,10 @@
 id: READINESS-RELEASE
 status: completed
 updated: 2026-07-25
-current_sprint: SPRINT-046
-release_target: v2.18.1
-release: v2.18.1
-git_tag: v2.18.1
+current_sprint: SPRINT-047
+release_target: v2.19.0
+release: v2.19.0
+git_tag: v2.19.0
 ---
 
 # Release Readiness Checklist
@@ -146,6 +146,15 @@ curl -fsS http://localhost:8091/api/workforce
   explicitly deferred to Sprint 46 under TASK-0166/TASK-0167/TASK-0168 in the
   [SPRINT-045 manual checklist](../06-manual-tests/SPRINT-045-manual.md).
 
+### SPRINT-046 (v2.19.0 partial)
+
+- [x] TASK-0169 referral attribution and qualification foundation.
+- [x] Tenant-scoped referral code, idempotent attribution, qualification gates,
+  and append-only status events covered by automated tests.
+- [x] Full Go tests, Go vet, server build, and diff validation.
+- [ ] Manual referral UAT; deferred with the close remark **test later**.
+- [ ] TASK-0166, TASK-0167, and TASK-0168 carry over for completion.
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -167,6 +176,10 @@ curl -fsS http://localhost:8091/api/workforce
 | Tester | Codex release verification | 2026-07-25 | Automated verification passed; Docker-backed S45 UAT deferred |
 | PM | User-authorized release close | 2026-07-25 | v2.18.1 closes S45 as a partial release; manual UAT deferred |
 | DevOps | Codex release verification | 2026-07-25 | Release build and tag prepared; S45 integration UAT carried forward |
+| Dev | Codex release verification | 2026-07-25 | S46 referral attribution foundation and Monti email template branding |
+| Tester | Codex release verification | 2026-07-25 | Automated verification passed; manual UAT deferred — test later |
+| PM | User-authorized release close | 2026-07-25 | v2.19.0 closes S46 as a partial release; 7 points carry over |
+| DevOps | Codex release verification | 2026-07-25 | Release metadata prepared; tag and branch push pending |
 
 ## H. Release-cut (PM + DevOps)
 
@@ -179,10 +192,11 @@ git push origin v2.13.0
 ```
 
 - [x] Tag `v2.18.0` pushed to `origin`
-- [ ] Tag `v2.18.1` pushed to `origin` (this close)
+- [x] Tag `v2.18.1` pushed to `origin`
 - [x] Sprint marked `completed` in `03-sprints/`
 - [x] `_velocity.json` updated
-- [x] ROADMAP Sprint 45 shipped slice marked v2.18.0 and next sprint pointer advanced to Sprint 46
+- [x] ROADMAP Sprint 46 partial slice marked v2.19.0 and next sprint pointer advanced to Sprint 47
+- [ ] Tag `v2.19.0` pushed to `origin` (this close)
 
 ## Quick demo script (stakeholder, ~10 min)
 

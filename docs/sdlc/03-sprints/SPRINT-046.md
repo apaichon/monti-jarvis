@@ -1,11 +1,14 @@
 ---
 id: SPRINT-046
-status: in_progress
+status: completed
 start: 2026-08-08
 end: 2026-08-14
 updated: 2026-07-25
+closed: 2026-07-25
 design_pack: pending
 release_target: v2.19.0
+release: v2.19.0
+release_scope: partial_3_of_10_points_manual_uat_deferred
 roadmap_sprint: 46
 platform: Platform / Tenant / Growth
 feature: Tenant referral affiliate program and bonus quota
@@ -14,6 +17,10 @@ carry_over_from: SPRINT-045
 ---
 
 # SPRINT-046: Tenant Referral Affiliate Program and Bonus Quota
+
+> **CLOSED AS PARTIAL:** v2.19.0 ships the 3-point referral attribution and
+> qualification foundation. TASK-0166, TASK-0167, and TASK-0168 carry over as
+> 7 points. Manual testing is deferred with the close remark: **test later**.
 
 ## Goal
 
@@ -27,9 +34,9 @@ entitlements.
 
 | Task | Scope | Points | Status |
 | --- | --- | ---: | --- |
-| TASK-0166 | Carry over S45 usage/reconciliation hardening | 3 | in_progress |
-| TASK-0167 | Carry over S45 dashboard/reporting verification | 2 | in_progress |
-| TASK-0168 | Carry over S45 manual UAT | 2 | in_progress |
+| TASK-0166 | Carry over S45 usage/reconciliation hardening | 3 | carry_over |
+| TASK-0167 | Carry over S45 dashboard/reporting verification | 2 | carry_over |
+| TASK-0168 | Carry over S45 manual UAT | 2 | carry_over |
 | TASK-0169 | Referral attribution and qualification foundation | 3 | completed |
 | **Total** | | **10** | |
 
@@ -55,3 +62,9 @@ make test
 make build
 git diff --check
 ```
+
+## Close note
+
+Automated verification passed for the shipped foundation. The step-by-step
+manual UAT is intentionally deferred: **test later**. Bonus-quota grants,
+affiliate UX, and the three carry-over tasks remain outside this partial close.
