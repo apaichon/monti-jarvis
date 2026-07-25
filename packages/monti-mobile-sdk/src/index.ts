@@ -26,6 +26,17 @@ export interface MobileAvatar {
   is_default?: boolean;
 }
 
+export interface MobileQuotaDimension {
+  dimension: string;
+  unit: string;
+  period: string;
+  limit: number;
+  consumed: number | null;
+  remaining: number | null;
+  source: string;
+  freshness: string;
+}
+
 export interface MobileBootstrap {
   version: "v1";
   tenant: { id: string; display_name: string; slug: string };
@@ -57,6 +68,8 @@ export interface MobileBootstrap {
     warning_at_seconds: number;
     reset_at: string;
     state: string;
+    mobile_call_minutes?: MobileQuotaDimension;
+    dimensions?: MobileQuotaDimension[];
   };
 }
 

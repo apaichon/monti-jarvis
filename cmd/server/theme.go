@@ -314,7 +314,9 @@ func (s *server) serveThemeAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 	w.Header().Set("Content-Type", ct)
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	// Logo URLs are content-addressed, so they can be cached without causing a
+	// newly uploaded logo to be masked by the previous browser cache entry.
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	_, _ = io.Copy(w, rc)
 }
 

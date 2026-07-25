@@ -1993,3 +1993,163 @@ Required indexes and constraints:
 
 See DES-0039, 39-tenant-ai-config-extensibility-spec.md, 02-workflow.md
 §93–96, 04-api-spec.md, and 05-ux-ui.md.
+
+## Sprint 44 — Customer generative workspace
+
+> **ON HOLD:** The S44 migration and runtime schema creation were removed. The
+> following is a retained design proposal only; these tables do not exist in
+> the current build.
+
+```mermaid
+erDiagram
+  tenants ||--o{ customer_generation_connections : owns
+  customers ||--o{ customer_generation_connections : configures
+  tenants ||--o{ customer_generation_jobs : scopes
+  customers ||--o{ customer_generation_jobs : submits
+  customer_generation_jobs ||--o{ customer_generation_artifacts : produces
+  tenants ||--o{ customer_generation_artifacts : scopes
+  customers ||--o{ customer_generation_artifacts : owns
+
+  customer_generation_connections {
+    text tenant_id PK,FK
+    text customer_id PK,FK
+    text provider PK
+    text mode
+    bytea key_ciphertext
+    bytea key_nonce
+    text key_version
+    text key_last4
+    text status
+    timestamptz expires_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_generation_jobs {
+    text id PK
+    text tenant_id FK
+    text customer_id FK
+    text provider
+    text output_type
+    text prompt
+    text status
+    int attempts
+    text error_code
+    text error_message
+    text idempotency_key UK
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  customer_generation_artifacts {
+    text id PK
+    text job_id FK
+    text tenant_id FK
+    text customer_id FK
+    text artifact_type
+    text mime
+    text filename
+    text object_key
+    bigint size_bytes
+    text sha256
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+Redis uses `monti_jarvis:quota:{tenant_id}:generation` in DB 4 for the bounded
+generation rate bucket. MinIO objects use
+`km/generative/{tenant_id}/{customer_id}/{job_id}/{artifact_id}/{filename}`.
+The browser receives only metadata and an authenticated artifact URL.
+
+| Future entity | Status | Boundary |
+| --- | --- | --- |
+| `customer_generation_connections` | **Sprint 44** | Encrypted provider metadata per tenant/customer |
+| `customer_generation_jobs` | **Sprint 44** | Idempotent bounded generation state |
+| `customer_generation_artifacts` | **Sprint 44** | Tenant/customer-owned MinIO metadata |
+| `provider_subscription_sessions` | future | Explicitly deferred until a supported login contract exists |
+
+See DES-0040, 40-customer-generative-workspace-spec.md, workflow §97–99,
+04-api-spec.md, and 05-ux-ui.md.
+
+## Sprint 45 — AiaaS packages and usage reconciliation
+
+> **REVIEW PENDING:** These are proposed entities for the S45 design pack.
+> They require a migration and implementation review before creation.
+
+```mermaid
+erDiagram
+  tenants ||--o{ tenant_entitlement_snapshots : owns
+  packages ||--o{ tenant_entitlement_snapshots : contextualizes
+  tenant_entitlement_snapshots ||--o{ usage_events : prices
+  tenants ||--o{ usage_events : emits
+  usage_reconciliation_runs ||--o{ usage_events : reviews
+
+  tenant_entitlement_snapshots {
+    text id PK
+    text tenant_id FK
+    text package_id FK
+    text rules_schema_id FK
+    jsonb rules_snapshot
+    timestamptz valid_from
+    timestamptz valid_until
+    text source_order_id
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  usage_events {
+    text id PK
+    text tenant_id FK
+    text idempotency_key UK
+    text dimension
+    text unit
+    numeric amount
+    date period_start
+    date period_end
+    text source_type
+    text source_id
+    text entitlement_snapshot_id FK
+    text state
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  usage_reconciliation_runs {
+    text id PK
+    date start_date
+    date end_date
+    text status
+    jsonb source_watermarks
+    int mismatch_count
+    int correction_count
+    text error_code
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+| Entity | Status | Boundary |
+| --- | --- | --- |
+| `tenant_entitlement_snapshots` | **Sprint 45 proposed** | Immutable package context per validity interval |
+| `usage_events` | **Sprint 45 proposed** | One logical tenant-scoped event per idempotency key |
+| `usage_reconciliation_runs` | **Sprint 45 proposed** | Platform-admin run metadata; no raw provider bodies |
+
+Redis DB 4 keeps enforcement counters under `monti_jarvis:quota:{tenant}:...`.
+MinIO storage accounting is derived only from successful object operations; an
+unavailable manifest is reported as stale/unavailable, never as zero.
+
+See DES-0042, 42-aiaas-packages-usage-reconciliation-spec.md, workflow
+§100–104, API Sprint 45, and UX Sprint 45.

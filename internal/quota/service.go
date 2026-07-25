@@ -24,21 +24,25 @@ type UsageStore interface {
 	CountActiveTenantAssignments(ctx context.Context, tenantID string) (int, error)
 }
 
+type storageUsageStore interface {
+	CountTenantStorageBytes(ctx context.Context, tenantID string) (int, error)
+}
+
 // Service enforces package quotas and API rate limits (SPRINT-013).
 type Service struct {
-	ents               EntitlementReader
-	store              UsageStore
-	rdb                *redis.Client
-	prefix             string
-	enabled            bool
-	rateEnabled        bool
-	failOpen           bool
-	chatPerMin         int
-	kmPerMin           int
-	voicePerMin        int
-	concurrentTTL      time.Duration
+	ents                 EntitlementReader
+	store                UsageStore
+	rdb                  *redis.Client
+	prefix               string
+	enabled              bool
+	rateEnabled          bool
+	failOpen             bool
+	chatPerMin           int
+	kmPerMin             int
+	voicePerMin          int
+	concurrentTTL        time.Duration
 	previewMaxConcurrent int
-	now                func() time.Time // injectable for tests
+	now                  func() time.Time // injectable for tests
 }
 
 // New builds a quota service from app config + store + entitlements.
@@ -127,7 +131,11 @@ func (s *Service) RateLimitStatus(ctx context.Context) string {
 
 // Snapshot returns limits + usage for platform admin UI.
 func (s *Service) Snapshot(ctx context.Context, tenantID string) (*Snapshot, error) {
-	period := s.now().UTC().Format("2006-01")
+	now := time.Now()
+	if s != nil && s.now != nil {
+		now = s.now()
+	}
+	period := now.UTC().Format("2006-01")
 	out := &Snapshot{
 		TenantID: tenantID,
 		Status:   "none",
@@ -138,7 +146,7 @@ func (s *Service) Snapshot(ctx context.Context, tenantID string) (*Snapshot, err
 		return out, nil
 	}
 
-	usage, err := s.collectUsage(ctx, tenantID)
+	usage, availability, err := s.collectUsage(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -160,12 +168,51 @@ func (s *Service) Snapshot(ctx context.Context, tenantID string) (*Snapshot, err
 		out.Status = "active"
 	}
 	out.Limits = &limits
+	out.Dimensions = dimensionRows(out.Period, limits, out.Usage, availability)
 	out.Package = &PackageSummary{
 		ID:   eff.Package.ID,
 		Slug: eff.Package.Slug,
 		Name: eff.Package.Name,
 	}
 	return out, nil
+}
+
+type dimensionAvailability struct {
+	available bool
+	source    string
+	freshness string
+}
+
+type usageAvailability struct {
+	aiEmployees        dimensionAvailability
+	monthlyCallMinutes dimensionAvailability
+	mobileCallMinutes  dimensionAvailability
+	kmDocuments        dimensionAvailability
+	storageBytes       dimensionAvailability
+	concurrentCalls    dimensionAvailability
+}
+
+func dimensionRows(period string, limits Limits, usage Usage, available usageAvailability) []Dimension {
+	rows := make([]Dimension, 0, 6)
+	appendRow := func(name, unit string, limit, consumed int, state dimensionAvailability) {
+		if !state.available {
+			rows = append(rows, Dimension{Dimension: name, Unit: unit, Period: period, Limit: limit, Source: "unavailable", Freshness: "unavailable"})
+			return
+		}
+		remaining := limit - consumed
+		if remaining < 0 {
+			remaining = 0
+		}
+		used := consumed
+		rows = append(rows, Dimension{Dimension: name, Unit: unit, Period: period, Limit: limit, Consumed: &used, Remaining: &remaining, Source: state.source, Freshness: state.freshness})
+	}
+	appendRow("ai_employees", UnitAssignments, limits.MaxAIEmployees, usage.AIEmployees, available.aiEmployees)
+	appendRow("monthly_call_minutes", UnitMinutes, limits.MaxMonthlyCallMinutes, usage.MonthlyCallMinutes, available.monthlyCallMinutes)
+	appendRow("mobile_call_minutes", UnitMinutes, limits.MaxMobileCallMinutes, usage.MobileCallMinutes, available.mobileCallMinutes)
+	appendRow("km_documents", UnitDocuments, limits.MaxKMDocuments, usage.KMDocuments, available.kmDocuments)
+	appendRow("storage_bytes", UnitBytes, limits.MaxStorageBytes, usage.StorageBytes, available.storageBytes)
+	appendRow("concurrent_calls", UnitCalls, limits.MaxConcurrentCalls, usage.ConcurrentCalls, available.concurrentCalls)
+	return rows
 }
 
 // AllowRate enforces per-tenant per-minute rate limits for chat|km|voice.
@@ -292,6 +339,82 @@ func (s *Service) CheckMonthlyMinutes(ctx context.Context, tenantID string, addi
 	}
 	if cur+additional > limits.MaxMonthlyCallMinutes {
 		return limitExceeded(DimMaxMonthlyCallMinutes, limits.MaxMonthlyCallMinutes, cur)
+	}
+	return nil
+}
+
+// CheckMobileMinutes applies the mobile-only monthly allowance. Mobile and
+// web minutes deliberately use separate counters and dimensions.
+func (s *Service) CheckMobileMinutes(ctx context.Context, tenantID string, additional int) error {
+	return s.checkMonthlyDimension(ctx, tenantID, additional, DimMaxMobileCallMinutes, s.mobileMinutesKey)
+}
+
+// AddMobileCallMinutes increments the mobile-only monthly counter.
+func (s *Service) AddMobileCallMinutes(ctx context.Context, tenantID string, minutes int) error {
+	return s.addMonthlyDimension(ctx, tenantID, minutes, s.mobileMinutesKey)
+}
+
+// GetMobileCallMinutes reads the current mobile monthly counter.
+func (s *Service) GetMobileCallMinutes(ctx context.Context, tenantID string) (int, error) {
+	if s == nil || s.rdb == nil || tenantID == "" {
+		return 0, nil
+	}
+	return s.getInt(ctx, s.mobileMinutesKey(tenantID))
+}
+
+// CheckStorageBytes applies the monthly storage allowance to a successful
+// object write. The counter is updated only after the object write succeeds.
+func (s *Service) CheckStorageBytes(ctx context.Context, tenantID string, additional int) error {
+	return s.checkMonthlyDimension(ctx, tenantID, additional, DimMaxStorageBytes, s.storageBytesKey)
+}
+
+// AddStorageBytes increments the storage projection counter.
+func (s *Service) AddStorageBytes(ctx context.Context, tenantID string, bytes int) error {
+	return s.addMonthlyDimension(ctx, tenantID, bytes, s.storageBytesKey)
+}
+
+func (s *Service) checkMonthlyDimension(ctx context.Context, tenantID string, additional int, dimension string, keyFn func(string) string) error {
+	if s == nil || !s.enabled {
+		return nil
+	}
+	if additional < 0 {
+		additional = 0
+	}
+	limits, err := s.limitsOrNil(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	if limits == nil {
+		return nil
+	}
+	limit := limitForDimension(*limits, dimension)
+	cur, err := s.getInt(ctx, keyFn(tenantID))
+	if err != nil {
+		return s.onRedisErr("CheckMonthlyDimension", err)
+	}
+	if additional == 0 {
+		if cur >= limit {
+			return limitExceeded(dimension, limit, cur)
+		}
+		return nil
+	}
+	if cur+additional > limit {
+		return limitExceeded(dimension, limit, cur)
+	}
+	return nil
+}
+
+func (s *Service) addMonthlyDimension(ctx context.Context, tenantID string, amount int, keyFn func(string) string) error {
+	if s == nil || !s.enabled || amount <= 0 || tenantID == "" || s.rdb == nil {
+		return nil
+	}
+	key := keyFn(tenantID)
+	n, err := s.rdb.IncrBy(ctx, key, int64(amount)).Result()
+	if err != nil {
+		return s.onRedisErr("AddMonthlyDimension", err)
+	}
+	if n == int64(amount) {
+		_ = s.rdb.Expire(ctx, key, 40*24*time.Hour).Err()
 	}
 	return nil
 }
@@ -484,6 +607,10 @@ func (s *Service) Check(ctx context.Context, tenantID, dimension string) error {
 		return nil
 	case DimMaxMonthlyCallMinutes:
 		return s.CheckMonthlyMinutes(ctx, tenantID, 0)
+	case DimMaxMobileCallMinutes:
+		return s.CheckMobileMinutes(ctx, tenantID, 0)
+	case DimMaxStorageBytes:
+		return s.CheckStorageBytes(ctx, tenantID, 0)
 	case DimMaxAIEmployees:
 		n, err := s.countAvatars(ctx, tenantID)
 		if err != nil {
@@ -519,6 +646,14 @@ func (s *Service) concurrentKey(tenantID string) string {
 func (s *Service) minutesKey(tenantID string) string {
 	ym := s.now().UTC().Format("200601")
 	return s.prefix + "quota:" + tenantID + ":minutes:" + ym
+}
+
+func (s *Service) mobileMinutesKey(tenantID string) string {
+	return s.prefix + "quota:" + tenantID + ":mobile_minutes:" + s.now().UTC().Format("200601")
+}
+
+func (s *Service) storageBytesKey(tenantID string) string {
+	return s.prefix + "quota:" + tenantID + ":storage_bytes:" + s.now().UTC().Format("200601")
 }
 
 func (s *Service) rateKey(tenantID, bucket string) string {
@@ -567,27 +702,53 @@ func (s *Service) limitsOrNil(ctx context.Context, tenantID string) (*Limits, er
 	return &l, nil
 }
 
-func (s *Service) collectUsage(ctx context.Context, tenantID string) (Usage, error) {
+func (s *Service) collectUsage(ctx context.Context, tenantID string) (Usage, usageAvailability, error) {
 	u := Usage{}
+	a := usageAvailability{}
 	if n, err := s.countAvatars(ctx, tenantID); err == nil {
 		u.AIEmployees = n
+		a.aiEmployees = dimensionAvailability{available: true, source: "postgres", freshness: "current"}
 	} else if !s.failOpen {
-		return u, err
+		return u, a, err
 	}
 	if n, err := s.countKM(ctx, tenantID); err == nil {
 		u.KMDocuments = n
+		a.kmDocuments = dimensionAvailability{available: true, source: "postgres", freshness: "current"}
 	} else if !s.failOpen {
-		return u, err
+		return u, a, err
 	}
 	if s.rdb != nil {
-		if n, err := s.getInt(ctx, s.concurrentKey(tenantID)); err == nil {
-			u.ConcurrentCalls = n
-		}
-		if n, err := s.getInt(ctx, s.minutesKey(tenantID)); err == nil {
-			u.MonthlyCallMinutes = n
+		if err := s.rdb.Ping(ctx).Err(); err == nil {
+			redisState := dimensionAvailability{available: true, source: "redis_db_4", freshness: "current"}
+			if n, err := s.getInt(ctx, s.concurrentKey(tenantID)); err == nil {
+				u.ConcurrentCalls = n
+				a.concurrentCalls = redisState
+			}
+			if n, err := s.getInt(ctx, s.minutesKey(tenantID)); err == nil {
+				u.MonthlyCallMinutes = n
+				a.monthlyCallMinutes = redisState
+			}
+			if n, err := s.getInt(ctx, s.mobileMinutesKey(tenantID)); err == nil {
+				u.MobileCallMinutes = n
+				a.mobileCallMinutes = redisState
+			}
+			if _, ok := s.store.(storageUsageStore); !ok {
+				if n, err := s.getInt(ctx, s.storageBytesKey(tenantID)); err == nil {
+					u.StorageBytes = n
+					a.storageBytes = redisState
+				}
+			}
 		}
 	}
-	return u, nil
+	if ss, ok := s.store.(storageUsageStore); ok {
+		if n, err := ss.CountTenantStorageBytes(ctx, tenantID); err == nil {
+			u.StorageBytes = n
+			a.storageBytes = dimensionAvailability{available: true, source: "postgres_minio", freshness: "current"}
+		} else if !s.failOpen {
+			return u, a, err
+		}
+	}
+	return u, a, nil
 }
 
 func (s *Service) countKM(ctx context.Context, tenantID string) (int, error) {
@@ -623,17 +784,38 @@ func (s *Service) onRedisErr(op string, err error) error {
 		log.Printf("quota: %s redis error (fail-open): %v", op, err)
 		return nil
 	}
-	return err
+	return quotaUnavailable()
 }
 
 func limitsFromRules(rules map[string]any) Limits {
+	mobileMinutes := intRule(rules, DimMaxMobileCallMinutes, -1)
+	if mobileMinutes < 0 {
+		// rules-v1 predates the mobile dimension. Keep existing packages
+		// compatible by mirroring their web-minute allowance.
+		mobileMinutes = intRule(rules, DimMaxMonthlyCallMinutes, 0)
+	}
 	return Limits{
 		MaxAIEmployees:        intRule(rules, DimMaxAIEmployees, 0),
 		MaxMonthlyCallMinutes: intRule(rules, DimMaxMonthlyCallMinutes, 0),
+		MaxMobileCallMinutes:  mobileMinutes,
 		MaxKMDocuments:        intRule(rules, DimMaxKMDocuments, 0),
+		MaxStorageBytes:       intRule(rules, DimMaxStorageBytes, 0),
 		MaxConcurrentCalls:    intRule(rules, DimMaxConcurrentCalls, 0),
 		VoiceEnabled:          boolRule(rules, DimVoiceEnabled, true),
 		RAGEnabled:            boolRule(rules, DimRAGEnabled, true),
+	}
+}
+
+func limitForDimension(l Limits, dimension string) int {
+	switch dimension {
+	case DimMaxMonthlyCallMinutes:
+		return l.MaxMonthlyCallMinutes
+	case DimMaxMobileCallMinutes:
+		return l.MaxMobileCallMinutes
+	case DimMaxStorageBytes:
+		return l.MaxStorageBytes
+	default:
+		return 0
 	}
 }
 

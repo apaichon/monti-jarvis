@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	ErrAvatarNotFound           = errors.New("avatar not found")
-	ErrAvatarHasAssignments     = errors.New("avatar has active tenant assignments")
-	ErrVoiceProviderNotFound    = errors.New("voice provider not found")
-	ErrAssignmentNotFound       = errors.New("tenant avatar assignment not found")
-	ErrMaxAIEmployeesExceeded     = errors.New("max ai employees exceeded")
+	ErrAvatarNotFound         = errors.New("avatar not found")
+	ErrAvatarHasAssignments   = errors.New("avatar has active tenant assignments")
+	ErrVoiceProviderNotFound  = errors.New("voice provider not found")
+	ErrAssignmentNotFound     = errors.New("tenant avatar assignment not found")
+	ErrMaxAIEmployeesExceeded = errors.New("max ai employees exceeded")
 )
 
 type Avatar struct {
@@ -124,7 +124,7 @@ func (s *Store) seedAvatars(ctx context.Context) error {
 
 	type seedAvatar struct {
 		id, name, role, trait, color, imageURL, greeting, voice string
-		flags                                                    string
+		flags                                                   string
 	}
 	seeds := []seedAvatar{
 		{"ava", "Ava", "General Support", "Warm & Patient", "#008cff", "/images/ava.jpg",
@@ -333,6 +333,9 @@ func (s *Store) ReplaceAvatarVoices(ctx context.Context, avatarID string, voices
 }
 
 func (s *Store) CountActiveTenantAssignments(ctx context.Context, tenantID string) (int, error) {
+	if s == nil || s.pg == nil {
+		return 0, fmt.Errorf("postgres is not available")
+	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	var n int
 	err := s.pg.QueryRow(ctx, fmt.Sprintf(`

@@ -21,6 +21,8 @@ func writeQuotaError(w http.ResponseWriter, err error) {
 	if errors.As(err, &qe) {
 		status := http.StatusTooManyRequests
 		switch qe.Code {
+		case "quota_unavailable":
+			status = http.StatusServiceUnavailable
 		case "feature_disabled":
 			status = http.StatusForbidden
 		case "no_entitlement":
@@ -100,7 +102,13 @@ func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, t
 		writeQuotaError(w, err)
 		return
 	}
-	if err := s.quota.CheckMonthlyMinutes(ctx, tenantID, 0); err != nil {
+	mobileCall := r.URL.Query().Get("mobile") == "1"
+	if mobileCall {
+		if err := s.quota.CheckMobileMinutes(ctx, tenantID, 0); err != nil {
+			writeQuotaError(w, err)
+			return
+		}
+	} else if err := s.quota.CheckMonthlyMinutes(ctx, tenantID, 0); err != nil {
 		writeQuotaError(w, err)
 		return
 	}
@@ -149,7 +157,11 @@ func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, t
 		}
 		if mins > 0 {
 			bg := context.Background()
-			_ = s.quota.AddCallMinutes(bg, tenantID, mins)
+			if mobileCall {
+				_ = s.quota.AddMobileCallMinutes(bg, tenantID, mins)
+			} else {
+				_ = s.quota.AddCallMinutes(bg, tenantID, mins)
+			}
 			_ = s.quota.AddDailyCallMinutes(bg, tenantID, tz, mins)
 		}
 	}()
@@ -203,7 +215,7 @@ func (s *server) getPlatformTenantUsage(w http.ResponseWriter, r *http.Request) 
 			"package":   nil,
 			"limits":    nil,
 			"usage": map[string]int{
-				"ai_employees": 0, "monthly_call_minutes": 0, "km_documents": 0, "concurrent_calls": 0,
+				"ai_employees": 0, "monthly_call_minutes": 0, "mobile_call_minutes": 0, "km_documents": 0, "storage_bytes": 0, "concurrent_calls": 0,
 			},
 		})
 		return

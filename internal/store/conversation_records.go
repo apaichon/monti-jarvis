@@ -58,6 +58,27 @@ type ConversationArchiveObject struct {
 	StoredAt             time.Time `json:"stored_at,omitempty"`
 }
 
+// CountTenantStorageBytes returns successfully persisted archive bytes for a
+// tenant. Failed and deleted objects do not consume the storage dimension.
+func (s *Store) CountTenantStorageBytes(ctx context.Context, tenantID string) (int, error) {
+	if s == nil || s.pg == nil {
+		return 0, fmt.Errorf("postgres is not available")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var bytes int64
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT COALESCE(SUM(size_bytes), 0)
+FROM %s.conversation_archive_objects
+WHERE tenant_id = $1 AND status = 'stored'`, schema), tenantID).Scan(&bytes)
+	if err != nil {
+		return 0, err
+	}
+	if bytes < 0 || bytes > int64(^uint(0)>>1) {
+		return 0, fmt.Errorf("storage usage is outside supported range")
+	}
+	return int(bytes), nil
+}
+
 type ConversationTranscriptLine struct {
 	ID        string    `json:"id"`
 	Role      string    `json:"role"`

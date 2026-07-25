@@ -2,10 +2,10 @@
 id: READINESS-RELEASE
 status: completed
 updated: 2026-07-18
-current_sprint: SPRINT-032
-release_target: v2.13.0
-release: v2.13.0
-git_tag: v2.13.0
+current_sprint: SPRINT-045
+release_target: v2.18.0
+release: v2.18.0
+git_tag: v2.18.0
 ---
 
 # Release Readiness Checklist
@@ -136,6 +136,15 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] Source-error behavior is covered by focused ClickHouse client regression coverage.
 - [ ] Manual browser, responsive-layout, dependency-failure, session-expiry, and existing-regression UAT evidence; carried over as TASK-0144.
 
+### SPRINT-045 (v2.18.0)
+
+- [x] TASK-0164 four-tier AiaaS package initialization and rules-v2 validation.
+- [x] TASK-0165 dimensioned quota enforcement, mobile allowance metadata, and
+  safe unavailable-source reporting.
+- [x] Full Go tests, Go/Svelte build, mobile SDK build, and diff validation.
+- [ ] Docker-backed two-tenant/load UAT and usage-ledger/reconciliation checks;
+  carried forward in [SPRINT-045 manual checklist](../06-manual-tests/SPRINT-045-manual.md).
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -153,6 +162,10 @@ curl -fsS http://localhost:8091/api/workforce
 | Tester | Codex release verification | 2026-07-18 | Automated contract, authorization, error, and build checks; manual UAT deferred |
 | PM | User-authorized release close | 2026-07-18 | Sprint 32 release accepted with TASK-0144 manual-UAT carry-over |
 | DevOps | Codex release verification | 2026-07-18 | Build/test/tag verification for v2.13.0 |
+| Dev | Codex release verification | 2026-07-25 | S45 package initialization and dimensioned quota slice |
+| Tester | Codex release verification | 2026-07-25 | Automated verification passed; Docker-backed S45 UAT deferred |
+| PM | User-authorized release close | 2026-07-25 | v2.18.0 ships the verified 6-point S45 slice |
+| DevOps | Codex release verification | 2026-07-25 | Release build and tag prepared; S45 integration UAT carried forward |
 
 ## H. Release-cut (PM + DevOps)
 

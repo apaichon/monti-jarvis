@@ -97,7 +97,7 @@ func (s *server) getTenantUsage(w http.ResponseWriter, r *http.Request) {
 			"package":   nil,
 			"limits":    nil,
 			"usage": map[string]int{
-				"ai_employees": 0, "monthly_call_minutes": 0, "km_documents": 0, "concurrent_calls": 0,
+				"ai_employees": 0, "monthly_call_minutes": 0, "mobile_call_minutes": 0, "km_documents": 0, "storage_bytes": 0, "concurrent_calls": 0,
 			},
 			"call_limits": nil,
 			"daily_usage": map[string]int{"call_minutes": 0},

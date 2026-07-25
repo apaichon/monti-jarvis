@@ -42,12 +42,12 @@ func (f *fakeStore) CountActiveTenantAssignments(ctx context.Context, tenantID s
 
 func starterRules() map[string]any {
 	return map[string]any{
-		"max_ai_employees":          2,
-		"max_monthly_call_minutes":  500,
-		"max_km_documents":          3,
-		"max_concurrent_calls":      2,
-		"voice_enabled":             true,
-		"rag_enabled":               true,
+		"max_ai_employees":         2,
+		"max_monthly_call_minutes": 500,
+		"max_km_documents":         3,
+		"max_concurrent_calls":     2,
+		"voice_enabled":            true,
+		"rag_enabled":              true,
 	}
 }
 
@@ -194,6 +194,34 @@ func TestAddCallMinutesAndMonthlyCheck(t *testing.T) {
 	}
 }
 
+func TestMobileMinutesUseSeparateCounter(t *testing.T) {
+	rules := starterRules()
+	rules[DimMaxMonthlyCallMinutes] = 10
+	rules[DimMaxMobileCallMinutes] = 7
+	svc, _ := testSvc(t, rules, nil)
+	ctx := context.Background()
+
+	if err := svc.AddCallMinutes(ctx, "demo", 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.CheckMobileMinutes(ctx, "demo", 0); err != nil {
+		t.Fatalf("web usage must not consume mobile allowance: %v", err)
+	}
+	if err := svc.AddMobileCallMinutes(ctx, "demo", 7); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.CheckMobileMinutes(ctx, "demo", 0); !errors.Is(err, ErrLimitExceeded) {
+		t.Fatalf("mobile allowance should be exhausted: %v", err)
+	}
+}
+
+func TestLegacyRulesMirrorMonthlyAllowanceForMobile(t *testing.T) {
+	limits := limitsFromRules(map[string]any{DimMaxMonthlyCallMinutes: 12})
+	if limits.MaxMobileCallMinutes != 12 {
+		t.Fatalf("legacy mobile limit = %d, want 12", limits.MaxMobileCallMinutes)
+	}
+}
+
 func TestSnapshot(t *testing.T) {
 	us := &fakeStore{kmDocs: 1, avatars: 1}
 	svc, _ := testSvc(t, starterRules(), us)
@@ -220,6 +248,45 @@ func TestSnapshot(t *testing.T) {
 	}
 	if snap.Usage.MonthlyCallMinutes != 5 || snap.Usage.ConcurrentCalls != 1 {
 		t.Fatalf("redis usage %+v", snap.Usage)
+	}
+	if len(snap.Dimensions) != 6 {
+		t.Fatalf("dimension count %d", len(snap.Dimensions))
+	}
+	for _, row := range snap.Dimensions {
+		if row.Consumed == nil || row.Remaining == nil {
+			t.Fatalf("available row has nil usage: %+v", row)
+		}
+		if row.Source == "" || row.Freshness != "current" {
+			t.Fatalf("dimension metadata: %+v", row)
+		}
+	}
+}
+
+func TestSnapshotMarksRedisDimensionsUnavailable(t *testing.T) {
+	svc, mr := testSvc(t, starterRules(), &fakeStore{kmDocs: 1, avatars: 1})
+	mr.Close()
+	snap, err := svc.Snapshot(context.Background(), "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range snap.Dimensions {
+		if row.Dimension == "mobile_call_minutes" {
+			if row.Source != "unavailable" || row.Freshness != "unavailable" || row.Consumed != nil || row.Remaining != nil {
+				t.Fatalf("redis outage row: %+v", row)
+			}
+			return
+		}
+	}
+	t.Fatal("mobile dimension missing")
+}
+
+func TestQuotaUnavailableUsesSafeError(t *testing.T) {
+	svc, mr := testSvc(t, starterRules(), nil)
+	svc.failOpen = false
+	mr.Close()
+	err := svc.CheckMobileMinutes(context.Background(), "demo", 0)
+	if !errors.Is(err, ErrQuotaUnavailable) {
+		t.Fatalf("error = %v, want ErrQuotaUnavailable", err)
 	}
 }
 

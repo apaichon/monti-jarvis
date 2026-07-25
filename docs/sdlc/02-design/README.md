@@ -44,6 +44,9 @@ System design artifacts for Monti Jarvis.
 | 37 | [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md) | 39 | Tenant brand chrome (name/logo/subtitle) + color tokens, draft/publish, customer+embed | **`shipped`** v2.15.0 |
 | 38 | [38-tenant-ux-bugfix-spec.md](38-tenant-ux-bugfix-spec.md) | 42 | Session expiry, first-login menu, nav groups/scroll, KM document scope | **`shipped`** v2.16.0 |
 | 39 | [39-tenant-ai-config-extensibility-spec.md](39-tenant-ai-config-extensibility-spec.md) | 43 | Embed auth, grouped config, encrypted tenant Gemini key, prompts, tools, and skills | `review_pending` |
+| 40 | [40-customer-generative-workspace-spec.md](40-customer-generative-workspace-spec.md) | 44 | Customer provider credentials, bounded generation jobs, and artifacts | `backlog — ON HOLD` |
+| 41 | [41-roadmap-45-codex-cli-skills-artifacts.md](41-roadmap-45-codex-cli-skills-artifacts.md) | 45 | Feature 43 skills applied to bounded Codex CLI jobs and downloadable HTML/image/report artifacts | `backlog — ON HOLD` |
+| 42 | [42-aiaas-packages-usage-reconciliation-spec.md](42-aiaas-packages-usage-reconciliation-spec.md) | 45 | AiaaS package tiers, dimensioned quotas, usage ledger, reconciliation, and mobile enforcement | `approved` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -72,6 +75,10 @@ System design artifacts for Monti Jarvis.
 **Sprint 42:** ✅ Shipped v2.16.0 — [38-tenant-ux-bugfix-spec.md](38-tenant-ux-bugfix-spec.md); workflow §91–92; API § Tenant UX Bug Fix; UX T21. [SPRINT-042](../03-sprints/SPRINT-042.md) · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md).
 
 **Sprint 43:** Design pack drafted and review-pending — [39-tenant-ai-config-extensibility-spec.md](39-tenant-ai-config-extensibility-spec.md); workflow §93–96; API § Tenant AI Configuration and Embed Auth; UX T22. [SPRINT-043](../03-sprints/SPRINT-043.md) · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md).
+
+**Sprint 44:** **ON HOLD pending security review; runtime removed** — [40-customer-generative-workspace-spec.md](40-customer-generative-workspace-spec.md). [SPRINT-044](../03-sprints/SPRINT-044.md) · [FEAT-0038](../01-features/FEAT-0038-customer-generative-ai.md).
+
+**Sprint 45:** Design pack approved; implementation started — [42-aiaas-packages-usage-reconciliation-spec.md](42-aiaas-packages-usage-reconciliation-spec.md); workflow §100–104; API § Sprint 45; UX T24/A24/M2. [SPRINT-045](../03-sprints/SPRINT-045.md) · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md).
 
 **Sprint 39:** ✅ Shipped v2.15.0 — [37-theme-color-customization-spec.md](37-theme-color-customization-spec.md); workflow §89–90; API § Theme Color Customization; UX T20. [SPRINT-039](../03-sprints/SPRINT-039.md) · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md).
 

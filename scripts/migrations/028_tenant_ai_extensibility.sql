@@ -17,6 +17,15 @@ CREATE TABLE IF NOT EXISTS :POSTGRES_SCHEMA.tenant_ai_configs (
   updated_by text NOT NULL DEFAULT 'system'
 );
 
+-- CREATE TABLE IF NOT EXISTS does not upgrade a table created by an older
+-- server. Keep existing installations compatible with encrypted key reads.
+ALTER TABLE :POSTGRES_SCHEMA.tenant_ai_configs
+  ADD COLUMN IF NOT EXISTS gemini_key_ciphertext bytea,
+  ADD COLUMN IF NOT EXISTS gemini_key_nonce bytea,
+  ADD COLUMN IF NOT EXISTS gemini_key_version text,
+  ADD COLUMN IF NOT EXISTS gemini_key_last4 text,
+  ADD COLUMN IF NOT EXISTS gemini_key_updated_at timestamptz;
+
 CREATE TABLE IF NOT EXISTS :POSTGRES_SCHEMA.tenant_agent_configs (
   tenant_id text NOT NULL REFERENCES :POSTGRES_SCHEMA.tenants(id) ON DELETE CASCADE,
   agent_id text NOT NULL,
@@ -28,6 +37,9 @@ CREATE TABLE IF NOT EXISTS :POSTGRES_SCHEMA.tenant_agent_configs (
   updated_by text NOT NULL DEFAULT 'system',
   PRIMARY KEY (tenant_id, agent_id)
 );
+ALTER TABLE :POSTGRES_SCHEMA.tenant_agent_configs
+  ADD COLUMN IF NOT EXISTS system_prompt text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
 
 CREATE TABLE IF NOT EXISTS :POSTGRES_SCHEMA.tenant_call_tools (
   id text PRIMARY KEY,
@@ -44,6 +56,13 @@ CREATE TABLE IF NOT EXISTS :POSTGRES_SCHEMA.tenant_call_tools (
   updated_by text NOT NULL DEFAULT 'system',
   UNIQUE (tenant_id, tool_key)
 );
+ALTER TABLE :POSTGRES_SCHEMA.tenant_call_tools
+  ADD COLUMN IF NOT EXISTS tool_key text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS display_name text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS handler_key text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS input_schema jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS :POSTGRES_SCHEMA.tenant_skills (
   id text PRIMARY KEY,
@@ -58,6 +77,11 @@ CREATE TABLE IF NOT EXISTS :POSTGRES_SCHEMA.tenant_skills (
   updated_by text NOT NULL DEFAULT 'system',
   UNIQUE (tenant_id, slug)
 );
+ALTER TABLE :POSTGRES_SCHEMA.tenant_skills
+  ADD COLUMN IF NOT EXISTS slug text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS prompt text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
 
 CREATE TABLE IF NOT EXISTS :POSTGRES_SCHEMA.tenant_skill_tools (
   tenant_id text NOT NULL REFERENCES :POSTGRES_SCHEMA.tenants(id) ON DELETE CASCADE,

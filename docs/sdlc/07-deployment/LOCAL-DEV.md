@@ -55,6 +55,10 @@ make up
 
 `make up` runs: `infra-destroy` → `infra-up` → `infra-init` → `start`.
 
+For Sprint 43 tenant AI setup, including the encryption key required by the
+tenant portal’s Gemini provider section, see
+[SPRINT-043-TENANT-AI-SETUP.md](SPRINT-043-TENANT-AI-SETUP.md).
+
 ## Day-to-day commands
 
 | Command | Purpose |

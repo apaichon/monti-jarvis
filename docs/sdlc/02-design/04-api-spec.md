@@ -3458,3 +3458,185 @@ validation_error` or `404 not_found` without partial writes.
 | 502 | `ai_provider_unavailable` | Tenant key decryption/provider failure; no silent fallback |
 
 See DES-0039, workflow §93–96, ER Sprint 43, and UX T22.
+
+## Sprint 44 — Customer generative workspace
+
+> **ON HOLD:** These endpoints are not registered in the server. Customer and
+> tenant CLI/generative execution is disabled pending security review.
+
+All endpoints require a customer bearer token. The tenant is taken from the
+token; an optional `X-Tenant-Id`/`tenant_id` must match it. Anonymous callers,
+tenant-admin tokens, and cross-tenant selectors are rejected.
+
+### `GET /api/customer/generative/providers`
+
+Returns the bounded provider catalog plus the current customer's masked
+connection metadata. Claude is `not_configured` or `configured`; Codex/Grok are
+`not_configured`; Antigravity is `unsupported`.
+
+### `GET /api/customer/generative/connections`
+
+Returns `{ "connections": [...] }`; each row contains provider, mode, status,
+expiry, last four characters, and timestamps only. Ciphertext, nonce, and key
+plaintext are never serialized.
+
+### `PUT /api/customer/generative/connections/{provider}`
+
+Role: `customer` (own tenant/customer only).
+
+```json
+{ "mode": "api_key", "api_key": "<server-side secret>", "expires_at": null }
+```
+
+Claude API keys are encrypted with `TENANT_SECRET_ENCRYPTION_KEY`; the response
+is masked metadata. `409 unsupported_provider` is returned for providers whose
+adapter is not enabled. Subscription mode is explicitly `409
+unsupported_credential_mode` in this release. `DELETE` on the same path
+revokes/removes the connection and returns `{ "status": "revoked" }`.
+
+### `POST /api/customer/generative/jobs`
+
+Role: `customer`; rate bucket: `generation` (default 10/minute/tenant).
+
+```json
+{
+  "provider": "claude",
+  "output_type": "html",
+  "prompt": "Create a small accessible landing page",
+  "idempotency_key": "optional-client-key"
+}
+```
+
+`output_type` is one of `html`, `image`, `canvas`, `link`, `report`, `doc`.
+Prompt size is capped at 32 KiB and generated artifact bytes at 512 KiB. A new
+job returns `202`; a duplicate idempotency key returns the existing job with
+`200`. Jobs expose `queued|running|completed|failed`, attempts, safe error
+code/message, and artifact metadata. Provider bodies and credentials are not
+returned.
+
+### `GET /api/customer/generative/jobs` and `GET /api/customer/generative/jobs/{id}`
+
+Return only jobs where both `tenant_id` and `customer_id` match the bearer
+context. Job results include artifact metadata and an authenticated URL:
+
+```json
+{
+  "id": "gen_...", "status": "completed", "provider": "claude",
+  "output_type": "html", "artifacts": [{
+    "id": "gart_...", "type": "html", "mime": "text/html; charset=utf-8",
+    "filename": "artifact.html", "size_bytes": 1234,
+    "url": "/api/customer/generative/artifacts/gart_..."
+  }]
+}
+```
+
+### `GET /api/customer/generative/artifacts/{id}`
+
+Role: `customer`; reads are tenant/customer filtered, private, no-store, and
+`nosniff`. HTML/SVG responses carry a sandbox CSP. Missing or cross-boundary
+objects return `404 not_found`.
+
+### Sprint 44 error codes
+
+| HTTP | Code | Meaning |
+| ---: | --- | --- |
+| 400 | `validation_error` | Invalid provider/output/prompt or oversized request |
+| 400 | `secret_invalid` / `credential_expired` | Credential cannot be used |
+| 401 | `customer_auth_required` | Missing, invalid, or inactive customer session |
+| 403 | `tenant_context_mismatch` | Header/query tenant differs from bearer tenant |
+| 404 | `not_found` | Job, connection, or artifact is not owned by caller |
+| 409 | `unsupported_provider` / `unsupported_credential_mode` | Runtime capability is not available |
+| 429 | `quota_exceeded` | Generation rate bucket exhausted |
+| 502 | `generation service unavailable` | Postgres, MinIO, or provider dependency failure |
+
+See DES-0040, workflow §97–99, ER Sprint 44, and UX T23.
+
+## Sprint 45 — AiaaS packages and usage reconciliation
+
+> **REVIEW PENDING:** This contract is a design proposal. It does not change
+> the server until Sprint 45 is approved and implemented.
+
+### Platform package initialization and administration
+
+The four AiaaS rows in DES-0042 are idempotent seed defaults. Seeding inserts
+missing catalog entries and does not overwrite values already changed by a
+platform administrator.
+
+| Method | Path | Role | Contract |
+| --- | --- | --- | --- |
+| `GET` | `/api/platform/packages` | `platform_admin` | List package catalog and rules |
+| `POST` | `/api/platform/packages` | `platform_admin` | Create a package after rules validation |
+| `PUT` | `/api/platform/packages/{id}` | `platform_admin` | Edit name, price, status, billing period, or validated rules |
+| `POST` | `/api/platform/tenants/{tenant_id}/entitlement` | `platform_admin` | Explicitly assign changed package and create a new snapshot |
+
+Editing a package does not mutate `tenant_entitlement_snapshots` or historical
+`usage_events`. Existing tenants continue using their current snapshot until
+the platform admin explicitly reassigns the package.
+
+### Existing entitlement and usage responses
+
+`GET /api/entitlements/me` and `GET /api/tenant/usage` retain their existing
+authentication and tenant scope. They add catalog-driven dimension rows:
+
+```json
+{
+  "dimension": "mobile_call_minutes",
+  "unit": "minutes",
+  "period": "2026-08",
+  "limit": 300,
+  "consumed": 42,
+  "remaining": 258,
+  "source": "redis_db_4",
+  "freshness": "current"
+}
+```
+
+`GET /api/platform/tenants/{tenant_id}/usage` adds `current_dimensions`,
+`historical_activity`, and `freshness`; platform support filters remain
+platform-admin-only. Missing ClickHouse, Redis, or MinIO sources produce
+`source: unavailable|stale`, not a zero value.
+
+### `GET /api/mobile/v1/bootstrap`
+
+Role: authenticated customer/mobile session. Returns the selected tenant's
+mobile allowance and stable dimension-specific errors. It must not expose
+another tenant's package or allow a client-supplied tenant override.
+
+### `POST /api/platform/usage/reconcile`
+
+Role: `platform_admin` only. Starts one bounded run for a date range.
+
+```json
+{
+  "start_date": "2026-08-01",
+  "end_date": "2026-08-07",
+  "tenant_id": "optional-platform-filter",
+  "dry_run": true,
+  "idempotency_key": "reconcile-2026-08-01-07"
+}
+```
+
+Response: `202 { "run_id": "recon_...", "status": "queued" }`.
+Duplicate idempotency keys return the existing run. The server bounds the date
+range and never accepts SQL, Redis keys, object keys, or provider payloads from
+the caller.
+
+### `GET /api/platform/usage/reconcile/{run_id}`
+
+Role: `platform_admin`. Returns `queued|running|completed|failed`, source
+watermarks, mismatch/correction counts, freshness, and safe error codes. It
+never returns raw event bodies or credentials.
+
+### Sprint 45 error codes
+
+| HTTP | Code | Meaning |
+| ---: | --- | --- |
+| 400 | `invalid_dimension` / `invalid_period` | Unsupported dimension or date range |
+| 401 | `unauthorized` | Missing or invalid session |
+| 403 | `forbidden` / `reconciliation_forbidden` | Role cannot access the resource |
+| 404 | `tenant_not_found` / `reconciliation_not_found` | Resource is absent or not visible |
+| 409 | `no_entitlement` / `reconciliation_in_progress` | No active package or duplicate active run |
+| 429 | `quota_exceeded` | Dimension allowance exhausted; no usage increment |
+| 503 | `quota_unavailable` / `usage_source_unavailable` | Required source unavailable |
+
+See DES-0042, workflow §100–104, ER Sprint 45, and UX T24/A24/M2.

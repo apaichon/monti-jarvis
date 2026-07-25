@@ -57,6 +57,21 @@ func TestValidateBranding(t *testing.T) {
 	}
 }
 
+func TestThemeLogoVersionedPath(t *testing.T) {
+	version := themeLogoVersion([]byte("new logo"))
+	key := ThemeLogoKeyVersioned("acme", "png", version)
+	url := ThemeLogoURLVersioned("acme", "png", version)
+	if key != "theme/acme/logo."+version+".png" {
+		t.Fatalf("unexpected key %q", key)
+	}
+	if url != "/api/assets/theme/acme/logo."+version+".png" {
+		t.Fatalf("unexpected URL %q", url)
+	}
+	if key == ThemeLogoKeyVersioned("acme", "png", themeLogoVersion([]byte("old logo"))) {
+		t.Fatal("different logo contents must use different object keys")
+	}
+}
+
 func TestContrastRatioBlackWhite(t *testing.T) {
 	r, err := ContrastRatio("#000000", "#ffffff")
 	if err != nil {

@@ -114,6 +114,12 @@ CREATE TABLE IF NOT EXISTS %s.tenant_ai_configs (
   gemini_key_updated_at timestamptz,
   %s
 );
+ALTER TABLE %s.tenant_ai_configs
+  ADD COLUMN IF NOT EXISTS gemini_key_ciphertext bytea,
+  ADD COLUMN IF NOT EXISTS gemini_key_nonce bytea,
+  ADD COLUMN IF NOT EXISTS gemini_key_version text,
+  ADD COLUMN IF NOT EXISTS gemini_key_last4 text,
+  ADD COLUMN IF NOT EXISTS gemini_key_updated_at timestamptz;
 CREATE TABLE IF NOT EXISTS %s.tenant_agent_configs (
   tenant_id text NOT NULL REFERENCES %s.tenants(id) ON DELETE CASCADE,
   agent_id text NOT NULL,
@@ -122,6 +128,9 @@ CREATE TABLE IF NOT EXISTS %s.tenant_agent_configs (
   %s,
   PRIMARY KEY (tenant_id, agent_id)
 );
+ALTER TABLE %s.tenant_agent_configs
+  ADD COLUMN IF NOT EXISTS system_prompt text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
 CREATE TABLE IF NOT EXISTS %s.tenant_call_tools (
   id text PRIMARY KEY,
   tenant_id text NOT NULL REFERENCES %s.tenants(id) ON DELETE CASCADE,
@@ -134,6 +143,13 @@ CREATE TABLE IF NOT EXISTS %s.tenant_call_tools (
   %s,
   UNIQUE (tenant_id, tool_key)
 );
+ALTER TABLE %s.tenant_call_tools
+  ADD COLUMN IF NOT EXISTS tool_key text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS display_name text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS handler_key text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS input_schema jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS %s.tenant_skills (
   id text PRIMARY KEY,
   tenant_id text NOT NULL REFERENCES %s.tenants(id) ON DELETE CASCADE,
@@ -144,6 +160,11 @@ CREATE TABLE IF NOT EXISTS %s.tenant_skills (
   %s,
   UNIQUE (tenant_id, slug)
 );
+ALTER TABLE %s.tenant_skills
+  ADD COLUMN IF NOT EXISTS slug text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS name text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS prompt text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
 CREATE TABLE IF NOT EXISTS %s.tenant_skill_tools (
   tenant_id text NOT NULL REFERENCES %s.tenants(id) ON DELETE CASCADE,
   skill_id text NOT NULL,
@@ -161,10 +182,9 @@ CREATE TABLE IF NOT EXISTS %s.tenant_agent_skills (
 CREATE INDEX IF NOT EXISTS tenant_agent_configs_agent_idx ON %s.tenant_agent_configs (tenant_id, agent_id);
 CREATE INDEX IF NOT EXISTS tenant_call_tools_tenant_idx ON %s.tenant_call_tools (tenant_id, enabled);
 CREATE INDEX IF NOT EXISTS tenant_skills_tenant_idx ON %s.tenant_skills (tenant_id, enabled);`,
-		schema, schema, schema, auditColumnsDDL, schema, schema, auditColumnsDDL,
-		schema, schema, auditColumnsDDL, schema, schema, auditColumnsDDL,
-		schema, schema, auditColumnsDDL, schema, schema, auditColumnsDDL,
-		schema, schema, schema),
+		schema, schema, schema, auditColumnsDDL, schema, schema, schema, auditColumnsDDL, schema,
+		schema, schema, auditColumnsDDL, schema, schema, schema, auditColumnsDDL, schema, schema,
+		schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, schema, schema),
 	)
 	return err
 }

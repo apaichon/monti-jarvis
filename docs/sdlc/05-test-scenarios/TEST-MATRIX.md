@@ -1,8 +1,9 @@
 ---
 id: TEST-MATRIX
 status: active
-updated: 2026-07-16
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027]
+hold_reason: sprint_044_security_review
+updated: 2026-07-24
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -163,6 +164,23 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | G-04 | Healthz reachable | Smoke | `curl -fsS http://localhost:8091/healthz` |
 | G-05 | Infra dependencies ok | Smoke | `make infra-check` |
 | G-06 | Infra API reports stores | Smoke | `curl -fsS http://localhost:8091/api/infra` |
+
+## FEAT-0038 — Customer Generative AI (SPRINT-044, ON HOLD)
+
+> S44 implementation was removed. These scenarios are retained as a future
+> security-review checklist and are not executable against the current build.
+
+| ID | AC | Scenario | Type | Test / Command |
+| --- | ---: | --- | --- | --- |
+| T44-01 | 1 | Authenticated customer saves/revokes a masked Claude credential; unsupported providers are bounded | Held | Security review required · [UAT §3](../06-manual-tests/SPRINT-044-manual.md#3-credential-vault-and-provider-states) |
+| T44-02 | 2–3 | Customer creates a tenant-scoped job and polls to a terminal state | Smoke / Manual | [UAT §4](../06-manual-tests/SPRINT-044-manual.md#4-end-to-end-claude-generation) |
+| T44-03 | 3 | Duplicate idempotency key reuses the logical job/artifact | Smoke / Manual | [UAT §5](../06-manual-tests/SPRINT-044-manual.md#5-idempotency-rate-and-tenant-isolation) |
+| T44-04 | 4 | HTML/image/canvas/link/report/doc use explicit artifact metadata and safe preview | Auto + Manual | `go test ./cmd/server` · [UAT §4](../06-manual-tests/SPRINT-044-manual.md#4-end-to-end-claude-generation) |
+| T44-05 | 5 | Tenant/customer filters prevent cross-tenant job/artifact reads | Smoke / Manual | [UAT §5](../06-manual-tests/SPRINT-044-manual.md#5-idempotency-rate-and-tenant-isolation) |
+| T44-06 | 6 | Generation rate bucket and redacted audit/usage behavior | Held | Security review required · [UAT §5](../06-manual-tests/SPRINT-044-manual.md#5-idempotency-rate-and-tenant-isolation) |
+| T44-07 | — | S44 build and static verification | Held | Implementation removed pending security review |
+
+---
 
 ## FEAT-0028 — Tenant System Performance Monitoring (SPRINT-026)
 

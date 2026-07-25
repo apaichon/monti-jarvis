@@ -64,6 +64,32 @@ const rulesV1Fields = `{
   "rag_enabled": {"type":"bool","required":true,"default":true}
 }`
 
+const rulesV2Fields = `{
+  "max_ai_employees": {"type":"int","min":0,"required":true,"description":"Max AI avatars"},
+  "max_monthly_call_minutes": {"type":"int","min":0,"required":true,"description":"Monthly web/inbound voice minutes"},
+  "max_mobile_call_minutes": {"type":"int","min":0,"required":true,"description":"Monthly mobile call minutes"},
+  "max_km_documents": {"type":"int","min":0,"required":true,"description":"KM documents"},
+  "max_storage_bytes": {"type":"int","min":0,"required":true,"description":"Object storage bytes"},
+  "max_concurrent_calls": {"type":"int","min":0,"required":true,"description":"Parallel calls"},
+  "voice_enabled": {"type":"bool","required":true,"default":true},
+  "rag_enabled": {"type":"bool","required":true,"default":true}
+}`
+
+type packageSeed struct {
+	id, slug, name string
+	priceCents     int
+	rules          string
+}
+
+func aiaasSeedPackages() []packageSeed {
+	return []packageSeed{
+		{id: "pkg-aiaas-500", slug: "aiaas-500", name: "AiaaS ฿500", priceCents: 50000, rules: `{"max_ai_employees":1,"max_monthly_call_minutes":100,"max_mobile_call_minutes":100,"max_km_documents":100,"max_storage_bytes":5368709120,"max_concurrent_calls":1,"voice_enabled":true,"rag_enabled":true}`},
+		{id: "pkg-aiaas-1000", slug: "aiaas-1000", name: "AiaaS ฿1,000", priceCents: 100000, rules: `{"max_ai_employees":3,"max_monthly_call_minutes":300,"max_mobile_call_minutes":300,"max_km_documents":300,"max_storage_bytes":21474836480,"max_concurrent_calls":2,"voice_enabled":true,"rag_enabled":true}`},
+		{id: "pkg-aiaas-1500", slug: "aiaas-1500", name: "AiaaS ฿1,500", priceCents: 150000, rules: `{"max_ai_employees":5,"max_monthly_call_minutes":750,"max_mobile_call_minutes":750,"max_km_documents":750,"max_storage_bytes":53687091200,"max_concurrent_calls":5,"voice_enabled":true,"rag_enabled":true}`},
+		{id: "pkg-aiaas-2000", slug: "aiaas-2000", name: "AiaaS ฿2,000", priceCents: 200000, rules: `{"max_ai_employees":10,"max_monthly_call_minutes":1500,"max_mobile_call_minutes":1500,"max_km_documents":1500,"max_storage_bytes":107374182400,"max_concurrent_calls":10,"voice_enabled":true,"rag_enabled":true}`},
+	}
+}
+
 func (s *Store) ensurePackagesSchema(ctx context.Context) error {
 	if s.pg == nil {
 		return nil
@@ -141,6 +167,13 @@ ON CONFLICT (id) DO NOTHING`, schema), rulesV1Fields)
 	if err != nil {
 		return err
 	}
+	_, err = s.pg.Exec(ctx, fmt.Sprintf(`
+INSERT INTO %s.package_rule_schemas (id, version, name, fields, status)
+VALUES ('rules-v2', 2, 'Sprint 45 AiaaS dimensions', $1::jsonb, 'active')
+ON CONFLICT (id) DO NOTHING`, schema), rulesV2Fields)
+	if err != nil {
+		return err
+	}
 
 	pkgs := []struct {
 		id, slug, name string
@@ -161,6 +194,23 @@ ON CONFLICT (id) DO NOTHING`, schema), p.id, p.slug, p.name)
 		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s.package_limits (package_id, rules_schema_id, rules)
 VALUES ($1, 'rules-v1', $2::jsonb)
+ON CONFLICT (package_id) DO NOTHING`, schema), p.id, p.rules)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, p := range aiaasSeedPackages() {
+		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
+INSERT INTO %s.packages (id, slug, name, status, price_cents, currency, billing_period)
+VALUES ($1, $2, $3, 'active', $4, 'THB', 'monthly')
+ON CONFLICT (id) DO NOTHING`, schema), p.id, p.slug, p.name, p.priceCents)
+		if err != nil {
+			return err
+		}
+		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
+INSERT INTO %s.package_limits (package_id, rules_schema_id, rules)
+VALUES ($1, 'rules-v2', $2::jsonb)
 ON CONFLICT (package_id) DO NOTHING`, schema), p.id, p.rules)
 		if err != nil {
 			return err

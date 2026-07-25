@@ -3350,3 +3350,190 @@ Create tool schema + handler key
 
 See DES-0039, 39-tenant-ai-config-extensibility-spec.md, workflow §93–96,
 ER Sprint 43, and API Sprint 43.
+
+## T23 — Customer generative workspace (Sprint 44)
+
+> **ON HOLD:** The S44 workspace route and implementation were removed. This
+> wireframe is retained for security review only.
+
+The proposed customer portal adds a direct `/workspace` route. It requires the existing
+OTP/session customer identity; no-auth callers can still use the inbound
+call-center surface, but cannot create generation jobs.
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ A1  Customer workspace                              Back to call center       │
+│     Turn a prompt into an artifact.  HTML · image · canvas · link · report    │
+├───────────────────────────────┬──────────────────────────────────────────────┤
+│ B1  Connect                    │ C1  Generate                                 │
+│     Claude       Connected     │     Output type [html       v]                │
+│     Codex        Not configured│     Prompt ________________________________  │
+│     Antigravity   Adapter pending│   ________________________________          │
+│     Grok CLI      Not configured│     [ Run generation ]                      │
+│     API key [••••••••] [Save]  │     Bounded job · rate/quota feedback         │
+│     Only last four shown       │                                              │
+├────────────────────────────────┴──────────────────────────────────────────────┤
+│ D1  Generation history                                                        │
+│     html   completed   Preview artifact.html                                  │
+│     report failed      Provider could not complete this job                   │
+│     queued/running     Waiting for result…                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Screen map → API
+
+| UI zone | User action | API |
+| --- | --- | --- |
+| B1 provider list | Select provider/capability | `GET /api/customer/generative/providers` |
+| B1 credential form | Save/rotate Claude key | `PUT /api/customer/generative/connections/claude` |
+| B1 credential form | Revoke key | `DELETE /api/customer/generative/connections/claude` |
+| C1 prompt form | Create bounded job | `POST /api/customer/generative/jobs` |
+| D1 history | Load history | `GET /api/customer/generative/jobs` |
+| D1 active row | Poll progress/result | `GET /api/customer/generative/jobs/{id}` |
+| D1 artifact action | Authenticated preview | `GET /api/customer/generative/artifacts/{id}` |
+
+### Flow A — connect and generate
+
+```text
+Sign in with OTP → open Workspace → select Claude → save masked key
+  → choose output → enter prompt → Run generation → queued/running
+  → completed → Preview artifact
+```
+
+### Flow B — safe failure
+
+```text
+missing session / expired key / rate limit / provider failure
+  → structured error banner + safe customer message
+  → no credential/body in UI error or audit record
+```
+
+### Flow C — preview boundary
+
+```text
+artifact metadata → authenticated fetch → HTML sandbox iframe
+  ├─ text/JSON/Markdown → preformatted preview
+  └─ image/SVG → image preview with response CSP
+```
+
+### Mobile / narrow layout
+
+- B1 and C1 stack vertically; the key is never persisted in browser storage.
+- History rows stack prompt/result controls; provider state stays visible beside
+  each provider name.
+- HTML preview remains sandboxed and scrollable; long text wraps in the preview.
+
+### Component → file
+
+| Zone | Path |
+| --- | --- |
+| Workspace screen | `apps/customer-web/src/routes/workspace/+page.svelte` |
+| Generative API client | `apps/customer-web/src/lib/api/generative.ts` |
+| Portal workspace entry | `apps/customer-web/src/routes/+page.svelte` |
+| Go API handlers | `cmd/server/generative.go` |
+
+See DES-0040, 40-customer-generative-workspace-spec.md, workflow §97–99,
+ER Sprint 44, and API Sprint 44.
+
+## T24/A24/M2 — AiaaS packages and usage reconciliation (Sprint 45)
+
+> **REVIEW PENDING:** S45 adds package/usage views and operator reconciliation;
+> it does not add a customer generative or CLI surface.
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ T24 Tenant usage and package                                                  │
+│     Current package: AiaaS ฿1,000/month        [View package catalog]        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ A1 Dimension             Limit       Used       Remaining     Freshness       │
+│    AI avatars            3           2          1              current         │
+│    KM documents          300         74         226            current         │
+│    Storage               20 GB       8.2 GB     11.8 GB        current         │
+│    Web minutes           300         120        180            current         │
+│    Mobile minutes        300         42         258            current         │
+│    Concurrent calls      2           1          1              current         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ A2 Historical activity vs current enforcement                                 │
+│    [month v] [dimension v]   Source: ClickHouse / Redis / MinIO               │
+│    stale or unavailable sources are labeled, never rendered as zero          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ A24 Platform reconciliation (platform admin)                                  │
+│ Date range [2026-08-01]–[2026-08-07] Tenant [all] [Dry run] [Start]           │
+│ Run recon_...   running   mismatches 3   corrections 0   source watermarks   │
+│ [Refresh] [Download safe summary]                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ A25 Platform package catalog (platform admin)                                 │
+│ aiaas-500   ฿500   1 avatar   100 KM   5 GB   [Edit] [Archive]                │
+│ aiaas-1000  ฿1,000 3 avatars  300 KM  20 GB   [Edit] [Archive]                │
+│ [Create package]  Changes affect future assignments; existing snapshots stay │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ M2 Mobile bootstrap / quota metadata                                          │
+│ Package: AiaaS ฿1,000   Mobile minutes 258 remaining   Calls 1/2 active       │
+│ Error: MOBILE_MINUTES_EXCEEDED — no additional usage consumed                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Screen map → API
+
+| UI zone | User action | API |
+| --- | --- | --- |
+| T24 package header | Load current package | `GET /api/entitlements/me` |
+| T24 dimension table | Load current usage | `GET /api/tenant/usage` |
+| T24 history | Select period/dimension | `GET /api/tenant/usage?period=&dimension=` |
+| A24 tenant detail | Inspect a tenant | `GET /api/platform/tenants/{tenant_id}/usage` |
+| A24 reconciliation form | Start bounded dry-run/reconciliation | `POST /api/platform/usage/reconcile` |
+| A24 run status | Refresh run | `GET /api/platform/usage/reconcile/{run_id}` |
+| A25 package catalog | Edit or archive package defaults | `GET/POST/PUT /api/platform/packages*` |
+| A25 tenant assignment | Apply changed package explicitly | `POST /api/platform/tenants/{tenant_id}/entitlement` |
+| M2 mobile bootstrap | Load allowance metadata | `GET /api/mobile/v1/bootstrap` |
+
+### Flow A — tenant reads package usage
+
+```text
+Tenant login → Billing/Usage → entitlement snapshot + dimension rows
+  → choose period → current enforcement and historical activity shown separately
+  → stale/unavailable source is labeled → no fabricated zero value
+```
+
+### Flow B — platform runs reconciliation
+
+```text
+Platform admin → Usage reconciliation → choose bounded dates + optional tenant
+  → dry run → queued/running → mismatch summary → approve controlled correction
+  → audit event with run ID, counts, watermarks, and safe error state
+```
+
+### Flow C — mobile call enforcement
+
+```text
+Mobile bootstrap → receive mobile remaining + concurrency metadata
+  → create call → quota lease → terminal call event → idempotent usage event
+  → release concurrency and finalize minutes on success/failure/disconnect
+```
+
+### Mobile / narrow layout
+
+- T24 dimension rows become stacked cards with unit and freshness beside the
+  value; the package price remains pinned above the cards.
+- A24 uses a single-column form and a paginated run-history list.
+- M2 keeps remaining mobile minutes and concurrent calls visible above call
+  controls; quota failures are concise and dimension-specific.
+
+### Component → file (planned)
+
+| Zone | Path |
+| --- | --- |
+| Tenant billing/usage page | `apps/tenant-web/src/routes/billing/+page.svelte` |
+| Tenant billing API client | `apps/tenant-web/src/lib/api/billing.ts` |
+| Platform billing/usage page | existing platform billing route/API surface |
+| Mobile quota payload | `cmd/server/mobile.go` |
+| Usage reconciliation handlers | planned `cmd/server/usage_reconciliation.go` |
+
+See DES-0042, 42-aiaas-packages-usage-reconciliation-spec.md, workflow
+§100–104, ER Sprint 45, and API Sprint 45.

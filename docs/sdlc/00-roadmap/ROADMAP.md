@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S42 shipped tracks + S43 tenant AI + S44 customer generative AI)
+# Monti AI Call Center — Roadmap (36 core + S37–S42 shipped tracks + S43 tenant AI + S44 customer generative AI + S45 AiaaS mass + S46 tenant referrals + S47 Langfuse observability)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -67,7 +67,10 @@
 | **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
 | **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) ✅ v2.16.0 · [SPRINT-042](../03-sprints/SPRINT-042.md) |
 | **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md) · [SPRINT-043](../03-sprints/SPRINT-043.md) ✅ v2.17.0 |
-| **44** | **Customer / Tenant** | **Customer generative AI (Claude · Codex · Antigravity · Grok CLI) → HTML/image/canvas/link/report/doc** | **K** | **1, 20, 21, 43** · backlog |
+| **44** | **Customer / Tenant** | **Customer generative AI (Claude · Codex · Antigravity · Grok CLI) → HTML/image/canvas/link/report/doc** | **K** | **1, 20, 21, 43** · [SPRINT-044](../03-sprints/SPRINT-044.md) · backlog — ON HOLD |
+| **45** | **Platform / Tenant / Mobile** | **AiaaS for mass-market packages: ฿500 · ฿1,000 · ฿1,500 · ฿2,000 with differentiated quotas and corrected usage/statistics** | **L** | **13, 16, 25, 27, 30, 31, 43** · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [SPRINT-045](../03-sprints/SPRINT-045.md) · in_progress |
+| **46** | **Platform / Tenant / Growth** | **Tenant referral affiliate program with configurable bonus-quota rewards and referral usage tracking** | **M** | **9, 10, 13, 31, 45** · backlog |
+| **47** | **Platform / AI Operations** | **Langfuse real-time LLM observability and evaluation across chat, voice, mobile, RAG, tools, and generative jobs** | **N** | **21, 25, 27, 31, 43, 44** · backlog |
 
 ---
 
@@ -483,7 +486,7 @@ Dedicated **bug-fix sprint** (not mixed with new product features). Prioritize p
 
 ## Backlog add: SPRINT-044 — Customer Generative AI (Multi-Provider CLI & Artifact Outputs)
 
-**Platform:** Customer / Tenant · **Feature:** Customers generate artifacts via Claude, Codex, Antigravity, Grok CLI using API key or subscription login · **Depends:** 1, 20, 21, 43 · **Status:** backlog  
+**Platform:** Customer / Tenant · **Feature:** Customers generate artifacts via Claude, Codex, Antigravity, Grok CLI using API key or subscription login · **Depends:** 1, 20, 21, 43 · **Status:** backlog — ON HOLD pending security review · [FEAT-0038](../01-features/FEAT-0038-customer-generative-ai.md)
 
 First-class **customer** generative workspace (not voice call-center only): authenticate a provider, run generation jobs, and receive structured outputs stored under the tenant/customer boundary.
 
@@ -543,3 +546,259 @@ Prefer **tenant-managed** keys for B2B call-center embeds; allow **customer-owne
 - Complements S43 (tenant Gemini for call agents) without replacing inbound call AI  
 
 **Out (unless pulled in):** Training custom models; unrestricted shell on customer devices; free unlimited generation without quota; replacing Gemini voice pipeline for calls.
+
+## Backlog add: SPRINT-045 — AiaaS for Mass-Market Packages and Usage Reconciliation
+
+**Platform:** Platform / Tenant / Mobile · **Feature:** Simple monthly AiaaS packages for mass-market tenants with differentiated capacity · **Depends:** 13, 16, 25, 27, 30, 31, 43 · **Status:** backlog — design review · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [DES-0042](../02-design/42-aiaas-packages-usage-reconciliation-spec.md)
+
+Offer a small, understandable package ladder in Thai baht. The following is the
+roadmap baseline for product and technical estimation; final commercial values
+must be approved before package catalog release.
+
+The four rows are initialization defaults only. After seeding, platform admins
+can change package names, prices, status, and quota rules through the existing
+package-management surface. Existing tenant entitlement snapshots are not
+rewritten by catalog edits; a changed package takes effect only through an
+explicit reassignment/upgrade.
+
+| Monthly price | AI avatars | KM documents | Storage | Concurrent calls | Mobile call minutes |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| **฿500** | 1 | 100 | 5 GB | 1 | 100 min |
+| **฿1,000** | 3 | 300 | 20 GB | 2 | 300 min |
+| **฿1,500** | 5 | 750 | 50 GB | 5 | 750 min |
+| **฿2,000** | 10 | 1,500 | 100 GB | 10 | 1,500 min |
+
+### Requirement change
+
+- Replace the current generic package presentation with named AiaaS mass
+  packages whose price, quota rules, billing period, and included features are
+  stored in the package/entitlement authorities rather than hard-coded in UI.
+- Add storage and mobile usage as first-class quota dimensions. Preserve the
+  existing monthly call-minute, KM-document, AI-avatar, and concurrent-call
+  dimensions, and define whether mobile minutes are a separate allowance or a
+  shared pool before implementation.
+- Make every quota check and usage response identify its dimension, period,
+  unit, limit, consumed value, remaining value, and source. A rejected request
+  must not increment usage; a released concurrent-call slot must not create
+  negative or stale usage.
+- Correct usage tracking for web and mobile call paths, KM ingest/deletion,
+  avatar assignment/revocation, MinIO storage upload/delete, and concurrent
+  voice lifecycle (including disconnect, timeout, retry, and failed-start
+  paths).
+- Align tenant statistics, platform statistics, billing usage, and package
+  usage cards with the same definitions. Clearly distinguish historical
+  activity from current enforcement counters and show mobile activity
+  separately while allowing reconciliation to the package allowance.
+- Add an upgrade/downgrade-safe entitlement snapshot so historical usage keeps
+  its package/rate context and a changed package does not rewrite past facts.
+
+### Deliverables
+
+| Deliverable | Notes |
+| --- | --- |
+| Package catalog and entitlement model | Seed the four price points in THB; expose quota dimensions and units through the API; preserve tenant-specific entitlement snapshots. |
+| Quota enforcement | Add storage and mobile dimensions; normalize web/mobile call-minute and concurrency checks; use Redis DB 4 with the `monti_jarvis:` prefix. |
+| Usage ledger/projection | Idempotent usage events for calls, mobile calls, KM, avatars, and MinIO bytes; define correction/replay behavior without double counting. |
+| Tenant and platform statistics | Report limit, used, remaining, and utilization by dimension; reconcile ClickHouse historical facts with Postgres/Redis authorities and label unavailable/stale data. |
+| Billing and package UI | Show the four plans, included quota, current consumption, remaining quota, and upgrade/downgrade impact in baht. |
+| Mobile contract | Apply the selected package to mobile call API/SDK sessions and return stable quota/rate-limit errors plus usage metadata. |
+| Migration and verification | Backfill or explicitly mark legacy usage, test two-tenant isolation, package changes, retries, deletes, disconnects, date boundaries, and concurrent load. |
+
+**Related design hold:** [DES-0041 — Roadmap 45 Codex CLI skills and downloadable artifacts](../02-design/41-roadmap-45-codex-cli-skills-artifacts.md)
+is separate from this package/usage sprint and remains **ON HOLD**. Sprint 45
+does not enable customer or tenant CLI/generative execution.
+
+### Acceptance sketch
+
+1. A tenant can compare and purchase the ฿500/฿1,000/฿1,500/฿2,000 plans;
+   each plan returns the exact avatar, KM, storage, concurrency, and mobile
+   allowance shown in the catalog.
+2. The same entitlement is enforced for tenant web, embed, and mobile paths;
+   over-limit requests fail with a dimension-specific response and do not
+   consume additional quota.
+3. Storage usage changes only after successful MinIO writes/deletes, KM usage
+   follows document lifecycle, avatar usage follows active assignments, and
+   concurrent usage is released on every terminal call path.
+4. Tenant and platform dashboards agree on controlled fixtures for used,
+   remaining, utilization, mobile minutes, and historical-vs-current periods;
+   unavailable sources are not rendered as zero.
+5. Replayed or duplicated usage events produce one logical usage result, and
+   changing packages preserves historical usage facts and their entitlement
+   context.
+6. Automated and manual tests cover two tenants, all four tiers, web and
+   mobile calls, KM/storage/avatar mutations, failed starts, disconnects,
+   retries, quota exhaustion, and concurrent multi-user load.
+
+**Out (unless pulled in):** Overage billing, automatic package upgrade,
+enterprise custom pricing, cross-tenant quota pooling, and changing the core
+Gemini voice pipeline.
+
+## Backlog add: SPRINT-046 — Tenant Referral Affiliate Program and Bonus Quota
+
+**Platform:** Platform / Tenant / Growth · **Feature:** Tenant referral/affiliate
+program that rewards qualified referrals with additional quota allowance ·
+**Depends:** 9, 10, 13, 31, 45 · **Status:** backlog
+
+Allow an active tenant to invite another business to Monti. A referral becomes
+qualified only after the referred tenant completes onboarding/KYC, is activated,
+and completes its first paid package order. The referring tenant receives a
+configurable bonus entitlement, increasing the quota available to its own
+tenant/customer traffic without changing the purchased package price.
+
+### Referral and reward baseline
+
+| Area | Roadmap requirement |
+| --- | --- |
+| Referral identity | Tenant-specific referral code and link; attribution is captured at signup and cannot be changed after qualification. |
+| Qualified referral | Referred tenant is new, passes required onboarding/KYC, becomes active, and has a paid order that is not refunded or voided during the qualification window. |
+| Referrer reward | Configurable bonus quota, initially intended as additional monthly call minutes, mobile call minutes, KM documents, and storage; any concurrent-call increase requires capacity approval. |
+| Referred-tenant reward | Optional one-time onboarding quota bonus or package promotion, separately configured from the referrer reward. |
+| Affiliate status | `clicked` → `attributed` → `pending` → `qualified` → `granted`, with `reversed` and `rejected` outcomes. |
+| Settlement | Keep quota rewards and any future cash commission as separate ledger types; no automatic cash payout is in the initial scope. |
+
+The initial reward values are product-configurable rather than hard-coded. The
+technical design must support both fixed bonuses and percentage bonuses with
+per-dimension caps, expiry, and a maximum number of rewarded referrals per
+tenant and billing period. Bonus quota must be represented separately from the
+base package entitlement so the tenant can see what was purchased, earned, used,
+and what will expire.
+
+### Requirement change
+
+- Add referral attribution and qualification records under the
+  `callcenter` schema with tenant-scoped authorization and an immutable audit
+  trail for status changes.
+- Add a bonus-entitlement ledger that can grant, consume, expire, reverse, and
+  reconcile quota bonuses for each S45 dimension: AI avatars, KM documents,
+  storage, concurrent calls, monthly call minutes, and mobile call minutes.
+- Increase a tenant's available quota through an explicit bonus layer; never
+  mutate the purchased package limit or rewrite historical usage facts.
+- Make quota APIs and tenant/platform statistics show `base_limit`,
+  `bonus_granted`, `bonus_used`, `bonus_remaining`, `total_limit`, and expiry
+  where applicable. Existing usage counters must continue to report actual
+  consumption, not reward grants.
+- Track referral conversions, qualified revenue, granted quota value, consumed
+  bonus quota, expiry, reversal, and fraud/rejection outcomes in platform
+  reporting without exposing another tenant's private customer or billing data.
+- Ensure mobile, embed, KM, avatar, MinIO storage, and concurrent-call paths use
+  the same entitlement resolution as the purchased AiaaS package and consume
+  bonus quota deterministically according to the documented order.
+
+### Deliverables
+
+| Deliverable | Notes |
+| --- | --- |
+| Tenant referral UX | Referral code/link, invite status, qualified referrals, earned quota, expiry, and conversion summary. |
+| Platform affiliate administration | Configure campaign dates, qualification window, reward dimensions/values, caps, expiry, approval/reversal, and fraud review. |
+| Attribution and qualification service | Idempotent signup/order attribution; block self-referral, duplicate attribution, circular referrals, and refunded-order rewards. |
+| Bonus quota ledger | Append-only grant/consume/expire/reverse records with deterministic idempotency keys and tenant isolation. |
+| Quota enforcement integration | Resolve base plus valid bonus entitlements for web, embed, mobile, KM, avatars, storage, and concurrency using Redis DB 4 and the `monti_jarvis:` prefix. |
+| Statistics and billing usage | Add referral funnel and bonus-quota metrics to platform views; add base-versus-bonus breakdowns to tenant usage and S45 package reporting. |
+| Audit and verification | Record actor, reason, source order, campaign, and timestamps; test qualification, reversal, expiry, retries, abuse controls, and two-tenant isolation. |
+
+### Acceptance sketch
+
+1. A tenant can generate a referral link and see its lifecycle without seeing
+   the referred tenant's private records.
+2. A referral is rewarded once, only after the configured qualification event;
+   retries and duplicate callbacks do not grant quota twice.
+3. The referrer sees the bonus entitlement separately from its purchased S45
+   package, and the combined available quota is enforced consistently on web,
+   embed, KM, storage, avatar, concurrent-call, and mobile paths.
+4. Bonus consumption, expiry, reversal, and remaining values appear in tenant
+   and platform statistics; quota usage is never mistaken for referral revenue
+   or quota grants.
+5. Refunded/voided orders, self-referrals, duplicate referrals, expired
+   campaigns, and fraud-rejected referrals grant no usable bonus quota.
+6. Controlled tests prove tenant isolation, idempotent ledger behavior,
+   package upgrade/downgrade compatibility, mobile usage reconciliation, and
+   accurate base-versus-bonus reporting.
+
+**Out (unless pulled in):** Multi-level/downline commissions, public affiliate
+marketplace, automatic cash payouts, cross-tenant quota pooling, and referral
+rewards that bypass payment, KYC, rate limits, or tenant isolation.
+
+## Backlog add: SPRINT-047 — Langfuse Real-Time LLM Observability and Evaluation
+
+**Platform:** Platform / AI Operations · **Feature:** Real-time traces, metrics,
+feedback, and evaluation for every supported LLM interaction · **Depends:** 21,
+25, 27, 31, 43, 44 · **Status:** backlog
+
+Integrate Langfuse as the operational observability and evaluation layer for
+Monti's AI workloads. The integration must make model behavior measurable in
+near real time without putting prompts, transcripts, customer identity, or
+provider secrets into telemetry by default.
+
+### Requirement change
+
+- Instrument text chat, voice relay, mobile calls, RAG retrieval, tool calls,
+  tenant skills, and S44 generative jobs with trace/session/generation/span
+  relationships that preserve tenant and request correlation.
+- Capture model/provider, model version, prompt version, latency, token or audio
+  usage when available, estimated cost state, retries, errors, fallback path,
+  tool name, retrieval count, and quota/usage event references as structured
+  metadata.
+- Support real-time operational views for request volume, latency, error rate,
+  time-to-first-token, token/audio usage, cost coverage, fallback frequency,
+  RAG retrieval behavior, and quota impact by tenant, channel, avatar, model,
+  and provider.
+- Add evaluation pipelines for answer relevance, groundedness/citation use,
+  safety/policy adherence, tool-call correctness, language/locale quality,
+  voice completion quality, and artifact output validity. Support online sample
+  evaluation plus replay/offline evaluation against approved datasets.
+- Allow tenant-safe feedback and evaluation scores without exposing one
+  tenant's traces or datasets to another tenant. Platform operators receive
+  aggregate cross-tenant views with bounded drill-down and redaction.
+- Version prompts, model configuration, evaluation rubrics, datasets, and score
+  definitions so results remain comparable after runtime changes.
+- Keep Langfuse delivery asynchronous, sampled/configurable, and fail-open:
+  Langfuse outage or timeout must not fail chat, voice, mobile calls, RAG,
+  archive, quota enforcement, billing, or artifact generation.
+
+### Telemetry data boundary
+
+| Data | Policy |
+| --- | --- |
+| Tenant/request correlation | Use opaque tenant-scoped IDs; never send customer email, phone, auth token, or raw session secret. |
+| Prompt/response/transcript | Redact or hash by default; raw content requires an explicit platform policy, bounded retention, and tenant consent/configuration. |
+| Voice/audio | Send duration and provider usage metadata only by default; no audio payloads in Langfuse. |
+| KM/RAG | Record document/scope identifiers and retrieval metrics without copying document content or embeddings. |
+| Tools and skills | Record allowlisted tool/skill names, status, latency, and bounded error codes; never secrets or unrestricted arguments. |
+| Provider credentials | Never send API keys, OAuth tokens, subscription tokens, or raw authorization headers. |
+
+### Deliverables
+
+| Deliverable | Notes |
+| --- | --- |
+| Langfuse adapter | Central Go integration for traces, generations, observations, scores, batching, retries, sampling, redaction, and shutdown flush. |
+| Runtime instrumentation | Wire chat, Gemini text/voice, mobile voice, RAG, tools/skills, and S44 provider adapters to a common trace contract. |
+| Real-time operations dashboard | Platform-admin views for latency, errors, usage/cost coverage, model/provider, channel, tenant aggregates, and degraded telemetry state. |
+| Evaluation service | Configurable online evaluators plus offline replay jobs, dataset/version management, score persistence, and threshold alerts. |
+| Tenant feedback path | Tenant-scoped rating/feedback and evaluation summaries connected to existing satisfaction/statistics without leaking raw customer content. |
+| Privacy and retention controls | Redaction, sampling, retention, consent/configuration, RBAC, audit events, and documented Langfuse deployment/secrets. |
+| Verification and runbook | Failure-mode tests, trace completeness checks, score reproducibility, cost/usage reconciliation, and operator troubleshooting guidance. |
+
+### Acceptance sketch
+
+1. A completed chat, voice, mobile, RAG, tool, or generative job produces a
+   correlated Langfuse trace when telemetry is enabled, with model/config
+   metadata and outcome status but no secrets or prohibited PII.
+2. Langfuse being unavailable, slow, or rate-limited does not change the
+   success/failure behavior of the customer interaction or quota/billing path.
+3. Platform operators can see near-real-time latency, error, usage, cost-state,
+   and fallback metrics, with tenant/channel/model/provider filters and safe
+   partial-failure states.
+4. An approved evaluation dataset can be replayed against a versioned prompt
+   and model configuration; scores for relevance, groundedness, safety, and
+   output validity are reproducible and attributable to that version.
+5. Tenant feedback and evaluation results are isolated; aggregate dashboards
+   reconcile with call-center statistics, AI usage facts, and quota records
+   without becoming a second usage authority.
+6. Tests cover redaction, tenant isolation, sampling, duplicate/retry delivery,
+   provider metadata missing/unavailable, Langfuse outage, high concurrency,
+   voice/mobile lifecycle completion, and prompt/model version changes.
+
+**Out (unless pulled in):** Training or fine-tuning models, sending raw audio
+or unrestricted customer transcripts to third parties, automatic model
+switching based only on an evaluation score, and using Langfuse as the billing
+or quota source of truth.

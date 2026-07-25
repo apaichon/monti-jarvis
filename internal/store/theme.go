@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -644,6 +645,40 @@ func ThemeLogoURL(tenantID, ext string) string {
 	return "/api/assets/theme/" + id + "/logo." + ext
 }
 
+// ThemeLogoKeyVersioned returns a content-addressed logo object key. Using the
+// content digest in the path prevents browsers from reusing a cached previous
+// upload and keeps published logos stable when a draft is replaced.
+func ThemeLogoKeyVersioned(tenantID, ext, version string) string {
+	id := strings.TrimSpace(tenantID)
+	ext = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(ext)), ".")
+	if ext == "" {
+		ext = "png"
+	}
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return ThemeLogoKey(tenantID, ext)
+	}
+	return themeAssetsPrefix + id + "/logo." + version + "." + ext
+}
+
+func ThemeLogoURLVersioned(tenantID, ext, version string) string {
+	id := strings.TrimSpace(tenantID)
+	ext = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(ext)), ".")
+	if ext == "" {
+		ext = "png"
+	}
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return ThemeLogoURL(tenantID, ext)
+	}
+	return "/api/assets/theme/" + id + "/logo." + version + "." + ext
+}
+
+func themeLogoVersion(data []byte) string {
+	digest := sha256.Sum256(data)
+	return fmt.Sprintf("%x", digest[:])
+}
+
 // PutThemeLogo stores logo in MinIO and returns object key + public path URL.
 func (s *Store) PutThemeLogo(ctx context.Context, tenantID, contentType string, data []byte) (string, string, error) {
 	if s.minio == nil {
@@ -653,14 +688,15 @@ func (s *Store) PutThemeLogo(ctx context.Context, tenantID, contentType string, 
 	if ext == "" {
 		return "", "", fmt.Errorf("unsupported image type")
 	}
-	key := ThemeLogoKey(tenantID, ext)
+	version := themeLogoVersion(data)
+	key := ThemeLogoKeyVersioned(tenantID, ext, version)
 	_, err := s.minio.PutObject(ctx, s.cfg.MinioBucket, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
 		return "", "", err
 	}
-	return key, ThemeLogoURL(tenantID, ext), nil
+	return key, ThemeLogoURLVersioned(tenantID, ext, version), nil
 }
 
 // GetThemeAsset streams a theme logo object.

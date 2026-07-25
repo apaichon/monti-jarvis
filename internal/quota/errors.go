@@ -11,6 +11,7 @@ var (
 	ErrFeatureDisabled  = errors.New("feature disabled")
 	ErrNoEntitlement    = errors.New("no entitlement")
 	ErrQuotaDisabled    = errors.New("quota disabled")
+	ErrQuotaUnavailable = errors.New("quota unavailable")
 )
 
 // Error is a structured quota/rate/feature failure for HTTP mapping.
@@ -80,6 +81,10 @@ func noEntitlement() *Error {
 		Message: "tenant has no active package entitlement",
 		cause:   ErrNoEntitlement,
 	}
+}
+
+func quotaUnavailable() *Error {
+	return &Error{Code: "quota_unavailable", Message: "quota source is unavailable", cause: ErrQuotaUnavailable}
 }
 
 // DailyCallLimit exceeded for S16 operational daily minutes.

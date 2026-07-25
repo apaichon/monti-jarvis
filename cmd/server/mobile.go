@@ -4,12 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/libra/monti-jarvis/internal/auth"
+	"github.com/libra/monti-jarvis/internal/quota"
 	"github.com/libra/monti-jarvis/internal/store"
 	"github.com/libra/monti-jarvis/internal/workforce"
 )
@@ -113,6 +115,17 @@ func (s *server) mobileBootstrap(w http.ResponseWriter, r *http.Request) {
 		"warning_at_seconds":      10,
 		"reset_at":                resetAt,
 	}
+	if s.quota != nil {
+		if snap, snapshotErr := s.quota.Snapshot(r.Context(), tenantID); snapshotErr == nil && snap != nil {
+			limitsOut["dimensions"] = snap.Dimensions
+			for _, dimension := range snap.Dimensions {
+				if dimension.Dimension == "mobile_call_minutes" {
+					limitsOut["mobile_call_minutes"] = dimension
+					break
+				}
+			}
+		}
+	}
 	if quotaSummary != nil {
 		limitsOut["daily_remaining_seconds"] = quotaSummary.DailyRemainingSeconds
 		limitsOut["state"] = quotaSummary.State
@@ -166,6 +179,19 @@ func (s *server) mobileCreateCall(w http.ResponseWriter, r *http.Request) {
 	if settings.CustomerMaxCallSeconds > 0 && settings.CustomerDailyCallSeconds > 0 && settings.CustomerMaxCallSeconds > settings.CustomerDailyCallSeconds {
 		writeMobileError(w, http.StatusForbidden, "call_duration_limit_exceeded")
 		return
+	}
+	if s.quota != nil {
+		if err := s.quota.CheckMobileMinutes(r.Context(), tenantID, 0); err != nil {
+			switch {
+			case errors.Is(err, quota.ErrQuotaUnavailable):
+				writeMobileError(w, http.StatusServiceUnavailable, "quota_unavailable")
+			case errors.Is(err, quota.ErrLimitExceeded):
+				writeQuotaError(w, err)
+			default:
+				writeMobileError(w, http.StatusForbidden, "no_entitlement")
+			}
+			return
+		}
 	}
 	if customer != nil && settings.CustomerDailyCallSeconds > 0 {
 		summary, summaryErr := s.store.CustomerUsageSummary(r.Context(), tenantID, customer.ID, settings.CustomerDailyCallSeconds, settings.CustomerMaxCallSeconds, time.Now())
