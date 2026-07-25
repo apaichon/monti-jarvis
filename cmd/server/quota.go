@@ -163,6 +163,7 @@ func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, t
 				_ = s.quota.AddCallMinutes(bg, tenantID, mins)
 			}
 			_ = s.quota.AddDailyCallMinutes(bg, tenantID, tz, mins)
+			s.recordCallUsageEvent(tenantID, r.URL.Query().Get("call_id"), mobileCall, mins)
 		}
 	}()
 
@@ -175,6 +176,22 @@ func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, t
 		req = r.WithContext(cctx)
 	}
 	s.voice.Handler().ServeHTTP(w, req)
+}
+
+func (s *server) recordCallUsageEvent(tenantID, callID string, mobile bool, minutes int) {
+	if s == nil || s.store == nil || strings.TrimSpace(callID) == "" || minutes <= 0 {
+		return
+	}
+	dimension, sourceType := "monthly_call_minutes", "call"
+	if mobile {
+		dimension, sourceType = "mobile_call_minutes", "mobile_call"
+	}
+	now := time.Now().UTC()
+	_, _, _ = s.store.RecordUsageEvent(context.Background(), store.UsageEventInput{
+		TenantID: tenantID, IdempotencyKey: "call:" + callID + ":" + dimension,
+		Dimension: dimension, Unit: "minutes", Amount: int64(minutes),
+		PeriodStart: now, PeriodEnd: now, SourceType: sourceType, SourceID: callID,
+	})
 }
 
 func withVoiceTenant(r *http.Request, tenantID string) *http.Request {

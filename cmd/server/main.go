@@ -351,6 +351,8 @@ func main() {
 	mux.Handle("GET /api/platform/system-performance", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformSystemPerformance)))
 	mux.Handle("GET /api/platform/call-center/statistics", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformCallCenterStatistics)))
 	mux.Handle("GET /api/platform/billing/usage", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformBillingUsage)))
+	mux.Handle("POST /api/platform/usage/reconcile", guard.RequirePlatformAdmin(http.HandlerFunc(s.startUsageReconciliation)))
+	mux.Handle("GET /api/platform/usage/reconcile/{run_id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getUsageReconciliation)))
 	mux.Handle("GET /api/platform/tenants/{tenant_id}/kyc", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/approve", guard.RequirePlatformAdmin(http.HandlerFunc(s.approvePlatformTenantKYC)))
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))

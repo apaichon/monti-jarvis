@@ -1,11 +1,11 @@
 ---
 id: READINESS-RELEASE
 status: completed
-updated: 2026-07-18
-current_sprint: SPRINT-045
-release_target: v2.18.0
-release: v2.18.0
-git_tag: v2.18.0
+updated: 2026-07-25
+current_sprint: SPRINT-046
+release_target: v2.18.1
+release: v2.18.1
+git_tag: v2.18.1
 ---
 
 # Release Readiness Checklist
@@ -136,14 +136,15 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] Source-error behavior is covered by focused ClickHouse client regression coverage.
 - [ ] Manual browser, responsive-layout, dependency-failure, session-expiry, and existing-regression UAT evidence; carried over as TASK-0144.
 
-### SPRINT-045 (v2.18.0)
+### SPRINT-045 (v2.18.1)
 
 - [x] TASK-0164 four-tier AiaaS package initialization and rules-v2 validation.
 - [x] TASK-0165 dimensioned quota enforcement, mobile allowance metadata, and
   safe unavailable-source reporting.
 - [x] Full Go tests, Go/Svelte build, mobile SDK build, and diff validation.
 - [ ] Docker-backed two-tenant/load UAT and usage-ledger/reconciliation checks;
-  carried forward under TASK-0166/TASK-0168 in [SPRINT-045 manual checklist](../06-manual-tests/SPRINT-045-manual.md).
+  explicitly deferred to Sprint 46 under TASK-0166/TASK-0167/TASK-0168 in the
+  [SPRINT-045 manual checklist](../06-manual-tests/SPRINT-045-manual.md).
 
 ## F. Documentation
 
@@ -164,7 +165,7 @@ curl -fsS http://localhost:8091/api/workforce
 | DevOps | Codex release verification | 2026-07-18 | Build/test/tag verification for v2.13.0 |
 | Dev | Codex release verification | 2026-07-25 | S45 package initialization and dimensioned quota slice |
 | Tester | Codex release verification | 2026-07-25 | Automated verification passed; Docker-backed S45 UAT deferred |
-| PM | User-authorized release close | 2026-07-25 | v2.18.0 ships the verified 6-point S45 slice |
+| PM | User-authorized release close | 2026-07-25 | v2.18.1 closes S45 as a partial release; manual UAT deferred |
 | DevOps | Codex release verification | 2026-07-25 | Release build and tag prepared; S45 integration UAT carried forward |
 
 ## H. Release-cut (PM + DevOps)
@@ -178,6 +179,7 @@ git push origin v2.13.0
 ```
 
 - [x] Tag `v2.18.0` pushed to `origin`
+- [ ] Tag `v2.18.1` pushed to `origin` (this close)
 - [x] Sprint marked `completed` in `03-sprints/`
 - [x] `_velocity.json` updated
 - [x] ROADMAP Sprint 45 shipped slice marked v2.18.0 and next sprint pointer advanced to Sprint 46

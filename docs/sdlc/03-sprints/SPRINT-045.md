@@ -1,13 +1,14 @@
 ---
 id: SPRINT-045
-status: in_progress
+status: completed
 start: 2026-08-01
 end: 2026-08-07
 updated: 2026-07-25
 design_pack: approved
-release_target: v2.18.0
-release: v2.18.0
-release_scope: partial_6_of_13_points
+release_target: v2.18.1
+release: v2.18.1
+release_scope: partial_6_of_13_points_manual_uat_deferred
+closed: 2026-07-25
 roadmap_sprint: 45
 feature: FEAT-0039
 platform: Platform / Tenant / Mobile
@@ -16,8 +17,10 @@ depends_on: [SPRINT-013, SPRINT-016, SPRINT-025, SPRINT-027, SPRINT-030, SPRINT-
 
 # SPRINT-045 — AiaaS Mass-Market Packages and Usage Reconciliation
 
-> **REOPENED:** v2.18.0 shipped the verified 6-point slice. Sprint 45 remains
-> in progress until the remaining 7 points are implemented and verified.
+> **CLOSED AS PARTIAL:** v2.18.1 ships the verified 6-point slice plus the
+> follow-up ledger/projection implementation. Manual UAT and the remaining
+> acceptance evidence are explicitly deferred to Sprint 46; 7 points carry
+> over and are not counted as complete.
 
 ## Goal
 
@@ -38,13 +41,14 @@ same tenant-scoped dimension contract.
 | --- | ---: | --- | --- |
 | Package initialization and entitlement snapshots | 3 | dev | Idempotent four-tier defaults, platform-admin catalog CRUD, package-change history — **TASK-0164 completed** |
 | Dimensioned quota enforcement | 3 | dev | Storage/mobile dimensions and stable quota response contract — **TASK-0165 completed** |
-| Idempotent usage ledger and reconciliation | 3 | devops/dev | Replay-safe events, source watermarks, mismatch/correction states — **TASK-0166 backlog** |
-| Statistics and billing projections | 2 | dev | Tenant/platform current-vs-historical usage consistency — **TASK-0167 backlog** |
-| Mobile enforcement and verification | 2 | dev/tester | Mobile quota metadata, lifecycle release, two-tenant/load UAT — **TASK-0168 backlog** |
+| Idempotent usage ledger and reconciliation | 3 | devops/dev | Replay-safe events, source watermarks, mismatch/correction states — **TASK-0166 carry-over** |
+| Statistics and billing projections | 2 | dev | Tenant/platform current-vs-historical usage consistency — **TASK-0167 carry-over** |
+| Mobile enforcement and verification | 2 | dev/tester | Mobile quota metadata, lifecycle release, two-tenant/load UAT — **TASK-0168 carry-over** |
 
 **Delivered:** 6 points across package initialization and dimensioned quota
-enforcement. **Remaining:** 7 points across TASK-0166, TASK-0167, and
-TASK-0168.
+enforcement. **Carry-over:** 7 points across TASK-0166, TASK-0167, and
+TASK-0168. Manual UAT is deferred by release decision and tracked in the
+Sprint 45 manual runbook.
 
 ## Partial release record
 
@@ -55,13 +59,13 @@ source reporting, and storage projection reads. Docker-backed two-tenant/load
 UAT and idempotent usage-ledger/reconciliation work remain open under the
 three remaining tasks below.
 
-## Remaining tasks
+## Carry-over tasks to Sprint 46
 
 | Task | Points | Status | Outcome |
 | --- | ---: | --- | --- |
-| [TASK-0166](../04-tasks/TASK-0166.md) | 3 | backlog | Idempotent usage ledger and bounded reconciliation runs |
-| [TASK-0167](../04-tasks/TASK-0167.md) | 2 | backlog | Tenant/platform current-vs-historical statistics and billing projections |
-| [TASK-0168](../04-tasks/TASK-0168.md) | 2 | backlog | Mobile lifecycle verification, two-tenant isolation, and load UAT |
+| [TASK-0166](../04-tasks/TASK-0166.md) | 3 | in_progress | Idempotent usage ledger and bounded reconciliation runs |
+| [TASK-0167](../04-tasks/TASK-0167.md) | 2 | in_progress | Tenant/platform current-vs-historical statistics and billing projections |
+| [TASK-0168](../04-tasks/TASK-0168.md) | 2 | in_progress | Mobile lifecycle verification, two-tenant isolation, and load UAT |
 
 ## Scope boundary
 
@@ -107,3 +111,10 @@ go test ./internal/quota ./internal/metering ./cmd/server -count=1
 # two-tenant concurrent-load tests preserve isolation
 git diff --check
 ```
+
+## Close note
+
+Automated tests, build, migration, and transactional duplicate-safety smoke
+checks passed. The local Docker stack was healthy during migration. The
+step-by-step manual UAT remains deferred and must be executed before broad
+customer production traffic or declaring the carry-over tasks complete.

@@ -99,6 +99,8 @@ type platformBillingTenant struct {
 	AIEstimatedEvents     int                      `json:"ai_estimated_events"`
 	AIUnavailableEvents   int                      `json:"ai_unavailable_events"`
 	AICoveragePercent     float64                  `json:"ai_coverage_percent"`
+	UsageProjections      []store.UsageProjection  `json:"usage_projections"`
+	UsageProjectionStatus string                   `json:"usage_projection_status"`
 	Status                string                   `json:"status"`
 }
 
@@ -169,7 +171,14 @@ func (s *server) getPlatformBillingUsage(w http.ResponseWriter, r *http.Request)
 	}
 
 	for _, item := range items {
-		row := platformBillingTenant{TenantID: item.ID, Slug: item.Slug, Name: item.Name, Status: "current"}
+		row := platformBillingTenant{TenantID: item.ID, Slug: item.Slug, Name: item.Name, Status: "current", UsageProjections: []store.UsageProjection{}, UsageProjectionStatus: "unavailable"}
+		if projectionStart, parseStartErr := time.Parse("2006-01-02", startDate); parseStartErr == nil {
+			if projectionEnd, parseEndErr := time.Parse("2006-01-02", endDate); parseEndErr == nil {
+				if projections, projectionErr := s.store.ListUsageProjections(ctx, item.ID, projectionStart, projectionEnd); projectionErr == nil {
+					row.UsageProjections, row.UsageProjectionStatus = projections, "current"
+				}
+			}
+		}
 		if paid, ok := billing.ByTenant[item.ID]; ok {
 			row.PaidOrders, row.PaidAmountMinor, row.Currency = paid.PaidOrders, paid.PaidAmountCents, paid.Currency
 		}

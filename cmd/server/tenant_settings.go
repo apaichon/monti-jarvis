@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/libra/monti-jarvis/internal/store"
 )
@@ -138,6 +139,16 @@ func (s *server) getTenantUsage(w http.ResponseWriter, r *http.Request) {
 		"call_minutes": daily,
 		"timezone":     tz,
 	}
+	historical := map[string]any{"status": "unavailable", "dimensions": []store.UsageProjection{}}
+	if s.store != nil {
+		now := time.Now().UTC()
+		start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		if projections, projectionErr := s.store.ListUsageProjections(r.Context(), tenantID, start, now); projectionErr == nil {
+			historical["status"] = "current"
+			historical["dimensions"] = projections
+		}
+	}
+	out["historical_usage"] = historical
 	writeJSON(w, http.StatusOK, out)
 }
 

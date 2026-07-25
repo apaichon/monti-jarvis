@@ -12,3 +12,4 @@ updated: 2026-07-18
 - 2026-07-14 (SPRINT-023): dev shipped 3 done tasks, 2 high-risk items closed. Highlights: TASK-0108, TASK-0109, TASK-0110.
 - 2026-07-14 (SPRINT-025): dev shipped 2 done tasks, 2 high-risk items closed. Highlights: TASK-0117, TASK-0118.
 - 2026-07-18 (SPRINT-031): dev shipped 2 done tasks, 0 high-risk items closed. Highlights: TASK-0141, TASK-0142.
+- 2026-07-25 (SPRINT-045): dev shipped 2 done tasks, 0 high-risk items closed. Highlights: TASK-0164, TASK-0165; ledger/projection follow-up carried into Sprint 46.
