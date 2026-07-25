@@ -179,7 +179,7 @@ curl -fsS http://localhost:8091/api/workforce
 | Dev | Codex release verification | 2026-07-25 | S46 referral attribution foundation and Monti email template branding |
 | Tester | Codex release verification | 2026-07-25 | Automated verification passed; manual UAT deferred — test later |
 | PM | User-authorized release close | 2026-07-25 | v2.19.0 closes S46 as a partial release; 7 points carry over |
-| DevOps | Codex release verification | 2026-07-25 | Release metadata prepared; tag and branch push pending |
+| DevOps | Codex release verification | 2026-07-25 | v2.19.0 tag and feature branch pushed to origin |
 
 ## H. Release-cut (PM + DevOps)
 
@@ -196,7 +196,7 @@ git push origin v2.13.0
 - [x] Sprint marked `completed` in `03-sprints/`
 - [x] `_velocity.json` updated
 - [x] ROADMAP Sprint 46 partial slice marked v2.19.0 and next sprint pointer advanced to Sprint 47
-- [ ] Tag `v2.19.0` pushed to `origin` (this close)
+- [x] Tag `v2.19.0` pushed to `origin`
 
 ## Quick demo script (stakeholder, ~10 min)
 
