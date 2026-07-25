@@ -17,7 +17,8 @@ func (s *server) sendVerificationEmail(ctx context.Context, user store.AuthUser,
 	}
 	base := strings.TrimRight(s.cfg.PublicBaseURL, "/")
 	verifyURL := base + "/tenant/register/verify?token=" + rawToken
-	subject, html := resend.VerificationEmail(verifyURL, user.DisplayName)
+	logoURL := resend.BrandLogoURL(s.cfg.PublicBaseURL)
+	subject, html := resend.VerificationEmail(verifyURL, user.DisplayName, logoURL)
 	mailCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
 	if err := s.mailer.Send(mailCtx, user.Email, subject, html); err != nil {
@@ -47,7 +48,8 @@ func (s *server) sendKYCApprovedEmail(ctx context.Context, result store.Platform
 	base := strings.TrimRight(s.cfg.PublicBaseURL, "/")
 	loginURL := base + "/tenant/login"
 	billingURL := base + "/tenant/billing"
-	subject, html := resend.KYCApprovedEmail(loginURL, billingURL, result.CompanyName)
+	logoURL := resend.BrandLogoURL(s.cfg.PublicBaseURL)
+	subject, html := resend.KYCApprovedEmail(loginURL, billingURL, result.CompanyName, logoURL)
 	mailCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
 	if err := s.mailer.Send(mailCtx, to, subject, html); err != nil {
@@ -75,7 +77,8 @@ func (s *server) sendKYCRejectedEmail(ctx context.Context, result store.Platform
 	}
 	base := strings.TrimRight(s.cfg.PublicBaseURL, "/")
 	backofficeURL := base + "/tenant/backoffice"
-	subject, html := resend.KYCRejectedEmail(backofficeURL, result.CompanyName, result.RejectionReason)
+	logoURL := resend.BrandLogoURL(s.cfg.PublicBaseURL)
+	subject, html := resend.KYCRejectedEmail(backofficeURL, result.CompanyName, result.RejectionReason, logoURL)
 	mailCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
 	if err := s.mailer.Send(mailCtx, to, subject, html); err != nil {
@@ -93,7 +96,8 @@ func (s *server) sendRegistrationCompleteEmail(ctx context.Context, user store.A
 	}
 	base := strings.TrimRight(s.cfg.PublicBaseURL, "/")
 	loginURL := base + "/tenant/login"
-	subject, html := resend.RegistrationCompleteEmail(loginURL, tenantID, user.DisplayName)
+	logoURL := resend.BrandLogoURL(s.cfg.PublicBaseURL)
+	subject, html := resend.RegistrationCompleteEmail(loginURL, tenantID, user.DisplayName, logoURL)
 	mailCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
 	if err := s.mailer.Send(mailCtx, user.Email, subject, html); err != nil {

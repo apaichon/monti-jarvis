@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"log"
 	"net"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/libra/monti-jarvis/internal/auditctx"
 	"github.com/libra/monti-jarvis/internal/auth"
+	"github.com/libra/monti-jarvis/internal/resend"
 	"github.com/libra/monti-jarvis/internal/store"
 )
 
@@ -399,8 +399,7 @@ func (s *server) customerOTPHash(tenantID, email, otp string) string {
 }
 
 func (s *server) sendCustomerOTPEmail(ctx context.Context, email, code string, ttlSeconds int) {
-	subject := "Your Monti sign-in code"
-	htmlBody := fmt.Sprintf(`<p>Your Monti sign-in code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">%s</p><p>This code expires in %d minutes.</p>`, html.EscapeString(code), max(1, ttlSeconds/60))
+	subject, htmlBody := resend.CustomerOTPEmail(code, ttlSeconds, resend.BrandLogoURL(s.cfg.PublicBaseURL))
 	if s.mailer == nil || !s.mailer.Enabled() {
 		log.Printf("mailer warning: customer OTP email skipped for %s (resend disabled)", email)
 		return
