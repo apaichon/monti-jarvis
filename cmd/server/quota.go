@@ -187,10 +187,15 @@ func (s *server) recordCallUsageEvent(tenantID, callID string, mobile bool, minu
 		dimension, sourceType = "mobile_call_minutes", "mobile_call"
 	}
 	now := time.Now().UTC()
+	snapshotID := ""
+	if entitlement, err := s.store.GetActiveEntitlement(context.Background(), tenantID); err == nil && entitlement != nil {
+		snapshotID = entitlement.ID
+	}
 	_, _, _ = s.store.RecordUsageEvent(context.Background(), store.UsageEventInput{
 		TenantID: tenantID, IdempotencyKey: "call:" + callID + ":" + dimension,
 		Dimension: dimension, Unit: "minutes", Amount: int64(minutes),
 		PeriodStart: now, PeriodEnd: now, SourceType: sourceType, SourceID: callID,
+		EntitlementSnapshotID: snapshotID,
 	})
 }
 

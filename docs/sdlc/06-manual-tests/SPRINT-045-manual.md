@@ -1,6 +1,6 @@
 ---
 id: UAT-SPRINT-045
-status: deferred
+status: passed
 updated: 2026-07-25
 sprint: SPRINT-045
 owner: Tester
@@ -8,13 +8,12 @@ owner: Tester
 
 # SPRINT-045 — Step-by-step manual UAT
 
-This runbook verifies the deferred Sprint 45 points: idempotent usage
+This runbook records the follow-up verification for Sprint 45 points: idempotent usage
 events, tenant/platform projections, mobile lifecycle behavior, and
 two-tenant isolation under concurrent use.
 
-Sprint 45 is closed as a partial release. Execute this runbook in Sprint 46
-and attach the evidence before marking TASK-0166, TASK-0167, or TASK-0168
-completed.
+Sprint 45 follow-up verification is complete. The final release cut/tag is
+still pending explicit release authorization.
 
 Run all commands from the repository root. Use only the local Docker fixture.
 Do not paste real provider credentials, customer data, or production tenant
@@ -488,6 +487,23 @@ this document and TASK-0166/TASK-0167/TASK-0168 in_progress with the failed
 step, evidence path, and follow-up noted.
 
 ## Automated evidence already recorded
+
+## Execution evidence — 2026-07-25
+
+- [x] Local Docker infrastructure, migration 029, Postgres ledger tables,
+  Redis DB 4, ClickHouse, and MinIO health checks passed.
+- [x] All four AiaaS catalog rows returned the expected price, web/mobile
+  minutes, storage, KM, avatar, and concurrency dimensions.
+- [x] Tenant and platform usage projections passed with current versus
+  historical separation and two-tenant isolation.
+- [x] Duplicate ledger fixture produced one Tenant A row totaling 2 and one
+  Tenant B row totaling 7, then cleaned all fixture rows.
+- [x] Reconciliation returned completed status, bounded watermarks, zero
+  mismatches, correction counters, duplicate replay, and tenant-admin 403.
+- [x] Mobile bootstrap, same-tenant replay, cross-tenant idempotency scoping,
+  end replay, concurrent starts, WebSocket disconnect, and cleanup passed.
+- [x] ClickHouse outage returned `503 usage_unavailable`; Redis outage kept
+  safe fail-open behavior; both services were restored healthy.
 
 - [x] Four AiaaS seed definitions and rules-v2 validation pass.
 - [x] Separate web/mobile minute counters pass focused tests.

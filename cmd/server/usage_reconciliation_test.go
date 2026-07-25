@@ -29,3 +29,14 @@ func TestParseUsageReconciliationRequestBoundsPeriod(t *testing.T) {
 		}
 	}
 }
+
+func TestParseUsageReconciliationRequestAcceptsBoundedThirtyOneDayWindow(t *testing.T) {
+	_, err := parseUsageReconciliationRequest([]byte(`{"start_date":"2026-07-01","end_date":"2026-07-31","idempotency_key":"bounded"}`))
+	if err != nil {
+		t.Fatalf("31 calendar-day window should be accepted: %v", err)
+	}
+	_, err = parseUsageReconciliationRequest([]byte(`{"start_date":"2026-07-01","end_date":"2026-08-01","idempotency_key":"too-wide"}`))
+	if !errors.Is(err, store.ErrUsageValidation) {
+		t.Fatalf("expected 32-day window to be rejected, got %v", err)
+	}
+}

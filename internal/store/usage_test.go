@@ -34,3 +34,30 @@ func TestNormalizeUsageEventRejectsInvalidDimensionAndCorrection(t *testing.T) {
 		t.Fatal("expected correction without correction_of to be rejected")
 	}
 }
+
+func TestNormalizeUsageEventAcceptsAllDimensionContracts(t *testing.T) {
+	cases := []struct {
+		name, dimension, unit string
+	}{
+		{name: "avatars", dimension: "ai_employees", unit: "assignments"},
+		{name: "web minutes", dimension: "monthly_call_minutes", unit: "minutes"},
+		{name: "mobile minutes", dimension: "mobile_call_minutes", unit: "minutes"},
+		{name: "knowledge", dimension: "km_documents", unit: "documents"},
+		{name: "storage", dimension: "storage_bytes", unit: "bytes"},
+		{name: "concurrency", dimension: "concurrent_calls", unit: "calls"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := normalizeUsageEvent(UsageEventInput{
+				TenantID: "tenant-a", IdempotencyKey: tc.name, Dimension: tc.dimension,
+				Unit: tc.unit, Amount: 1, SourceType: "uat",
+			})
+			if err != nil {
+				t.Fatalf("normalize %s: %v", tc.name, err)
+			}
+			if got.Dimension != tc.dimension || got.Unit != tc.unit || got.PeriodEnd.Before(got.PeriodStart) {
+				t.Fatalf("unexpected normalized event: %+v", got)
+			}
+		})
+	}
+}

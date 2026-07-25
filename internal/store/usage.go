@@ -81,7 +81,9 @@ type UsageProjection struct {
 	Dimension             string `json:"dimension"`
 	Unit                  string `json:"unit"`
 	Period                string `json:"period"`
+	Limit                 *int   `json:"limit"`
 	Consumed              int64  `json:"consumed"`
+	Remaining             *int64 `json:"remaining"`
 	Source                string `json:"source"`
 	Freshness             string `json:"freshness"`
 	EntitlementSnapshotID string `json:"entitlement_snapshot_id,omitempty"`
@@ -332,14 +334,28 @@ func (s *Store) RunUsageReconciliation(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	var count, amount int64
+	var count, amount, correctionCount, reversalCount, voidedCount int64
 	var latest *time.Time
-	err = s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(*)::bigint,COALESCE(SUM(amount),0)::bigint,MAX(created_at) FROM %s.usage_events WHERE period_start <= $2 AND period_end >= $1 AND ($3='' OR tenant_id=$3)`, schema), startDate, endDate, tenantID).Scan(&count, &amount, &latest)
+	err = s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT COUNT(*)::bigint,
+       COALESCE(SUM(amount),0)::bigint,
+       COUNT(*) FILTER (WHERE state='correction')::bigint,
+       COUNT(*) FILTER (WHERE state='reversed')::bigint,
+       COUNT(*) FILTER (WHERE state='voided')::bigint,
+       MAX(created_at)
+FROM %s.usage_events
+WHERE period_start <= $2 AND period_end >= $1 AND ($3='' OR tenant_id=$3)`, schema), startDate, endDate, tenantID).Scan(&count, &amount, &correctionCount, &reversalCount, &voidedCount, &latest)
 	if err != nil {
 		_, _ = s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.usage_reconciliation_runs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1`, schema), id, UsageReconciliationFailed, "reconciliation_source_unavailable")
 		return err
 	}
-	watermarks := map[string]any{"usage_events_count": count, "usage_events_amount": amount}
+	watermarks := map[string]any{
+		"usage_events_count":       count,
+		"usage_events_amount":      amount,
+		"usage_events_corrections": correctionCount,
+		"usage_events_reversed":    reversalCount,
+		"usage_events_voided":      voidedCount,
+	}
 	if latest != nil {
 		watermarks["usage_events_latest_created_at"] = latest.UTC().Format(time.RFC3339Nano)
 	}
@@ -347,6 +363,7 @@ func (s *Store) RunUsageReconciliation(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.usage_reconciliation_runs SET status=$2,source_watermarks=$3::jsonb,mismatch_count=0,correction_count=0,error_code='',updated_at=now() WHERE id=$1`, schema), id, UsageReconciliationCompleted, string(payload))
+	corrections := correctionCount + reversalCount + voidedCount
+	_, err = s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.usage_reconciliation_runs SET status=$2,source_watermarks=$3::jsonb,mismatch_count=0,correction_count=$4,error_code='',updated_at=now() WHERE id=$1`, schema), id, UsageReconciliationCompleted, string(payload), corrections)
 	return err
 }

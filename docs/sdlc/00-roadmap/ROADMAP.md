@@ -68,7 +68,7 @@
 | **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) ✅ v2.16.0 · [SPRINT-042](../03-sprints/SPRINT-042.md) |
 | **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md) · [SPRINT-043](../03-sprints/SPRINT-043.md) ✅ v2.17.0 |
 | **44** | **Customer / Tenant** | **Customer generative AI (Claude · Codex · Antigravity · Grok CLI) → HTML/image/canvas/link/report/doc** | **K** | **1, 20, 21, 43** · [SPRINT-044](../03-sprints/SPRINT-044.md) · backlog — ON HOLD |
-| **45** | **Platform / Tenant / Mobile** | **AiaaS for mass-market packages: ฿500 · ฿1,000 · ฿1,500 · ฿2,000 with differentiated quotas and corrected usage/statistics** | **L** | **13, 16, 25, 27, 30, 31, 43** · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [SPRINT-045](../03-sprints/SPRINT-045.md) · completed partial v2.18.1; manual UAT deferred |
+| **45** | **Platform / Tenant / Mobile** | **AiaaS for mass-market packages: ฿500 · ฿1,000 · ฿1,500 · ฿2,000 with differentiated quotas and corrected usage/statistics** | **L** | **13, 16, 25, 27, 30, 31, 43** · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [SPRINT-045](../03-sprints/SPRINT-045.md) · completed 13/13; completion release pending |
 | **46** | **Platform / Tenant / Growth** | **Tenant referral affiliate program with configurable bonus-quota rewards and referral usage tracking** | **M** | **9, 10, 13, 31, 45** · [SPRINT-046](../03-sprints/SPRINT-046.md) · completed partial v2.19.0; manual UAT deferred |
 | **47** | **Platform / AI Operations** | **Langfuse real-time LLM observability and evaluation across chat, voice, mobile, RAG, tools, and generative jobs** | **N** | **21, 25, 27, 31, 43, 44** · backlog |
 
@@ -547,9 +547,9 @@ Prefer **tenant-managed** keys for B2B call-center embeds; allow **customer-owne
 
 **Out (unless pulled in):** Training custom models; unrestricted shell on customer devices; free unlimited generation without quota; replacing Gemini voice pipeline for calls.
 
-## Backlog add: SPRINT-045 — AiaaS for Mass-Market Packages and Usage Reconciliation
+## Completed: SPRINT-045 — AiaaS for Mass-Market Packages and Usage Reconciliation
 
-**Platform:** Platform / Tenant / Mobile · **Feature:** Simple monthly AiaaS packages for mass-market tenants with differentiated capacity · **Depends:** 13, 16, 25, 27, 30, 31, 43 · **Status:** completed partial; v2.18.1 shipped with manual UAT deferred · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [DES-0042](../02-design/42-aiaas-packages-usage-reconciliation-spec.md)
+**Platform:** Platform / Tenant / Mobile · **Feature:** Simple monthly AiaaS packages for mass-market tenants with differentiated capacity · **Depends:** 13, 16, 25, 27, 30, 31, 43 · **Status:** completed 13/13; completion release cut/tag pending · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [DES-0042](../02-design/42-aiaas-packages-usage-reconciliation-spec.md)
 
 Offer a small, understandable package ladder in Thai baht. The following is the
 roadmap baseline for product and technical estimation; final commercial values

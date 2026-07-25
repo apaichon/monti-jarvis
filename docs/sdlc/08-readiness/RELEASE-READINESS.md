@@ -136,15 +136,18 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] Source-error behavior is covered by focused ClickHouse client regression coverage.
 - [ ] Manual browser, responsive-layout, dependency-failure, session-expiry, and existing-regression UAT evidence; carried over as TASK-0144.
 
-### SPRINT-045 (v2.18.1)
+### SPRINT-045 (completion verification; release cut pending)
 
 - [x] TASK-0164 four-tier AiaaS package initialization and rules-v2 validation.
 - [x] TASK-0165 dimensioned quota enforcement, mobile allowance metadata, and
   safe unavailable-source reporting.
 - [x] Full Go tests, Go/Svelte build, mobile SDK build, and diff validation.
-- [ ] Docker-backed two-tenant/load UAT and usage-ledger/reconciliation checks;
-  explicitly deferred to Sprint 46 under TASK-0166/TASK-0167/TASK-0168 in the
+- [x] Docker-backed two-tenant/load UAT and usage-ledger/reconciliation checks
+  completed under TASK-0166/TASK-0167/TASK-0168 in the
   [SPRINT-045 manual checklist](../06-manual-tests/SPRINT-045-manual.md).
+- [x] Controlled ClickHouse and Redis outage behavior verified with recovery.
+- [ ] Completion release version/tag cut and pushed; pending explicit release
+  authorization.
 
 ### SPRINT-046 (v2.19.0 partial)
 
@@ -153,7 +156,6 @@ curl -fsS http://localhost:8091/api/workforce
   and append-only status events covered by automated tests.
 - [x] Full Go tests, Go vet, server build, and diff validation.
 - [ ] Manual referral UAT; deferred with the close remark **test later**.
-- [ ] TASK-0166, TASK-0167, and TASK-0168 carry over for completion.
 
 ## F. Documentation
 
@@ -176,6 +178,8 @@ curl -fsS http://localhost:8091/api/workforce
 | Tester | Codex release verification | 2026-07-25 | Automated verification passed; Docker-backed S45 UAT deferred |
 | PM | User-authorized release close | 2026-07-25 | v2.18.1 closes S45 as a partial release; manual UAT deferred |
 | DevOps | Codex release verification | 2026-07-25 | Release build and tag prepared; S45 integration UAT carried forward |
+| Dev | Codex completion verification | 2026-07-25 | TASK-0166/TASK-0167/TASK-0168 implementation and regression checks completed |
+| Tester | Codex completion verification | 2026-07-25 | Docker-backed S45 manual UAT, duplicate safety, isolation, and outage recovery passed |
 | Dev | Codex release verification | 2026-07-25 | S46 referral attribution foundation and Monti email template branding |
 | Tester | Codex release verification | 2026-07-25 | Automated verification passed; manual UAT deferred — test later |
 | PM | User-authorized release close | 2026-07-25 | v2.19.0 closes S46 as a partial release; 7 points carry over |

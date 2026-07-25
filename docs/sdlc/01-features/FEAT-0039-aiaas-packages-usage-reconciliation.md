@@ -1,7 +1,7 @@
 ---
 id: FEAT-0039
 title: "AiaaS mass-market packages and usage reconciliation"
-status: in_progress
+status: completed
 roadmap_sprint: 45
 priority: L
 depends_on: [SPRINT-013, SPRINT-016, SPRINT-025, SPRINT-027, SPRINT-030, SPRINT-031, SPRINT-043]

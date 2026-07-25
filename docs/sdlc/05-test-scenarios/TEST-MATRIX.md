@@ -3,7 +3,7 @@ id: TEST-MATRIX
 status: active
 hold_reason: sprint_044_security_review
 updated: 2026-07-24
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044]
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044, SPRINT-045]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -202,6 +202,18 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | T27-05 | 5, 7 | Customer auth, tenant isolation, avatar assignment, quota, and rate-limit enforcement | Auto + Manual | `go test ./cmd/server` · [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
 | T27-06 | 6 | TypeScript SDK exposes token refresh, lifecycle, reconnect, transcript, end, and rating APIs | Auto + Manual | `tsc -p packages/monti-mobile-sdk/tsconfig.json` · [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
 | T27-07 | Regression | Existing web call routes, archive, quota, statistics, and `/healthz` remain compatible | Smoke / Manual | [UAT-027](../06-manual-tests/SPRINT-027-manual.md#scenarios) | Pass |
+
+---
+
+## FEAT-0039 — AiaaS Packages and Usage Reconciliation (SPRINT-045)
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T45-01 | 1–2 | Four catalog tiers expose dimensioned limits and tenant/platform projections | Auto + Manual | `go test ./...` · [UAT §3–§4](../06-manual-tests/SPRINT-045-manual.md#3-verify-all-four-package-tiers) | Pass |
+| T45-02 | 3 | Usage ledger accepts all dimension contracts and keeps corrections attributable | Auto + Manual | `go test ./internal/store ./cmd/server` · [UAT §5](../06-manual-tests/SPRINT-045-manual.md#5-verify-idempotent-usage-ledger-events) | Pass |
+| T45-03 | 4–5 | Current enforcement and historical usage remain distinct with safe unavailable states | Auto + Manual | `go test ./...` · [UAT §4](../06-manual-tests/SPRINT-045-manual.md#4-verify-current-versus-historical-projections) | Pass |
+| T45-04 | 6 | Mobile lifecycle, WebSocket disconnect, retries, two-tenant isolation, and concurrent load | Manual | [UAT §7–§8](../06-manual-tests/SPRINT-045-manual.md#7-verify-mobile-bootstrap-and-call-idempotency) | Pass |
+| T45-05 | Regression | ClickHouse/Redis controlled outage behavior recovers without unsafe zeroes | Manual | [UAT §9](../06-manual-tests/SPRINT-045-manual.md#9-verify-unavailable-source-behavior) | Pass |
 
 ---
 
