@@ -1,13 +1,13 @@
 ---
 id: SPRINT-045
-status: completed
+status: in_progress
 start: 2026-08-01
 end: 2026-08-07
 updated: 2026-07-25
-closed: 2026-07-25
 design_pack: approved
 release_target: v2.18.0
 release: v2.18.0
+release_scope: partial_6_of_13_points
 roadmap_sprint: 45
 feature: FEAT-0039
 platform: Platform / Tenant / Mobile
@@ -16,9 +16,8 @@ depends_on: [SPRINT-013, SPRINT-016, SPRINT-025, SPRINT-027, SPRINT-030, SPRINT-
 
 # SPRINT-045 — AiaaS Mass-Market Packages and Usage Reconciliation
 
-> **SHIPPED SLICE:** The package initialization and dimensioned quota slice is
-> released in v2.18.0. The remaining usage-ledger, reconciliation, reporting,
-> and load-UAT packages remain queued for a follow-up sprint.
+> **REOPENED:** v2.18.0 shipped the verified 6-point slice. Sprint 45 remains
+> in progress until the remaining 7 points are implemented and verified.
 
 ## Goal
 
@@ -39,21 +38,30 @@ same tenant-scoped dimension contract.
 | --- | ---: | --- | --- |
 | Package initialization and entitlement snapshots | 3 | dev | Idempotent four-tier defaults, platform-admin catalog CRUD, package-change history — **TASK-0164 completed** |
 | Dimensioned quota enforcement | 3 | dev | Storage/mobile dimensions and stable quota response contract — **TASK-0165 completed** |
-| Idempotent usage ledger and reconciliation | 3 | devops/dev | Replay-safe events, source watermarks, mismatch/correction states — **queued** |
-| Statistics and billing projections | 2 | dev | Tenant/platform current-vs-historical usage consistency — **queued** |
-| Mobile enforcement and verification | 2 | dev/tester | Mobile quota metadata, lifecycle release, two-tenant/load UAT — **queued** |
+| Idempotent usage ledger and reconciliation | 3 | devops/dev | Replay-safe events, source watermarks, mismatch/correction states — **TASK-0166 backlog** |
+| Statistics and billing projections | 2 | dev | Tenant/platform current-vs-historical usage consistency — **TASK-0167 backlog** |
+| Mobile enforcement and verification | 2 | dev/tester | Mobile quota metadata, lifecycle release, two-tenant/load UAT — **TASK-0168 backlog** |
 
 **Delivered:** 6 points across package initialization and dimensioned quota
-enforcement. The remaining 7 points stay queued behind usage-ledger and
-reconciliation design review.
+enforcement. **Remaining:** 7 points across TASK-0166, TASK-0167, and
+TASK-0168.
 
-## Close summary
+## Partial release record
 
 TASK-0164 and TASK-0165 are completed and verified. The release includes the
 four idempotent AiaaS catalog defaults, rules-v2 storage/mobile dimensions,
 separate mobile/web counters, mobile bootstrap metadata, safe unavailable
 source reporting, and storage projection reads. Docker-backed two-tenant/load
-UAT and idempotent usage-ledger/reconciliation work are carried forward.
+UAT and idempotent usage-ledger/reconciliation work remain open under the
+three remaining tasks below.
+
+## Remaining tasks
+
+| Task | Points | Status | Outcome |
+| --- | ---: | --- | --- |
+| [TASK-0166](../04-tasks/TASK-0166.md) | 3 | backlog | Idempotent usage ledger and bounded reconciliation runs |
+| [TASK-0167](../04-tasks/TASK-0167.md) | 2 | backlog | Tenant/platform current-vs-historical statistics and billing projections |
+| [TASK-0168](../04-tasks/TASK-0168.md) | 2 | backlog | Mobile lifecycle verification, two-tenant isolation, and load UAT |
 
 ## Scope boundary
 

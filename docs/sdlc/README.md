@@ -16,11 +16,11 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Blueprint (business):** [`docs/monti_multi_tenant_ai_call_center_blueprint.md`](../monti_multi_tenant_ai_call_center_blueprint.md)
 
-**Current sprint:** Sprint 46 — Tenant Referral Affiliate Program and Bonus Quota (**backlog**)
+**Current sprint:** Sprint 45 — AiaaS Packages and Usage Reconciliation (**in_progress; 6/13 points delivered**)
 
 **Parallel build:** _none_
 
-**Latest shipped:** [`SPRINT-045`](03-sprints/SPRINT-045.md) — AiaaS packages and dimensioned quota slice · **v2.18.0**
+**Latest shipped:** [`SPRINT-045`](03-sprints/SPRINT-045.md) — AiaaS packages and dimensioned quota partial slice · **v2.18.0**
 
 **Planned next:** Sprint 46 — Tenant Referral Affiliate Program and Bonus Quota
 

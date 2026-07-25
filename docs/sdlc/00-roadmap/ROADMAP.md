@@ -549,7 +549,7 @@ Prefer **tenant-managed** keys for B2B call-center embeds; allow **customer-owne
 
 ## Backlog add: SPRINT-045 — AiaaS for Mass-Market Packages and Usage Reconciliation
 
-**Platform:** Platform / Tenant / Mobile · **Feature:** Simple monthly AiaaS packages for mass-market tenants with differentiated capacity · **Depends:** 13, 16, 25, 27, 30, 31, 43 · **Status:** backlog — design review · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [DES-0042](../02-design/42-aiaas-packages-usage-reconciliation-spec.md)
+**Platform:** Platform / Tenant / Mobile · **Feature:** Simple monthly AiaaS packages for mass-market tenants with differentiated capacity · **Depends:** 13, 16, 25, 27, 30, 31, 43 · **Status:** in_progress; v2.18.0 partial slice shipped · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [DES-0042](../02-design/42-aiaas-packages-usage-reconciliation-spec.md)
 
 Offer a small, understandable package ladder in Thai baht. The following is the
 roadmap baseline for product and technical estimation; final commercial values

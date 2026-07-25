@@ -143,7 +143,7 @@ curl -fsS http://localhost:8091/api/workforce
   safe unavailable-source reporting.
 - [x] Full Go tests, Go/Svelte build, mobile SDK build, and diff validation.
 - [ ] Docker-backed two-tenant/load UAT and usage-ledger/reconciliation checks;
-  carried forward in [SPRINT-045 manual checklist](../06-manual-tests/SPRINT-045-manual.md).
+  carried forward under TASK-0166/TASK-0168 in [SPRINT-045 manual checklist](../06-manual-tests/SPRINT-045-manual.md).
 
 ## F. Documentation
 
