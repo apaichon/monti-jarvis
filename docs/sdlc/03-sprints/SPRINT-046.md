@@ -47,6 +47,8 @@ entitlements.
 
 ## Verification
 
+Manual UAT: [SPRINT-046-referrals-manual.md](../06-manual-tests/SPRINT-046-referrals-manual.md)
+
 ```bash
 go test ./...
 make test
