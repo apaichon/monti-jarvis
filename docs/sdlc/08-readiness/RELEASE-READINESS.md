@@ -177,10 +177,10 @@ git tag -a v2.13.0 -m "v2.13.0 - SPRINT-032 billing usage readiness and reconcil
 git push origin v2.13.0
 ```
 
-- [ ] Tag pushed to `origin`
+- [x] Tag `v2.18.0` pushed to `origin`
 - [x] Sprint marked `completed` in `03-sprints/`
 - [x] `_velocity.json` updated
-- [x] ROADMAP Sprint 32 marked shipped and next sprint pointer advanced to Sprint 33
+- [x] ROADMAP Sprint 45 shipped slice marked v2.18.0 and next sprint pointer advanced to Sprint 46
 
 ## Quick demo script (stakeholder, ~10 min)
 
