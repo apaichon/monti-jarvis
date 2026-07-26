@@ -58,6 +58,7 @@ const ACCESS_KEY = 'monti_customer_access_token';
 const REFRESH_KEY = 'monti_customer_refresh_token';
 const PROFILE_KEY = 'monti_customer_profile';
 let customerAccessMemory = '';
+let customerMemory: CustomerProfile | null = null;
 
 function clearLegacyCredentialKeys() {
   if (typeof window === 'undefined') return;
@@ -82,29 +83,18 @@ export function getCustomerRefreshToken() {
 }
 
 export function getStoredCustomer(): CustomerProfile | null {
-  if (typeof sessionStorage === 'undefined') return null;
-  const raw = sessionStorage.getItem(PROFILE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as CustomerProfile;
-  } catch {
-    return null;
-  }
+  return customerMemory;
 }
 
 export function storeCustomerSession(data: CustomerAuthResponse) {
   customerAccessMemory = data.access_token;
-  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PROFILE_KEY, JSON.stringify(data.customer));
+  customerMemory = data.customer;
 }
 
 export function clearCustomerSession() {
   customerAccessMemory = '';
+  customerMemory = null;
   clearLegacyCredentialKeys();
-  try {
-    sessionStorage.removeItem(PROFILE_KEY);
-  } catch {
-    /* ignore */
-  }
 }
 
 async function parseJSON<T>(res: Response): Promise<T> {
@@ -180,7 +170,7 @@ export async function loadCustomerMe(opts?: { tenantId?: string; embedKey?: stri
     return null;
   }
   const data = await parseJSON<{ customer: CustomerProfile }>(res);
-  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PROFILE_KEY, JSON.stringify(data.customer));
+  customerMemory = data.customer;
   return data.customer;
 }
 
