@@ -15,16 +15,20 @@
 
   // Reactive tick so first login re-renders shell without hard refresh (SPRINT-042).
   let sessionTick = $state(0);
+  let sessionReady = $state(false);
 
   onMount(() => {
-    void bootstrapSession();
-    return subscribeSession(() => {
+    const unsubscribe = subscribeSession(() => {
       sessionTick += 1;
     });
+    void bootstrapSession().finally(() => {
+      sessionReady = true;
+    });
+    return unsubscribe;
   });
 
   const showShell = $derived(
-    sessionTick >= 0 &&
+    sessionReady &&
       hasRegistrationSession() &&
       !$page.url.pathname.endsWith('/login') &&
       !$page.url.pathname.includes('/register')
@@ -41,7 +45,9 @@
   }
 </script>
 
-{#if showShell}
+{#if !sessionReady}
+  <div style="min-height:100vh;display:grid;place-items:center;color:var(--muted)">Loading session…</div>
+{:else if showShell}
   <div class="tenant-app-shell">
     <aside class="tenant-sidebar">
       <div class="tenant-sidebar-top">
