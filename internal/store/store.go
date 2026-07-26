@@ -15,10 +15,12 @@ import (
 )
 
 type Store struct {
-	cfg   env.Config
-	pg    *pgxpool.Pool
-	redis *redis.Client
-	minio *minio.Client
+	cfg           env.Config
+	pg            *pgxpool.Pool
+	pgKMRead      *pgxpool.Pool
+	pgTicketWrite *pgxpool.Pool
+	redis         *redis.Client
+	minio         *minio.Client
 }
 
 type Health struct {
@@ -95,6 +97,28 @@ func Open(ctx context.Context, cfg env.Config) (*Store, []string) {
 			}
 		}
 	}
+	if cfg.PostgresKMReadURL != "" {
+		pool, err := pgxpool.New(ctx, cfg.PostgresKMReadURL)
+		if err != nil {
+			warnings = append(warnings, "postgres km read config: "+err.Error())
+		} else if err := pool.Ping(ctx); err != nil {
+			warnings = append(warnings, "postgres km read ping: "+err.Error())
+			pool.Close()
+		} else {
+			s.pgKMRead = pool
+		}
+	}
+	if cfg.PostgresTicketWriteURL != "" {
+		pool, err := pgxpool.New(ctx, cfg.PostgresTicketWriteURL)
+		if err != nil {
+			warnings = append(warnings, "postgres ticket write config: "+err.Error())
+		} else if err := pool.Ping(ctx); err != nil {
+			warnings = append(warnings, "postgres ticket write ping: "+err.Error())
+			pool.Close()
+		} else {
+			s.pgTicketWrite = pool
+		}
+	}
 
 	if cfg.RedisURL != "" {
 		opts, err := redis.ParseURL(cfg.RedisURL)
@@ -137,9 +161,59 @@ func (s *Store) Close() {
 	if s.pg != nil {
 		s.pg.Close()
 	}
+	if s.pgKMRead != nil {
+		s.pgKMRead.Close()
+	}
+	if s.pgTicketWrite != nil {
+		s.pgTicketWrite.Close()
+	}
 	if s.redis != nil {
 		_ = s.redis.Close()
 	}
+}
+
+// KMReadDB returns the least-privilege KM read pool when configured. The
+// writer fallback preserves local development behavior only; production
+// validation requires an explicit distinct URL.
+func (s *Store) KMReadDB() *pgxpool.Pool {
+	if s == nil {
+		return nil
+	}
+	if s.pgKMRead != nil {
+		return s.pgKMRead
+	}
+	return s.pg
+}
+
+// TicketWriteDB returns the dedicated ticket capability pool when configured.
+// Ticket methods use this pool for both their scoped reads and writes so a
+// ticket request cannot silently switch database principals mid-transaction.
+func (s *Store) TicketWriteDB() *pgxpool.Pool {
+	if s == nil {
+		return nil
+	}
+	if s.pgTicketWrite != nil {
+		return s.pgTicketWrite
+	}
+	return s.pg
+}
+
+// ValidateCapabilityPools prevents production from silently falling back to
+// the general writer when a specialized capability pool failed to connect.
+func (s *Store) ValidateCapabilityPools() error {
+	if s == nil || !strings.EqualFold(strings.TrimSpace(s.cfg.AppEnv), "production") {
+		return nil
+	}
+	if s.pg == nil {
+		return fmt.Errorf("postgres writer pool is unavailable")
+	}
+	if s.pgKMRead == nil {
+		return fmt.Errorf("postgres KM read pool is unavailable")
+	}
+	if s.pgTicketWrite == nil {
+		return fmt.Errorf("postgres ticket write pool is unavailable")
+	}
+	return nil
 }
 
 func (s *Store) Health(ctx context.Context) Health {

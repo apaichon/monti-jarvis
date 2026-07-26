@@ -10,13 +10,11 @@
 
   onMount(() => {
     const access = $page.url.searchParams.get('access_token');
-    const refresh = $page.url.searchParams.get('refresh_token');
     const tid = $page.url.searchParams.get('tenant_id');
-    if (access && refresh) {
+    if (access) {
       saveSession(
         {
           access_token: access,
-          refresh_token: refresh,
           expires_in: Number($page.url.searchParams.get('expires_in') || 0),
           token_type: 'Bearer',
           user: {

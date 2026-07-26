@@ -4,7 +4,6 @@ import {
   applyTokenPair,
   clearSession,
   getAccessToken,
-  getRefreshToken,
   getStoredUser,
   type TokenPair
 } from '$lib/auth/session';
@@ -45,16 +44,14 @@ export function handleUnauthorized(hadSession = true) {
 
 async function tryRefreshAccessToken(): Promise<boolean> {
   if (!browser) return false;
-  const refresh = getRefreshToken();
-  if (!refresh) return false;
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {
     try {
       const res = await fetch('/api/auth/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refresh })
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       });
       if (!res.ok) return false;
       const pair = (await res.json()) as TokenPair;
@@ -62,7 +59,6 @@ async function tryRefreshAccessToken(): Promise<boolean> {
       const user = pair.user || getStoredUser() || undefined;
       applyTokenPair({
         access_token: pair.access_token,
-        refresh_token: pair.refresh_token || refresh,
         user: user as TokenPair['user']
       });
       return true;
@@ -90,7 +86,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     } else {
       headers.delete('Authorization');
     }
-    return fetch(path, { ...init, headers });
+    return fetch(path, { ...init, credentials: 'include', headers });
   };
 
   let res: Response;
@@ -102,7 +98,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 
   // One refresh + retry on 401 when we had a session.
-  if (res.status === 401 && getAccessToken()) {
+  if (res.status === 401 && (getAccessToken() || getStoredUser())) {
     const refreshed = await tryRefreshAccessToken();
     if (refreshed) {
       try {

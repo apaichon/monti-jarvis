@@ -2,6 +2,7 @@ package env
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -11,12 +12,18 @@ import (
 )
 
 type Config struct {
-	Port                     string
-	GeminiAPIKey             string
-	GeminiModel              string
-	GeminiLiveModel          string
-	Voice                    string
-	PostgresURL              string
+	Port            string
+	GeminiAPIKey    string
+	GeminiModel     string
+	GeminiLiveModel string
+	Voice           string
+	PostgresURL     string
+	// PostgresKMReadURL is the least-privilege connection used by KM/RAG read
+	// paths. It must not be used for KM ingest or ticket mutation.
+	PostgresKMReadURL string
+	// PostgresTicketWriteURL is the dedicated ticket capability connection.
+	PostgresTicketWriteURL   string
+	PostgresRLSEnforced      bool
 	PostgresSchema           string
 	RedisURL                 string
 	RedisPrefix              string
@@ -38,6 +45,8 @@ type Config struct {
 	ClickHouseDB             string
 	ClickHouseUser           string
 	ClickHousePassword       string
+	ClickHouseKMReadUser     string
+	ClickHouseKMReadPassword string
 	GeminiEmbedModel         string
 	AIUsageRateVersion       string
 	AIUsagePricingAsOf       string
@@ -46,6 +55,9 @@ type Config struct {
 	AIUsageOutputPriceMicros int64
 	AIUsageAudioPriceMicros  int64
 	AuthDisabled             bool
+	CookieSecure             bool
+	CookieSameSite           string
+	AllowedOrigins           []string
 	JWTSecret                string
 	JWTAccessTTL             time.Duration
 	JWTRefreshTTL            time.Duration
@@ -136,6 +148,9 @@ func Load() Config {
 		GeminiLiveModel:          envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
 		Voice:                    envOr("VOICE", "Aoede"),
 		PostgresURL:              os.Getenv("POSTGRES_URL"),
+		PostgresKMReadURL:        envOr("POSTGRES_KM_READONLY_URL", envOr("POSTGRES_READONLY_URL", "")),
+		PostgresTicketWriteURL:   os.Getenv("POSTGRES_TICKET_WRITE_URL"),
+		PostgresRLSEnforced:      envBool("POSTGRES_RLS_ENFORCED", false),
 		PostgresSchema:           envOr("POSTGRES_SCHEMA", "callcenter"),
 		RedisURL:                 os.Getenv("REDIS_URL"),
 		RedisPrefix:              envOr("REDIS_PREFIX", "monti_jarvis:"),
@@ -157,6 +172,8 @@ func Load() Config {
 		ClickHouseDB:             envOr("CLICKHOUSE_DB", "monti_jarvis"),
 		ClickHouseUser:           envOr("CLICKHOUSE_USER", "monti"),
 		ClickHousePassword:       envOr("CLICKHOUSE_PASSWORD", "monti"),
+		ClickHouseKMReadUser:     envOr("CLICKHOUSE_KM_READONLY_USER", envOr("CLICKHOUSE_USER", "monti")),
+		ClickHouseKMReadPassword: envOr("CLICKHOUSE_KM_READONLY_PASSWORD", envOr("CLICKHOUSE_PASSWORD", "monti")),
 		GeminiEmbedModel:         envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
 		AIUsageRateVersion:       envOr("AI_USAGE_RATE_VERSION", "unconfigured"),
 		AIUsagePricingAsOf:       envOr("AI_USAGE_PRICING_AS_OF", ""),
@@ -165,6 +182,9 @@ func Load() Config {
 		AIUsageOutputPriceMicros: envInt64("AI_USAGE_OUTPUT_PRICE_MICROS", 0),
 		AIUsageAudioPriceMicros:  envInt64("AI_USAGE_AUDIO_PRICE_MICROS", 0),
 		AuthDisabled:             envBool("AUTH_DISABLED", true),
+		CookieSecure:             envBool("COOKIE_SECURE", false),
+		CookieSameSite:           strings.ToLower(envOr("COOKIE_SAMESITE", "lax")),
+		AllowedOrigins:           splitOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		JWTSecret:                os.Getenv("JWT_SECRET"),
 		JWTAccessTTL:             envDuration("JWT_ACCESS_TTL", 15*time.Minute),
 		JWTRefreshTTL:            envDuration("JWT_REFRESH_TTL", 168*time.Hour),
@@ -239,6 +259,83 @@ func Load() Config {
 		AuditLogRetryBackoff:      envDuration("AUDIT_LOG_RETRY_BACKOFF", time.Second),
 		AppEnv:                    appEnv,
 	}
+}
+
+// ValidateProductionSecurity enforces the Sprint 41 capability split before
+// production serves traffic. Development keeps the existing local setup
+// compatible; production must opt into explicit database principals.
+func (c Config) ValidateProductionSecurity() error {
+	if !strings.EqualFold(strings.TrimSpace(c.AppEnv), "production") {
+		return nil
+	}
+	if c.AuthDisabled {
+		return fmt.Errorf("AUTH_DISABLED must be false in production")
+	}
+	if len(strings.TrimSpace(c.JWTSecret)) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 bytes in production")
+	}
+	if !c.CookieSecure {
+		return fmt.Errorf("COOKIE_SECURE must be true in production")
+	}
+	switch strings.ToLower(strings.TrimSpace(c.CookieSameSite)) {
+	case "lax", "strict":
+	default:
+		return fmt.Errorf("COOKIE_SAMESITE must be lax or strict in production")
+	}
+	if len(c.AllowedOrigins) == 0 {
+		return fmt.Errorf("ALLOWED_ORIGINS must contain an explicit origin in production")
+	}
+	for _, origin := range c.AllowedOrigins {
+		parsed, err := url.Parse(origin)
+		if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" || strings.Contains(origin, "*") {
+			return fmt.Errorf("ALLOWED_ORIGINS contains an invalid or wildcard origin")
+		}
+	}
+	if !c.PostgresRLSEnforced {
+		return fmt.Errorf("POSTGRES_RLS_ENFORCED must be true in production")
+	}
+	if strings.TrimSpace(c.PostgresURL) == "" {
+		return fmt.Errorf("POSTGRES_URL is required in production")
+	}
+	if strings.TrimSpace(c.PostgresKMReadURL) == "" {
+		return fmt.Errorf("POSTGRES_KM_READONLY_URL is required in production")
+	}
+	if strings.TrimSpace(c.PostgresTicketWriteURL) == "" {
+		return fmt.Errorf("POSTGRES_TICKET_WRITE_URL is required in production")
+	}
+	writer := databasePrincipal(c.PostgresURL)
+	kmRead := databasePrincipal(c.PostgresKMReadURL)
+	ticketWrite := databasePrincipal(c.PostgresTicketWriteURL)
+	if writer == kmRead || writer == ticketWrite || kmRead == ticketWrite {
+		return fmt.Errorf("production database capability users must be distinct")
+	}
+	return nil
+}
+
+func databasePrincipal(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if parsed, err := url.Parse(raw); err == nil && parsed.User != nil {
+		if user := strings.TrimSpace(parsed.User.Username()); user != "" {
+			return user
+		}
+	}
+	// Keyword/value DSNs and malformed URLs cannot expose a principal safely;
+	// retain the full value so exact duplicate URLs are still rejected.
+	return raw
+}
+
+func splitOrigins(raw string) []string {
+	seen := map[string]bool{}
+	var origins []string
+	for _, value := range strings.Split(raw, ",") {
+		value = strings.TrimRight(strings.TrimSpace(value), "/")
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		origins = append(origins, value)
+	}
+	return origins
 }
 
 var configGroupNames = map[string]bool{

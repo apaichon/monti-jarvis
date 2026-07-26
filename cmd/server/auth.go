@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/libra/monti-jarvis/internal/auth"
@@ -37,7 +38,8 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 		writeAuthHandlerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, pair)
+	setRefreshCookie(w, s.cfg, tenantRefreshCookie, "/api/auth", pair.RefreshToken, int(s.cfg.JWTRefreshTTL.Seconds()))
+	writeJSON(w, http.StatusOK, browserTokenPair(pair))
 }
 
 func (s *server) refreshToken(w http.ResponseWriter, r *http.Request) {
@@ -46,17 +48,19 @@ func (s *server) refreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req refreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
+	refreshToken := requestRefreshToken(r, tenantRefreshCookie, req.RefreshToken)
 	ctx := auth.WithRequestMeta(r.Context(), r)
-	pair, err := s.auth.RefreshWithAccess(ctx, req.RefreshToken, r.Header.Get("Authorization"))
+	pair, err := s.auth.RefreshWithAccess(ctx, refreshToken, r.Header.Get("Authorization"))
 	if err != nil {
 		writeAuthHandlerError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, pair)
+	setRefreshCookie(w, s.cfg, tenantRefreshCookie, "/api/auth", pair.RefreshToken, int(s.cfg.JWTRefreshTTL.Seconds()))
+	writeJSON(w, http.StatusOK, browserTokenPair(pair))
 }
 
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
@@ -66,8 +70,10 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	var req logoutRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
+	refreshToken := requestRefreshToken(r, tenantRefreshCookie, req.RefreshToken)
 	ctx := auth.WithRequestMeta(r.Context(), r)
-	_ = s.auth.Logout(ctx, req.RefreshToken, r.Header.Get("Authorization"))
+	_ = s.auth.Logout(ctx, refreshToken, r.Header.Get("Authorization"))
+	clearRefreshCookie(w, s.cfg, tenantRefreshCookie, "/api/auth")
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -102,6 +108,6 @@ func writeAuthHandlerError(w http.ResponseWriter, err error) {
 	case errors.Is(err, auth.ErrNotConfigured):
 		writeError(w, http.StatusServiceUnavailable, "auth is not configured")
 	default:
-		writeError(w, http.StatusBadGateway, err.Error())
+		writeError(w, http.StatusBadGateway, "authentication request failed")
 	}
 }

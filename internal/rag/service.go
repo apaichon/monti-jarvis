@@ -34,14 +34,23 @@ type Result struct {
 }
 
 type Service struct {
-	ch     *clickhouse.Client
-	embed  *gemini.Client
-	tenant string
-	cache  *preloadCache
+	ch      *clickhouse.Client
+	writeCH *clickhouse.Client
+	embed   *gemini.Client
+	tenant  string
+	cache   *preloadCache
 }
 
 func New(ch *clickhouse.Client, embed *gemini.Client, tenantID string) *Service {
-	return &Service{ch: ch, embed: embed, tenant: tenantID, cache: newPreloadCache()}
+	return NewWithWrite(ch, ch, embed, tenantID)
+}
+
+// NewWithWrite separates the KM/RAG read client from the client used for
+// operational QA-event writes. In production the read client is authenticated
+// with a ClickHouse read-only KM user; the write client is never used for
+// retrieval queries.
+func NewWithWrite(readCH, writeCH *clickhouse.Client, embed *gemini.Client, tenantID string) *Service {
+	return &Service{ch: readCH, writeCH: writeCH, embed: embed, tenant: tenantID, cache: newPreloadCache()}
 }
 
 func (s *Service) WithTenant(tenantID string) *Service {
@@ -164,7 +173,9 @@ func (s *Service) buildResult(hits []clickhouse.ChunkHit, question, agentID, top
 	}
 	if question != "" && len(result.Sources) == 0 {
 		result.MissingKM = true
-		_ = s.ch.InsertQAEvent(context.Background(), s.tenant, agentID, topic, question, "missing_km")
+		if s.writeCH != nil {
+			_ = s.writeCH.InsertQAEvent(context.Background(), s.tenant, agentID, topic, question, "missing_km")
+		}
 	}
 	result.ContextBlock = formatContext(result.Sources)
 	return result

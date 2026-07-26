@@ -23,9 +23,9 @@ export type OTPRequestResponse = {
 };
 
 export type CustomerAuthResponse = {
-  status: 'authenticated';
-  access_token: string;
-  refresh_token: string;
+	status: 'authenticated';
+	access_token: string;
+	refresh_token?: string;
   token_type: 'Bearer';
   expires_in: number;
   refresh_expires_in: number;
@@ -57,20 +57,33 @@ export type CustomerQuotaSummary = {
 const ACCESS_KEY = 'monti_customer_access_token';
 const REFRESH_KEY = 'monti_customer_refresh_token';
 const PROFILE_KEY = 'monti_customer_profile';
+let customerAccessMemory = '';
+
+function clearLegacyCredentialKeys() {
+  if (typeof window === 'undefined') return;
+  for (const key of [ACCESS_KEY, REFRESH_KEY, PROFILE_KEY, 'monti_customer_access', 'monti_customer_refresh']) {
+    try {
+      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
+    } catch {
+      /* ignore unavailable browser storage */
+    }
+  }
+}
+
+clearLegacyCredentialKeys();
 
 export function getCustomerAccessToken() {
-  if (typeof localStorage === 'undefined') return '';
-  return localStorage.getItem(ACCESS_KEY) || '';
+  return customerAccessMemory;
 }
 
 export function getCustomerRefreshToken() {
-  if (typeof localStorage === 'undefined') return '';
-  return localStorage.getItem(REFRESH_KEY) || '';
+  return '';
 }
 
 export function getStoredCustomer(): CustomerProfile | null {
-  if (typeof localStorage === 'undefined') return null;
-  const raw = localStorage.getItem(PROFILE_KEY);
+  if (typeof sessionStorage === 'undefined') return null;
+  const raw = sessionStorage.getItem(PROFILE_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as CustomerProfile;
@@ -80,16 +93,18 @@ export function getStoredCustomer(): CustomerProfile | null {
 }
 
 export function storeCustomerSession(data: CustomerAuthResponse) {
-  localStorage.setItem(ACCESS_KEY, data.access_token);
-  localStorage.setItem(REFRESH_KEY, data.refresh_token);
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(data.customer));
+  customerAccessMemory = data.access_token;
+  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PROFILE_KEY, JSON.stringify(data.customer));
 }
 
 export function clearCustomerSession() {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
-  localStorage.removeItem(PROFILE_KEY);
+  customerAccessMemory = '';
+  clearLegacyCredentialKeys();
+  try {
+    sessionStorage.removeItem(PROFILE_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 async function parseJSON<T>(res: Response): Promise<T> {
@@ -112,6 +127,7 @@ export async function requestCustomerOTP(body: {
   if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const res = await fetch('/api/customer/auth/request-otp', {
     method: 'POST',
+    credentials: 'include',
     headers,
     body: JSON.stringify(body)
   });
@@ -129,6 +145,7 @@ export async function verifyCustomerOTP(body: {
   if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const res = await fetch('/api/customer/auth/verify-otp', {
     method: 'POST',
+    credentials: 'include',
     headers,
     body: JSON.stringify(body)
   });
@@ -138,16 +155,16 @@ export async function verifyCustomerOTP(body: {
 }
 
 export async function logoutCustomer() {
-  const refresh_token = getCustomerRefreshToken();
   await fetch('/api/customer/auth/logout', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refresh_token })
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' }
   }).catch(() => {});
   clearCustomerSession();
 }
 
 export async function loadCustomerMe(opts?: { tenantId?: string; embedKey?: string; parentOrigin?: string }) {
+  if (!getCustomerAccessToken()) await refreshCustomerSession();
   const token = getCustomerAccessToken();
   if (!token) return null;
   const headers: Record<string, string> = {};
@@ -155,6 +172,7 @@ export async function loadCustomerMe(opts?: { tenantId?: string; embedKey?: stri
   if (opts?.embedKey) headers['X-Monti-Embed-Key'] = opts.embedKey;
   if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const res = await fetch('/api/customer/me', {
+    credentials: 'include',
     headers: customerAuthHeaders(headers)
   });
   if (res.status === 401 || res.status === 403) {
@@ -162,8 +180,24 @@ export async function loadCustomerMe(opts?: { tenantId?: string; embedKey?: stri
     return null;
   }
   const data = await parseJSON<{ customer: CustomerProfile }>(res);
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(data.customer));
+  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PROFILE_KEY, JSON.stringify(data.customer));
   return data.customer;
+}
+
+export async function refreshCustomerSession(): Promise<CustomerProfile | null> {
+  try {
+    const res = await fetch('/api/customer/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' }
+    });
+    if (!res.ok) return null;
+    const data = await parseJSON<CustomerAuthResponse>(res);
+    storeCustomerSession(data);
+    return data.customer;
+  } catch {
+    return null;
+  }
 }
 
 export function customerAuthHeaders(headers: Record<string, string> = {}) {
@@ -179,6 +213,7 @@ export async function loadCustomerPortalPolicy(opts?: { tenantId?: string; embed
   if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const qs = opts?.tenantId ? `?tenant_id=${encodeURIComponent(opts.tenantId)}` : '';
   const res = await fetch(`/api/customer/portal-policy${qs}`, {
+    credentials: 'include',
     headers: customerAuthHeaders(headers)
   });
   return parseJSON<CustomerPortalPolicy>(res);
@@ -191,6 +226,7 @@ export async function loadCustomerQuota(opts?: { tenantId?: string; embedKey?: s
   if (opts?.parentOrigin) headers['X-Embed-Parent-Origin'] = opts.parentOrigin;
   const qs = opts?.tenantId ? `?tenant_id=${encodeURIComponent(opts.tenantId)}` : '';
   const res = await fetch(`/api/customer/quota${qs}`, {
+    credentials: 'include',
     headers: customerAuthHeaders(headers)
   });
   return parseJSON<CustomerQuotaSummary>(res);

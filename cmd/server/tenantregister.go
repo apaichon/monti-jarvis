@@ -154,16 +154,16 @@ func (s *server) verifyTenantEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.sendRegistrationCompleteEmail(ctx, user, user.TenantID)
+	setRefreshCookie(w, s.cfg, tenantRefreshCookie, "/api/auth", pair.RefreshToken, int(s.cfg.JWTRefreshTTL.Seconds()))
 
 	writeJSON(w, http.StatusOK, registerTenantResponse{
-		TenantID:     user.TenantID,
-		Slug:         user.TenantID,
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
-		ExpiresIn:    pair.ExpiresIn,
-		TokenType:    pair.TokenType,
-		User:         pair.User,
-		Message:      "Email verified. You can sign in and complete KYC in the tenant backoffice.",
+		TenantID:    user.TenantID,
+		Slug:        user.TenantID,
+		AccessToken: pair.AccessToken,
+		ExpiresIn:   pair.ExpiresIn,
+		TokenType:   pair.TokenType,
+		User:        pair.User,
+		Message:     "Email verified. You can sign in and complete KYC in the tenant backoffice.",
 	})
 }
 

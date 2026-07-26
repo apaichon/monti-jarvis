@@ -321,6 +321,7 @@ export class MontiMobileClient {
     const headers = new Headers(init.headers);
     headers.set("Content-Type", "application/json");
     headers.set("X-Monti-SDK-Version", this.options.sdkVersion ?? "0.1.0");
+    headers.set("X-Monti-Client", "mobile");
     if (this.options.tenantId) headers.set("X-Tenant-Id", this.options.tenantId);
     if (init.auth !== false) {
       const accessToken = this.options.tokenStore.getAccessToken();

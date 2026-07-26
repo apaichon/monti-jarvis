@@ -30,8 +30,7 @@
   function consumeOAuthCallback(): boolean {
     const params = $page.url.searchParams;
     const access = params.get('access_token');
-    const refresh = params.get('refresh_token');
-    if (!access || !refresh) {
+    if (!access) {
       const err = params.get('error');
       if (err) feedback.error(err);
       return false;
@@ -44,7 +43,6 @@
     }
     const pair: TokenPair = {
       access_token: access,
-      refresh_token: refresh,
       expires_in: Number(params.get('expires_in') || 0),
       token_type: 'Bearer',
       user: {

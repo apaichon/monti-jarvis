@@ -22,13 +22,15 @@
       failVerification('Missing verification token');
       return;
     }
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete('token');
+    window.history.replaceState({}, '', clean.pathname + (clean.search || '') + clean.hash);
     try {
       const res = await verifyEmail(token);
-      if (res.access_token && res.refresh_token && res.user) {
+      if (res.access_token && res.user) {
         saveSession(
           {
             access_token: res.access_token,
-            refresh_token: res.refresh_token,
             expires_in: res.expires_in ?? 0,
             token_type: res.token_type ?? 'Bearer',
             user: res.user

@@ -10,7 +10,7 @@ export type UserProfile = {
 
 export type TokenPair = {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string;
   expires_in: number;
   token_type: string;
   user: UserProfile;
@@ -23,6 +23,23 @@ const TENANT_KEY = 'monti_tenant_slug';
 const REG_KEY = 'monti_tenant_registration';
 const CHECKOUT_ORDER_ID = 'monti_checkout_order_id';
 const CHECKOUT_ORDER_NO = 'monti_checkout_order_no';
+const LEGACY_TOKEN_KEYS = [ACCESS_KEY, REFRESH_KEY, 'monti_tenant_access_token', 'monti_tenant_refresh_token'];
+
+let accessTokenMemory = '';
+
+function clearLegacyCredentialKeys() {
+  if (!browser) return;
+  for (const key of LEGACY_TOKEN_KEYS) {
+    try {
+      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
+    } catch {
+      /* storage may be unavailable in private browsing */
+    }
+  }
+}
+
+clearLegacyCredentialKeys();
 
 /** Prefer localStorage so session survives ChillPay external redirect (sessionStorage is tab-only and flaky across return). */
 function storage(): Storage | null {
@@ -104,8 +121,7 @@ function notifySession() {
 
 export function saveSession(pair: TokenPair, tenantId?: string, registrationId?: string) {
   if (!browser) return;
-  write(ACCESS_KEY, pair.access_token);
-  write(REFRESH_KEY, pair.refresh_token);
+  accessTokenMemory = pair.access_token;
   write(USER_KEY, JSON.stringify(pair.user));
   if (tenantId) write(TENANT_KEY, tenantId);
   if (registrationId) write(REG_KEY, registrationId);
@@ -113,26 +129,25 @@ export function saveSession(pair: TokenPair, tenantId?: string, registrationId?:
 }
 
 export function getAccessToken(): string | null {
-  return read(ACCESS_KEY);
+  return accessTokenMemory || null;
 }
 
 /** Write access token only (e.g. bootstrap preview voice on localhost from *.local). */
 export function setAccessToken(token: string) {
   if (!browser || !token) return;
-  write(ACCESS_KEY, token);
+  accessTokenMemory = token;
   notifySession();
 }
 
-export function applyTokenPair(pair: Pick<TokenPair, 'access_token' | 'refresh_token'> & { user?: UserProfile }) {
+export function applyTokenPair(pair: Pick<TokenPair, 'access_token'> & { user?: UserProfile }) {
   if (!browser) return;
-  write(ACCESS_KEY, pair.access_token);
-  if (pair.refresh_token) write(REFRESH_KEY, pair.refresh_token);
+  accessTokenMemory = pair.access_token;
   if (pair.user) write(USER_KEY, JSON.stringify(pair.user));
   notifySession();
 }
 
 export function getRefreshToken(): string | null {
-  return read(REFRESH_KEY);
+  return null;
 }
 
 export function getStoredTenantId(): string | null {
@@ -150,16 +165,35 @@ export function getStoredUser(): UserProfile | null {
 }
 
 export function hasRegistrationSession(): boolean {
-  return !!getAccessToken();
+  return !!getAccessToken() || !!getStoredUser();
 }
 
 export function clearSession() {
-  remove(ACCESS_KEY);
-  remove(REFRESH_KEY);
+  accessTokenMemory = '';
+  clearLegacyCredentialKeys();
   remove(USER_KEY);
   remove(TENANT_KEY);
   remove(REG_KEY);
   notifySession();
+}
+
+/** Rehydrate the memory-only access token from the HttpOnly refresh cookie. */
+export async function bootstrapSession(): Promise<boolean> {
+  if (!browser || accessTokenMemory) return !!accessTokenMemory;
+  try {
+    const res = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) return false;
+    const pair = (await res.json()) as TokenPair;
+    if (!pair.access_token) return false;
+    applyTokenPair(pair);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

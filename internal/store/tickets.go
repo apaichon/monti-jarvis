@@ -145,7 +145,8 @@ ON %s.ticket_events (tenant_id, ticket_id, created_at ASC)`, schema),
 }
 
 func (s *Store) CreateTicket(ctx context.Context, in TicketInput) (Ticket, bool, error) {
-	if s == nil || s.pg == nil {
+	db := s.TicketWriteDB()
+	if db == nil {
 		return Ticket{}, false, fmt.Errorf("postgres is not available")
 	}
 	in.TenantID = strings.TrimSpace(in.TenantID)
@@ -190,9 +191,17 @@ func (s *Store) CreateTicket(ctx context.Context, in TicketInput) (Ticket, bool,
 			return Ticket{}, false, err
 		}
 	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return Ticket{}, false, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, in.TenantID); err != nil {
+		return Ticket{}, false, err
+	}
 	if in.CallID != "" {
 		var openID string
-		err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT id FROM %s.tickets
+		err := tx.QueryRow(ctx, fmt.Sprintf(`SELECT id FROM %s.tickets
 WHERE tenant_id=$1 AND call_id=$2 AND status IN ('open','in_progress','waiting_customer')
 ORDER BY created_at DESC LIMIT 1`, schema), in.TenantID, strings.TrimSpace(in.CallID)).Scan(&openID)
 		if err == nil {
@@ -202,12 +211,6 @@ ORDER BY created_at DESC LIMIT 1`, schema), in.TenantID, strings.TrimSpace(in.Ca
 			return Ticket{}, false, err
 		}
 	}
-
-	tx, err := s.pg.Begin(ctx)
-	if err != nil {
-		return Ticket{}, false, err
-	}
-	defer tx.Rollback(ctx)
 
 	id := "tick_" + newStoreID()
 	actor := auditctx.ActorID(ctx)
@@ -266,14 +269,49 @@ func (s *Store) GetTicket(ctx context.Context, tenantID, id string) (Ticket, err
 }
 
 func (s *Store) getTicket(ctx context.Context, predicate string, tenantID, value string) (Ticket, error) {
-	schema := quoteIdent(s.cfg.PostgresSchema)
-	row := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT t.id,t.tenant_id,COALESCE(t.conversation_record_id,''),t.call_id,COALESCE(t.customer_id,''),COALESCE(t.avatar_id,''),COALESCE(a.name,''),t.subject,t.description,COALESCE(t.source_summary,'{}'::jsonb),t.category,t.priority,t.status,t.source,COALESCE(t.assignee_user_id,''),t.contact_name,t.contact_email,t.resolved_at,t.closed_at,t.last_activity_at,t.created_at,t.updated_at
+	db := s.TicketWriteDB()
+	if db == nil {
+		return Ticket{}, fmt.Errorf("postgres is not available")
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return Ticket{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return Ticket{}, err
+	}
+	ticket, err := getTicketTx(ctx, tx, s.cfg.PostgresSchema, predicate, tenantID, value)
+	if err != nil {
+		return Ticket{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Ticket{}, err
+	}
+	return ticket, nil
+}
+
+func getTicketTx(ctx context.Context, tx pgx.Tx, schemaName, predicate, tenantID, value string) (Ticket, error) {
+	schema := quoteIdent(schemaName)
+	row := tx.QueryRow(ctx, fmt.Sprintf(`SELECT t.id,t.tenant_id,COALESCE(t.conversation_record_id,''),t.call_id,COALESCE(t.customer_id,''),COALESCE(t.avatar_id,''),COALESCE(a.name,''),t.subject,t.description,COALESCE(t.source_summary,'{}'::jsonb),t.category,t.priority,t.status,t.source,COALESCE(t.assignee_user_id,''),t.contact_name,t.contact_email,t.resolved_at,t.closed_at,t.last_activity_at,t.created_at,t.updated_at
 FROM %s.tickets t LEFT JOIN %s.ai_avatars a ON a.id=t.avatar_id
 WHERE t.tenant_id=$1 AND t.%s`, schema, schema, predicate), tenantID, value)
 	return scanTicket(row)
 }
 
 func (s *Store) ListTickets(ctx context.Context, tenantID string, f TicketFilters) ([]Ticket, error) {
+	db := s.TicketWriteDB()
+	if db == nil {
+		return nil, fmt.Errorf("postgres is not available")
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return nil, err
+	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	q := fmt.Sprintf(`SELECT t.id,t.tenant_id,COALESCE(t.conversation_record_id,''),t.call_id,COALESCE(t.customer_id,''),COALESCE(t.avatar_id,''),COALESCE(a.name,''),t.subject,t.description,COALESCE(t.source_summary,'{}'::jsonb),t.category,t.priority,t.status,t.source,COALESCE(t.assignee_user_id,''),t.contact_name,t.contact_email,t.resolved_at,t.closed_at,t.last_activity_at,t.created_at,t.updated_at
 FROM %s.tickets t LEFT JOIN %s.ai_avatars a ON a.id=t.avatar_id WHERE t.tenant_id=$1`, schema, schema)
@@ -309,7 +347,7 @@ FROM %s.tickets t LEFT JOIN %s.ai_avatars a ON a.id=t.avatar_id WHERE t.tenant_i
 		add("t.assignee_user_id", f.AssigneeUserID)
 	}
 	q += " ORDER BY t.last_activity_at DESC LIMIT 100"
-	rows, err := s.pg.Query(ctx, q, args...)
+	rows, err := tx.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -322,10 +360,20 @@ FROM %s.tickets t LEFT JOIN %s.ai_avatars a ON a.id=t.avatar_id WHERE t.tenant_i
 		}
 		out = append(out, t)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *Store) UpdateTicket(ctx context.Context, tenantID, id string, status, priority, assignee *string) (Ticket, TicketEvent, error) {
+	db := s.TicketWriteDB()
+	if db == nil {
+		return Ticket{}, TicketEvent{}, fmt.Errorf("postgres is not available")
+	}
 	current, err := s.GetTicket(ctx, tenantID, id)
 	if err != nil {
 		return Ticket{}, TicketEvent{}, ErrTicketNotFound
@@ -352,9 +400,17 @@ func (s *Store) UpdateTicket(ctx context.Context, tenantID, id string, status, p
 		return current, TicketEvent{}, nil
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return Ticket{}, TicketEvent{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return Ticket{}, TicketEvent{}, err
+	}
 	if nextAssignee != "" {
 		var assigned bool
-		if err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT EXISTS (
+		if err := tx.QueryRow(ctx, fmt.Sprintf(`SELECT EXISTS (
 SELECT 1 FROM %s.user_roles r JOIN %s.users u ON u.id=r.user_id
 WHERE r.user_id=$1 AND r.tenant_id=$2 AND r.role='tenant_admin' AND u.status='active'
 )`, schema, schema), nextAssignee, tenantID).Scan(&assigned); err != nil {
@@ -373,7 +429,7 @@ WHERE r.user_id=$1 AND r.tenant_id=$2 AND r.role='tenant_admin' AND u.status='ac
 	if nextStatus == "closed" && current.Status != "closed" {
 		closedAt = time.Now().UTC()
 	}
-	_, err = s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.tickets
+	_, err = tx.Exec(ctx, fmt.Sprintf(`UPDATE %s.tickets
 SET status=$3,priority=$4,assignee_user_id=$5,resolved_at=$6,closed_at=$7,last_activity_at=now(),updated_by=$8,updated_at=now()
 WHERE tenant_id=$1 AND id=$2`, schema), tenantID, id, nextStatus, nextPriority, nilIfBlank(nextAssignee), resolvedAt, closedAt, actor)
 	if err != nil {
@@ -386,8 +442,11 @@ WHERE tenant_id=$1 AND id=$2`, schema), tenantID, id, nextStatus, nextPriority, 
 		eventType = "priority_changed"
 	}
 	payload := map[string]any{"status": nextStatus, "priority": nextPriority, "assignee_user_id": nextAssignee}
-	event, err := s.addTicketEvent(ctx, tenantID, id, eventType, "tenant_user", actor, "", payload)
+	event, err := s.addTicketEventTx(ctx, tx, tenantID, id, eventType, "tenant_user", actor, "", payload)
 	if err != nil {
+		return Ticket{}, TicketEvent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return Ticket{}, TicketEvent{}, err
 	}
 	updated, err := s.GetTicket(ctx, tenantID, id)
@@ -399,18 +458,33 @@ func (s *Store) AddTicketNote(ctx context.Context, tenantID, id, note string) (T
 	if note == "" {
 		return Ticket{}, TicketEvent{}, fmt.Errorf("note is required")
 	}
-	if _, err := s.GetTicket(ctx, tenantID, id); err != nil {
+	db := s.TicketWriteDB()
+	if db == nil {
+		return Ticket{}, TicketEvent{}, fmt.Errorf("postgres is not available")
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return Ticket{}, TicketEvent{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return Ticket{}, TicketEvent{}, err
+	}
+	if _, err := getTicketTx(ctx, tx, s.cfg.PostgresSchema, `id=$2`, tenantID, id); err != nil {
 		return Ticket{}, TicketEvent{}, ErrTicketNotFound
 	}
-	event, err := s.addTicketEvent(ctx, tenantID, id, "note_added", "tenant_user", auditctx.ActorID(ctx), note, nil)
+	event, err := s.addTicketEventTx(ctx, tx, tenantID, id, "note_added", "tenant_user", auditctx.ActorID(ctx), note, nil)
 	if err != nil {
+		return Ticket{}, TicketEvent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return Ticket{}, TicketEvent{}, err
 	}
 	updated, err := s.GetTicket(ctx, tenantID, id)
 	return updated, event, err
 }
 
-func (s *Store) addTicketEvent(ctx context.Context, tenantID, ticketID, eventType, actorType, actorID, note string, payload map[string]any) (TicketEvent, error) {
+func (s *Store) addTicketEventTx(ctx context.Context, tx pgx.Tx, tenantID, ticketID, eventType, actorType, actorID, note string, payload map[string]any) (TicketEvent, error) {
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	if payload == nil {
 		payload = map[string]any{}
@@ -421,19 +495,31 @@ func (s *Store) addTicketEvent(ctx context.Context, tenantID, ticketID, eventTyp
 		actor = actorID
 	}
 	event := TicketEvent{ID: "tev_" + newStoreID(), TenantID: tenantID, TicketID: ticketID, EventType: eventType, ActorType: actorType, ActorID: actorID, Note: note, Payload: payload, CreatedAt: time.Now().UTC()}
-	_, err := s.pg.Exec(ctx, fmt.Sprintf(`INSERT INTO %s.ticket_events
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s.ticket_events
 (id,tenant_id,ticket_id,event_type,actor_type,actor_id,note,payload,created_by,updated_by)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)`, schema), event.ID, tenantID, ticketID, eventType, actorType, actorID, note, raw, actor)
 	if err != nil {
 		return TicketEvent{}, err
 	}
-	_, _ = s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.tickets SET last_activity_at=now(),updated_at=now(),updated_by=$3 WHERE tenant_id=$1 AND id=$2`, schema), tenantID, ticketID, actor)
+	_, _ = tx.Exec(ctx, fmt.Sprintf(`UPDATE %s.tickets SET last_activity_at=now(),updated_at=now(),updated_by=$3 WHERE tenant_id=$1 AND id=$2`, schema), tenantID, ticketID, actor)
 	return event, nil
 }
 
 func (s *Store) ListTicketEvents(ctx context.Context, tenantID, ticketID string) ([]TicketEvent, error) {
+	db := s.TicketWriteDB()
+	if db == nil {
+		return nil, fmt.Errorf("postgres is not available")
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return nil, err
+	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	rows, err := s.pg.Query(ctx, fmt.Sprintf(`SELECT id,tenant_id,ticket_id,event_type,actor_type,actor_id,note,payload,created_at
+	rows, err := tx.Query(ctx, fmt.Sprintf(`SELECT id,tenant_id,ticket_id,event_type,actor_type,actor_id,note,payload,created_at
 FROM %s.ticket_events WHERE tenant_id=$1 AND ticket_id=$2 ORDER BY created_at ASC`, schema), tenantID, ticketID)
 	if err != nil {
 		return nil, err
@@ -450,16 +536,31 @@ FROM %s.ticket_events WHERE tenant_id=$1 AND ticket_id=$2 ORDER BY created_at AS
 		_ = json.Unmarshal(raw, &event.Payload)
 		out = append(out, event)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *Store) ValidateCallReference(ctx context.Context, tenantID, callID string) error {
-	if strings.TrimSpace(callID) == "" || s.pg == nil {
+	db := s.TicketWriteDB()
+	if strings.TrimSpace(callID) == "" || db == nil {
 		return nil
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return err
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	var exists bool
-	err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT EXISTS (
+	err = tx.QueryRow(ctx, fmt.Sprintf(`SELECT EXISTS (
   SELECT 1 FROM %s.call_sessions WHERE tenant_id=$1 AND id=$2
   UNION ALL
   SELECT 1 FROM %s.conversation_records WHERE tenant_id=$1 AND call_id=$2
@@ -470,7 +571,7 @@ func (s *Store) ValidateCallReference(ctx context.Context, tenantID, callID stri
 	if !exists {
 		return ErrTicketNotFound
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 func scanTicket(row pgx.Row) (Ticket, error) {
