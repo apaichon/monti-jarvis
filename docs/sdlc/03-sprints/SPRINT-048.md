@@ -1,10 +1,11 @@
 ---
 id: SPRINT-048
-status: done
+status: shipped
 start: 2026-08-15
 end: 2026-08-21
-updated: 2026-07-25
+updated: 2026-07-26
 design_pack: approved
+release: v2.21.0
 release_target: v2.21.0
 roadmap_sprint: 48
 feature: FEAT-0040
@@ -33,12 +34,12 @@ existing registration, KYC, checkout, and referral attribution.
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0170](../04-tasks/TASK-0170.md) Product-web shell + marketing pages | 4 | completed | dev | `apps/product-web` dark brand shell, routes, SEO, static serve at `/product/` — **built in worktree** |
-| [TASK-0171](../04-tasks/TASK-0171.md) Lead capture API + store + consent | 3 | completed | dev | Public lead endpoints, dedupe, rate limit, consent, lifecycle — **built in worktree** |
-| [TASK-0172](../04-tasks/TASK-0172.md) Pricing catalog + conversion redirects | 3 | completed | dev | Public packages API, attribution helper, allowlisted CTAs — **built in worktree** |
-| [TASK-0173](../04-tasks/TASK-0173.md) Sales lead console + lifecycle notes | 2 | completed | dev | Platform `/admin/leads` + API — **built in worktree** |
-| [TASK-0174](../04-tasks/TASK-0174.md) Funnel events + verification | 1 | completed | tester/dev | Funnel API + unit tests pass; manual smoke/UAT remaining |
-| **Total** | **13** | | | **12/13 implemented in `.worktrees/SPRINT-048`** |
+| [TASK-0170](../04-tasks/TASK-0170.md) Product-web shell + marketing pages | 4 | completed | dev | `apps/product-web` dark brand shell, routes, SEO, static serve at `/product/` |
+| [TASK-0171](../04-tasks/TASK-0171.md) Lead capture API + store + consent | 3 | completed | dev | Public lead endpoints, dedupe, rate limit, consent, lifecycle |
+| [TASK-0172](../04-tasks/TASK-0172.md) Pricing catalog + conversion redirects | 3 | completed | dev | Public packages API, attribution helper, allowlisted CTAs |
+| [TASK-0173](../04-tasks/TASK-0173.md) Sales lead console + lifecycle notes | 2 | completed | dev | Platform `/admin/leads` + API |
+| [TASK-0174](../04-tasks/TASK-0174.md) Funnel events + verification | 1 | completed | tester/dev | Funnel API + unit tests; merged/tagged **v2.21.0** |
+| **Total** | **13** | | | **13/13 shipped on `main` as v2.21.0** |
 
 ## Scope boundary
 

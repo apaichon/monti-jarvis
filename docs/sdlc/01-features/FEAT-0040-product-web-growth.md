@@ -1,11 +1,12 @@
 ---
 id: FEAT-0040
 title: "Product web for marketing, lead capture, demos, tenant registration, and package conversion"
-status: in_progress
+status: shipped
 roadmap_sprint: 48
 priority: O
 depends_on: [SPRINT-004, SPRINT-006, SPRINT-009, SPRINT-017, SPRINT-020, SPRINT-031, SPRINT-039, SPRINT-046]
-updated: 2026-07-25
+release: v2.21.0
+updated: 2026-07-26
 ---
 
 # FEAT-0040: Product Web Growth and Tenant Conversion

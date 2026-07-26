@@ -1,6 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S42 shipped tracks + S43 tenant AI + S44 customer generative AI + S45 AiaaS mass + S46 tenant referrals + S47 Langfuse observability)
-
-# Monti AI Call Center — Roadmap (36 core + S37–S42 shipped tracks + S43 tenant AI + S44 customer generative AI + S45 AiaaS mass + S46 tenant referrals + S47 Langfuse observability + S48 product web growth)
+# Monti AI Call Center — Roadmap (36 core + S37–S48 shipped tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -70,15 +68,10 @@
 | **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) ✅ v2.16.0 · [SPRINT-042](../03-sprints/SPRINT-042.md) |
 | **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md) · [SPRINT-043](../03-sprints/SPRINT-043.md) ✅ v2.17.0 |
 | **44** | **Customer / Tenant** | **Customer generative AI (Claude · Codex · Antigravity · Grok CLI) → HTML/image/canvas/link/report/doc** | **K** | **1, 20, 21, 43** · [SPRINT-044](../03-sprints/SPRINT-044.md) · backlog — ON HOLD |
-| **45** | **Platform / Tenant / Mobile** | **AiaaS for mass-market packages: ฿500 · ฿1,000 · ฿1,500 · ฿2,000 with differentiated quotas and corrected usage/statistics** | **L** | **13, 16, 25, 27, 30, 31, 43** · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [SPRINT-045](../03-sprints/SPRINT-045.md) · completed 13/13; completion release pending |
-| **46** | **Platform / Tenant / Growth** | **Tenant referral affiliate program with configurable bonus-quota rewards and referral usage tracking** | **M** | **9, 10, 13, 31, 45** · [SPRINT-046](../03-sprints/SPRINT-046.md) · completed 17/17; v2.20.0 release pending manual UAT |
+| **45** | **Platform / Tenant / Mobile** | **AiaaS for mass-market packages: ฿500 · ฿1,000 · ฿1,500 · ฿2,000 with differentiated quotas and corrected usage/statistics** | **L** | **13, 16, 25, 27, 30, 31, 43** · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [SPRINT-045](../03-sprints/SPRINT-045.md) · completed 13/13; residual usage ledger/UAT |
+| **46** | **Platform / Tenant / Growth** | **Tenant referral affiliate program with configurable bonus-quota rewards and referral usage tracking** | **M** | **9, 10, 13, 31, 45** · [SPRINT-046](../03-sprints/SPRINT-046.md) · ✅ v2.20.0 · manual UAT deferred |
 | **47** | **Platform / AI Operations** | **Langfuse real-time LLM observability and evaluation across chat, voice, mobile, RAG, tools, and generative jobs** | **N** | **21, 25, 27, 31, 43, 44** · backlog |
-
-| **44** | **Customer / Tenant** | **Customer generative AI (Claude · Codex · Antigravity · Grok CLI) → HTML/image/canvas/link/report/doc** | **K** | **1, 20, 21, 43** · [SPRINT-044](../03-sprints/SPRINT-044.md) · backlog — ON HOLD |
-| **45** | **Platform / Tenant / Mobile** | **AiaaS for mass-market packages: ฿500 · ฿1,000 · ฿1,500 · ฿2,000 with differentiated quotas and corrected usage/statistics** | **L** | **13, 16, 25, 27, 30, 31, 43** · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [SPRINT-045](../03-sprints/SPRINT-045.md) · completed 13/13; completion release pending |
-| **46** | **Platform / Tenant / Growth** | **Tenant referral affiliate program with configurable bonus-quota rewards and referral usage tracking** | **M** | **9, 10, 13, 31, 45** · [SPRINT-046](../03-sprints/SPRINT-046.md) · completed partial v2.19.0 (3/10 points); manual UAT deferred — test later |
-| **47** | **Platform / AI Operations** | **Langfuse real-time LLM observability and evaluation across chat, voice, mobile, RAG, tools, and generative jobs** | **N** | **21, 25, 27, 31, 43, 44** · backlog |
-| **48** | **Customer / Growth / Tenant** | **Product web for marketing, advertising, lead capture, demos, tenant registration, and package conversion** | **O** | **4, 6, 9, 17, 20, 31, 39, 46** · [SPRINT-048](../03-sprints/SPRINT-048.md) · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md) · **in_progress** (parallel worktree) |
+| **48** | **Customer / Growth / Tenant** | **Product web for marketing, advertising, lead capture, demos, tenant registration, and package conversion** | **O** | **4, 6, 9, 17, 20, 31, 39, 46** · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md) · [SPRINT-048](../03-sprints/SPRINT-048.md) · ✅ v2.21.0 |
 
 ---
 
@@ -641,11 +634,11 @@ does not enable customer or tenant CLI/generative execution.
 enterprise custom pricing, cross-tenant quota pooling, and changing the core
 Gemini voice pipeline.
 
-## Completed: SPRINT-046 — Tenant Referral Affiliate Program and Bonus Quota — v2.20.0 pending
+## Completed: SPRINT-046 — Tenant Referral Affiliate Program and Bonus Quota — v2.20.0
 
 **Platform:** Platform / Tenant / Growth · **Feature:** Tenant referral/affiliate
 program that rewards qualified referrals with additional quota allowance ·
-**Depends:** 9, 10, 13, 31, 45 · **Status:** completed 17/17; v2.20.0 release pending manual UAT
+**Depends:** 9, 10, 13, 31, 45 · **Status:** ✅ shipped v2.20.0; manual UAT deferred
 
 Allow an active tenant to invite another business to Monti. A referral becomes
 qualified only after the referred tenant completes onboarding/KYC, is activated,
@@ -1079,11 +1072,11 @@ or unrestricted customer transcripts to third parties, automatic model
 switching based only on an evaluation score, and using Langfuse as the billing
 or quota source of truth.
 
-## Active parallel: SPRINT-048 — Product Web Sales, Marketing, Demo, and Tenant Conversion
+## Completed: SPRINT-048 — Product Web Sales, Marketing, Demo, and Tenant Conversion — v2.21.0
 
 **Platform:** Customer / Growth / Tenant · **Feature:** [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md) ·
 **Sprint:** [SPRINT-048](../03-sprints/SPRINT-048.md) · **Depends:** 4, 6, 9, 17, 20, 31, 39, 46 ·
-**Status:** in_progress (design pack approved; implementation in worktree `SPRINT-048`) · **Release target:** v2.20.0
+**Status:** ✅ **shipped v2.21.0** (merged to `main`, tag `v2.21.0`)
 
 ### Product intent
 
