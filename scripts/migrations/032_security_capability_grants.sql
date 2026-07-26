@@ -24,10 +24,28 @@ GRANT SELECT ON TABLE
   :POSTGRES_SCHEMA.call_sessions,
   :POSTGRES_SCHEMA.conversation_records,
   :POSTGRES_SCHEMA.customers,
+  :POSTGRES_SCHEMA.tenants,
   :POSTGRES_SCHEMA.users,
   :POSTGRES_SCHEMA.user_roles
 TO :TICKET_WRITE_ROLE;
 
+-- Ticket handlers set app.tenant_id with SET LOCAL inside every transaction.
+-- FORCE makes the policy apply even when the migration owner is also the table
+-- owner; an absent context therefore returns no rows and rejects writes.
+ALTER TABLE :POSTGRES_SCHEMA.tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE :POSTGRES_SCHEMA.tickets FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tickets_tenant_boundary ON :POSTGRES_SCHEMA.tickets;
+CREATE POLICY tickets_tenant_boundary ON :POSTGRES_SCHEMA.tickets
+  USING (tenant_id = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
+
+ALTER TABLE :POSTGRES_SCHEMA.ticket_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE :POSTGRES_SCHEMA.ticket_events FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS ticket_events_tenant_boundary ON :POSTGRES_SCHEMA.ticket_events;
+CREATE POLICY ticket_events_tenant_boundary ON :POSTGRES_SCHEMA.ticket_events
+  USING (tenant_id = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
+
 -- Neither capability role receives sequence ownership, DELETE, DDL, or
--- unrestricted schema privileges. Tenant RLS policies are added only after
--- transaction-local app.tenant_id wiring is enabled for the target handlers.
+-- unrestricted schema privileges. KM tables remain outside this migration
+-- until their management handlers also set transaction-local tenant context.
