@@ -713,7 +713,10 @@
   const customerLabel = $derived(customer?.display_name || customer?.email || 'Customer');
   const canOpenPicker = $derived(!live && !authRequired && !quotaExhausted && agents.length > 0);
   const showCallDetails = $derived(!callStarted || callControlsExpanded);
-  const hideAgentSurfaceBeforeLogin = $derived(!!portalPolicy?.customer_auth.enabled && !customer && !callStarted);
+  // Customer auth can be enabled for optional account-aware support. Only a
+  // tenant policy that explicitly requires workforce auth should hide the
+  // public agent and call controls.
+  const hideAgentSurfaceBeforeLogin = $derived(authRequired && !callStarted);
   const callTimerLabel = $derived(activeCallLimitSeconds > 0 ? remainingTimer : timer);
   const callTimerWarning = $derived(activeCallLimitSeconds > 0 && remainingSeconds <= 10);
 </script>
