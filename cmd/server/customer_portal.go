@@ -26,13 +26,15 @@ func (s *server) customerPortalPolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	summary, _ := s.customerQuotaSummary(r, tenantID, settings, nil)
+	// When customer auth is enabled, callers must sign in before workforce/chat/voice.
+	requireAuth := settings.Enabled
 	writeJSON(w, http.StatusOK, map[string]any{
 		"tenant_id": tenantID,
 		"customer_auth": map[string]any{
 			"enabled":                    settings.Enabled,
 			"mode":                       settings.AuthMode,
-			"require_auth_for_workforce": settings.RequireAuthForWorkforce,
-			"allow_public_no_auth":       !settings.RequireAuthForWorkforce,
+			"require_auth_for_workforce": requireAuth || settings.RequireAuthForWorkforce,
+			"allow_public_no_auth":       !requireAuth,
 		},
 		"quota": summary,
 	})
@@ -92,7 +94,7 @@ func (s *server) resolveCustomerPortalContext(w http.ResponseWriter, r *http.Req
 			customer = c
 		}
 	}
-	if enforceWorkforceAuth && settings.Enabled && settings.RequireAuthForWorkforce && customer == nil {
+	if enforceWorkforceAuth && settings.Enabled && customer == nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "customer auth required", "code": "customer_auth_required"})
 		return customerPortalContext{}, false
 	}
@@ -119,7 +121,7 @@ func (s *server) enforceCustomerPortalAccess(w http.ResponseWriter, r *http.Requ
 			customer = c
 		}
 	}
-	if settings.Enabled && settings.RequireAuthForWorkforce && customer == nil {
+	if settings.Enabled && customer == nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "customer auth required", "code": "customer_auth_required"})
 		return nil, settings, false
 	}

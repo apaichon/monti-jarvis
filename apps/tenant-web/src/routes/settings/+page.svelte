@@ -338,22 +338,22 @@
     <section class="card">
       <h2>Customer OTP auth</h2>
       <p style="font-size:12px;color:var(--muted);margin:0 0 12px">
-        Controls customer email OTP sign-in for the public caller desk. Leave disabled to keep no-auth demo behavior.
+        Controls customer email OTP for the public caller desk. When enabled, callers must sign in before Start call / chat. Leave disabled for the no-auth demo.
       </p>
       <label style="flex-direction:row;align-items:center;gap:10px">
         <input type="checkbox" bind:checked={customerAuthEnabled} style="width:auto" />
-        <span>Enable customer email OTP</span>
+        <span>Enable customer email OTP (required before Start call)</span>
       </label>
       <label>
         <span>Auth mode</span>
         <select bind:value={customerAuthMode}>
-          <option value="optional">Optional — no-auth still allowed</option>
+          <option value="optional">Optional profile fields</option>
           <option value="required">Required — customer must sign in</option>
         </select>
       </label>
       <label style="flex-direction:row;align-items:center;gap:10px">
         <input type="checkbox" bind:checked={requireAuthForWorkforce} style="width:auto" />
-        <span>Require OTP before AI workforce selection</span>
+        <span>Require OTP before AI workforce selection (always enforced when OTP is enabled)</span>
       </label>
       <label>
         <span>Customer daily call minutes (0 = unset)</span>

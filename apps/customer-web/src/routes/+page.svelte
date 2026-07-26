@@ -131,7 +131,9 @@
       applyThemeTokens(document.documentElement, theme);
     }
     void loadCustomerMe().then((profile) => {
-      if (profile) customer = profile;
+      // Always apply result so a stale sessionStorage profile without a valid
+      // cookie/token cannot unlock Start call.
+      customer = profile;
       void refreshPortalState();
     });
     try {
@@ -151,9 +153,9 @@
     return new Date(seconds * 1000).toISOString().slice(11, 19);
   }
 
-  const authRequired = $derived(
-    !!portalPolicy?.customer_auth.enabled && !!portalPolicy?.customer_auth.require_auth_for_workforce && !customer
-  );
+  // Start call / chat / workforce require a signed-in customer session.
+  // Policy still drives backend enforcement; UI always gates on session presence.
+  const authRequired = $derived(!customer);
   const quotaExhausted = $derived(quota?.state === 'quota_exhausted');
   const quotaLabel = $derived(formatQuota(quota));
 
@@ -713,9 +715,7 @@
   const customerLabel = $derived(customer?.display_name || customer?.email || 'Customer');
   const canOpenPicker = $derived(!live && !authRequired && !quotaExhausted && agents.length > 0);
   const showCallDetails = $derived(!callStarted || callControlsExpanded);
-  // Customer auth can be enabled for optional account-aware support. Only a
-  // tenant policy that explicitly requires workforce auth should hide the
-  // public agent and call controls.
+  // Hide agent picker, Start call, and orb until the customer is signed in.
   const hideAgentSurfaceBeforeLogin = $derived(authRequired && !callStarted);
   const callTimerLabel = $derived(activeCallLimitSeconds > 0 ? remainingTimer : timer);
   const callTimerWarning = $derived(activeCallLimitSeconds > 0 && remainingSeconds <= 10);
@@ -769,11 +769,7 @@
           </div>
         {:else}
           <form onsubmit={challengeId ? verifyOTP : sendOTP} style="display:grid;gap:10px">
-            <div class="voice-state">
-              {portalPolicy?.customer_auth.require_auth_for_workforce
-                ? 'Customer sign-in required before selecting AI workforce.'
-                : 'Optional customer sign-in for account-aware support.'}
-            </div>
+            <div class="voice-state">Sign in required before starting a call or chat.</div>
             <input
               type="email"
               bind:value={customerEmail}
@@ -816,7 +812,7 @@
     {#if authRequired}
       <section class="voice-card auth-required-card">
         <strong>Sign in required</strong>
-        <div class="voice-state">This tenant requires OTP before choosing an AI workforce.</div>
+        <div class="voice-state">Verify your email OTP to unlock AI agents and Start call.</div>
       </section>
     {/if}
 

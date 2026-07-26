@@ -139,10 +139,12 @@ ON %s.customer_sessions (tenant_id, customer_id, expires_at DESC)`, schema),
 }
 
 func defaultCustomerAuthSettings(tenantID string) CustomerAuthSettings {
+	// Default closed: callers must OTP sign-in before Start call / chat / workforce.
+	// Tenants that want public no-auth can explicitly set enabled=false.
 	return CustomerAuthSettings{
-		TenantID: tenantID, Enabled: false, AuthMode: "optional",
+		TenantID: tenantID, Enabled: true, AuthMode: "required",
 		AllowedDomains: []string{}, OTPTTLSeconds: 600, SessionTTLSeconds: int((7 * 24 * time.Hour).Seconds()),
-		RequireAuthForWorkforce: false, CustomerDailyCallSeconds: 0, CustomerMaxCallSeconds: 0,
+		RequireAuthForWorkforce: true, CustomerDailyCallSeconds: 0, CustomerMaxCallSeconds: 0,
 	}
 }
 

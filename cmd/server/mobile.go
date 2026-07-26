@@ -137,8 +137,8 @@ func (s *server) mobileBootstrap(w http.ResponseWriter, r *http.Request) {
 		"tenant":  map[string]any{"id": tenantID, "display_name": tenantSettings.DisplayName, "slug": tenantID},
 		"auth": map[string]any{
 			"enabled": settings.Enabled, "mode": mobileAuthMode(settings),
-			"require_auth_for_workforce": settings.Enabled && settings.RequireAuthForWorkforce,
-			"allow_public_no_auth":       !settings.Enabled || !settings.RequireAuthForWorkforce,
+			"require_auth_for_workforce": settings.Enabled,
+			"allow_public_no_auth":       !settings.Enabled,
 			"otp":                        map[string]any{"channel": "email", "ttl_seconds": settings.OTPTTLSeconds, "resend_after_seconds": 60},
 		},
 		"locale": map[string]any{
@@ -372,7 +372,7 @@ func (s *server) mobileContext(w http.ResponseWriter, r *http.Request, requireCa
 		writeMobileError(w, http.StatusUnauthorized, "unauthorized")
 		return "", nil, settings, false
 	}
-	if requireCallAuth && settings.Enabled && settings.RequireAuthForWorkforce && customer == nil {
+	if requireCallAuth && settings.Enabled && customer == nil {
 		writeMobileError(w, http.StatusUnauthorized, "customer_auth_required")
 		return "", nil, settings, false
 	}
