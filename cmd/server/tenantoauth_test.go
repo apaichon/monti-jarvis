@@ -26,7 +26,7 @@ func TestRedirectSuccessQuery(t *testing.T) {
 			TenantID:    "acme",
 		},
 	}
-	redirectSuccess(rr, req, "http://localhost:8091/tenant/login", pair)
+	(&server{}).redirectSuccess(rr, req, "http://localhost:8091/tenant/login", pair)
 	if rr.Code != http.StatusFound {
 		t.Fatalf("status %d", rr.Code)
 	}
@@ -36,13 +36,19 @@ func TestRedirectSuccessQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := u.Query()
-	for _, key := range []string{"access_token", "refresh_token", "tenant_id", "user_id", "email", "display_name", "role"} {
+	for _, key := range []string{"access_token", "tenant_id", "user_id", "email", "display_name", "role"} {
 		if q.Get(key) == "" {
 			t.Fatalf("missing query %s in %s", key, loc)
 		}
 	}
 	if q.Get("role") != "tenant_admin" || q.Get("tenant_id") != "acme" {
 		t.Fatalf("unexpected profile in redirect: %s", loc)
+	}
+	if q.Get("refresh_token") != "" {
+		t.Fatal("refresh token must not be placed in OAuth URL")
+	}
+	if cookie := rr.Header().Get("Set-Cookie"); !strings.Contains(cookie, "HttpOnly") {
+		t.Fatalf("expected HttpOnly refresh cookie, got %q", cookie)
 	}
 	if !strings.HasPrefix(loc, "http://localhost:8091/tenant/login?") {
 		t.Fatalf("unexpected location %s", loc)

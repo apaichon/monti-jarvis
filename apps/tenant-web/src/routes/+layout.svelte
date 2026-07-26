@@ -6,6 +6,7 @@
   import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
   import {
     clearSession,
+    bootstrapSession,
     hasRegistrationSession,
     subscribeSession
   } from '$lib/auth/session';
@@ -16,6 +17,7 @@
   let sessionTick = $state(0);
 
   onMount(() => {
+    void bootstrapSession();
     return subscribeSession(() => {
       sessionTick += 1;
     });
@@ -29,6 +31,7 @@
   );
 
   function logout() {
+    void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     clearSession();
     window.location.href = `${base}/login`;
   }

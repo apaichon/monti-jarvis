@@ -76,11 +76,10 @@
         goto(`${base}/register/check-email?email=${encodeURIComponent(adminEmail.trim())}`);
         return;
       }
-      if (res.access_token && res.refresh_token && res.user) {
+      if (res.access_token && res.user) {
         saveSession(
           {
             access_token: res.access_token,
-            refresh_token: res.refresh_token,
             expires_in: res.expires_in ?? 0,
             token_type: res.token_type ?? 'Bearer',
             user: res.user

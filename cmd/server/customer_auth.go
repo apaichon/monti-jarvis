@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -231,15 +232,19 @@ func (s *server) verifyCustomerOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.store.RecordCustomerAuthEvent(r.Context(), tenantID, customer.ID, customer.Email, "customer.auth.logged_in", clientIP(r), r.UserAgent(), map[string]any{"session_id": session.ID})
-	writeJSON(w, http.StatusOK, map[string]any{
+	setRefreshCookie(w, s.cfg, customerRefreshCookie, "/api/customer/auth", rawRefresh, int(sessionTTL.Seconds()))
+	response := map[string]any{
 		"status":             "authenticated",
 		"access_token":       access,
-		"refresh_token":      rawRefresh,
 		"token_type":         "Bearer",
 		"expires_in":         expiresIn,
 		"refresh_expires_in": int(sessionTTL.Seconds()),
 		"customer":           customerAuthProfile(*customer, tenantID),
-	})
+	}
+	if r.Header.Get("X-Monti-Client") == "mobile" {
+		response["refresh_token"] = rawRefresh
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *server) refreshCustomerAuth(w http.ResponseWriter, r *http.Request) {
@@ -248,15 +253,16 @@ func (s *server) refreshCustomerAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req customerRefreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	if err := auth.ValidateRefreshToken(req.RefreshToken); err != nil {
+	refreshToken := requestRefreshToken(r, customerRefreshCookie, req.RefreshToken)
+	if err := auth.ValidateRefreshToken(refreshToken); err != nil {
 		writeCustomerAuthError(w, store.ErrCustomerSessionInvalid)
 		return
 	}
-	hash := auth.HashRefreshToken(req.RefreshToken)
+	hash := auth.HashRefreshToken(refreshToken)
 	session, err := s.store.GetCustomerSessionByRefreshHash(r.Context(), hash)
 	if err != nil {
 		writeCustomerAuthError(w, err)
@@ -286,23 +292,29 @@ func (s *server) refreshCustomerAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.store.RecordCustomerAuthEvent(r.Context(), session.TenantID, customer.ID, customer.Email, "customer.auth.token_refreshed", clientIP(r), r.UserAgent(), map[string]any{"session_id": newSession.ID})
-	writeJSON(w, http.StatusOK, map[string]any{
+	setRefreshCookie(w, s.cfg, customerRefreshCookie, "/api/customer/auth", rawRefresh, int(sessionTTL.Seconds()))
+	response := map[string]any{
 		"status":             "authenticated",
 		"access_token":       access,
-		"refresh_token":      rawRefresh,
 		"token_type":         "Bearer",
 		"expires_in":         expiresIn,
 		"refresh_expires_in": int(sessionTTL.Seconds()),
 		"customer":           customerAuthProfile(*customer, session.TenantID),
-	})
+	}
+	if r.Header.Get("X-Monti-Client") == "mobile" {
+		response["refresh_token"] = rawRefresh
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *server) logoutCustomerAuth(w http.ResponseWriter, r *http.Request) {
 	var req customerRefreshRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
-	if strings.TrimSpace(req.RefreshToken) != "" {
-		_ = s.store.RevokeCustomerSessionByRefreshHash(r.Context(), auth.HashRefreshToken(req.RefreshToken))
+	refreshToken := requestRefreshToken(r, customerRefreshCookie, req.RefreshToken)
+	if strings.TrimSpace(refreshToken) != "" {
+		_ = s.store.RevokeCustomerSessionByRefreshHash(r.Context(), auth.HashRefreshToken(refreshToken))
 	}
+	clearRefreshCookie(w, s.cfg, customerRefreshCookie, "/api/customer/auth")
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

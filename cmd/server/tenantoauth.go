@@ -82,7 +82,7 @@ func (s *server) tenantOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		s.redirectOAuthError(w, r, base, err)
 		return
 	} else if ok {
-		redirectSuccess(w, r, base+"/login", pair)
+		s.redirectSuccess(w, r, base+"/login", pair)
 		return
 	}
 
@@ -100,7 +100,7 @@ func (s *server) tenantOAuthCallback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.publishTenantRegistered(ctx, result, user)
-		redirectSuccess(w, r, base+"/register/success", pair)
+		s.redirectSuccess(w, r, base+"/register/success", pair)
 		return
 	}
 
@@ -149,14 +149,14 @@ func (s *server) completeTenantOAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if ok {
 		s.tenantOAuth.DeletePendingSession(ctx, session.ID)
+		setRefreshCookie(w, s.cfg, tenantRefreshCookie, "/api/auth", pair.RefreshToken, int(s.cfg.JWTRefreshTTL.Seconds()))
 		writeJSON(w, http.StatusOK, registerTenantResponse{
-			TenantID:     pair.User.TenantID,
-			Slug:         pair.User.TenantID,
-			AccessToken:  pair.AccessToken,
-			RefreshToken: pair.RefreshToken,
-			ExpiresIn:    pair.ExpiresIn,
-			TokenType:    pair.TokenType,
-			User:         pair.User,
+			TenantID:    pair.User.TenantID,
+			Slug:        pair.User.TenantID,
+			AccessToken: pair.AccessToken,
+			ExpiresIn:   pair.ExpiresIn,
+			TokenType:   pair.TokenType,
+			User:        pair.User,
 		})
 		return
 	}
@@ -167,12 +167,12 @@ func (s *server) completeTenantOAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	s.tenantOAuth.DeletePendingSession(ctx, session.ID)
 	s.publishTenantRegistered(ctx, result, user)
+	setRefreshCookie(w, s.cfg, tenantRefreshCookie, "/api/auth", pair.RefreshToken, int(s.cfg.JWTRefreshTTL.Seconds()))
 	writeJSON(w, http.StatusCreated, registerTenantResponse{
 		TenantID:       result.TenantID,
 		Slug:           result.Slug,
 		RegistrationID: result.RegistrationID,
 		AccessToken:    pair.AccessToken,
-		RefreshToken:   pair.RefreshToken,
 		ExpiresIn:      pair.ExpiresIn,
 		TokenType:      pair.TokenType,
 		User:           pair.User,
@@ -241,10 +241,10 @@ func (s *server) finishOAuthRegistration(ctx context.Context, identity tenantoau
 
 var errOAuthUserInactive = errors.New("oauth user inactive")
 
-func redirectSuccess(w http.ResponseWriter, r *http.Request, successPath string, pair auth.TokenPair) {
+func (s *server) redirectSuccess(w http.ResponseWriter, r *http.Request, successPath string, pair auth.TokenPair) {
+	setRefreshCookie(w, s.cfg, tenantRefreshCookie, "/api/auth", pair.RefreshToken, int(s.cfg.JWTRefreshTTL.Seconds()))
 	q := url.Values{}
 	q.Set("access_token", pair.AccessToken)
-	q.Set("refresh_token", pair.RefreshToken)
 	q.Set("tenant_id", pair.User.TenantID)
 	q.Set("user_id", pair.User.ID)
 	q.Set("email", pair.User.Email)

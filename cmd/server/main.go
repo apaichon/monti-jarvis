@@ -33,6 +33,7 @@ import (
 	"github.com/libra/monti-jarvis/internal/quota"
 	"github.com/libra/monti-jarvis/internal/rag"
 	"github.com/libra/monti-jarvis/internal/resend"
+	"github.com/libra/monti-jarvis/internal/security"
 	"github.com/libra/monti-jarvis/internal/store"
 	"github.com/libra/monti-jarvis/internal/tenantoauth"
 	"github.com/libra/monti-jarvis/internal/tenantregister"
@@ -90,17 +91,17 @@ type chatResponse struct {
 func main() {
 	cfg := env.Load()
 	if cfg.ConfigError != "" {
-		log.Fatalf("configuration: %s", cfg.ConfigError)
+		log.Fatalf("configuration: %s", security.RedactText(cfg.ConfigError))
 	}
 	if err := cfg.ValidateProductionSecurity(); err != nil {
-		log.Fatalf("security configuration: %s", err)
+		log.Fatalf("security configuration: %s", security.RedactText(err.Error()))
 	}
 	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	st, warnings := store.Open(rootCtx, cfg)
 	for _, warning := range warnings {
-		log.Printf("infra warning: %s", warning)
+		log.Printf("infra warning: %s", security.RedactText(warning))
 	}
 	if err := st.ValidateCapabilityPools(); err != nil {
 		st.Close()
@@ -319,6 +320,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
+	mux.HandleFunc("GET /readyz", s.ready)
 	mux.HandleFunc("GET /api/infra", s.infra)
 	mux.HandleFunc("GET /api/public/brands", s.publicBrands)
 	mux.HandleFunc("GET /api/public/brands/{slug}", s.publicBrand)
@@ -327,6 +329,7 @@ func main() {
 	mux.HandleFunc("GET /api/public/packages", s.publicPackages)
 	mux.HandleFunc("POST /api/public/funnel/events", s.createFunnelEvent)
 	mux.Handle("GET /api/platform/leads", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformLeads)))
+	mux.Handle("GET /api/platform/security/posture", guard.RequirePlatformAdmin(http.HandlerFunc(s.securityPosture)))
 	mux.Handle("GET /api/platform/leads/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformLead)))
 	mux.Handle("PATCH /api/platform/leads/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.patchPlatformLead)))
 	mux.Handle("POST /api/platform/leads/{id}/notes", guard.RequirePlatformAdmin(http.HandlerFunc(s.addPlatformLeadNote)))
@@ -594,7 +597,7 @@ func main() {
 	}
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           withCORS(cfg.AuthDisabled, withCommonHeaders(handler)),
+		Handler:           withCORS(cfg, withCommonHeaders(handler)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -641,6 +644,49 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+func (s *server) ready(w http.ResponseWriter, _ *http.Request) {
+	capabilityErr := error(nil)
+	if s.store != nil {
+		capabilityErr = s.store.ValidateCapabilityPools()
+	}
+	ready := capabilityErr == nil && s.cfg.ConfigError == ""
+	status := http.StatusOK
+	if !ready {
+		status = http.StatusServiceUnavailable
+	}
+	writeJSON(w, status, map[string]any{
+		"ready":                 ready,
+		"auth_disabled":         s.cfg.AuthDisabled,
+		"cookie_secure":         s.cfg.CookieSecure,
+		"allowed_origins_set":   len(s.cfg.AllowedOrigins) > 0,
+		"postgres_rls_enforced": s.cfg.PostgresRLSEnforced,
+		"capability_pools":      capabilityErr == nil,
+	})
+}
+
+func (s *server) securityPosture(w http.ResponseWriter, _ *http.Request) {
+	capabilityPools := true
+	if s.store != nil {
+		capabilityPools = s.store.ValidateCapabilityPools() == nil
+	}
+	checks := map[string]bool{
+		"auth_enabled":          !s.cfg.AuthDisabled,
+		"cookie_secure":         s.cfg.CookieSecure,
+		"allowed_origins_set":   len(s.cfg.AllowedOrigins) > 0,
+		"postgres_rls_enforced": s.cfg.PostgresRLSEnforced,
+		"capability_pools":      capabilityPools,
+	}
+	status := "healthy"
+	if s.cfg.AuthDisabled || !s.cfg.CookieSecure || len(s.cfg.AllowedOrigins) == 0 || !s.cfg.PostgresRLSEnforced || !capabilityPools {
+		status = "degraded"
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  status,
+		"checks":  checks,
+		"version": "SPRINT-041",
+	})
+}
+
 func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
@@ -662,12 +708,12 @@ func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out := map[string]any{
-		"postgres":   h.Postgres,
-		"redis":      h.Redis,
-		"minio":      h.Minio,
-		"clickhouse": h.ClickHouse,
-		"nats":       h.NATS,
-		"livekit":    h.LiveKit,
+		"postgres":   security.RedactText(h.Postgres),
+		"redis":      security.RedactText(h.Redis),
+		"minio":      security.RedactText(h.Minio),
+		"clickhouse": security.RedactText(h.ClickHouse),
+		"nats":       security.RedactText(h.NATS),
+		"livekit":    security.RedactText(h.LiveKit),
 	}
 	if s.auth != nil && s.auth.Enabled() {
 		out["auth_cache"] = s.auth.CacheStatus()
@@ -977,11 +1023,18 @@ func withCommonHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func withCORS(_ bool, next http.Handler) http.Handler {
+func withCORS(cfg env.Config, next http.Handler) http.Handler {
 	// Include embed parent-origin header so host-page preflight from Vue/etc. succeeds.
 	allowHeaders := "Content-Type, X-Tenant-Id, Authorization, X-Monti-Embed-Key, X-Embed-Parent-Origin"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := store.RequestOrigin(r.Header.Get("Origin"), r.Header.Get("Referer"))
+		if len(cfg.AllowedOrigins) == 0 && cfg.AuthDisabled {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else if origin != "" && store.OriginAllowed(cfg.AllowedOrigins, origin, false) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Vary", "Origin")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", allowHeaders)
 		if r.Method == http.MethodOptions {

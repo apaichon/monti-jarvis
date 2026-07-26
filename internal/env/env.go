@@ -23,6 +23,7 @@ type Config struct {
 	PostgresKMReadURL string
 	// PostgresTicketWriteURL is the dedicated ticket capability connection.
 	PostgresTicketWriteURL   string
+	PostgresRLSEnforced      bool
 	PostgresSchema           string
 	RedisURL                 string
 	RedisPrefix              string
@@ -54,6 +55,9 @@ type Config struct {
 	AIUsageOutputPriceMicros int64
 	AIUsageAudioPriceMicros  int64
 	AuthDisabled             bool
+	CookieSecure             bool
+	CookieSameSite           string
+	AllowedOrigins           []string
 	JWTSecret                string
 	JWTAccessTTL             time.Duration
 	JWTRefreshTTL            time.Duration
@@ -146,6 +150,7 @@ func Load() Config {
 		PostgresURL:              os.Getenv("POSTGRES_URL"),
 		PostgresKMReadURL:        envOr("POSTGRES_KM_READONLY_URL", envOr("POSTGRES_READONLY_URL", "")),
 		PostgresTicketWriteURL:   os.Getenv("POSTGRES_TICKET_WRITE_URL"),
+		PostgresRLSEnforced:      envBool("POSTGRES_RLS_ENFORCED", false),
 		PostgresSchema:           envOr("POSTGRES_SCHEMA", "callcenter"),
 		RedisURL:                 os.Getenv("REDIS_URL"),
 		RedisPrefix:              envOr("REDIS_PREFIX", "monti_jarvis:"),
@@ -177,6 +182,9 @@ func Load() Config {
 		AIUsageOutputPriceMicros: envInt64("AI_USAGE_OUTPUT_PRICE_MICROS", 0),
 		AIUsageAudioPriceMicros:  envInt64("AI_USAGE_AUDIO_PRICE_MICROS", 0),
 		AuthDisabled:             envBool("AUTH_DISABLED", true),
+		CookieSecure:             envBool("COOKIE_SECURE", false),
+		CookieSameSite:           strings.ToLower(envOr("COOKIE_SAMESITE", "lax")),
+		AllowedOrigins:           splitOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		JWTSecret:                os.Getenv("JWT_SECRET"),
 		JWTAccessTTL:             envDuration("JWT_ACCESS_TTL", 15*time.Minute),
 		JWTRefreshTTL:            envDuration("JWT_REFRESH_TTL", 168*time.Hour),
@@ -266,6 +274,26 @@ func (c Config) ValidateProductionSecurity() error {
 	if len(strings.TrimSpace(c.JWTSecret)) < 32 {
 		return fmt.Errorf("JWT_SECRET must be at least 32 bytes in production")
 	}
+	if !c.CookieSecure {
+		return fmt.Errorf("COOKIE_SECURE must be true in production")
+	}
+	switch strings.ToLower(strings.TrimSpace(c.CookieSameSite)) {
+	case "lax", "strict":
+	default:
+		return fmt.Errorf("COOKIE_SAMESITE must be lax or strict in production")
+	}
+	if len(c.AllowedOrigins) == 0 {
+		return fmt.Errorf("ALLOWED_ORIGINS must contain an explicit origin in production")
+	}
+	for _, origin := range c.AllowedOrigins {
+		parsed, err := url.Parse(origin)
+		if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" || strings.Contains(origin, "*") {
+			return fmt.Errorf("ALLOWED_ORIGINS contains an invalid or wildcard origin")
+		}
+	}
+	if !c.PostgresRLSEnforced {
+		return fmt.Errorf("POSTGRES_RLS_ENFORCED must be true in production")
+	}
 	if strings.TrimSpace(c.PostgresURL) == "" {
 		return fmt.Errorf("POSTGRES_URL is required in production")
 	}
@@ -294,6 +322,20 @@ func databasePrincipal(raw string) string {
 	// Keyword/value DSNs and malformed URLs cannot expose a principal safely;
 	// retain the full value so exact duplicate URLs are still rejected.
 	return raw
+}
+
+func splitOrigins(raw string) []string {
+	seen := map[string]bool{}
+	var origins []string
+	for _, value := range strings.Split(raw, ",") {
+		value = strings.TrimRight(strings.TrimSpace(value), "/")
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		origins = append(origins, value)
+	}
+	return origins
 }
 
 var configGroupNames = map[string]bool{

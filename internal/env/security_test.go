@@ -9,6 +9,10 @@ func TestValidateProductionSecurityRequiresCapabilitySeparation(t *testing.T) {
 		PostgresURL:            "postgres://writer:secret@writer-db/monti",
 		PostgresKMReadURL:      "postgres://km-read:secret@read-db/monti",
 		PostgresTicketWriteURL: "postgres://ticket-write:secret@ticket-db/monti",
+		CookieSecure:           true,
+		CookieSameSite:         "lax",
+		AllowedOrigins:         []string{"https://tenant.example"},
+		PostgresRLSEnforced:    true,
 	}
 	if err := cfg.ValidateProductionSecurity(); err != nil {
 		t.Fatalf("valid production config rejected: %v", err)
@@ -27,6 +31,9 @@ func TestValidateProductionSecurityRequiresCapabilitySeparation(t *testing.T) {
 		{name: "same user different URLs", mut: func(c *Config) {
 			c.PostgresKMReadURL = "postgres://writer:other-password@km-read/db"
 		}},
+		{name: "insecure cookie", mut: func(c *Config) { c.CookieSecure = false }},
+		{name: "wildcard origin", mut: func(c *Config) { c.AllowedOrigins = []string{"*"} }},
+		{name: "RLS disabled", mut: func(c *Config) { c.PostgresRLSEnforced = false }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
