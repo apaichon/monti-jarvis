@@ -83,7 +83,7 @@ System design artifacts for Monti Jarvis.
 
 **Sprint 44:** **ON HOLD pending security review; runtime removed** — [40-customer-generative-workspace-spec.md](40-customer-generative-workspace-spec.md). [SPRINT-044](../03-sprints/SPRINT-044.md) · [FEAT-0038](../01-features/FEAT-0038-customer-generative-ai.md).
 
-**Sprint 48:** Design pack approved; parallel build in worktree — [43-product-web-growth-spec.md](43-product-web-growth-spec.md); workflow §105–108; API § Sprint 48 product web/leads; UX P48/A48. [SPRINT-048](../03-sprints/SPRINT-048.md) · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md).
+**Sprint 48:** ✅ **shipped v2.21.0** — [43-product-web-growth-spec.md](43-product-web-growth-spec.md); workflow §105–108; API § Sprint 48 product web/leads; UX P48/A48. [SPRINT-048](../03-sprints/SPRINT-048.md) · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md).
 
 **Sprint 45:** Design pack approved; implementation started — [42-aiaas-packages-usage-reconciliation-spec.md](42-aiaas-packages-usage-reconciliation-spec.md); workflow §100–104; API § Sprint 45; UX T24/A24/M2. [SPRINT-045](../03-sprints/SPRINT-045.md) · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md).
 
