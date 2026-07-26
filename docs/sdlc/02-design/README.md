@@ -47,6 +47,7 @@ System design artifacts for Monti Jarvis.
 | 40 | [40-customer-generative-workspace-spec.md](40-customer-generative-workspace-spec.md) | 44 | Customer provider credentials, bounded generation jobs, and artifacts | `backlog — ON HOLD` |
 | 41 | [41-roadmap-45-codex-cli-skills-artifacts.md](41-roadmap-45-codex-cli-skills-artifacts.md) | 45 | Feature 43 skills applied to bounded Codex CLI jobs and downloadable HTML/image/report artifacts | `backlog — ON HOLD` |
 | 42 | [42-aiaas-packages-usage-reconciliation-spec.md](42-aiaas-packages-usage-reconciliation-spec.md) | 45 | AiaaS package tiers, dimensioned quotas, usage ledger, reconciliation, and mobile enforcement | `approved` |
+| 43 | [43-product-web-growth-spec.md](43-product-web-growth-spec.md) | 48 | Product web marketing shell, lead capture, public pricing, conversion redirects, sales leads | `approved` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -77,6 +78,12 @@ System design artifacts for Monti Jarvis.
 **Sprint 43:** Design pack drafted and review-pending — [39-tenant-ai-config-extensibility-spec.md](39-tenant-ai-config-extensibility-spec.md); workflow §93–96; API § Tenant AI Configuration and Embed Auth; UX T22. [SPRINT-043](../03-sprints/SPRINT-043.md) · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md).
 
 **Sprint 44:** **ON HOLD pending security review; runtime removed** — [40-customer-generative-workspace-spec.md](40-customer-generative-workspace-spec.md). [SPRINT-044](../03-sprints/SPRINT-044.md) · [FEAT-0038](../01-features/FEAT-0038-customer-generative-ai.md).
+
+**Sprint 45:** Design pack approved; implementation started — [42-aiaas-packages-usage-reconciliation-spec.md](42-aiaas-packages-usage-reconciliation-spec.md); workflow §100–104; API § Sprint 45; UX T24/A24/M2. [SPRINT-045](../03-sprints/SPRINT-045.md) · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md).
+
+**Sprint 44:** **ON HOLD pending security review; runtime removed** — [40-customer-generative-workspace-spec.md](40-customer-generative-workspace-spec.md). [SPRINT-044](../03-sprints/SPRINT-044.md) · [FEAT-0038](../01-features/FEAT-0038-customer-generative-ai.md).
+
+**Sprint 48:** Design pack approved; parallel build in worktree — [43-product-web-growth-spec.md](43-product-web-growth-spec.md); workflow §105–108; API § Sprint 48 product web/leads; UX P48/A48. [SPRINT-048](../03-sprints/SPRINT-048.md) · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md).
 
 **Sprint 45:** Design pack approved; implementation started — [42-aiaas-packages-usage-reconciliation-spec.md](42-aiaas-packages-usage-reconciliation-spec.md); workflow §100–104; API § Sprint 45; UX T24/A24/M2. [SPRINT-045](../03-sprints/SPRINT-045.md) · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md).
 

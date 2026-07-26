@@ -16,3 +16,5 @@ packages/*/dist/
 apps/*/node_modules/
 apps/*/.svelte-kit/
 apps/*/build/var/
+var/
+.worktrees/

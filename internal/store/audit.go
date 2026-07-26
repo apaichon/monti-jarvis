@@ -60,6 +60,8 @@ var auditableTables = []string{
 	"customer_sessions",
 	"customer_auth_events",
 	"conversation_ratings",
+	"marketing_leads",
+	"marketing_lead_notes",
 }
 
 func (s *Store) ensureAuditSchema(ctx context.Context) error {

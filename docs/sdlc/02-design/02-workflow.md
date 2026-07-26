@@ -3032,3 +3032,103 @@ sequenceDiagram
 
 See DES-0042, 42-aiaas-packages-usage-reconciliation-spec.md, ER Sprint 45,
 API Sprint 45, and UX T24/A24/M2.
+
+## 105. Visitor browses product web and starts conversion (Sprint 48)
+
+```mermaid
+sequenceDiagram
+  actor V as Visitor
+  participant B as Browser
+  participant G as Go :8091
+  participant PW as product-web static
+  participant P as Postgres
+  participant R as Redis DB 4
+
+  V->>B: Open /product/ with utm_* or ref
+  B->>G: GET /product/
+  G->>PW: Serve SPA shell
+  PW-->>B: Home marketing page
+  B->>G: POST /api/public/funnel/events page_view
+  G->>R: Rate limit funnel IP
+  G->>P: Insert funnel_events (no PII body)
+  G-->>B: 202 accepted
+  alt Try live demo
+    B->>G: GET /?utm_*&ref=
+    Note over B,G: Existing customer no-auth demo surface
+  else Register
+    B->>G: GET /tenant/register?utm_*&ref=&package_id=
+    Note over B,G: Existing tenant registration (S6+)
+  else Contact / book demo
+    B->>G: POST /api/public/leads
+    G->>R: Rate limit lead IP
+    G->>P: Dedupe + insert marketing_leads status=new
+    G-->>B: 201 lead_id confirmation
+  end
+```
+
+## 106. Sales progresses a marketing lead (Sprint 48)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin / sales
+  participant B as Browser /admin
+  participant G as Go :8091
+  participant P as Postgres
+
+  A->>B: Open /admin/leads
+  B->>G: GET /api/platform/leads?status=new
+  G->>P: List marketing_leads
+  G-->>B: lead rows (no payment secrets)
+  A->>B: Change status + add note
+  B->>G: PATCH /api/platform/leads/{id}
+  G->>P: Update status + lead_events history
+  B->>G: POST /api/platform/leads/{id}/notes
+  G->>P: Insert marketing_lead_notes
+  G-->>B: 200 updated lead
+  alt forbidden
+    Note over G: tenant_admin or anon → 401/403
+  end
+```
+
+## 107. Public pricing drives authenticated package purchase (Sprint 48)
+
+```mermaid
+sequenceDiagram
+  actor V as Visitor / Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant P as Postgres
+  participant Pay as Existing checkout (S9)
+
+  V->>B: Open /product/pricing
+  B->>G: GET /api/public/packages
+  G->>P: Active sellable packages only
+  G-->>B: Public DTO (price + highlights)
+  V->>B: Choose package → Start now
+  B->>G: GET /tenant/register?package_id=...
+  Note over B,G: Register / verify / KYC existing flows
+  V->>B: Authenticated /tenant/billing checkout
+  B->>G: Existing tenant packages + checkout APIs
+  G->>Pay: ChillPay + entitlement authority
+  Pay-->>B: Receipt / workspace — public pricing never grants quota
+```
+
+## 108. Attribution preservation rules (Sprint 48)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant PW as product-web
+  participant G as Go :8091
+
+  B->>PW: Land with utm_* + ref
+  PW->>PW: Persist allowlisted keys in sessionStorage/cookie
+  PW->>G: Lead create includes attribution fields
+  PW->>B: CTA href only Monti-relative path + allowlisted query
+  alt external or javascript URL
+    PW-->>B: Drop / reject redirect target
+  end
+```
+
+See DES-0043, 43-product-web-growth-spec.md, ER Sprint 48, API Sprint 48,
+and UX P48/A48.

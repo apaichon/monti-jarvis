@@ -3537,3 +3537,108 @@ Mobile bootstrap → receive mobile remaining + concurrency metadata
 
 See DES-0042, 42-aiaas-packages-usage-reconciliation-spec.md, workflow
 §100–104, ER Sprint 45, and API Sprint 45.
+
+## Sprint 48 — Product web growth (P48 / A48)
+
+Public marketing shell at `/product/*` and platform sales leads at `/admin/leads`.
+Customer demo remains `/`; tenant register/billing remain `/tenant/*`.
+
+### P48 — Product web layout
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ P48 Product web (/product) — dark Monti brand                                 │
+│ [Logo Monti]  Product  Solutions  Resources  Pricing  About   [EN|TH]        │
+│                                      [Try live demo] [Book a demo] [Start]   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ HERO                                                                          │
+│  AI Call Center Workforce for modern support teams                            │
+│  [Try live demo]  [See pricing]  [Contact sales]                              │
+│  Proof row: approved metrics only · social logos placeholders                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ SECTIONS: Use cases · Product pillars · Solutions grid · Resources teaser     │
+│ PRICING CARDS (from GET /api/public/packages — never hard-coded)              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐                         │
+│  │ ฿500     │ │ ฿1,000 ★ │ │ ฿1,500   │ │ ฿2,000   │                         │
+│  │ highlights│ │ highlights│ │ …       │ │ …       │                         │
+│  │ [Start]  │ │ [Start]  │ │ [Start]  │ │ [Start]  │                         │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ CONTACT / BOOK DEMO                                                           │
+│  Name [    ] Email [    ] Company [    ] Use case [ textarea ]                │
+│  ☐ Contact consent   ☐ Marketing opt-in   [Submit]                            │
+│  Confirmation: "Thanks — sales will follow up" + lead_id hidden for ops       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ FOOTER: Product · Solutions · Pricing · Privacy · Register · Demo             │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### A48 — Platform sales leads
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ A48 Leads (/admin/leads)                                                      │
+│ Status [new ▾] Kind [all ▾] Search [email/company] [Refresh]                  │
+│ id · email · company · kind · status · source · created · [Open]              │
+│ lead_… · a@ex.com · Acme · book_demo · new · google/aiaas-q3 · …             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ DETAIL DRAWER                                                                 │
+│ Status [contacted ▾] Assigned [me ▾] [Save]                                   │
+│ Attribution: utm + ref + landing + package interest                           │
+│ Notes: [________________] [Add note]                                          │
+│ History: new → contacted (admin@, timestamp)                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Screen map → API
+
+| UI zone | User action | API / route |
+| --- | --- | --- |
+| P48 nav | Open marketing pages | static `/product/*` |
+| P48 hero demo | Try live demo | `GET /` + allowlisted query |
+| P48 pricing | Load packages | `GET /api/public/packages` |
+| P48 pricing Start | Register with package interest | `GET /tenant/register?package_id=` |
+| P48 contact form | Submit lead | `POST /api/public/leads` |
+| P48 analytics | Page/CTA beacon | `POST /api/public/funnel/events` |
+| A48 list | Filter leads | `GET /api/platform/leads` |
+| A48 detail | Change status | `PATCH /api/platform/leads/{id}` |
+| A48 notes | Add note | `POST /api/platform/leads/{id}/notes` |
+
+### Flow A — visitor → lead
+
+```text
+Land /product?utm_campaign=x → page_view funnel
+  → Book a demo → validate + consent → POST lead → confirmation
+  → sales lists lead in /admin/leads
+```
+
+### Flow B — visitor → register → buy
+
+```text
+Pricing card Start → /tenant/register?package_id=&utm_*
+  → verify/KYC (existing) → /tenant/billing checkout (existing)
+  → receipt/workspace — public page never grants entitlement
+```
+
+### Flow C — visitor → demo → convert
+
+```text
+Try live demo → / customer portal
+  → post-demo CTA returns to /product/contact or /tenant/register
+  → attribution keys preserved when still present
+```
+
+### Component → file (planned)
+
+| Zone | Path |
+| --- | --- |
+| Product shell | `apps/product-web/src/routes/+layout.svelte` |
+| Home | `apps/product-web/src/routes/+page.svelte` |
+| Pricing | `apps/product-web/src/routes/pricing/+page.svelte` |
+| Contact | `apps/product-web/src/routes/contact/+page.svelte` |
+| Attribution helper | `apps/product-web/src/lib/attribution.ts` |
+| Lead API client | `apps/product-web/src/lib/api.ts` |
+| Admin leads page | `apps/platform-admin-web/src/routes/leads/+page.svelte` |
+| Static serve | `internal/productweb/serve.go` |
+
+See DES-0043, workflow §105–108, ER Sprint 48, API Sprint 48.

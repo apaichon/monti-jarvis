@@ -81,6 +81,13 @@
         </a>
         <a
           class="nav-link"
+          class:active={$page.url.pathname.startsWith(`${base}/leads`)}
+          href="{base}/leads"
+        >
+          <span>✉</span>Leads
+        </a>
+        <a
+          class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/audit-logs`)}
           href="{base}/audit-logs"
         >

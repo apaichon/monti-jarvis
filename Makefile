@@ -6,13 +6,14 @@ PORT ?= 8091
 CUSTOMER_WEB_DIR := apps/customer-web
 PLATFORM_ADMIN_WEB_DIR := apps/platform-admin-web
 TENANT_WEB_DIR := apps/tenant-web
+PRODUCT_WEB_DIR := apps/product-web
 COMPOSE_FILE := infra/docker-compose.yml
 
 # Stale GOROOT (e.g. ~/tools/go without crypto/pbkdf2) shadows the go.mod toolchain stdlib.
 unexport GOROOT
 
 .PHONY: help build run start stop restart status logs test \
-	customer-web customer-dev platform-admin-web platform-admin-dev tenant-web tenant-dev clean-web clean km-seed db-migrate \
+	customer-web customer-dev platform-admin-web platform-admin-dev tenant-web tenant-dev product-web product-dev clean-web clean km-seed db-migrate \
 	infra-check infra-up infra-down infra-init infra-destroy infra-reset dev-hosts up down
 
 help:
@@ -25,13 +26,15 @@ help:
 	@printf "  make status         process + /healthz\n"
 	@printf "  make logs           tail server log\n"
 	@printf "  make run            foreground server\n"
-	@printf "  make build          build customer-web + platform-admin-web + tenant-web + Go binary\n"
+	@printf "  make build          build customer-web + platform-admin-web + tenant-web + product-web + Go binary\n"
 	@printf "  make customer-web   build Svelte customer portal only\n"
 	@printf "  make customer-dev   vite dev on :5173 (proxies API)\n"
 	@printf "  make platform-admin-web   build platform admin portal only\n"
 	@printf "  make platform-admin-dev   vite dev on :5174 (proxies API)\n"
 	@printf "  make tenant-web           build tenant signup portal only\n"
 	@printf "  make tenant-dev           vite dev on :5175 (proxies API)\n"
+	@printf "  make product-web          build product marketing site only\n"
+	@printf "  make product-dev          vite dev on :5176 (proxies API)\n"
 	@printf "  make test           go test ./...\n"
 	@printf "  make km-seed        ingest sample KB for all avatars\n"
 	@printf "  make db-migrate     apply Postgres + ClickHouse audit migrations\n"
@@ -62,12 +65,23 @@ tenant-web:
 tenant-dev:
 	@cd $(TENANT_WEB_DIR) && npm install && npm run dev
 
+product-web:
+	@if [ -d $(PRODUCT_WEB_DIR) ]; then \
+		cd $(PRODUCT_WEB_DIR) && npm install && (npm run build || (rm -rf .svelte-kit && npm run build)); \
+	else \
+		printf "product-web: $(PRODUCT_WEB_DIR) not present yet — skip\n"; \
+	fi
+
+product-dev:
+	@cd $(PRODUCT_WEB_DIR) && npm install && npm run dev
+
 clean-web:
 	rm -rf $(CUSTOMER_WEB_DIR)/.svelte-kit $(CUSTOMER_WEB_DIR)/build
 	rm -rf $(PLATFORM_ADMIN_WEB_DIR)/.svelte-kit $(PLATFORM_ADMIN_WEB_DIR)/build
 	rm -rf $(TENANT_WEB_DIR)/.svelte-kit $(TENANT_WEB_DIR)/build
+	rm -rf $(PRODUCT_WEB_DIR)/.svelte-kit $(PRODUCT_WEB_DIR)/build
 
-build: customer-web platform-admin-web tenant-web
+build: customer-web platform-admin-web tenant-web product-web
 	go build -o $(BINARY) ./cmd/server
 
 run:
@@ -152,4 +166,5 @@ down: stop infra-destroy
 clean:
 	rm -rf $(BINARY) $(RUN_DIR) $(CUSTOMER_WEB_DIR)/node_modules $(CUSTOMER_WEB_DIR)/build \
 		$(PLATFORM_ADMIN_WEB_DIR)/node_modules $(PLATFORM_ADMIN_WEB_DIR)/build \
-		$(TENANT_WEB_DIR)/node_modules $(TENANT_WEB_DIR)/build
+		$(TENANT_WEB_DIR)/node_modules $(TENANT_WEB_DIR)/build \
+		$(PRODUCT_WEB_DIR)/node_modules $(PRODUCT_WEB_DIR)/build

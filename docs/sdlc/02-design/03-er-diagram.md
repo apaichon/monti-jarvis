@@ -2153,3 +2153,89 @@ unavailable manifest is reported as stale/unavailable, never as zero.
 
 See DES-0042, 42-aiaas-packages-usage-reconciliation-spec.md, workflow
 §100–104, API Sprint 45, and UX Sprint 45.
+
+## Sprint 48 — Product web leads and funnel
+
+```mermaid
+erDiagram
+  marketing_leads ||--o{ marketing_lead_notes : has
+  marketing_leads ||--o{ marketing_lead_events : history
+  marketing_leads }o--o| tenants : converted_tenant_id
+  packages ||--o{ marketing_leads : package_interest_id
+
+  marketing_leads {
+    text id PK
+    text kind
+    text status
+    text email
+    text full_name
+    text company_name
+    text phone
+    text use_case
+    text preferred_channel
+    text language
+    boolean consent_marketing
+    boolean consent_contact
+    timestamptz consent_at
+    text utm_source
+    text utm_medium
+    text utm_campaign
+    text utm_content
+    text utm_term
+    text referral_code
+    text landing_path
+    text package_interest_id
+    text dedupe_key
+    text assigned_to
+    text converted_tenant_id
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  marketing_lead_notes {
+    text id PK
+    text lead_id FK
+    text body
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  marketing_lead_events {
+    text id PK
+    text lead_id FK
+    text from_status
+    text to_status
+    text actor
+    timestamptz created_at
+  }
+
+  funnel_events {
+    text id PK
+    text event_name
+    text page_path
+    text cta_id
+    text utm_source
+    text utm_campaign
+    text referral_code
+    text session_key
+    text client_ip_hash
+    timestamptz created_at
+  }
+```
+
+| Entity | Status | Boundary |
+| --- | --- | --- |
+| `marketing_leads` | **Sprint 48** | Public lead capture + sales lifecycle; no payment secrets |
+| `marketing_lead_notes` | **Sprint 48** | Platform-admin follow-up notes |
+| `marketing_lead_events` | **Sprint 48** | Status transition audit |
+| `funnel_events` | **Sprint 48** | Coarse acquisition events; no conversation PII |
+
+Redis keys: `monti_jarvis:lead:rl:{ip}`, `monti_jarvis:funnel:rl:{ip}`.
+
+Migration: `scripts/migrations/029_product_web_leads.sql`.
+
+See DES-0043, workflow §105–108, API Sprint 48, UX P48/A48.

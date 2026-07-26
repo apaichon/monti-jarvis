@@ -3675,3 +3675,128 @@ never returns raw event bodies or credentials.
 | 503 | `quota_unavailable` / `usage_source_unavailable` | Required source unavailable |
 
 See DES-0042, workflow §100–104, ER Sprint 45, and UX T24/A24/M2.
+
+## Sprint 48 — Product web, leads, public packages, funnel
+
+Base: `http://localhost:8091`. Deep spec: [43-product-web-growth-spec.md](43-product-web-growth-spec.md).  
+Workflows: [02-workflow.md](02-workflow.md) §105–108 · UX: [05-ux-ui.md](05-ux-ui.md) P48/A48.
+
+### Static routes (add)
+
+| Route | Handler |
+| --- | --- |
+| `/product/` | Svelte product web (`apps/product-web/build`) |
+| `/product/*` | SPA fallback → `index.html` |
+
+Env: `PRODUCT_WEB_DIR` (default `apps/product-web/build`).
+
+### Public packages
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/public/packages` | public | Active sellable packages for marketing pricing |
+
+**Response 200**
+
+```json
+{
+  "packages": [
+    {
+      "id": "aiaas-1000",
+      "name": "AiaaS ฿1,000",
+      "price_amount": 1000,
+      "price_currency": "THB",
+      "billing_period": "month",
+      "highlights": ["3 AI avatars", "300 KM docs"],
+      "rules_summary": {"ai_employees": 3, "km_documents": 300}
+    }
+  ]
+}
+```
+
+Public pricing never creates entitlements.
+
+### Public leads
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/public/leads` | public + RL | Create or dedupe marketing lead |
+
+**Request**
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `kind` | string | yes | `contact` \| `book_demo` \| `newsletter` |
+| `email` | string | yes | normalized lower |
+| `consent_contact` | bool | kind≠newsletter | must be true |
+| `consent_marketing` | bool | newsletter | must be true for newsletter |
+| `full_name` | string | no | |
+| `company_name` | string | no | |
+| `phone` | string | no | |
+| `use_case` | string | no | max 2000 |
+| `preferred_channel` | string | no | `email`\|`phone`\|`line`\|`other` |
+| `language` | string | no | `en`\|`th` |
+| `utm_*` | string | no | allowlisted keys |
+| `referral_code` | string | no | optional S46 code |
+| `landing_path` | string | no | product path |
+| `package_interest_id` | string | no | package id |
+| `website` | string | honeypot | must be empty |
+
+**Response 201**
+
+```json
+{"lead_id":"lead_…","status":"new","deduped":false}
+```
+
+**Response 200** (dedupe hit): same shape with `"deduped":true`.
+
+### Public funnel events
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/public/funnel/events` | public + RL | Coarse funnel beacon |
+
+Allowlisted `event_name`: `page_view`, `cta_click`, `demo_start`, `lead_submit`, `register_start`.
+
+**Request**
+
+```json
+{
+  "event_name": "cta_click",
+  "page_path": "/product/pricing",
+  "cta_id": "start_register",
+  "session_key": "opaque-client-key",
+  "utm_source": "google",
+  "referral_code": "REFABC"
+}
+```
+
+No email/name/phone in funnel body.
+
+### Platform leads (sales)
+
+| Method | Path | Role | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/platform/leads` | platform_admin | List/filter leads |
+| `GET` | `/api/platform/leads/{id}` | platform_admin | Detail + notes + history |
+| `PATCH` | `/api/platform/leads/{id}` | platform_admin | status, assigned_to |
+| `POST` | `/api/platform/leads/{id}/notes` | platform_admin | append note |
+
+**List query:** `status`, `kind`, `q` (email/company), `limit`, `offset`.
+
+**PATCH body**
+
+```json
+{"status":"contacted","assigned_to":"user_…"}
+```
+
+### Sprint 48 error codes
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `LEAD_VALIDATION` / `LEAD_CONSENT_REQUIRED` / `LEAD_SPAM` / `FUNNEL_UNKNOWN_EVENT` | bad input |
+| 401/403 | standard | missing/forbidden role on platform leads |
+| 429 | `LEAD_RATE_LIMITED` / `FUNNEL_RATE_LIMITED` | IP over limit |
+| 503 | `LEAD_DISABLED` / `PACKAGE_PUBLIC_UNAVAILABLE` | feature disabled |
+
+See DES-0043, workflow §105–108, ER Sprint 48, UX P48/A48.

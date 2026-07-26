@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -64,29 +65,131 @@ const rulesV1Fields = `{
   "rag_enabled": {"type":"bool","required":true,"default":true}
 }`
 
+// rules-v2: shared-cloud / dedicated dimensions (Montti pricing sheet).
+// max_km_documents maps to Knowledge Bases count on the commercial sheet.
+// Platform voice minutes use a very high cap (sheet: unlimited platform; AI provider BYOK).
 const rulesV2Fields = `{
   "max_ai_employees": {"type":"int","min":0,"required":true,"description":"Max AI avatars"},
-  "max_monthly_call_minutes": {"type":"int","min":0,"required":true,"description":"Monthly web/inbound voice minutes"},
+  "max_monthly_call_minutes": {"type":"int","min":0,"required":true,"description":"Monthly web/inbound voice minutes (high = platform unlimited)"},
   "max_mobile_call_minutes": {"type":"int","min":0,"required":true,"description":"Monthly mobile call minutes"},
-  "max_km_documents": {"type":"int","min":0,"required":true,"description":"KM documents"},
-  "max_storage_bytes": {"type":"int","min":0,"required":true,"description":"Object storage bytes"},
-  "max_concurrent_calls": {"type":"int","min":0,"required":true,"description":"Parallel calls"},
+  "max_km_documents": {"type":"int","min":0,"required":true,"description":"Knowledge bases"},
+  "max_storage_bytes": {"type":"int","min":0,"required":true,"description":"Knowledge storage bytes"},
+  "max_concurrent_calls": {"type":"int","min":0,"required":true,"description":"Concurrent voice sessions"},
   "voice_enabled": {"type":"bool","required":true,"default":true},
   "rag_enabled": {"type":"bool","required":true,"default":true}
 }`
 
-type packageSeed struct {
-	id, slug, name string
-	priceCents     int
-	rules          string
+// Purchase modes encoded in package description for catalog routing.
+const (
+	PurchaseModeSelfServe = "self_serve" // startups/SME — payment gateway
+	PurchaseModeQuote     = "quote"      // dedicated — request quote / capacity check
+	DeploymentSharedCloud = "shared_cloud"
+	DeploymentDedicatedVM = "dedicated_vm"
+	// Platform-unlimited voice minutes (BYOK AI usage billed by provider).
+	platformUnlimitedMinutes = 99_999_999
+)
+
+// PackagePurchaseMode returns self_serve or quote from slug/description.
+func PackagePurchaseMode(p Package) string {
+	slug := strings.ToLower(strings.TrimSpace(p.Slug))
+	desc := strings.ToLower(p.Description)
+	switch {
+	case strings.HasPrefix(slug, "dedicated-"), strings.Contains(desc, "quote required"):
+		return PurchaseModeQuote
+	case strings.HasPrefix(slug, "shared-"), strings.Contains(desc, "self-serve"):
+		return PurchaseModeSelfServe
+	default:
+		// Legacy active packages remain self-serve if priced.
+		if p.PriceCents > 0 {
+			return PurchaseModeSelfServe
+		}
+		return PurchaseModeQuote
+	}
 }
 
-func aiaasSeedPackages() []packageSeed {
-	return []packageSeed{
-		{id: "pkg-aiaas-500", slug: "aiaas-500", name: "AiaaS ฿500", priceCents: 50000, rules: `{"max_ai_employees":1,"max_monthly_call_minutes":100,"max_mobile_call_minutes":100,"max_km_documents":100,"max_storage_bytes":5368709120,"max_concurrent_calls":1,"voice_enabled":true,"rag_enabled":true}`},
-		{id: "pkg-aiaas-1000", slug: "aiaas-1000", name: "AiaaS ฿1,000", priceCents: 100000, rules: `{"max_ai_employees":3,"max_monthly_call_minutes":300,"max_mobile_call_minutes":300,"max_km_documents":300,"max_storage_bytes":21474836480,"max_concurrent_calls":2,"voice_enabled":true,"rag_enabled":true}`},
-		{id: "pkg-aiaas-1500", slug: "aiaas-1500", name: "AiaaS ฿1,500", priceCents: 150000, rules: `{"max_ai_employees":5,"max_monthly_call_minutes":750,"max_mobile_call_minutes":750,"max_km_documents":750,"max_storage_bytes":53687091200,"max_concurrent_calls":5,"voice_enabled":true,"rag_enabled":true}`},
-		{id: "pkg-aiaas-2000", slug: "aiaas-2000", name: "AiaaS ฿2,000", priceCents: 200000, rules: `{"max_ai_employees":10,"max_monthly_call_minutes":1500,"max_mobile_call_minutes":1500,"max_km_documents":1500,"max_storage_bytes":107374182400,"max_concurrent_calls":10,"voice_enabled":true,"rag_enabled":true}`},
+// PackageDeployment returns shared_cloud or dedicated_vm.
+func PackageDeployment(p Package) string {
+	if strings.HasPrefix(strings.ToLower(p.Slug), "dedicated-") {
+		return DeploymentDedicatedVM
+	}
+	return DeploymentSharedCloud
+}
+
+// PackageIsQuoteOnly is true when checkout via payment gateway is not allowed.
+func PackageIsQuoteOnly(p Package) bool {
+	return PackagePurchaseMode(p) == PurchaseModeQuote
+}
+
+type monttiPackageSeed struct {
+	id, slug, name, description string
+	priceCents                  int
+	currency                    string
+	rules                       string
+}
+
+func monttiSharedCloudPackages() []monttiPackageSeed {
+	// docs/sales/Montti_AI_Complete_Pricing.md — Shared Cloud (startups/SME, self-serve)
+	// KM documents are unlimited in count; real KM cap is max_storage_bytes.
+	const unlimitedKM = 1_000_000
+	return []monttiPackageSeed{
+		{
+			id: "pkg-shared-launch", slug: "shared-launch", name: "Launch",
+			description: "Shared Cloud · self-serve · startups/SME · BYOK AI · concurrent voice 1 · KM unlimited within storage",
+			priceCents:  50000, currency: "THB",
+			rules: fmt.Sprintf(`{"max_ai_employees":2,"max_km_documents":%d,"max_storage_bytes":%d,"max_concurrent_calls":1,"max_monthly_call_minutes":%d,"max_mobile_call_minutes":%d,"voice_enabled":true,"rag_enabled":true}`, unlimitedKM, 1<<30, platformUnlimitedMinutes, platformUnlimitedMinutes),
+		},
+		{
+			id: "pkg-shared-starter", slug: "shared-starter", name: "Starter",
+			description: "Shared Cloud · self-serve · startups/SME · BYOK AI · concurrent voice 2 · KM unlimited within storage",
+			priceCents:  90000, currency: "THB",
+			rules: fmt.Sprintf(`{"max_ai_employees":5,"max_km_documents":%d,"max_storage_bytes":%d,"max_concurrent_calls":2,"max_monthly_call_minutes":%d,"max_mobile_call_minutes":%d,"voice_enabled":true,"rag_enabled":true}`, unlimitedKM, 5*(1<<30), platformUnlimitedMinutes, platformUnlimitedMinutes),
+		},
+		{
+			id: "pkg-shared-growth", slug: "shared-growth", name: "Growth",
+			description: "Shared Cloud · self-serve · startups/SME · BYOK AI · concurrent voice 4 · KM unlimited within storage",
+			priceCents:  150000, currency: "THB",
+			rules: fmt.Sprintf(`{"max_ai_employees":10,"max_km_documents":%d,"max_storage_bytes":%d,"max_concurrent_calls":4,"max_monthly_call_minutes":%d,"max_mobile_call_minutes":%d,"voice_enabled":true,"rag_enabled":true}`, unlimitedKM, 10*(1<<30), platformUnlimitedMinutes, platformUnlimitedMinutes),
+		},
+		{
+			id: "pkg-shared-business", slug: "shared-business", name: "Business",
+			description: "Shared Cloud · self-serve · startups/SME · BYOK AI · concurrent voice 6 · KM unlimited within storage",
+			priceCents:  200000, currency: "THB",
+			rules: fmt.Sprintf(`{"max_ai_employees":20,"max_km_documents":%d,"max_storage_bytes":%d,"max_concurrent_calls":6,"max_monthly_call_minutes":%d,"max_mobile_call_minutes":%d,"voice_enabled":true,"rag_enabled":true}`, unlimitedKM, 20*(1<<30), platformUnlimitedMinutes, platformUnlimitedMinutes),
+		},
+	}
+}
+
+func monttiDedicatedPackages() []monttiPackageSeed {
+	// docs/sales/Montti_AI_Complete_Pricing.md — Dedicated VM (quote before capacity assign).
+	// Catalog currency is THB (same as Shared Cloud). Sheet list prices were EUR
+	// (€99 / €299 / €499 / €849); converted at planning rate ≈ ฿38.5/EUR and
+	// rounded to nearest ฿100 for marketing display.
+	const unlimited = 1_000_000
+	return []monttiPackageSeed{
+		{
+			id: "pkg-dedicated-launch", slug: "dedicated-launch", name: "Dedicated Launch",
+			description: "Dedicated VM · quote required · capacity check · 8 vCPU · 24 GB RAM · 300 GB SSD · up to 100 concurrent",
+			priceCents:  380000, currency: "THB", // was €99
+			rules: fmt.Sprintf(`{"max_ai_employees":%d,"max_km_documents":%d,"max_storage_bytes":%d,"max_concurrent_calls":100,"max_monthly_call_minutes":%d,"max_mobile_call_minutes":%d,"voice_enabled":true,"rag_enabled":true}`, unlimited, unlimited, 300*(1<<30), platformUnlimitedMinutes, platformUnlimitedMinutes),
+		},
+		{
+			id: "pkg-dedicated-growth", slug: "dedicated-growth", name: "Dedicated Growth",
+			description: "Dedicated VM · quote required · capacity check · 12 vCPU · 48 GB RAM · 400 GB SSD · up to 250 concurrent · white-label included",
+			priceCents:  1150000, currency: "THB", // was €299
+			rules: fmt.Sprintf(`{"max_ai_employees":%d,"max_km_documents":%d,"max_storage_bytes":%d,"max_concurrent_calls":250,"max_monthly_call_minutes":%d,"max_mobile_call_minutes":%d,"voice_enabled":true,"rag_enabled":true}`, unlimited, unlimited, 400*(1<<30), platformUnlimitedMinutes, platformUnlimitedMinutes),
+		},
+		{
+			id: "pkg-dedicated-business", slug: "dedicated-business", name: "Dedicated Business",
+			description: "Dedicated VM · quote required · capacity check · 16 vCPU · 64 GB RAM · 500 GB SSD · up to 500 concurrent",
+			priceCents:  1920000, currency: "THB", // was €499
+			rules: fmt.Sprintf(`{"max_ai_employees":%d,"max_km_documents":%d,"max_storage_bytes":%d,"max_concurrent_calls":500,"max_monthly_call_minutes":%d,"max_mobile_call_minutes":%d,"voice_enabled":true,"rag_enabled":true}`, unlimited, unlimited, 500*(1<<30), platformUnlimitedMinutes, platformUnlimitedMinutes),
+		},
+		{
+			id: "pkg-dedicated-enterprise", slug: "dedicated-enterprise", name: "Dedicated Enterprise",
+			description: "Dedicated VM · quote required · capacity check · 18 vCPU · 96 GB RAM · 600 GB SSD · up to 1000 concurrent",
+			priceCents:  3270000, currency: "THB", // was €849
+			rules: fmt.Sprintf(`{"max_ai_employees":%d,"max_km_documents":%d,"max_storage_bytes":%d,"max_concurrent_calls":1000,"max_monthly_call_minutes":%d,"max_mobile_call_minutes":%d,"voice_enabled":true,"rag_enabled":true}`, unlimited, unlimited, 600*(1<<30), platformUnlimitedMinutes, platformUnlimitedMinutes),
+		},
 	}
 }
 
@@ -169,59 +272,66 @@ ON CONFLICT (id) DO NOTHING`, schema), rulesV1Fields)
 	}
 	_, err = s.pg.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s.package_rule_schemas (id, version, name, fields, status)
-VALUES ('rules-v2', 2, 'Sprint 45 AiaaS dimensions', $1::jsonb, 'active')
-ON CONFLICT (id) DO NOTHING`, schema), rulesV2Fields)
+VALUES ('rules-v2', 2, 'Montti shared/dedicated dimensions', $1::jsonb, 'active')
+ON CONFLICT (id) DO UPDATE SET fields = EXCLUDED.fields, name = EXCLUDED.name, status = 'active'`, schema), rulesV2Fields)
 	if err != nil {
 		return err
 	}
 
-	pkgs := []struct {
-		id, slug, name string
-		rules          string
-	}{
-		{"pkg-starter", "starter", "Starter", `{"max_ai_employees":2,"max_monthly_call_minutes":500,"max_km_documents":50,"max_concurrent_calls":2,"voice_enabled":true,"rag_enabled":true}`},
-		{"pkg-pro", "pro", "Pro", `{"max_ai_employees":10,"max_monthly_call_minutes":5000,"max_km_documents":500,"max_concurrent_calls":10,"voice_enabled":true,"rag_enabled":true}`},
-		{"pkg-enterprise", "enterprise", "Enterprise", `{"max_ai_employees":50,"max_monthly_call_minutes":50000,"max_km_documents":5000,"max_concurrent_calls":50,"voice_enabled":true,"rag_enabled":true}`},
-	}
-	for _, p := range pkgs {
-		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
-INSERT INTO %s.packages (id, slug, name, status, price_cents, currency, billing_period)
-VALUES ($1, $2, $3, 'active', 0, 'USD', 'monthly')
-ON CONFLICT (id) DO NOTHING`, schema), p.id, p.slug, p.name)
-		if err != nil {
-			return err
-		}
-		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
-INSERT INTO %s.package_limits (package_id, rules_schema_id, rules)
-VALUES ($1, 'rules-v1', $2::jsonb)
-ON CONFLICT (package_id) DO NOTHING`, schema), p.id, p.rules)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, p := range aiaasSeedPackages() {
-		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
-INSERT INTO %s.packages (id, slug, name, status, price_cents, currency, billing_period)
-VALUES ($1, $2, $3, 'active', $4, 'THB', 'monthly')
-ON CONFLICT (id) DO NOTHING`, schema), p.id, p.slug, p.name, p.priceCents)
-		if err != nil {
-			return err
-		}
-		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
-INSERT INTO %s.package_limits (package_id, rules_schema_id, rules)
-VALUES ($1, 'rules-v2', $2::jsonb)
-ON CONFLICT (package_id) DO NOTHING`, schema), p.id, p.rules)
-		if err != nil {
-			return err
-		}
-	}
-
+	// Archive legacy catalog rows superseded by Montti shared/dedicated pricing.
 	_, err = s.pg.Exec(ctx, fmt.Sprintf(`
-INSERT INTO %s.tenant_entitlements (id, tenant_id, package_id, rules_schema_id, rules_snapshot, status)
-SELECT 'ent_demo_starter', $1, 'pkg-starter', 'rules-v1', pl.rules, 'active'
-FROM %s.package_limits pl WHERE pl.package_id = 'pkg-starter'
-ON CONFLICT (id) DO NOTHING`, schema, schema), demoTenant)
+UPDATE %s.packages
+SET status = 'archived', updated_by = 'system', updated_at = now()
+WHERE id IN (
+  'pkg-starter','pkg-pro','pkg-enterprise',
+  'pkg-aiaas-500','pkg-aiaas-1000','pkg-aiaas-1500','pkg-aiaas-2000'
+) AND status <> 'archived'`, schema))
+	if err != nil {
+		return err
+	}
+
+	upsert := append(monttiSharedCloudPackages(), monttiDedicatedPackages()...)
+	for _, p := range upsert {
+		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
+INSERT INTO %s.packages (id, slug, name, description, status, price_cents, currency, billing_period, created_by, updated_by)
+VALUES ($1, $2, $3, $4, 'active', $5, $6, 'monthly', 'system', 'system')
+ON CONFLICT (id) DO UPDATE SET
+  slug = EXCLUDED.slug,
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  status = 'active',
+  price_cents = EXCLUDED.price_cents,
+  currency = EXCLUDED.currency,
+  billing_period = 'monthly',
+  updated_by = 'system',
+  updated_at = now()`, schema),
+			p.id, p.slug, p.name, p.description, p.priceCents, p.currency)
+		if err != nil {
+			return err
+		}
+		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
+INSERT INTO %s.package_limits (package_id, rules_schema_id, rules, created_by, updated_by)
+VALUES ($1, 'rules-v2', $2::jsonb, 'system', 'system')
+ON CONFLICT (package_id) DO UPDATE SET
+  rules_schema_id = 'rules-v2',
+  rules = EXCLUDED.rules,
+  updated_by = 'system',
+  updated_at = now()`, schema), p.id, p.rules)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Demo tenant: prefer shared Launch if no active entitlement.
+	_, err = s.pg.Exec(ctx, fmt.Sprintf(`
+INSERT INTO %s.tenant_entitlements (id, tenant_id, package_id, rules_schema_id, rules_snapshot, status, created_by, updated_by)
+SELECT 'ent_demo_shared_launch', $1, 'pkg-shared-launch', 'rules-v2', pl.rules, 'active', 'system', 'system'
+FROM %s.package_limits pl
+WHERE pl.package_id = 'pkg-shared-launch'
+  AND NOT EXISTS (
+    SELECT 1 FROM %s.tenant_entitlements e WHERE e.tenant_id = $1 AND e.status = 'active'
+  )
+ON CONFLICT (id) DO NOTHING`, schema, schema, schema), demoTenant)
 	if err != nil {
 		return err
 	}

@@ -100,6 +100,12 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "package is not active")
 		return
 	}
+	// Dedicated / enterprise capacity plans require a sales quote and server
+	// resource check — never self-serve via payment gateway.
+	if store.PackageIsQuoteOnly(*pkg) {
+		writeError(w, http.StatusConflict, "package requires quote: contact sales to verify dedicated capacity")
+		return
+	}
 
 	gwRow, err := s.store.GetPaymentGatewayConfig(r.Context())
 	if err != nil {
@@ -566,11 +572,15 @@ func (s *server) mockPayOrder(w http.ResponseWriter, r *http.Request) {
 
 func tenantPackageJSON(p store.Package) map[string]any {
 	summary := map[string]any{}
-	for _, key := range []string{"max_ai_employees", "max_monthly_call_minutes", "max_km_documents", "max_concurrent_calls"} {
+	for _, key := range []string{
+		"max_ai_employees", "max_monthly_call_minutes", "max_mobile_call_minutes",
+		"max_km_documents", "max_storage_bytes", "max_concurrent_calls",
+	} {
 		if v, ok := p.Rules[key]; ok {
 			summary[key] = v
 		}
 	}
+	mode := store.PackagePurchaseMode(p)
 	return map[string]any{
 		"id":             p.ID,
 		"slug":           p.Slug,
@@ -579,6 +589,9 @@ func tenantPackageJSON(p store.Package) map[string]any {
 		"price_cents":    p.PriceCents,
 		"currency":       p.Currency,
 		"billing_period": p.BillingPeriod,
+		"purchase_mode":  mode,
+		"deployment":     store.PackageDeployment(p),
+		"quote_only":     mode == store.PurchaseModeQuote,
 		"rules_summary":  summary,
 	}
 }
