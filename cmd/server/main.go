@@ -27,7 +27,9 @@ import (
 	"github.com/libra/monti-jarvis/internal/natsbus"
 	"github.com/libra/monti-jarvis/internal/observability"
 	"github.com/libra/monti-jarvis/internal/payment"
+	"github.com/libra/monti-jarvis/internal/leads"
 	"github.com/libra/monti-jarvis/internal/platformweb"
+	"github.com/libra/monti-jarvis/internal/productweb"
 	"github.com/libra/monti-jarvis/internal/quota"
 	"github.com/libra/monti-jarvis/internal/rag"
 	"github.com/libra/monti-jarvis/internal/resend"
@@ -56,8 +58,11 @@ type server struct {
 	static          http.Handler
 	platform        http.Handler
 	tenant          http.Handler
+	product         http.Handler
 	legacy          http.Handler
 	registerLimiter *tenantregister.RateLimiter
+	leadLimiter     *leads.RateLimiter
+	funnelLimiter   *leads.RateLimiter
 	mailer          *resend.Client
 	tenantOAuth     *tenantoauth.Service
 	monitoring      *observability.Service
@@ -180,6 +185,8 @@ func main() {
 	}
 	guard := auth.NewHTTPGuard(authSvc, st, cfg.AuthDisabled)
 	registerLimiter := tenantregister.NewRateLimiter(st.Redis(), cfg.RedisPrefix, cfg.TenantRegisterRateLimit)
+	leadLimiter := leads.NewRateLimiter(st.Redis(), cfg.RedisPrefix+"lead:rl:", cfg.LeadRateLimitPerIP)
+	funnelLimiter := leads.NewRateLimiter(st.Redis(), cfg.RedisPrefix+"funnel:rl:", cfg.FunnelRateLimitPerIP)
 	mailer := resend.New(cfg.ResendAPIKey, cfg.ResendFromEmail)
 	if mailer.Enabled() {
 		log.Printf("mailer: resend enabled from=%s", cfg.ResendFromEmail)
@@ -256,8 +263,11 @@ func main() {
 		static:          customerweb.Handler(cfg.CustomerWebDir),
 		platform:        platformweb.Handler(cfg.PlatformAdminWebDir),
 		tenant:          tenantweb.Handler(cfg.TenantWebDir),
+		product:         productweb.Handler(cfg.ProductWebDir, cfg.ProductWebEnabled),
 		legacy:          web.Handler(),
 		registerLimiter: registerLimiter,
+		leadLimiter:     leadLimiter,
+		funnelLimiter:   funnelLimiter,
 		mailer:          mailer,
 		tenantOAuth:     tenantOAuth,
 		monitoring:      newMonitoringService(st, ch, bus, ai, cfg),
@@ -304,6 +314,14 @@ func main() {
 	mux.HandleFunc("GET /api/infra", s.infra)
 	mux.HandleFunc("GET /api/public/brands", s.publicBrands)
 	mux.HandleFunc("GET /api/public/brands/{slug}", s.publicBrand)
+	// Sprint 48: product web leads, public packages, funnel
+	mux.HandleFunc("POST /api/public/leads", s.createPublicLead)
+	mux.HandleFunc("GET /api/public/packages", s.publicPackages)
+	mux.HandleFunc("POST /api/public/funnel/events", s.createFunnelEvent)
+	mux.Handle("GET /api/platform/leads", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformLeads)))
+	mux.Handle("GET /api/platform/leads/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformLead)))
+	mux.Handle("PATCH /api/platform/leads/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.patchPlatformLead)))
+	mux.Handle("POST /api/platform/leads/{id}/notes", guard.RequirePlatformAdmin(http.HandlerFunc(s.addPlatformLeadNote)))
 	mux.Handle("PUT /api/tenant/brand", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantBrand)))
 	mux.Handle("PUT /api/platform/tenants/{tenant_id}/brand-listing", guard.RequirePlatformAdmin(http.HandlerFunc(s.putPlatformBrandListing)))
 	mux.Handle("POST /api/calls", guard.OptionalBearer(http.HandlerFunc(s.createCall)))
@@ -546,6 +564,10 @@ func main() {
 		http.Redirect(w, r, "/tenant/", http.StatusFound)
 	})
 	mux.Handle("/tenant/", s.tenant)
+	mux.HandleFunc("GET /product", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/product/", http.StatusFound)
+	})
+	mux.Handle("/product/", s.product)
 
 	mux.Handle("/", s.static)
 
@@ -561,8 +583,8 @@ func main() {
 
 	go func() {
 		health := st.Health(context.Background())
-		log.Printf("monti-jarvis listening on :%s customer_web=%s platform_admin=%s tenant_web=%s auth_disabled=%t livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
-			cfg.Port, cfg.CustomerWebDir, cfg.PlatformAdminWebDir, cfg.TenantWebDir, cfg.AuthDisabled, lk.Enabled(), bus != nil && bus.Enabled(),
+		log.Printf("monti-jarvis listening on :%s customer_web=%s platform_admin=%s tenant_web=%s product_web=%s auth_disabled=%t livekit=%t nats=%t postgres=%s redis=%s legacy_ui=%t",
+			cfg.Port, cfg.CustomerWebDir, cfg.PlatformAdminWebDir, cfg.TenantWebDir, cfg.ProductWebDir, cfg.AuthDisabled, lk.Enabled(), bus != nil && bus.Enabled(),
 			health.Postgres, health.Redis, cfg.LegacyUIEnabled)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
@@ -597,6 +619,8 @@ func (s *server) health(w http.ResponseWriter, _ *http.Request) {
 		"customer_web":       s.cfg.CustomerWebDir,
 		"platform_admin_web": s.cfg.PlatformAdminWebDir,
 		"tenant_web":         s.cfg.TenantWebDir,
+		"product_web":        s.cfg.ProductWebDir,
+		"lead_capture":       s.cfg.LeadCaptureEnabled,
 	})
 }
 

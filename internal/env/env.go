@@ -58,6 +58,12 @@ type Config struct {
 	TenantRegisterEnabled    bool
 	TenantRegisterRateLimit  int
 	TenantWebDir             string
+	ProductWebDir            string
+	ProductWebEnabled        bool
+	LeadCaptureEnabled       bool
+	LeadRateLimitPerIP       int
+	FunnelRateLimitPerIP     int
+	LeadDedupeWindowHours    int
 	PublicBaseURL            string
 	ResendAPIKey             string
 	ResendFromEmail          string
@@ -171,6 +177,12 @@ func Load() Config {
 		TenantRegisterEnabled:    envBool("TENANT_REGISTER_ENABLED", true),
 		TenantRegisterRateLimit:  envInt("TENANT_REGISTER_RATE_LIMIT", 5),
 		TenantWebDir:             envOr("TENANT_WEB_DIR", "apps/tenant-web/build"),
+		ProductWebDir:            envOr("PRODUCT_WEB_DIR", "apps/product-web/build"),
+		ProductWebEnabled:        envBool("PRODUCT_WEB_ENABLED", true),
+		LeadCaptureEnabled:       envBool("LEAD_CAPTURE_ENABLED", true),
+		LeadRateLimitPerIP:       envInt("LEAD_RATE_LIMIT_PER_IP", 10),
+		FunnelRateLimitPerIP:     envInt("FUNNEL_RATE_LIMIT_PER_IP", 120),
+		LeadDedupeWindowHours:    envInt("LEAD_DEDUPE_WINDOW_HOURS", 24),
 		PublicBaseURL:            envOr("APP_PUBLIC_URL", "http://localhost:8091"),
 		ResendAPIKey:             resolveResendAPIKey(),
 		ResendFromEmail:          resolveResendFrom(),

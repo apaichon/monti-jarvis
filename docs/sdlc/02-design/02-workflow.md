@@ -2813,3 +2813,322 @@ sequenceDiagram
 
 See DES-0039, 39-tenant-ai-config-extensibility-spec.md, 03-er-diagram.md,
 04-api-spec.md, and 05-ux-ui.md for the Sprint 43 contracts.
+
+## 97. Customer connects a provider (Sprint 44)
+
+> **ON HOLD:** Sprint 44 runtime code and routes were removed. This sequence is
+> a retained design proposal only and must not be implemented or enabled
+> without security review.
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser
+  participant G as Go :8091
+  participant A as internal/auth
+  participant S as internal/store
+  participant P as Postgres
+  participant X as internal/secretbox
+  participant L as audit
+
+  C->>B: Enter Claude API key
+  B->>G: PUT /api/customer/generative/connections/claude
+  G->>A: Parse customer bearer
+  A-->>G: customer_id + tenant_id
+  G->>S: Validate provider, mode, expiry
+  S->>X: Encrypt key with deployment key
+  S->>P: Upsert ciphertext, nonce, version, last4
+  S-->>G: Masked connection metadata
+  G->>L: Redacted connection_saved event
+  G-->>B: configured + key_last4 only
+  alt unsupported provider or subscription mode
+    G-->>B: 409 unsupported_provider / unsupported_credential_mode
+  end
+```
+
+## 98. Customer creates and watches a generation job (Sprint 44)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser
+  participant G as Go :8091
+  participant Q as Redis quota
+  participant S as internal/store
+  participant P as Postgres
+  participant X as internal/secretbox
+  participant CL as internal/generative ClaudeAdapter
+  participant M as MinIO
+  participant U as ClickHouse metering
+
+  C->>B: Submit typed prompt
+  B->>G: POST /api/customer/generative/jobs
+  G->>S: Resolve authenticated tenant/customer
+  G->>Q: AllowRate(tenant, generation)
+  alt rate limited or invalid payload
+    Q-->>G: safe quota error
+    G-->>B: 400/429 structured failure
+  else allowed
+    G->>P: Insert queued job by idempotency key
+    P-->>G: New or existing job
+    G-->>B: 202 queued / 200 existing
+    G->>X: Decrypt provider key server-side
+    G->>CL: Bounded request with timeout
+    CL-->>G: Text + token usage or redacted error code
+    G->>M: Put tenant/customer artifact bytes
+    G->>P: Insert artifact metadata; mark job completed
+    G->>U: Upsert stable usage event
+  end
+  loop Poll until terminal
+    B->>G: GET /api/customer/generative/jobs/{id}
+    G->>P: Tenant/customer filtered read
+    G-->>B: status, safe error, artifact metadata
+  end
+```
+
+## 99. Customer previews an artifact (Sprint 44)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer
+  participant B as Browser
+  participant G as Go :8091
+  participant S as internal/store
+  participant P as Postgres
+  participant M as MinIO
+
+  C->>B: Select Preview
+  B->>G: GET /api/customer/generative/artifacts/{id}
+  G->>S: Validate bearer tenant + customer ownership
+  S->>P: Read metadata and tenant/customer object key
+  S->>M: Read object
+  M-->>G: Artifact bytes
+  G-->>B: Private bytes with nosniff and HTML/SVG sandbox CSP
+  B->>B: HTML in sandboxed iframe; text/JSON in preformatted view
+  alt missing or cross-tenant artifact
+    G-->>B: 404 not_found
+  end
+```
+
+See DES-0040, 40-customer-generative-workspace-spec.md, 03-er-diagram.md,
+04-api-spec.md, and 05-ux-ui.md for Sprint 44.
+
+## 100. Tenant reviews the AiaaS package catalog (Sprint 45)
+
+```mermaid
+sequenceDiagram
+  actor T as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant E as internal/entitlements
+  participant P as Postgres
+
+  T->>B: Open package and usage page
+  B->>G: GET /api/entitlements/me
+  G->>E: Resolve active tenant entitlement
+  E->>P: Read package + rules snapshot
+  P-->>E: Catalog dimensions and validity interval
+  E-->>G: Price, period, limits, source
+  G-->>B: Dimensioned package response
+  alt no active entitlement
+    G-->>B: 409 no_entitlement
+  end
+```
+
+## 101. Web or mobile request checks a dimensioned quota (Sprint 45)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer or caller
+  participant B as Web/Mobile client
+  participant G as Go :8091
+  participant E as internal/entitlements
+  participant Q as internal/quota + Redis DB 4
+  participant S as internal/store
+
+  C->>B: Start chat, voice, or mobile call
+  B->>G: Request with authenticated tenant context
+  G->>E: Resolve entitlement snapshot
+  G->>Q: Check dimension and acquire lease/counter
+  alt exhausted or Redis unavailable
+    Q-->>G: Structured dimension error
+    G-->>B: 429 quota_exceeded or 503 quota_unavailable
+  else allowed
+    Q-->>G: limit, consumed, remaining, lease
+    G->>S: Persist start/idempotency context
+    G-->>B: Accepted with quota metadata
+  end
+```
+
+## 102. Call, KM, avatar, or storage lifecycle records usage (Sprint 45)
+
+```mermaid
+sequenceDiagram
+  participant X as Call/KM/Avatar/MinIO path
+  participant G as Go :8091
+  participant U as usage ledger
+  participant P as Postgres
+  participant R as Redis DB 4
+  participant M as MinIO
+
+  X->>G: Terminal lifecycle event + idempotency key
+  G->>M: Confirm object write/delete when storage dimension applies
+  G->>U: Normalize dimension, unit, amount, period, source
+  U->>P: Insert usage event with unique tenant/key
+  alt duplicate event
+    P-->>U: Existing logical event
+  else first event
+    P-->>U: New event accepted
+    U->>R: Update enforcement counter atomically
+  end
+  U-->>G: applied or duplicate result
+```
+
+## 103. Platform reconciles usage sources (Sprint 45)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin
+  participant B as Browser/REST client
+  participant G as Go :8091
+  participant R as Reconciliation service
+  participant P as Postgres
+  participant C as ClickHouse
+  participant M as MinIO
+  participant Q as Redis DB 4
+
+  A->>B: Start bounded date-range reconciliation
+  B->>G: POST /api/platform/usage/reconcile
+  G->>R: Validate range and acquire run lock
+  R->>P: Read usage events and entitlement snapshots
+  R->>C: Read historical facts and source watermark
+  R->>M: Read storage usage manifest/projection
+  R->>Q: Read current enforcement counters
+  R->>P: Write mismatch/correction summary, never raw secrets
+  G-->>B: 202 run_id
+  B->>G: GET /api/platform/usage/reconcile/{run_id}
+  G->>P: Read run status
+  G-->>B: status, freshness, mismatch_count, safe errors
+```
+
+## 104. Tenant changes package without rewriting history (Sprint 45)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin/fulfillment
+  participant G as Go :8091
+  participant P as Postgres
+  participant E as internal/entitlements
+  participant Q as Redis DB 4
+
+  A->>G: Fulfill or change tenant package
+  G->>P: Close active entitlement interval
+  G->>P: Insert new rules snapshot and validity interval
+  G->>P: Preserve historical usage event snapshot references
+  G->>E: Invalidate tenant entitlement cache
+  G->>Q: Reconcile only future-period counters
+  G-->>A: New package and dimensioned allowances
+```
+
+See DES-0042, 42-aiaas-packages-usage-reconciliation-spec.md, ER Sprint 45,
+API Sprint 45, and UX T24/A24/M2.
+
+## 105. Visitor browses product web and starts conversion (Sprint 48)
+
+```mermaid
+sequenceDiagram
+  actor V as Visitor
+  participant B as Browser
+  participant G as Go :8091
+  participant PW as product-web static
+  participant P as Postgres
+  participant R as Redis DB 4
+
+  V->>B: Open /product/ with utm_* or ref
+  B->>G: GET /product/
+  G->>PW: Serve SPA shell
+  PW-->>B: Home marketing page
+  B->>G: POST /api/public/funnel/events page_view
+  G->>R: Rate limit funnel IP
+  G->>P: Insert funnel_events (no PII body)
+  G-->>B: 202 accepted
+  alt Try live demo
+    B->>G: GET /?utm_*&ref=
+    Note over B,G: Existing customer no-auth demo surface
+  else Register
+    B->>G: GET /tenant/register?utm_*&ref=&package_id=
+    Note over B,G: Existing tenant registration (S6+)
+  else Contact / book demo
+    B->>G: POST /api/public/leads
+    G->>R: Rate limit lead IP
+    G->>P: Dedupe + insert marketing_leads status=new
+    G-->>B: 201 lead_id confirmation
+  end
+```
+
+## 106. Sales progresses a marketing lead (Sprint 48)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin / sales
+  participant B as Browser /admin
+  participant G as Go :8091
+  participant P as Postgres
+
+  A->>B: Open /admin/leads
+  B->>G: GET /api/platform/leads?status=new
+  G->>P: List marketing_leads
+  G-->>B: lead rows (no payment secrets)
+  A->>B: Change status + add note
+  B->>G: PATCH /api/platform/leads/{id}
+  G->>P: Update status + lead_events history
+  B->>G: POST /api/platform/leads/{id}/notes
+  G->>P: Insert marketing_lead_notes
+  G-->>B: 200 updated lead
+  alt forbidden
+    Note over G: tenant_admin or anon → 401/403
+  end
+```
+
+## 107. Public pricing drives authenticated package purchase (Sprint 48)
+
+```mermaid
+sequenceDiagram
+  actor V as Visitor / Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant P as Postgres
+  participant Pay as Existing checkout (S9)
+
+  V->>B: Open /product/pricing
+  B->>G: GET /api/public/packages
+  G->>P: Active sellable packages only
+  G-->>B: Public DTO (price + highlights)
+  V->>B: Choose package → Start now
+  B->>G: GET /tenant/register?package_id=...
+  Note over B,G: Register / verify / KYC existing flows
+  V->>B: Authenticated /tenant/billing checkout
+  B->>G: Existing tenant packages + checkout APIs
+  G->>Pay: ChillPay + entitlement authority
+  Pay-->>B: Receipt / workspace — public pricing never grants quota
+```
+
+## 108. Attribution preservation rules (Sprint 48)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant PW as product-web
+  participant G as Go :8091
+
+  B->>PW: Land with utm_* + ref
+  PW->>PW: Persist allowlisted keys in sessionStorage/cookie
+  PW->>G: Lead create includes attribution fields
+  PW->>B: CTA href only Monti-relative path + allowlisted query
+  alt external or javascript URL
+    PW-->>B: Drop / reject redirect target
+  end
+```
+
+See DES-0043, 43-product-web-growth-spec.md, ER Sprint 48, API Sprint 48,
+and UX P48/A48.

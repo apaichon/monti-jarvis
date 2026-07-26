@@ -1,0 +1,71 @@
+/* Dark theme for highlight.js — matches Monti product-web panels */
+.hljs {
+  color: #d7e4f8;
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6b7f9e;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-name,
+.hljs-section,
+.hljs-link {
+  color: #7eb6ff;
+}
+
+.hljs-string,
+.hljs-doctag,
+.hljs-addition,
+.hljs-regexp,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #7ddea8;
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-attribute {
+  color: #9ecbff;
+}
+
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-type,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-number,
+.hljs-meta,
+.hljs-built_in,
+.hljs-bullet,
+.hljs-symbol {
+  color: #f0c674;
+}
+
+.hljs-tag {
+  color: #89b4fa;
+}
+
+.hljs-punctuation,
+.hljs-operator {
+  color: #a8b8d2;
+}
+
+.hljs-deletion {
+  color: #f38ba8;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}

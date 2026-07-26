@@ -219,6 +219,8 @@ func (s *Service) CheckFeature(ctx context.Context, tenantID, flag string) error
 }
 
 // CheckKMDocument denies when current doc count already at/over max_km_documents.
+// Packages that treat KM as unlimited use a high sentinel (typically 1_000_000);
+// the commercial cap is package max_storage_bytes (storage sizing), not doc count.
 func (s *Service) CheckKMDocument(ctx context.Context, tenantID string) error {
 	if s == nil || !s.enabled {
 		return nil
@@ -228,6 +230,11 @@ func (s *Service) CheckKMDocument(ctx context.Context, tenantID string) error {
 		return err
 	}
 	if limits == nil {
+		return nil
+	}
+	// Soft-unlimited: Montti shared/dedicated packages use 1e6 as "unlimited KM"
+	// within storage. Skip count gate so storage is the practical ceiling.
+	if limits.MaxKMDocuments >= 1_000_000 {
 		return nil
 	}
 	n, err := s.countKM(ctx, tenantID)
