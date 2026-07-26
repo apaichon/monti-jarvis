@@ -43,11 +43,12 @@ WHERE id = $1`, schema), id, status, version, chunkCount, actor)
 }
 
 func (s *Store) ListKnowledgeDocuments(ctx context.Context, tenantID, agentID string) ([]km.Document, error) {
-	if s.pg == nil {
+	db := s.KMReadDB()
+	if db == nil {
 		return nil, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
+	rows, err := db.Query(ctx, fmt.Sprintf(`
 SELECT id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version, chunk_count, created_at, updated_at
 FROM %s.knowledge_documents
 WHERE tenant_id = $1 AND agent_id = $2
@@ -71,12 +72,13 @@ ORDER BY created_at DESC`, schema), tenantID, agentID)
 }
 
 func (s *Store) GetKnowledgeDocument(ctx context.Context, id string) (km.Document, error) {
-	if s.pg == nil {
+	db := s.KMReadDB()
+	if db == nil {
 		return km.Document{}, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	var doc km.Document
-	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+	err := db.QueryRow(ctx, fmt.Sprintf(`
 SELECT id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version, chunk_count, created_at, updated_at
 FROM %s.knowledge_documents WHERE id = $1`, schema), id,
 	).Scan(
@@ -143,11 +145,12 @@ WHERE document_id = $1 AND tenant_id = $2`, schema), documentID, tenantID, kmSco
 // CountAgentKnowledgeByScope returns document counts per km_scope for an agent.
 func (s *Store) CountAgentKnowledgeByScope(ctx context.Context, tenantID, agentID string) (map[string]int, error) {
 	out := map[string]int{"general": 0, "billing": 0, "technical": 0}
-	if s.pg == nil {
+	db := s.KMReadDB()
+	if db == nil {
 		return out, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
+	rows, err := db.Query(ctx, fmt.Sprintf(`
 SELECT km_scope, COUNT(*) FROM %s.knowledge_documents
 WHERE tenant_id = $1 AND agent_id = $2
 GROUP BY km_scope`, schema), tenantID, agentID)
@@ -229,16 +232,17 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8)`, schema),
 }
 
 func (s *Store) CountAgentKnowledge(ctx context.Context, tenantID, agentID string) (docs, chunks int, err error) {
-	if s.pg == nil {
+	db := s.KMReadDB()
+	if db == nil {
 		return 0, 0, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	err = s.pg.QueryRow(ctx, fmt.Sprintf(`
+	err = db.QueryRow(ctx, fmt.Sprintf(`
 SELECT COUNT(*) FROM %s.knowledge_documents WHERE tenant_id = $1 AND agent_id = $2`, schema), tenantID, agentID).Scan(&docs)
 	if err != nil {
 		return 0, 0, err
 	}
-	err = s.pg.QueryRow(ctx, fmt.Sprintf(`
+	err = db.QueryRow(ctx, fmt.Sprintf(`
 SELECT COUNT(*) FROM %s.knowledge_chunks WHERE tenant_id = $1 AND agent_id = $2`, schema), tenantID, agentID).Scan(&chunks)
 	return docs, chunks, err
 }
@@ -246,12 +250,13 @@ SELECT COUNT(*) FROM %s.knowledge_chunks WHERE tenant_id = $1 AND agent_id = $2`
 // CountTenantKnowledgeDocuments returns total KM documents for a tenant (all agents).
 // Used by SPRINT-013 quota for max_km_documents.
 func (s *Store) CountTenantKnowledgeDocuments(ctx context.Context, tenantID string) (int, error) {
-	if s.pg == nil {
+	db := s.KMReadDB()
+	if db == nil {
 		return 0, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	var n int
-	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+	err := db.QueryRow(ctx, fmt.Sprintf(`
 SELECT COUNT(*) FROM %s.knowledge_documents WHERE tenant_id = $1`, schema), tenantID).Scan(&n)
 	return n, err
 }

@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	ErrPackageNotFound      = errors.New("package not found")
-	ErrRuleSchemaNotFound   = errors.New("rules schema not found")
-	ErrEntitlementNotFound  = errors.New("entitlement not found")
-	ErrTenantNotFound       = errors.New("tenant not found")
-	ErrActiveEntitlement    = errors.New("active entitlement exists")
+	ErrPackageNotFound        = errors.New("package not found")
+	ErrRuleSchemaNotFound     = errors.New("rules schema not found")
+	ErrEntitlementNotFound    = errors.New("entitlement not found")
+	ErrTenantNotFound         = errors.New("tenant not found")
+	ErrActiveEntitlement      = errors.New("active entitlement exists")
 	ErrPackageHasEntitlements = errors.New("package has active entitlements")
 )
 
@@ -30,30 +30,30 @@ type RuleSchema struct {
 }
 
 type Package struct {
-	ID             string
-	Slug           string
-	Name           string
-	Description    string
-	Status         string
-	PriceCents     int
-	Currency       string
-	BillingPeriod  string
-	RulesSchemaID  string
-	Rules          map[string]any
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID            string
+	Slug          string
+	Name          string
+	Description   string
+	Status        string
+	PriceCents    int
+	Currency      string
+	BillingPeriod string
+	RulesSchemaID string
+	Rules         map[string]any
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type TenantEntitlement struct {
-	ID             string
-	TenantID       string
-	PackageID      string
-	RulesSchemaID  string
-	RulesSnapshot  map[string]any
-	Status         string
-	ValidFrom      time.Time
-	ValidUntil     *time.Time
-	Package        *Package
+	ID            string
+	TenantID      string
+	PackageID     string
+	RulesSchemaID string
+	RulesSnapshot map[string]any
+	Status        string
+	ValidFrom     time.Time
+	ValidUntil    *time.Time
+	Package       *Package
 }
 
 const rulesV1Fields = `{
@@ -125,6 +125,18 @@ type monttiPackageSeed struct {
 	priceCents                  int
 	currency                    string
 	rules                       string
+}
+
+// aiaasSeedPackages preserves the legacy catalog shape for migration and
+// regression coverage. These rows are archived by seedPackages in favor of
+// the current shared-cloud and dedicated catalogs.
+func aiaasSeedPackages() []monttiPackageSeed {
+	return []monttiPackageSeed{
+		{id: "pkg-aiaas-500", slug: "aiaas-500", name: "AiaaS 500", priceCents: 50000, currency: "THB", rules: `{"max_ai_employees":1,"max_monthly_call_minutes":99999999,"max_mobile_call_minutes":100,"max_km_documents":100,"max_storage_bytes":5368709120,"max_concurrent_calls":1,"voice_enabled":true,"rag_enabled":true}`},
+		{id: "pkg-aiaas-1000", slug: "aiaas-1000", name: "AiaaS 1000", priceCents: 100000, currency: "THB", rules: `{"max_ai_employees":3,"max_monthly_call_minutes":99999999,"max_mobile_call_minutes":300,"max_km_documents":300,"max_storage_bytes":21474836480,"max_concurrent_calls":2,"voice_enabled":true,"rag_enabled":true}`},
+		{id: "pkg-aiaas-1500", slug: "aiaas-1500", name: "AiaaS 1500", priceCents: 150000, currency: "THB", rules: `{"max_ai_employees":5,"max_monthly_call_minutes":99999999,"max_mobile_call_minutes":750,"max_km_documents":750,"max_storage_bytes":53687091200,"max_concurrent_calls":5,"voice_enabled":true,"rag_enabled":true}`},
+		{id: "pkg-aiaas-2000", slug: "aiaas-2000", name: "AiaaS 2000", priceCents: 200000, currency: "THB", rules: `{"max_ai_employees":10,"max_monthly_call_minutes":99999999,"max_mobile_call_minutes":1500,"max_km_documents":1500,"max_storage_bytes":107374182400,"max_concurrent_calls":10,"voice_enabled":true,"rag_enabled":true}`},
+	}
 }
 
 func monttiSharedCloudPackages() []monttiPackageSeed {
