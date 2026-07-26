@@ -23,13 +23,20 @@ const TENANT_KEY = 'monti_tenant_slug';
 const REG_KEY = 'monti_tenant_registration';
 const CHECKOUT_ORDER_ID = 'monti_checkout_order_id';
 const CHECKOUT_ORDER_NO = 'monti_checkout_order_no';
-const LEGACY_TOKEN_KEYS = [ACCESS_KEY, REFRESH_KEY, 'monti_tenant_access_token', 'monti_tenant_refresh_token'];
+const LEGACY_SESSION_KEYS = [
+  ACCESS_KEY,
+  REFRESH_KEY,
+  USER_KEY,
+  'monti_tenant_access_token',
+  'monti_tenant_refresh_token'
+];
 
 let accessTokenMemory = '';
+let userMemory: UserProfile | null = null;
 
 function clearLegacyCredentialKeys() {
   if (!browser) return;
-  for (const key of LEGACY_TOKEN_KEYS) {
+  for (const key of LEGACY_SESSION_KEYS) {
     try {
       window.localStorage.removeItem(key);
       window.sessionStorage.removeItem(key);
@@ -122,7 +129,7 @@ function notifySession() {
 export function saveSession(pair: TokenPair, tenantId?: string, registrationId?: string) {
   if (!browser) return;
   accessTokenMemory = pair.access_token;
-  write(USER_KEY, JSON.stringify(pair.user));
+  userMemory = pair.user;
   if (tenantId) write(TENANT_KEY, tenantId);
   if (registrationId) write(REG_KEY, registrationId);
   notifySession();
@@ -142,7 +149,7 @@ export function setAccessToken(token: string) {
 export function applyTokenPair(pair: Pick<TokenPair, 'access_token'> & { user?: UserProfile }) {
   if (!browser) return;
   accessTokenMemory = pair.access_token;
-  if (pair.user) write(USER_KEY, JSON.stringify(pair.user));
+  if (pair.user) userMemory = pair.user;
   notifySession();
 }
 
@@ -155,21 +162,16 @@ export function getStoredTenantId(): string | null {
 }
 
 export function getStoredUser(): UserProfile | null {
-  const raw = read(USER_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as UserProfile;
-  } catch {
-    return null;
-  }
+  return userMemory;
 }
 
 export function hasRegistrationSession(): boolean {
-  return !!getAccessToken() || !!getStoredUser();
+  return !!getAccessToken();
 }
 
 export function clearSession() {
   accessTokenMemory = '';
+  userMemory = null;
   clearLegacyCredentialKeys();
   remove(USER_KEY);
   remove(TENANT_KEY);
