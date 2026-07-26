@@ -38,6 +38,16 @@ psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -v POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
 
 psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -v POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
   -f "$ROOT_DIR/scripts/migrations/031_referral_bonus_quota.sql"
+if [ -n "${POSTGRES_KM_READONLY_ROLE:-}" ] && [ -n "${POSTGRES_TICKET_WRITE_ROLE:-}" ]; then
+  echo "==> Applying Sprint 41 capability grants..."
+  psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 \
+    -v POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
+    -v KM_READ_ROLE="$POSTGRES_KM_READONLY_ROLE" \
+    -v TICKET_WRITE_ROLE="$POSTGRES_TICKET_WRITE_ROLE" \
+    -f "$ROOT_DIR/scripts/migrations/032_security_capability_grants.sql"
+else
+  echo "note: Sprint 41 capability grants skipped — set POSTGRES_KM_READONLY_ROLE and POSTGRES_TICKET_WRITE_ROLE"
+fi
 if curl -fsS "$CLICKHOUSE_URL/ping" >/dev/null 2>&1; then
   echo "==> Applying ClickHouse audit columns (db=$CLICKHOUSE_DB)..."
   CH_HAS_TABLES=0

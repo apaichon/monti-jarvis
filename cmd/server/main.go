@@ -21,13 +21,13 @@ import (
 	"github.com/libra/monti-jarvis/internal/env"
 	"github.com/libra/monti-jarvis/internal/gemini"
 	"github.com/libra/monti-jarvis/internal/km"
+	"github.com/libra/monti-jarvis/internal/leads"
 	"github.com/libra/monti-jarvis/internal/live"
 	"github.com/libra/monti-jarvis/internal/lktoken"
 	"github.com/libra/monti-jarvis/internal/metering"
 	"github.com/libra/monti-jarvis/internal/natsbus"
 	"github.com/libra/monti-jarvis/internal/observability"
 	"github.com/libra/monti-jarvis/internal/payment"
-	"github.com/libra/monti-jarvis/internal/leads"
 	"github.com/libra/monti-jarvis/internal/platformweb"
 	"github.com/libra/monti-jarvis/internal/productweb"
 	"github.com/libra/monti-jarvis/internal/quota"
@@ -92,12 +92,19 @@ func main() {
 	if cfg.ConfigError != "" {
 		log.Fatalf("configuration: %s", cfg.ConfigError)
 	}
+	if err := cfg.ValidateProductionSecurity(); err != nil {
+		log.Fatalf("security configuration: %s", err)
+	}
 	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	st, warnings := store.Open(rootCtx, cfg)
 	for _, warning := range warnings {
 		log.Printf("infra warning: %s", warning)
+	}
+	if err := st.ValidateCapabilityPools(); err != nil {
+		st.Close()
+		log.Fatalf("security capability pools: %s", err)
 	}
 	defer st.Close()
 
@@ -119,6 +126,7 @@ func main() {
 	}
 
 	ch := clickhouse.New(cfg.ClickHouseURL, cfg.ClickHouseDB, cfg.ClickHouseUser, cfg.ClickHousePassword)
+	chKMRead := clickhouse.New(cfg.ClickHouseURL, cfg.ClickHouseDB, cfg.ClickHouseKMReadUser, cfg.ClickHouseKMReadPassword)
 	if ch != nil && ch.Enabled() {
 		if err := ch.EnsureSchema(rootCtx); err != nil {
 			log.Printf("infra warning: clickhouse schema: %v", err)
@@ -145,7 +153,7 @@ func main() {
 	}
 
 	ai := gemini.New(cfg.GeminiAPIKey, cfg.GeminiModel, cfg.GeminiEmbedModel)
-	ragSvc := rag.New(ch, ai, cfg.DemoTenantID)
+	ragSvc := rag.NewWithWrite(chKMRead, ch, ai, cfg.DemoTenantID)
 	kmSvc := km.NewService(st, ch, ai, cfg.DemoTenantID)
 
 	var authSvc *auth.Service

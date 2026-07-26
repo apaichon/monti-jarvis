@@ -2,6 +2,7 @@ package env
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -11,12 +12,17 @@ import (
 )
 
 type Config struct {
-	Port                     string
-	GeminiAPIKey             string
-	GeminiModel              string
-	GeminiLiveModel          string
-	Voice                    string
-	PostgresURL              string
+	Port            string
+	GeminiAPIKey    string
+	GeminiModel     string
+	GeminiLiveModel string
+	Voice           string
+	PostgresURL     string
+	// PostgresKMReadURL is the least-privilege connection used by KM/RAG read
+	// paths. It must not be used for KM ingest or ticket mutation.
+	PostgresKMReadURL string
+	// PostgresTicketWriteURL is the dedicated ticket capability connection.
+	PostgresTicketWriteURL   string
 	PostgresSchema           string
 	RedisURL                 string
 	RedisPrefix              string
@@ -38,6 +44,8 @@ type Config struct {
 	ClickHouseDB             string
 	ClickHouseUser           string
 	ClickHousePassword       string
+	ClickHouseKMReadUser     string
+	ClickHouseKMReadPassword string
 	GeminiEmbedModel         string
 	AIUsageRateVersion       string
 	AIUsagePricingAsOf       string
@@ -136,6 +144,8 @@ func Load() Config {
 		GeminiLiveModel:          envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
 		Voice:                    envOr("VOICE", "Aoede"),
 		PostgresURL:              os.Getenv("POSTGRES_URL"),
+		PostgresKMReadURL:        envOr("POSTGRES_KM_READONLY_URL", envOr("POSTGRES_READONLY_URL", "")),
+		PostgresTicketWriteURL:   os.Getenv("POSTGRES_TICKET_WRITE_URL"),
 		PostgresSchema:           envOr("POSTGRES_SCHEMA", "callcenter"),
 		RedisURL:                 os.Getenv("REDIS_URL"),
 		RedisPrefix:              envOr("REDIS_PREFIX", "monti_jarvis:"),
@@ -157,6 +167,8 @@ func Load() Config {
 		ClickHouseDB:             envOr("CLICKHOUSE_DB", "monti_jarvis"),
 		ClickHouseUser:           envOr("CLICKHOUSE_USER", "monti"),
 		ClickHousePassword:       envOr("CLICKHOUSE_PASSWORD", "monti"),
+		ClickHouseKMReadUser:     envOr("CLICKHOUSE_KM_READONLY_USER", envOr("CLICKHOUSE_USER", "monti")),
+		ClickHouseKMReadPassword: envOr("CLICKHOUSE_KM_READONLY_PASSWORD", envOr("CLICKHOUSE_PASSWORD", "monti")),
 		GeminiEmbedModel:         envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
 		AIUsageRateVersion:       envOr("AI_USAGE_RATE_VERSION", "unconfigured"),
 		AIUsagePricingAsOf:       envOr("AI_USAGE_PRICING_AS_OF", ""),
@@ -239,6 +251,49 @@ func Load() Config {
 		AuditLogRetryBackoff:      envDuration("AUDIT_LOG_RETRY_BACKOFF", time.Second),
 		AppEnv:                    appEnv,
 	}
+}
+
+// ValidateProductionSecurity enforces the Sprint 41 capability split before
+// production serves traffic. Development keeps the existing local setup
+// compatible; production must opt into explicit database principals.
+func (c Config) ValidateProductionSecurity() error {
+	if !strings.EqualFold(strings.TrimSpace(c.AppEnv), "production") {
+		return nil
+	}
+	if c.AuthDisabled {
+		return fmt.Errorf("AUTH_DISABLED must be false in production")
+	}
+	if len(strings.TrimSpace(c.JWTSecret)) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 bytes in production")
+	}
+	if strings.TrimSpace(c.PostgresURL) == "" {
+		return fmt.Errorf("POSTGRES_URL is required in production")
+	}
+	if strings.TrimSpace(c.PostgresKMReadURL) == "" {
+		return fmt.Errorf("POSTGRES_KM_READONLY_URL is required in production")
+	}
+	if strings.TrimSpace(c.PostgresTicketWriteURL) == "" {
+		return fmt.Errorf("POSTGRES_TICKET_WRITE_URL is required in production")
+	}
+	writer := databasePrincipal(c.PostgresURL)
+	kmRead := databasePrincipal(c.PostgresKMReadURL)
+	ticketWrite := databasePrincipal(c.PostgresTicketWriteURL)
+	if writer == kmRead || writer == ticketWrite || kmRead == ticketWrite {
+		return fmt.Errorf("production database capability users must be distinct")
+	}
+	return nil
+}
+
+func databasePrincipal(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if parsed, err := url.Parse(raw); err == nil && parsed.User != nil {
+		if user := strings.TrimSpace(parsed.User.Username()); user != "" {
+			return user
+		}
+	}
+	// Keyword/value DSNs and malformed URLs cannot expose a principal safely;
+	// retain the full value so exact duplicate URLs are still rejected.
+	return raw
 }
 
 var configGroupNames = map[string]bool{
