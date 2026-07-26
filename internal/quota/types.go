@@ -1,5 +1,11 @@
 package quota
 
+import (
+	"time"
+
+	"github.com/libra/monti-jarvis/internal/store"
+)
+
 // PackageSummary mirrors entitlements package fields for snapshots.
 type PackageSummary struct {
 	ID   string `json:"id"`
@@ -33,25 +39,32 @@ type Usage struct {
 // mobile clients. Source/freshness are explicit so unavailable dependencies
 // are never rendered as an authoritative zero.
 type Dimension struct {
-	Dimension string `json:"dimension"`
-	Unit      string `json:"unit"`
-	Period    string `json:"period"`
-	Limit     int    `json:"limit"`
-	Consumed  *int   `json:"consumed"`
-	Remaining *int   `json:"remaining"`
-	Source    string `json:"source"`
-	Freshness string `json:"freshness"`
+	Dimension      string     `json:"dimension"`
+	Unit           string     `json:"unit"`
+	Period         string     `json:"period"`
+	Limit          int        `json:"limit"` // total limit, retained for existing clients
+	BaseLimit      int        `json:"base_limit"`
+	BonusGranted   int        `json:"bonus_granted"`
+	BonusUsed      int        `json:"bonus_used"`
+	BonusRemaining int        `json:"bonus_remaining"`
+	TotalLimit     int        `json:"total_limit"`
+	BonusExpiresAt *time.Time `json:"bonus_expires_at,omitempty"`
+	Consumed       *int       `json:"consumed"`
+	Remaining      *int       `json:"remaining"`
+	Source         string     `json:"source"`
+	Freshness      string     `json:"freshness"`
 }
 
 // Snapshot is returned by Service.Snapshot for platform admin UI.
 type Snapshot struct {
-	TenantID   string          `json:"tenant_id"`
-	Package    *PackageSummary `json:"package"`
-	Status     string          `json:"status"` // active | none
-	Period     string          `json:"period"` // YYYY-MM UTC
-	Limits     *Limits         `json:"limits"`
-	Usage      Usage           `json:"usage"`
-	Dimensions []Dimension     `json:"current_dimensions"`
+	TenantID   string               `json:"tenant_id"`
+	Package    *PackageSummary      `json:"package"`
+	Status     string               `json:"status"` // active | none
+	Period     string               `json:"period"` // YYYY-MM UTC
+	Limits     *Limits              `json:"limits"`
+	Usage      Usage                `json:"usage"`
+	Bonus      []store.BonusBalance `json:"bonus"`
+	Dimensions []Dimension          `json:"current_dimensions"`
 }
 
 // Rule dimension keys (package rules-v1).

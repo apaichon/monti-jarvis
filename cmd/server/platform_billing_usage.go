@@ -56,12 +56,17 @@ type platformBillingQuotaSummary struct {
 }
 
 type platformQuotaEnforcement struct {
-	Status       string `json:"status"`
-	MonthlyUsed  int    `json:"monthly_used"`
-	MonthlyLimit int    `json:"monthly_limit"`
-	DailyUsed    int    `json:"daily_used"`
-	DailyLimit   int    `json:"daily_limit"`
-	DailyStatus  string `json:"daily_status"`
+	Status            string `json:"status"`
+	MonthlyUsed       int    `json:"monthly_used"`
+	MonthlyLimit      int    `json:"monthly_limit"`
+	BaseMonthlyLimit  int    `json:"base_limit"`
+	BonusGranted      int    `json:"bonus_granted"`
+	BonusUsed         int    `json:"bonus_used"`
+	BonusRemaining    int    `json:"bonus_remaining"`
+	TotalMonthlyLimit int    `json:"total_limit"`
+	DailyUsed         int    `json:"daily_used"`
+	DailyLimit        int    `json:"daily_limit"`
+	DailyStatus       string `json:"daily_status"`
 }
 
 type platformAICostSummary struct {
@@ -236,10 +241,20 @@ func quotaUsageResponse(snapshot *quota.Snapshot) platformQuotaEnforcement {
 		status = "unavailable"
 	}
 	monthlyLimit := 0
+	baseLimit := 0
+	bonusGranted, bonusUsed, bonusRemaining := 0, 0, 0
 	if snapshot.Limits != nil {
-		monthlyLimit = snapshot.Limits.MaxMonthlyCallMinutes
+		baseLimit = snapshot.Limits.MaxMonthlyCallMinutes
+		monthlyLimit = baseLimit
 	}
-	return platformQuotaEnforcement{Status: status, MonthlyUsed: snapshot.Usage.MonthlyCallMinutes, MonthlyLimit: monthlyLimit, DailyStatus: "unavailable"}
+	for _, row := range snapshot.Dimensions {
+		if row.Dimension == "monthly_call_minutes" {
+			monthlyLimit = row.TotalLimit
+			bonusGranted, bonusUsed, bonusRemaining = row.BonusGranted, row.BonusUsed, row.BonusRemaining
+			break
+		}
+	}
+	return platformQuotaEnforcement{Status: status, MonthlyUsed: snapshot.Usage.MonthlyCallMinutes, MonthlyLimit: monthlyLimit, BaseMonthlyLimit: baseLimit, BonusGranted: bonusGranted, BonusUsed: bonusUsed, BonusRemaining: bonusRemaining, TotalMonthlyLimit: monthlyLimit, DailyStatus: "unavailable"}
 }
 
 func parsePlatformBillingUsageQuery(r *http.Request) (startDate, endDate, tenantID string, limit, offset int, err error) {

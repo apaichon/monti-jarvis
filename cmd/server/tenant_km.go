@@ -250,6 +250,11 @@ func (s *server) uploadTenantKMDocument(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	if s.quota != nil {
+		if count, countErr := s.store.CountTenantKnowledgeDocuments(ctx, tenantID); countErr == nil {
+			_ = s.quota.ConsumeBonusUsage(ctx, tenantID, quota.DimMaxKMDocuments, count, "km_document", doc.ID)
+		}
+	}
 	writeJSON(w, http.StatusCreated, km.PublicDocument(doc))
 }
 

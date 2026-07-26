@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/libra/monti-jarvis/internal/entitlements"
@@ -28,6 +29,11 @@ type storageUsageStore interface {
 	CountTenantStorageBytes(ctx context.Context, tenantID string) (int, error)
 }
 
+type bonusQuotaStore interface {
+	ListTenantBonusBalances(ctx context.Context, tenantID string) ([]store.BonusBalance, error)
+	ConsumeBonus(ctx context.Context, tenantID, dimension string, amount int64, idempotencyKey, sourceType, sourceID string) error
+}
+
 // Service enforces package quotas and API rate limits (SPRINT-013).
 type Service struct {
 	ents                 EntitlementReader
@@ -42,6 +48,7 @@ type Service struct {
 	voicePerMin          int
 	concurrentTTL        time.Duration
 	previewMaxConcurrent int
+	bonus                bonusQuotaStore
 	now                  func() time.Time // injectable for tests
 }
 
@@ -55,11 +62,15 @@ func New(ents *entitlements.Service, st *store.Store, cfg env.Config) *Service {
 	if st != nil {
 		us = st
 	}
-	return NewWithDeps(ents, us, rdb, cfg)
+	return NewWithBonusDeps(ents, us, rdb, cfg, st)
 }
 
 // NewWithDeps is for tests and alternate wiring.
 func NewWithDeps(ents EntitlementReader, us UsageStore, rdb *redis.Client, cfg env.Config) *Service {
+	return NewWithBonusDeps(ents, us, rdb, cfg, nil)
+}
+
+func NewWithBonusDeps(ents EntitlementReader, us UsageStore, rdb *redis.Client, cfg env.Config, bonus bonusQuotaStore) *Service {
 	prefix := cfg.RedisPrefix
 	if prefix == "" {
 		prefix = "monti_jarvis:"
@@ -97,6 +108,7 @@ func NewWithDeps(ents EntitlementReader, us UsageStore, rdb *redis.Client, cfg e
 		voicePerMin:          voice,
 		concurrentTTL:        ttl,
 		previewMaxConcurrent: previewMax,
+		bonus:                bonus,
 		now:                  time.Now,
 	}
 }
@@ -141,6 +153,7 @@ func (s *Service) Snapshot(ctx context.Context, tenantID string) (*Snapshot, err
 		Status:   "none",
 		Period:   period,
 		Usage:    Usage{},
+		Bonus:    []store.BonusBalance{},
 	}
 	if s == nil {
 		return out, nil
@@ -163,12 +176,15 @@ func (s *Service) Snapshot(ctx context.Context, tenantID string) (*Snapshot, err
 		return out, nil
 	}
 	limits := limitsFromRules(eff.Rules)
+	bonus := s.bonusBalances(ctx, tenantID)
 	out.Status = eff.Status
 	if out.Status == "" {
 		out.Status = "active"
 	}
 	out.Limits = &limits
-	out.Dimensions = dimensionRows(out.Period, limits, out.Usage, availability)
+	out.Bonus = bonus
+	totalLimits := limitsWithBonus(limits, bonus)
+	out.Dimensions = dimensionRows(out.Period, limits, totalLimits, out.Usage, availability, bonus)
 	out.Package = &PackageSummary{
 		ID:   eff.Package.ID,
 		Slug: eff.Package.Slug,
@@ -192,11 +208,20 @@ type usageAvailability struct {
 	concurrentCalls    dimensionAvailability
 }
 
-func dimensionRows(period string, limits Limits, usage Usage, available usageAvailability) []Dimension {
+func dimensionRows(period string, base, total Limits, usage Usage, available usageAvailability, bonuses []store.BonusBalance) []Dimension {
 	rows := make([]Dimension, 0, 6)
-	appendRow := func(name, unit string, limit, consumed int, state dimensionAvailability) {
+	bonusFor := func(name string) store.BonusBalance {
+		for _, b := range bonuses {
+			if b.Dimension == name {
+				return b
+			}
+		}
+		return store.BonusBalance{}
+	}
+	appendRow := func(name, unit string, baseLimit, limit, consumed int, state dimensionAvailability) {
+		b := bonusFor(name)
 		if !state.available {
-			rows = append(rows, Dimension{Dimension: name, Unit: unit, Period: period, Limit: limit, Source: "unavailable", Freshness: "unavailable"})
+			rows = append(rows, Dimension{Dimension: name, Unit: unit, Period: period, Limit: limit, BaseLimit: baseLimit, TotalLimit: limit, BonusGranted: int(b.Granted), BonusUsed: int(b.Used), BonusRemaining: int(b.Remaining), BonusExpiresAt: b.ExpiresAt, Source: "unavailable", Freshness: "unavailable"})
 			return
 		}
 		remaining := limit - consumed
@@ -204,14 +229,14 @@ func dimensionRows(period string, limits Limits, usage Usage, available usageAva
 			remaining = 0
 		}
 		used := consumed
-		rows = append(rows, Dimension{Dimension: name, Unit: unit, Period: period, Limit: limit, Consumed: &used, Remaining: &remaining, Source: state.source, Freshness: state.freshness})
+		rows = append(rows, Dimension{Dimension: name, Unit: unit, Period: period, Limit: limit, BaseLimit: baseLimit, TotalLimit: limit, BonusGranted: int(b.Granted), BonusUsed: int(b.Used), BonusRemaining: int(b.Remaining), BonusExpiresAt: b.ExpiresAt, Consumed: &used, Remaining: &remaining, Source: state.source, Freshness: state.freshness})
 	}
-	appendRow("ai_employees", UnitAssignments, limits.MaxAIEmployees, usage.AIEmployees, available.aiEmployees)
-	appendRow("monthly_call_minutes", UnitMinutes, limits.MaxMonthlyCallMinutes, usage.MonthlyCallMinutes, available.monthlyCallMinutes)
-	appendRow("mobile_call_minutes", UnitMinutes, limits.MaxMobileCallMinutes, usage.MobileCallMinutes, available.mobileCallMinutes)
-	appendRow("km_documents", UnitDocuments, limits.MaxKMDocuments, usage.KMDocuments, available.kmDocuments)
-	appendRow("storage_bytes", UnitBytes, limits.MaxStorageBytes, usage.StorageBytes, available.storageBytes)
-	appendRow("concurrent_calls", UnitCalls, limits.MaxConcurrentCalls, usage.ConcurrentCalls, available.concurrentCalls)
+	appendRow("ai_employees", UnitAssignments, base.MaxAIEmployees, total.MaxAIEmployees, usage.AIEmployees, available.aiEmployees)
+	appendRow("monthly_call_minutes", UnitMinutes, base.MaxMonthlyCallMinutes, total.MaxMonthlyCallMinutes, usage.MonthlyCallMinutes, available.monthlyCallMinutes)
+	appendRow("mobile_call_minutes", UnitMinutes, base.MaxMobileCallMinutes, total.MaxMobileCallMinutes, usage.MobileCallMinutes, available.mobileCallMinutes)
+	appendRow("km_documents", UnitDocuments, base.MaxKMDocuments, total.MaxKMDocuments, usage.KMDocuments, available.kmDocuments)
+	appendRow("storage_bytes", UnitBytes, base.MaxStorageBytes, total.MaxStorageBytes, usage.StorageBytes, available.storageBytes)
+	appendRow("concurrent_calls", UnitCalls, base.MaxConcurrentCalls, total.MaxConcurrentCalls, usage.ConcurrentCalls, available.concurrentCalls)
 	return rows
 }
 
@@ -351,7 +376,7 @@ func (s *Service) CheckMobileMinutes(ctx context.Context, tenantID string, addit
 
 // AddMobileCallMinutes increments the mobile-only monthly counter.
 func (s *Service) AddMobileCallMinutes(ctx context.Context, tenantID string, minutes int) error {
-	return s.addMonthlyDimension(ctx, tenantID, minutes, s.mobileMinutesKey)
+	return s.addMonthlyDimension(ctx, tenantID, minutes, DimMaxMobileCallMinutes, s.mobileMinutesKey)
 }
 
 // GetMobileCallMinutes reads the current mobile monthly counter.
@@ -370,7 +395,7 @@ func (s *Service) CheckStorageBytes(ctx context.Context, tenantID string, additi
 
 // AddStorageBytes increments the storage projection counter.
 func (s *Service) AddStorageBytes(ctx context.Context, tenantID string, bytes int) error {
-	return s.addMonthlyDimension(ctx, tenantID, bytes, s.storageBytesKey)
+	return s.addMonthlyDimension(ctx, tenantID, bytes, DimMaxStorageBytes, s.storageBytesKey)
 }
 
 func (s *Service) checkMonthlyDimension(ctx context.Context, tenantID string, additional int, dimension string, keyFn func(string) string) error {
@@ -404,17 +429,34 @@ func (s *Service) checkMonthlyDimension(ctx context.Context, tenantID string, ad
 	return nil
 }
 
-func (s *Service) addMonthlyDimension(ctx context.Context, tenantID string, amount int, keyFn func(string) string) error {
+func (s *Service) addMonthlyDimension(ctx context.Context, tenantID string, amount int, dimension string, keyFn func(string) string) error {
 	if s == nil || !s.enabled || amount <= 0 || tenantID == "" || s.rdb == nil {
 		return nil
 	}
 	key := keyFn(tenantID)
+	before, err := s.getInt(ctx, key)
+	if err != nil {
+		return s.onRedisErr("AddMonthlyDimension", err)
+	}
 	n, err := s.rdb.IncrBy(ctx, key, int64(amount)).Result()
 	if err != nil {
 		return s.onRedisErr("AddMonthlyDimension", err)
 	}
 	if n == int64(amount) {
 		_ = s.rdb.Expire(ctx, key, 40*24*time.Hour).Err()
+	}
+	if s.bonus != nil {
+		base, baseErr := s.baseLimitsOrNil(ctx, tenantID)
+		if baseErr != nil {
+			_ = s.rdb.DecrBy(ctx, key, int64(amount)).Err()
+			return baseErr
+		}
+		if base != nil {
+			if err := s.consumeBonusOverflow(ctx, tenantID, strings.TrimPrefix(dimension, "max_"), limitForDimension(*base, dimension), before, amount, "quota", key); err != nil {
+				_ = s.rdb.DecrBy(ctx, key, int64(amount)).Err()
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -462,19 +504,7 @@ func (s *Service) AcquireConcurrent(ctx context.Context, tenantID string) (relea
 
 // AddCallMinutes increments the monthly call-minutes counter.
 func (s *Service) AddCallMinutes(ctx context.Context, tenantID string, minutes int) error {
-	if s == nil || !s.enabled || minutes <= 0 || tenantID == "" {
-		return nil
-	}
-	key := s.minutesKey(tenantID)
-	n, err := s.rdb.IncrBy(ctx, key, int64(minutes)).Result()
-	if err != nil {
-		return s.onRedisErr("AddCallMinutes", err)
-	}
-	// Expire after ~40 days so stale months clean up.
-	if n == int64(minutes) {
-		_ = s.rdb.Expire(ctx, key, 40*24*time.Hour).Err()
-	}
-	return nil
+	return s.addMonthlyDimension(ctx, tenantID, minutes, DimMaxMonthlyCallMinutes, s.minutesKey)
 }
 
 // dayKey returns YYYYMMDD in the given IANA timezone (falls back to UTC).
@@ -677,6 +707,26 @@ func (s *Service) effective(ctx context.Context, tenantID string) (*entitlements
 
 // limitsOrNil returns limits, or nil if quota should not enforce (fail-open no entitlement).
 func (s *Service) limitsOrNil(ctx context.Context, tenantID string) (*Limits, error) {
+	l, err := s.baseLimitsOrNil(ctx, tenantID)
+	if err != nil || l == nil {
+		return l, err
+	}
+	if s.bonus == nil {
+		return l, nil
+	}
+	bonus, err := s.bonus.ListTenantBonusBalances(ctx, tenantID)
+	if err != nil {
+		if s.failOpen {
+			log.Printf("quota: bonus entitlement error (fail-open): %v", err)
+			return l, nil
+		}
+		return nil, err
+	}
+	total := limitsWithBonus(*l, bonus)
+	return &total, nil
+}
+
+func (s *Service) baseLimitsOrNil(ctx context.Context, tenantID string) (*Limits, error) {
 	eff, err := s.effective(ctx, tenantID)
 	if err != nil {
 		if errors.Is(err, ErrNoEntitlement) {
@@ -700,6 +750,93 @@ func (s *Service) limitsOrNil(ctx context.Context, tenantID string) (*Limits, er
 	}
 	l := limitsFromRules(eff.Rules)
 	return &l, nil
+}
+
+func (s *Service) bonusBalances(ctx context.Context, tenantID string) []store.BonusBalance {
+	if s == nil || s.bonus == nil {
+		return []store.BonusBalance{}
+	}
+	items, err := s.bonus.ListTenantBonusBalances(ctx, tenantID)
+	if err != nil {
+		return []store.BonusBalance{}
+	}
+	return items
+}
+
+func limitsWithBonus(base Limits, balances []store.BonusBalance) Limits {
+	total := base
+	for _, b := range balances {
+		remaining := int(b.Remaining)
+		switch b.Dimension {
+		case store.BonusAIEmployees:
+			total.MaxAIEmployees += remaining
+		case store.BonusMonthlyCallMinutes:
+			total.MaxMonthlyCallMinutes += remaining
+		case store.BonusMobileCallMinutes:
+			total.MaxMobileCallMinutes += remaining
+		case store.BonusKMDocuments:
+			total.MaxKMDocuments += remaining
+		case store.BonusStorageBytes:
+			total.MaxStorageBytes += remaining
+		case store.BonusConcurrentCalls:
+			total.MaxConcurrentCalls += remaining
+		}
+	}
+	return total
+}
+
+func (s *Service) consumeBonusOverflow(ctx context.Context, tenantID, dimension string, baseLimit, before, amount int, sourceType, sourceID string) error {
+	if s == nil || s.bonus == nil || amount <= 0 || before < 0 {
+		return nil
+	}
+	beforeOverflow := before - baseLimit
+	if beforeOverflow < 0 {
+		beforeOverflow = 0
+	}
+	afterOverflow := before + amount - baseLimit
+	if afterOverflow < 0 {
+		afterOverflow = 0
+	}
+	delta := afterOverflow - beforeOverflow
+	if delta <= 0 {
+		return nil
+	}
+	key := fmt.Sprintf("usage:%s:%s:%d", dimension, sourceID, afterOverflow)
+	return s.bonus.ConsumeBonus(ctx, tenantID, dimension, int64(delta), key, sourceType, sourceID)
+}
+
+// ConsumeBonusUsage records a successful non-Redis resource allocation (for
+// example an avatar assignment or KM document) against the bonus layer.
+func (s *Service) ConsumeBonusUsage(ctx context.Context, tenantID, dimension string, currentUsage int, sourceType, sourceID string) error {
+	if s == nil || s.bonus == nil || currentUsage <= 0 {
+		return nil
+	}
+	base, err := s.baseLimitsOrNil(ctx, tenantID)
+	if err != nil || base == nil {
+		return err
+	}
+	baseLimit := limitForDimension(*base, dimension)
+	if currentUsage <= baseLimit {
+		return nil
+	}
+	bonusDimension := strings.TrimPrefix(dimension, "max_")
+	balances, err := s.bonus.ListTenantBonusBalances(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	var alreadyConsumed int64
+	for _, balance := range balances {
+		if balance.Dimension == bonusDimension {
+			alreadyConsumed = balance.Used
+			break
+		}
+	}
+	needed := int64(currentUsage-baseLimit) - alreadyConsumed
+	if needed <= 0 {
+		return nil
+	}
+	idempotencyKey := fmt.Sprintf("resource:%s:%s:%d", bonusDimension, strings.TrimSpace(sourceID), currentUsage)
+	return s.bonus.ConsumeBonus(ctx, tenantID, bonusDimension, needed, idempotencyKey, sourceType, sourceID)
 }
 
 func (s *Service) collectUsage(ctx context.Context, tenantID string) (Usage, usageAvailability, error) {
@@ -808,12 +945,18 @@ func limitsFromRules(rules map[string]any) Limits {
 
 func limitForDimension(l Limits, dimension string) int {
 	switch dimension {
+	case DimMaxAIEmployees:
+		return l.MaxAIEmployees
 	case DimMaxMonthlyCallMinutes:
 		return l.MaxMonthlyCallMinutes
 	case DimMaxMobileCallMinutes:
 		return l.MaxMobileCallMinutes
+	case DimMaxKMDocuments:
+		return l.MaxKMDocuments
 	case DimMaxStorageBytes:
 		return l.MaxStorageBytes
+	case DimMaxConcurrentCalls:
+		return l.MaxConcurrentCalls
 	default:
 		return 0
 	}

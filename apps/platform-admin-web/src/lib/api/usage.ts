@@ -22,6 +22,16 @@ export type UsageCounts = {
   concurrent_calls: number;
 };
 
+export type UsageDimension = {
+  dimension: string;
+  base_limit: number;
+  total_limit: number;
+  bonus_granted: number;
+  bonus_used: number;
+  bonus_remaining: number;
+  consumed?: number | null;
+};
+
 export type TenantUsage = {
   tenant_id: string;
   package: UsagePackage | null;
@@ -29,6 +39,7 @@ export type TenantUsage = {
   period: string;
   limits: UsageLimits | null;
   usage: UsageCounts;
+  current_dimensions?: UsageDimension[];
 };
 
 export function getTenantUsage(tenantId: string) {

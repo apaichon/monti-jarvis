@@ -217,6 +217,17 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 
 ---
 
+## SPRINT-046 — Tenant Referrals and Bonus Quota
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T46-01 | 1–3 | Stable tenant code, public click capture, immutable signup attribution, lifecycle audit events | Auto + Manual | `go test ./...` · [UAT §3–§5](../06-manual-tests/SPRINT-046-referrals-manual.md#3-create-and-verify-tenant-as-referral-code) | Pass (auto) |
+| T46-02 | 4 | Active tenant, approved KYC, paid non-voided order, idempotent qualification | Auto + Manual | `go test ./cmd/server ./internal/store` · [UAT §6](../06-manual-tests/SPRINT-046-referrals-manual.md#6-verify-qualification-gates) | Pass (auto) |
+| T46-03 | 5–6 | Configurable rewards grant once, expire/reverse append-only, and preserve base package/usage | Auto + Manual | `go test ./internal/quota ./internal/store` · [UAT §7](../06-manual-tests/SPRINT-046-referrals-manual.md#7-verify-bonus-enforcement-authorization-isolation-and-no-base-mutation) | Pass (auto) |
+| T46-04 | 4–6 | Tenant isolation and platform-only reward configuration/qualification/reversal | Manual | [UAT §2, §7](../06-manual-tests/SPRINT-046-referrals-manual.md#2-obtain-admin-tokens-and-verify-roles) | Pending local sign-off |
+
+---
+
 ## Coverage gaps (planned)
 
 | Area | Gap | Target |

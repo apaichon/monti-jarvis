@@ -197,6 +197,15 @@ func (s *server) assignTenantAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+	alreadyAssigned := false
+	if assignments, listErr := s.store.ListTenantAvatarAssignments(ctx, tenantID); listErr == nil {
+		for _, existing := range assignments {
+			if existing.AvatarID == avatarID && existing.Status == "active" {
+				alreadyAssigned = true
+				break
+			}
+		}
+	}
 	if err := s.checkAvatarAssignCap(ctx, tenantID, avatarID); err != nil {
 		writeAvatarError(w, err)
 		return
@@ -205,6 +214,11 @@ func (s *server) assignTenantAvatar(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeAvatarError(w, err)
 		return
+	}
+	if !alreadyAssigned && s.quota != nil {
+		if count, countErr := s.store.CountActiveTenantAssignments(ctx, tenantID); countErr == nil {
+			_ = s.quota.ConsumeBonusUsage(ctx, tenantID, quota.DimMaxAIEmployees, count, "avatar_assignment", avatarID)
+		}
 	}
 	writeJSON(w, http.StatusOK, tenantAssignmentJSON(*assignment))
 }

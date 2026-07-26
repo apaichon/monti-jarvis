@@ -42,10 +42,10 @@
     const l = data.limits;
     const u = data.usage;
     return [
-      { label: 'AI employees', usage: u.ai_employees, limit: l.max_ai_employees },
-      { label: 'Call minutes (month)', usage: u.monthly_call_minutes, limit: l.max_monthly_call_minutes },
-      { label: 'KM documents', usage: u.km_documents, limit: l.max_km_documents },
-      { label: 'Concurrent calls', usage: u.concurrent_calls, limit: l.max_concurrent_calls }
+      { label: 'AI employees', usage: u.ai_employees, limit: l.max_ai_employees, total: data.current_dimensions?.find((d) => d.dimension === 'ai_employees')?.total_limit ?? l.max_ai_employees },
+      { label: 'Call minutes (month)', usage: u.monthly_call_minutes, limit: l.max_monthly_call_minutes, total: data.current_dimensions?.find((d) => d.dimension === 'monthly_call_minutes')?.total_limit ?? l.max_monthly_call_minutes },
+      { label: 'KM documents', usage: u.km_documents, limit: l.max_km_documents, total: data.current_dimensions?.find((d) => d.dimension === 'km_documents')?.total_limit ?? l.max_km_documents },
+      { label: 'Concurrent calls', usage: u.concurrent_calls, limit: l.max_concurrent_calls, total: data.current_dimensions?.find((d) => d.dimension === 'concurrent_calls')?.total_limit ?? l.max_concurrent_calls }
     ];
   });
 </script>
@@ -110,15 +110,15 @@
           <div>
             <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
               <span>{row.label}</span>
-              <span style="color:var(--muted)">{row.usage} / {row.limit}</span>
+              <span style="color:var(--muted)">{row.usage} / {row.total} <small>(base {row.limit})</small></span>
             </div>
             <div
               style="height:10px;background:var(--border,#e5e7eb);border-radius:999px;overflow:hidden"
             >
               <div
-                style="height:100%;width:{pct(row.usage, row.limit)}%;background:{barColor(
+                style="height:100%;width:{pct(row.usage, row.total)}%;background:{barColor(
                   row.usage,
-                  row.limit
+                  row.total
                 )};transition:width .2s"
               ></div>
             </div>

@@ -130,6 +130,11 @@
         </div>
 
         <div class="nav-group">
+          <div class="nav-group-label">Growth</div>
+          <a class="nav-link" href="{base}/referrals" class:active={active('/referrals')}><span>↗</span>Referrals</a>
+        </div>
+
+        <div class="nav-group">
           <div class="nav-group-label">Settings</div>
           <a class="nav-link" href="{base}/settings" class:active={active('/settings')}
             ><span>⚙</span>Settings</a

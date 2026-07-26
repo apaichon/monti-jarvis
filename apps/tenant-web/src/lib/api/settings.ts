@@ -41,6 +41,8 @@ export type UsageSnapshot = {
     km_documents: number;
     concurrent_calls: number;
   };
+  bonus?: Array<{ dimension: string; granted: number; used: number; remaining: number; expires_at?: string }>;
+  current_dimensions?: Array<{ dimension: string; base_limit: number; total_limit: number; bonus_remaining: number; consumed?: number | null }>;
   call_limits?: TenantCallLimits | null;
   daily_usage?: {
     call_minutes: number;

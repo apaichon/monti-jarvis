@@ -40,6 +40,14 @@ type TenantReferralCode struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type ReferralClick struct {
+	ID          string    `json:"id"`
+	Code        string    `json:"code"`
+	Source      string    `json:"source"`
+	LandingPath string    `json:"landing_path"`
+	ClickedAt   time.Time `json:"clicked_at"`
+}
+
 type TenantReferral struct {
 	ID                  string     `json:"id"`
 	ReferrerTenantID    string     `json:"referrer_tenant_id"`
@@ -93,9 +101,42 @@ CREATE TABLE IF NOT EXISTS %s.tenant_referral_events (
 CREATE INDEX IF NOT EXISTS tenant_referrals_referrer_idx
   ON %s.tenant_referrals (referrer_tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS tenant_referrals_status_idx
-  ON %s.tenant_referrals (status, created_at DESC);`,
-		schema, schema, auditColumnsDDL, schema, schema, schema, schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, schema))
+  ON %s.tenant_referrals (status, created_at DESC);
+CREATE TABLE IF NOT EXISTS %s.tenant_referral_clicks (
+  id text PRIMARY KEY,
+  referral_code_id text NOT NULL REFERENCES %s.tenant_referral_codes(id) ON DELETE CASCADE,
+  code text NOT NULL,
+  source text NOT NULL DEFAULT '',
+  landing_path text NOT NULL DEFAULT '',
+  clicked_at timestamptz NOT NULL DEFAULT now(),%s
+);`,
+		schema, schema, auditColumnsDDL, schema, schema, schema, schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, schema, schema, schema, auditColumnsDDL))
 	return err
+}
+
+func (s *Store) RecordReferralClick(ctx context.Context, code, source, landingPath string) (ReferralClick, error) {
+	if s == nil || s.pg == nil {
+		return ReferralClick{}, fmt.Errorf("postgres unavailable")
+	}
+	code = normalizeReferralCode(code)
+	if code == "" {
+		return ReferralClick{}, ErrReferralInvalid
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var codeID, status string
+	if err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT id, status FROM %s.tenant_referral_codes WHERE code=$1`, schema), code).Scan(&codeID, &status); errors.Is(err, pgx.ErrNoRows) {
+		return ReferralClick{}, ErrReferralInvalid
+	} else if err != nil {
+		return ReferralClick{}, err
+	} else if status != ReferralCodeActive {
+		return ReferralClick{}, ErrReferralInvalid
+	}
+	var out ReferralClick
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+INSERT INTO %s.tenant_referral_clicks (id, referral_code_id, code, source, landing_path, created_by, updated_by)
+VALUES ($1,$2,$3,$4,$5,$6,$6)
+RETURNING id, code, source, landing_path, clicked_at`, schema), "refclick_"+newStoreID(), codeID, code, strings.TrimSpace(source), strings.TrimSpace(landingPath), auditctx.ActorID(ctx)).Scan(&out.ID, &out.Code, &out.Source, &out.LandingPath, &out.ClickedAt)
+	return out, err
 }
 
 func normalizeReferralCode(code string) string {
@@ -403,10 +444,65 @@ WHERE id = $1`, schema), item.ID, ReferralQualified, actor)
 	if err := recordReferralEventTx(ctx, tx, schema, item.ID, previousStatus, ReferralQualified, "", "qualification"); err != nil {
 		return TenantReferral{}, err
 	}
+	if err := grantReferralBonusesTx(ctx, tx, schema, item.ID, item.ReferrerTenantID); err != nil {
+		return TenantReferral{}, err
+	}
 	if item.QualifiedAt == nil {
 		now := time.Now().UTC()
 		item.QualifiedAt = &now
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return TenantReferral{}, err
+	}
+	return item, nil
+}
+
+func (s *Store) ReverseReferral(ctx context.Context, referralID, reason string) (TenantReferral, error) {
+	if s == nil || s.pg == nil {
+		return TenantReferral{}, fmt.Errorf("postgres unavailable")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	tx, err := s.pg.Begin(ctx)
+	if err != nil {
+		return TenantReferral{}, err
+	}
+	defer tx.Rollback(ctx)
+	var item TenantReferral
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
+SELECT id, referrer_tenant_id, referred_tenant_id, code, status, source,
+       qualification_reason, attributed_at, qualified_at, created_at, updated_at
+FROM %s.tenant_referrals WHERE id=$1 FOR UPDATE`, schema), strings.TrimSpace(referralID)).Scan(
+		&item.ID, &item.ReferrerTenantID, &item.ReferredTenantID, &item.Code, &item.Status,
+		&item.Source, &item.QualificationReason, &item.AttributedAt, &item.QualifiedAt,
+		&item.CreatedAt, &item.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return TenantReferral{}, ErrReferralNotFound
+	}
+	if err != nil {
+		return TenantReferral{}, err
+	}
+	if item.Status == ReferralReversed {
+		return item, tx.Commit(ctx)
+	}
+	if item.Status != ReferralQualified {
+		return item, ErrReferralNotQualified
+	}
+	actor := auditctx.ActorID(ctx)
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "qualification reversed"
+	}
+	if _, err := tx.Exec(ctx, fmt.Sprintf(`UPDATE %s.tenant_referrals SET status=$2, qualification_reason=$3, updated_by=$4 WHERE id=$1`, schema), item.ID, ReferralReversed, reason, actor); err != nil {
+		return TenantReferral{}, err
+	}
+	if err := reverseReferralBonusesTx(ctx, tx, schema, item.ID, item.ReferrerTenantID, reason); err != nil {
+		return TenantReferral{}, err
+	}
+	if err := recordReferralEventTx(ctx, tx, schema, item.ID, item.Status, ReferralReversed, reason, "platform"); err != nil {
+		return TenantReferral{}, err
+	}
+	item.Status = ReferralReversed
+	item.QualificationReason = reason
 	if err := tx.Commit(ctx); err != nil {
 		return TenantReferral{}, err
 	}

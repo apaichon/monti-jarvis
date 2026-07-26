@@ -21,3 +21,17 @@ func TestReferralStatuses(t *testing.T) {
 		t.Fatalf("got %d referral statuses, want 6", len(statuses))
 	}
 }
+
+func TestBonusDimensionsHaveStableUnits(t *testing.T) {
+	for _, dimension := range []string{
+		BonusAIEmployees, BonusMonthlyCallMinutes, BonusMobileCallMinutes,
+		BonusKMDocuments, BonusStorageBytes, BonusConcurrentCalls,
+	} {
+		if !validBonusDimension(dimension) || bonusUnit(dimension) == "" {
+			t.Fatalf("bonus dimension %q is not stable", dimension)
+		}
+	}
+	if validBonusDimension("tenant_private_data") {
+		t.Fatal("private dimension must not be accepted")
+	}
+}

@@ -7,7 +7,7 @@ owner: sdlc-orchestrator
 created: 2026-07-25
 updated: 2026-07-25
 related: [SPRINT-046]
-release: v2.19.0
+release: pending
 ---
 
 # Retrospective - SPRINT-046
@@ -16,21 +16,23 @@ release: v2.19.0
 
 | Metric | Value |
 | --- | ---: |
-| Committed points | 10 |
-| Completed points | 3 |
-| Velocity | 3 |
-| Completion | 30.0% |
-| Carry-over | 7 points: TASK-0166, TASK-0167, TASK-0168 |
-| Risk closed/opened | 0 / 1 |
+| Committed points | 17 |
+| Completed points | 17 |
+| Velocity | 17 |
+| Completion | 100.0% |
+| Carry-over | none |
+| Risk closed/opened | 1 / 0 |
 
-Sprint 46 is closed as a partial release at the user's direction. Manual UAT
-is deferred with the close remark: **test later**.
+Sprint 46 was rebuilt to complete the carry-over and full referral reward
+scope. Manual UAT is now refreshed and ready for a local fixture sign-off
+before the pending v2.20.0 release cut.
 
 ## Per-role delivery
 
 | Role | Points | Tasks |
 | --- | ---: | --- |
-| dev | 3 | TASK-0169 |
+| dev | 10 | TASK-0169, TASK-0175 |
+| devops/dev/tester | 7 | TASK-0166, TASK-0167, TASK-0168 |
 
 ## What went well
 
@@ -43,13 +45,12 @@ is deferred with the close remark: **test later**.
 
 ## What did not go well
 
-- The remaining 7 points from the Sprint 45 carry-over were not completed.
-- Manual UAT was not executed during the sprint and remains deferred.
-- Bonus-quota grants, affiliate UX, and referral reporting remain future slices.
+- The original Sprint 46 close deferred the bonus-quota scope and manual UAT.
+- Manual UAT was not executed during the rebuild and remains the release gate.
+- Rebuilding the sprint made the bonus layer an explicit acceptance item while
+  keeping purchased entitlements and bonus entitlements separate.
 
 ## Action items
 
-- [ ] Test later: execute the Sprint 46 referral manual UAT and attach evidence.
-- [ ] Complete TASK-0166 usage/reconciliation hardening.
-- [ ] Complete TASK-0167 dashboard/reporting verification.
-- [ ] Complete TASK-0168 manual UAT and mobile/load verification.
+- [ ] Execute the refreshed Sprint 46 referral manual UAT and attach evidence
+      before the v2.20.0 release cut.

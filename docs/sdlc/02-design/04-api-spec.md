@@ -575,22 +575,39 @@ Public onboarding. Works when `TENANT_REGISTER_ENABLED=true` (default). Independ
 
 **Errors:** `400` validation · `409` slug/email conflict · `429` rate limit · `503` registration disabled or Postgres down
 
-## Tenant referrals (Sprint 46 foundation)
+## Tenant referrals and bonus quota (Sprint 46)
 
-Referral data is tenant-scoped. This foundation captures one attribution at
-registration and records qualification state; it does not grant or consume
-bonus quota.
+Referral data is tenant-scoped. Attribution is captured once during
+registration, qualification is idempotent, and qualified referrals create
+append-only bonus grants using the active platform reward rules. Bonus quota is
+reported separately from purchased package limits and usage events.
 
 | Method | Path | Role | Description |
 | --- | --- | --- | --- |
 | `GET` | `/api/tenant/referral` | `tenant_admin` | Get or create the active tenant's stable referral code |
-| `GET` | `/api/tenant/referrals` | `tenant_admin` | List referrals attributed to the authenticated tenant |
+| `GET` | `/api/tenant/referrals` | `tenant_admin` | List referrals and bonus balances for the authenticated tenant |
+| `POST` | `/api/public/tenant/referral/click` | public | Record a safe referral-code click/source before signup |
+| `GET` | `/api/platform/referral-rewards` | `platform_admin` | List active configurable reward rules |
+| `PUT` | `/api/platform/referral-rewards/{dimension}` | `platform_admin` | Set grant amount, expiry days, and active state |
 | `POST` | `/api/platform/referrals/{id}/qualify` | `platform_admin` | Evaluate active status, approved KYC, and paid non-voided order |
+| `POST` | `/api/platform/referrals/{id}/reverse` | `platform_admin` | Reverse qualification and append reward reversal entries |
 
 Referral states are `clicked`, `attributed`, `pending`, `qualified`,
 `rejected`, and `reversed`. Repeated qualification is idempotent. A pending
 qualification returns `409` with `error: referral_not_qualified` and the
-current referral record.
+current referral record. A successful qualification grants the configured
+dimensions exactly once using `referral:{id}:grant:{dimension}` idempotency
+keys. The tenant referral response includes `bonus[]` balances with
+`granted`, `used`, `expired`, `reversed`, `remaining`, and `expires_at`.
+
+Quota snapshots retain package limits as the base layer and add
+`base_limit`, `bonus_granted`, `bonus_used`, `bonus_remaining`, and
+`total_limit` on each current dimension. Enforcement uses the total limit but
+never rewrites the package entitlement or historical usage ledger. Monthly
+minutes, mobile minutes, storage, KM documents, and avatar allocations consume
+bonus entries deterministically after the base allowance is exhausted;
+concurrency bonuses extend the active slot ceiling and are released with the
+existing call lifecycle.
 
 ### `GET /api/platform/tenants`
 

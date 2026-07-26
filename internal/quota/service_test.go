@@ -32,6 +32,23 @@ type fakeStore struct {
 	avErr   error
 }
 
+type fakeBonusStore struct {
+	balances []store.BonusBalance
+	tenant   string
+	dim      string
+	amount   int64
+	key      string
+}
+
+func (f *fakeBonusStore) ListTenantBonusBalances(ctx context.Context, tenantID string) ([]store.BonusBalance, error) {
+	return f.balances, nil
+}
+
+func (f *fakeBonusStore) ConsumeBonus(ctx context.Context, tenantID, dimension string, amount int64, idempotencyKey, sourceType, sourceID string) error {
+	f.tenant, f.dim, f.amount, f.key = tenantID, dimension, amount, idempotencyKey
+	return nil
+}
+
 func (f *fakeStore) CountTenantKnowledgeDocuments(ctx context.Context, tenantID string) (int, error) {
 	return f.kmDocs, f.kmErr
 }
@@ -259,6 +276,38 @@ func TestSnapshot(t *testing.T) {
 		if row.Source == "" || row.Freshness != "current" {
 			t.Fatalf("dimension metadata: %+v", row)
 		}
+	}
+}
+
+func TestLimitsWithBonusKeepsBaseAndAddsRemaining(t *testing.T) {
+	base := Limits{MaxAIEmployees: 2, MaxMonthlyCallMinutes: 100, MaxKMDocuments: 10, MaxConcurrentCalls: 1}
+	total := limitsWithBonus(base, []store.BonusBalance{
+		{Dimension: store.BonusAIEmployees, Remaining: 1},
+		{Dimension: store.BonusMonthlyCallMinutes, Remaining: 25},
+		{Dimension: store.BonusKMDocuments, Remaining: 3},
+		{Dimension: store.BonusConcurrentCalls, Remaining: 1},
+	})
+	if total.MaxAIEmployees != 3 || total.MaxMonthlyCallMinutes != 125 || total.MaxKMDocuments != 13 || total.MaxConcurrentCalls != 2 {
+		t.Fatalf("unexpected total limits: %+v", total)
+	}
+	if base.MaxMonthlyCallMinutes != 100 {
+		t.Fatalf("base limits were mutated: %+v", base)
+	}
+}
+
+func TestConsumeBonusUsageConsumesOnlyNewResourceOverflow(t *testing.T) {
+	svc, _ := testSvc(t, starterRules(), &fakeStore{})
+	bonus := &fakeBonusStore{balances: []store.BonusBalance{{Dimension: store.BonusKMDocuments, Used: 1, Remaining: 9}}}
+	svc.bonus = bonus
+
+	if err := svc.ConsumeBonusUsage(context.Background(), "demo", DimMaxKMDocuments, 6, "km_document", "doc-2"); err != nil {
+		t.Fatal(err)
+	}
+	if bonus.tenant != "demo" || bonus.dim != store.BonusKMDocuments || bonus.amount != 2 {
+		t.Fatalf("bonus consume = %s/%s/%d, want demo/km_documents/2", bonus.tenant, bonus.dim, bonus.amount)
+	}
+	if bonus.key != "resource:km_documents:doc-2:6" {
+		t.Fatalf("idempotency key = %q", bonus.key)
 	}
 }
 

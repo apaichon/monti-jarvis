@@ -35,6 +35,9 @@ psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -v POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
 
 psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -v POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
   -f "$ROOT_DIR/scripts/migrations/030_referrals.sql"
+
+psql "$POSTGRES_URL" -v ON_ERROR_STOP=1 -v POSTGRES_SCHEMA="$POSTGRES_SCHEMA" \
+  -f "$ROOT_DIR/scripts/migrations/031_referral_bonus_quota.sql"
 if curl -fsS "$CLICKHOUSE_URL/ping" >/dev/null 2>&1; then
   echo "==> Applying ClickHouse audit columns (db=$CLICKHOUSE_DB)..."
   CH_HAS_TABLES=0

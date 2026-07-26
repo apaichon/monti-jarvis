@@ -69,7 +69,7 @@
 | **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md) · [SPRINT-043](../03-sprints/SPRINT-043.md) ✅ v2.17.0 |
 | **44** | **Customer / Tenant** | **Customer generative AI (Claude · Codex · Antigravity · Grok CLI) → HTML/image/canvas/link/report/doc** | **K** | **1, 20, 21, 43** · [SPRINT-044](../03-sprints/SPRINT-044.md) · backlog — ON HOLD |
 | **45** | **Platform / Tenant / Mobile** | **AiaaS for mass-market packages: ฿500 · ฿1,000 · ฿1,500 · ฿2,000 with differentiated quotas and corrected usage/statistics** | **L** | **13, 16, 25, 27, 30, 31, 43** · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md) · [SPRINT-045](../03-sprints/SPRINT-045.md) · completed 13/13; completion release pending |
-| **46** | **Platform / Tenant / Growth** | **Tenant referral affiliate program with configurable bonus-quota rewards and referral usage tracking** | **M** | **9, 10, 13, 31, 45** · [SPRINT-046](../03-sprints/SPRINT-046.md) · completed partial v2.19.0; manual UAT deferred |
+| **46** | **Platform / Tenant / Growth** | **Tenant referral affiliate program with configurable bonus-quota rewards and referral usage tracking** | **M** | **9, 10, 13, 31, 45** · [SPRINT-046](../03-sprints/SPRINT-046.md) · completed 17/17; v2.20.0 release pending manual UAT |
 | **47** | **Platform / AI Operations** | **Langfuse real-time LLM observability and evaluation across chat, voice, mobile, RAG, tools, and generative jobs** | **N** | **21, 25, 27, 31, 43, 44** · backlog |
 
 ---
@@ -633,11 +633,11 @@ does not enable customer or tenant CLI/generative execution.
 enterprise custom pricing, cross-tenant quota pooling, and changing the core
 Gemini voice pipeline.
 
-## Completed partial: SPRINT-046 — Tenant Referral Affiliate Program and Bonus Quota — v2.19.0
+## Completed: SPRINT-046 — Tenant Referral Affiliate Program and Bonus Quota — v2.20.0 pending
 
 **Platform:** Platform / Tenant / Growth · **Feature:** Tenant referral/affiliate
 program that rewards qualified referrals with additional quota allowance ·
-**Depends:** 9, 10, 13, 31, 45 · **Status:** completed partial; 3/10 points shipped in v2.19.0; manual UAT deferred with the close remark **test later**
+**Depends:** 9, 10, 13, 31, 45 · **Status:** completed 17/17; v2.20.0 release pending manual UAT
 
 Allow an active tenant to invite another business to Monti. A referral becomes
 qualified only after the referred tenant completes onboarding/KYC, is activated,
@@ -714,7 +714,7 @@ and what will expire.
    package upgrade/downgrade compatibility, mobile usage reconciliation, and
    accurate base-versus-bonus reporting.
 
-**Out (unless pulled in):** Multi-level/downline commissions, public affiliate
+**Out:** Multi-level/downline commissions, public affiliate
 marketplace, automatic cash payouts, cross-tenant quota pooling, and referral
 rewards that bypass payment, KYC, rate limits, or tenant isolation.
 

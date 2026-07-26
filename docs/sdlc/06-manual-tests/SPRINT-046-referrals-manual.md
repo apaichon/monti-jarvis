@@ -1,6 +1,6 @@
 ---
 id: UAT-SPRINT-046-TASK-0169
-status: deferred
+status: ready
 updated: 2026-07-25
 sprint: SPRINT-046
 task: TASK-0169
@@ -9,17 +9,14 @@ owner: tester
 
 # Sprint 46 referral foundation — manual UAT
 
-> **Deferred at sprint close:** test later. This checklist remains the required
-> manual verification before the referral foundation is treated as fully UAT
-> accepted.
+> Updated for the completed S46 bonus-quota slice. Run against local fixtures
+> before release sign-off; never use real tenant or payment data.
 
 This runbook verifies the Sprint 46 referral attribution and qualification
-foundation. It covers referral code creation, transactional signup attribution,
-qualification gates, idempotency, tenant isolation, and the append-only status
-event trail.
-
-Bonus quota grants, expiry, consumption, reversal, and affiliate reporting are
-not implemented in this slice and must not be marked as passed by this UAT.
+foundation. It covers referral code creation, click capture, transactional
+signup attribution, qualification gates, idempotency, tenant isolation,
+configurable rewards, append-only bonus grants, expiry, consumption, reversal,
+and affiliate reporting.
 
 Run from the repository root against a local fixture only. Do not use real
 tenant IDs, customer data, or production payment credentials.
@@ -84,7 +81,8 @@ Confirm `AUTH_DISABLED=false` and a valid local `JWT_SECRET` are set in
              to_regclass('callcenter.tenant_referral_events');"
    ```
 
-   Expected: all three relations are returned.
+   Expected: all three referral relations plus `tenant_referral_clicks`,
+   `referral_reward_rules`, and `tenant_bonus_ledger` are returned.
 
 ## 2. Obtain admin tokens and verify roles
 
@@ -351,9 +349,23 @@ Expected: the first response is `platform_admin`; the second is
    ```
 
    Expected: HTTP 200 with the same qualification result. No second
-   qualification event is appended.
+   qualification event or bonus grant is appended.
 
-## 7. Verify authorization, isolation, and no quota mutation
+8. Verify the grant ledger and tenant summary:
+
+   ```bash
+   curl -fsS -H "Authorization: Bearer $TENANT_A_TOKEN" \
+     "$BASE/api/tenant/referrals" | jq '.bonus, .referrals[0]'
+   psql "$POSTGRES_URL" -c \
+     "SELECT dimension, operation, amount, idempotency_key, expires_at
+        FROM callcenter.tenant_bonus_ledger
+       WHERE referral_id='$REFERRAL_ID' ORDER BY created_at;"
+   ```
+
+   Expected: one `grant` per active reward dimension, a future expiry, and
+   stable results on a repeated qualification.
+
+## 7. Verify bonus enforcement, authorization, isolation, and no base mutation
 
 1. A tenant token cannot qualify a referral:
 
@@ -392,7 +404,38 @@ Expected: the first response is `platform_admin`; the second is
 
    Expected: referral qualification itself creates no entitlement and no usage
    event. Any pre-existing fixture entitlement/usage must be documented
-   separately.
+   separately. The bonus ledger is the only new quota record.
+
+4. Configure a small test reward and exercise idempotent consumption:
+
+   ```bash
+   curl -fsS -X PUT -H "Authorization: Bearer $PLATFORM_TOKEN" \
+     -H 'Content-Type: application/json' \
+     "$BASE/api/platform/referral-rewards/monthly_call_minutes" \
+     -d '{"grant_amount":2,"expiry_days":90,"active":true}' | jq .
+   curl -fsS -H "Authorization: Bearer $TENANT_A_TOKEN" \
+     "$BASE/api/tenant/usage" | jq '.current_dimensions[] |
+       {dimension, base_limit, total_limit, bonus_remaining}'
+   ```
+
+   Expected: reward configuration is platform-only; tenant usage responses
+   show base and total separately, and retries with the same usage source do
+   not append a second consume event.
+
+5. Reverse the qualified referral and verify reward reversal:
+
+   ```bash
+   curl -fsS -X POST -H "Authorization: Bearer $PLATFORM_TOKEN" \
+     -H 'Content-Type: application/json' \
+     -d '{"reason":"manual UAT reversal"}' \
+     "$BASE/api/platform/referrals/$REFERRAL_ID/reverse" | jq .
+   psql "$POSTGRES_URL" -c \
+     "SELECT operation, amount, reason FROM callcenter.tenant_bonus_ledger
+       WHERE referral_id='$REFERRAL_ID' ORDER BY created_at;"
+   ```
+
+   Expected: the referral is `reversed`, no new usable bonus remains, and the
+   event/ledger trail remains append-only.
 
 ## 8. Cleanup and evidence
 
