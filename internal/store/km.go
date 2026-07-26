@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/libra/monti-jarvis/internal/auditctx"
 	"github.com/libra/monti-jarvis/internal/km"
 	"github.com/minio/minio-go/v7"
@@ -16,7 +17,15 @@ func (s *Store) CreateKnowledgeDocument(ctx context.Context, doc km.Document) (k
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	actor := auditctx.ActorID(ctx)
-	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+	tx, err := s.pg.Begin(ctx)
+	if err != nil {
+		return km.Document{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, doc.TenantID); err != nil {
+		return km.Document{}, err
+	}
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
 INSERT INTO %s.knowledge_documents
   (id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version, created_by, updated_by)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)
@@ -26,7 +35,10 @@ RETURNING id, tenant_id, agent_id, filename, object_key, mime, status, km_scope,
 	).Scan(
 		&doc.ID, &doc.TenantID, &doc.AgentID, &doc.Filename, &doc.ObjectKey, &doc.Mime, &doc.Status, &doc.KMScope, &doc.KMVersion, &doc.CreatedAt, &doc.UpdatedAt,
 	)
-	return doc, err
+	if err != nil {
+		return doc, err
+	}
+	return doc, tx.Commit(ctx)
 }
 
 func (s *Store) UpdateKnowledgeDocumentStatus(ctx context.Context, id, status string, version, chunkCount int) error {
@@ -35,11 +47,23 @@ func (s *Store) UpdateKnowledgeDocumentStatus(ctx context.Context, id, status st
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	actor := auditctx.ActorID(ctx)
-	_, err := s.pg.Exec(ctx, fmt.Sprintf(`
+	tenantID := km.TenantFromContext(ctx)
+	tx, err := s.pg.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.knowledge_documents
 SET status = $2, km_version = $3, chunk_count = $4, updated_by = $5
 WHERE id = $1`, schema), id, status, version, chunkCount, actor)
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) ListKnowledgeDocuments(ctx context.Context, tenantID, agentID string) ([]km.Document, error) {
@@ -48,7 +72,15 @@ func (s *Store) ListKnowledgeDocuments(ctx context.Context, tenantID, agentID st
 		return nil, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	rows, err := db.Query(ctx, fmt.Sprintf(`
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return nil, err
+	}
+	rows, err := tx.Query(ctx, fmt.Sprintf(`
 SELECT id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version, chunk_count, created_at, updated_at
 FROM %s.knowledge_documents
 WHERE tenant_id = $1 AND agent_id = $2
@@ -56,8 +88,6 @@ ORDER BY created_at DESC`, schema), tenantID, agentID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
 	var docs []km.Document
 	for rows.Next() {
 		var doc km.Document
@@ -68,7 +98,11 @@ ORDER BY created_at DESC`, schema), tenantID, agentID)
 		}
 		docs = append(docs, doc)
 	}
-	return docs, rows.Err()
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return docs, tx.Commit(ctx)
 }
 
 func (s *Store) GetKnowledgeDocument(ctx context.Context, id string) (km.Document, error) {
@@ -77,14 +111,26 @@ func (s *Store) GetKnowledgeDocument(ctx context.Context, id string) (km.Documen
 		return km.Document{}, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
+	tenantID := km.TenantFromContext(ctx)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return km.Document{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return km.Document{}, err
+	}
 	var doc km.Document
-	err := db.QueryRow(ctx, fmt.Sprintf(`
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
 SELECT id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version, chunk_count, created_at, updated_at
 FROM %s.knowledge_documents WHERE id = $1`, schema), id,
 	).Scan(
 		&doc.ID, &doc.TenantID, &doc.AgentID, &doc.Filename, &doc.ObjectKey, &doc.Mime, &doc.Status, &doc.KMScope, &doc.KMVersion, &doc.ChunkCount, &doc.CreatedAt, &doc.UpdatedAt,
 	)
-	return doc, err
+	if err != nil {
+		return doc, err
+	}
+	return doc, tx.Commit(ctx)
 }
 
 // DeleteKnowledgeDocument removes one document for a tenant. Returns object_key for MinIO cleanup.
@@ -94,18 +140,26 @@ func (s *Store) DeleteKnowledgeDocument(ctx context.Context, tenantID, documentI
 		return "", "", fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
+	tx, err := s.pg.Begin(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return "", "", err
+	}
 	var key, agent string
-	err = s.pg.QueryRow(ctx, fmt.Sprintf(`
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
 SELECT object_key, agent_id FROM %s.knowledge_documents
 WHERE id = $1 AND tenant_id = $2`, schema), documentID, tenantID).Scan(&key, &agent)
 	if err != nil {
 		return "", "", err
 	}
-	if _, err := s.pg.Exec(ctx, fmt.Sprintf(`
+	if _, err := tx.Exec(ctx, fmt.Sprintf(`
 DELETE FROM %s.knowledge_chunks WHERE document_id = $1 AND tenant_id = $2`, schema), documentID, tenantID); err != nil {
 		return "", "", err
 	}
-	tag, err := s.pg.Exec(ctx, fmt.Sprintf(`
+	tag, err := tx.Exec(ctx, fmt.Sprintf(`
 DELETE FROM %s.knowledge_documents WHERE id = $1 AND tenant_id = $2`, schema), documentID, tenantID)
 	if err != nil {
 		return "", "", err
@@ -113,7 +167,7 @@ DELETE FROM %s.knowledge_documents WHERE id = $1 AND tenant_id = $2`, schema), d
 	if tag.RowsAffected() == 0 {
 		return "", "", fmt.Errorf("document not found")
 	}
-	return key, agent, nil
+	return key, agent, tx.Commit(ctx)
 }
 
 // UpdateKnowledgeDocumentScope sets km_scope on document + its chunks.
@@ -123,7 +177,15 @@ func (s *Store) UpdateKnowledgeDocumentScope(ctx context.Context, tenantID, docu
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	actor := auditctx.ActorID(ctx)
-	tag, err := s.pg.Exec(ctx, fmt.Sprintf(`
+	tx, err := s.pg.Begin(ctx)
+	if err != nil {
+		return km.Document{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return km.Document{}, err
+	}
+	tag, err := tx.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.knowledge_documents
 SET km_scope = $3, updated_by = $4, updated_at = now()
 WHERE id = $1 AND tenant_id = $2`, schema), documentID, tenantID, kmScope, actor)
@@ -133,13 +195,22 @@ WHERE id = $1 AND tenant_id = $2`, schema), documentID, tenantID, kmScope, actor
 	if tag.RowsAffected() == 0 {
 		return km.Document{}, fmt.Errorf("no rows")
 	}
-	if _, err := s.pg.Exec(ctx, fmt.Sprintf(`
+	if _, err := tx.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.knowledge_chunks
 SET km_scope = $3, updated_by = $4, updated_at = now()
 WHERE document_id = $1 AND tenant_id = $2`, schema), documentID, tenantID, kmScope, actor); err != nil {
 		return km.Document{}, err
 	}
-	return s.GetKnowledgeDocument(ctx, documentID)
+	var doc km.Document
+	if err := scanKnowledgeDocumentRow(tx.QueryRow(ctx, fmt.Sprintf(`
+SELECT id, tenant_id, agent_id, filename, object_key, mime, status, km_scope, km_version, chunk_count, created_at, updated_at
+FROM %s.knowledge_documents WHERE id = $1`, schema), documentID), &doc); err != nil {
+		return km.Document{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return km.Document{}, err
+	}
+	return doc, nil
 }
 
 // CountAgentKnowledgeByScope returns document counts per km_scope for an agent.
@@ -150,14 +221,21 @@ func (s *Store) CountAgentKnowledgeByScope(ctx context.Context, tenantID, agentI
 		return out, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	rows, err := db.Query(ctx, fmt.Sprintf(`
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return out, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return out, err
+	}
+	rows, err := tx.Query(ctx, fmt.Sprintf(`
 SELECT km_scope, COUNT(*) FROM %s.knowledge_documents
 WHERE tenant_id = $1 AND agent_id = $2
 GROUP BY km_scope`, schema), tenantID, agentID)
 	if err != nil {
 		return out, err
 	}
-	defer rows.Close()
 	for rows.Next() {
 		var sc string
 		var n int
@@ -166,7 +244,11 @@ GROUP BY km_scope`, schema), tenantID, agentID)
 		}
 		out[sc] = n
 	}
-	return out, rows.Err()
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	return out, tx.Commit(ctx)
 }
 
 func (s *Store) DeleteAgentKnowledge(ctx context.Context, tenantID, agentID string) ([]string, error) {
@@ -174,12 +256,19 @@ func (s *Store) DeleteAgentKnowledge(ctx context.Context, tenantID, agentID stri
 		return nil, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
+	tx, err := s.pg.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return nil, err
+	}
+	rows, err := tx.Query(ctx, fmt.Sprintf(`
 SELECT object_key FROM %s.knowledge_documents WHERE tenant_id = $1 AND agent_id = $2`, schema), tenantID, agentID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var keys []string
 	for rows.Next() {
 		var key string
@@ -188,17 +277,21 @@ SELECT object_key FROM %s.knowledge_documents WHERE tenant_id = $1 AND agent_id 
 		}
 		keys = append(keys, key)
 	}
+	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	if _, err := s.pg.Exec(ctx, fmt.Sprintf(`
+	if _, err := tx.Exec(ctx, fmt.Sprintf(`
 DELETE FROM %s.knowledge_chunks WHERE tenant_id = $1 AND agent_id = $2`, schema), tenantID, agentID); err != nil {
 		return nil, err
 	}
-	_, err = s.pg.Exec(ctx, fmt.Sprintf(`
-DELETE FROM %s.knowledge_documents WHERE tenant_id = $1 AND agent_id = $2`, schema), tenantID, agentID)
-	return keys, err
+	_, err = tx.Exec(ctx, fmt.Sprintf(`
+	DELETE FROM %s.knowledge_documents WHERE tenant_id = $1 AND agent_id = $2`, schema), tenantID, agentID)
+	if err != nil {
+		return nil, err
+	}
+	return keys, tx.Commit(ctx)
 }
 
 func (s *Store) ReplaceKnowledgeChunks(ctx context.Context, tenantID, agentID, documentID, kmScope string, chunks []km.Chunk, chunkIDs []string) error {
@@ -211,6 +304,9 @@ func (s *Store) ReplaceKnowledgeChunks(ctx context.Context, tenantID, agentID, d
 		return err
 	}
 	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return err
+	}
 
 	if _, err := tx.Exec(ctx, fmt.Sprintf(`
 DELETE FROM %s.knowledge_chunks WHERE document_id = $1`, schema), documentID); err != nil {
@@ -237,14 +333,25 @@ func (s *Store) CountAgentKnowledge(ctx context.Context, tenantID, agentID strin
 		return 0, 0, fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	err = db.QueryRow(ctx, fmt.Sprintf(`
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return 0, 0, err
+	}
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
 SELECT COUNT(*) FROM %s.knowledge_documents WHERE tenant_id = $1 AND agent_id = $2`, schema), tenantID, agentID).Scan(&docs)
 	if err != nil {
 		return 0, 0, err
 	}
-	err = db.QueryRow(ctx, fmt.Sprintf(`
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
 SELECT COUNT(*) FROM %s.knowledge_chunks WHERE tenant_id = $1 AND agent_id = $2`, schema), tenantID, agentID).Scan(&chunks)
-	return docs, chunks, err
+	if err := tx.Commit(ctx); err != nil {
+		return 0, 0, err
+	}
+	return docs, chunks, nil
 }
 
 // CountTenantKnowledgeDocuments returns total KM documents for a tenant (all agents).
@@ -256,9 +363,26 @@ func (s *Store) CountTenantKnowledgeDocuments(ctx context.Context, tenantID stri
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	var n int
-	err := db.QueryRow(ctx, fmt.Sprintf(`
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	if err := setTenantContext(ctx, tx, tenantID); err != nil {
+		return 0, err
+	}
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
 SELECT COUNT(*) FROM %s.knowledge_documents WHERE tenant_id = $1`, schema), tenantID).Scan(&n)
-	return n, err
+	if err != nil {
+		return 0, err
+	}
+	return n, tx.Commit(ctx)
+}
+
+func scanKnowledgeDocumentRow(row pgx.Row, doc *km.Document) error {
+	return row.Scan(
+		&doc.ID, &doc.TenantID, &doc.AgentID, &doc.Filename, &doc.ObjectKey, &doc.Mime, &doc.Status, &doc.KMScope, &doc.KMVersion, &doc.ChunkCount, &doc.CreatedAt, &doc.UpdatedAt,
+	)
 }
 
 func (s *Store) PutKMObject(ctx context.Context, objectKey, contentType string, data []byte) error {

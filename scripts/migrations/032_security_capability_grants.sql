@@ -14,6 +14,20 @@ GRANT SELECT ON TABLE
   :POSTGRES_SCHEMA.tenant_embed_configs
 TO :KM_READ_ROLE;
 
+ALTER TABLE :POSTGRES_SCHEMA.knowledge_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE :POSTGRES_SCHEMA.knowledge_documents FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS knowledge_documents_tenant_boundary ON :POSTGRES_SCHEMA.knowledge_documents;
+CREATE POLICY knowledge_documents_tenant_boundary ON :POSTGRES_SCHEMA.knowledge_documents
+  USING (tenant_id = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
+
+ALTER TABLE :POSTGRES_SCHEMA.knowledge_chunks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE :POSTGRES_SCHEMA.knowledge_chunks FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS knowledge_chunks_tenant_boundary ON :POSTGRES_SCHEMA.knowledge_chunks;
+CREATE POLICY knowledge_chunks_tenant_boundary ON :POSTGRES_SCHEMA.knowledge_chunks
+  USING (tenant_id = current_setting('app.tenant_id', true))
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
+
 GRANT USAGE ON SCHEMA :POSTGRES_SCHEMA TO :TICKET_WRITE_ROLE;
 GRANT SELECT, INSERT, UPDATE ON TABLE
   :POSTGRES_SCHEMA.tickets,
@@ -47,5 +61,5 @@ CREATE POLICY ticket_events_tenant_boundary ON :POSTGRES_SCHEMA.ticket_events
   WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
 
 -- Neither capability role receives sequence ownership, DELETE, DDL, or
--- unrestricted schema privileges. KM tables remain outside this migration
--- until their management handlers also set transaction-local tenant context.
+-- unrestricted schema privileges. All KM document/chunk access requires the
+-- transaction-local tenant context set by the application.

@@ -55,6 +55,7 @@ func (s *Service) WithTenant(tenantID string) *Service {
 }
 
 func (s *Service) Ingest(ctx context.Context, agentID, filename string, data []byte, kmScope string) (Document, error) {
+	ctx = WithTenantContext(ctx, s.tenant)
 	agentID = strings.ToLower(strings.TrimSpace(agentID))
 	if agentID == "" {
 		return Document{}, fmt.Errorf("unknown agent_id %q", agentID)
@@ -143,10 +144,12 @@ func (s *Service) indexDocument(ctx context.Context, doc Document, text string) 
 }
 
 func (s *Service) ListAgentDocuments(ctx context.Context, agentID string) ([]Document, error) {
+	ctx = WithTenantContext(ctx, s.tenant)
 	return s.store.ListKnowledgeDocuments(ctx, s.tenant, strings.ToLower(strings.TrimSpace(agentID)))
 }
 
 func (s *Service) AgentKnowledge(ctx context.Context, agentID string) (AgentKnowledge, error) {
+	ctx = WithTenantContext(ctx, s.tenant)
 	agentID = strings.ToLower(strings.TrimSpace(agentID))
 	docs, err := s.store.ListKnowledgeDocuments(ctx, s.tenant, agentID)
 	if err != nil {
@@ -167,6 +170,7 @@ func (s *Service) AgentKnowledge(ctx context.Context, agentID string) (AgentKnow
 }
 
 func (s *Service) ResetAgent(ctx context.Context, agentID string) error {
+	ctx = WithTenantContext(ctx, s.tenant)
 	agentID = strings.ToLower(strings.TrimSpace(agentID))
 	if agentID == "" {
 		return fmt.Errorf("unknown agent_id %q", agentID)
@@ -184,6 +188,7 @@ func (s *Service) ResetAgent(ctx context.Context, agentID string) error {
 
 // DeleteDocument removes one document (PG + MinIO + ClickHouse) for the service tenant.
 func (s *Service) DeleteDocument(ctx context.Context, documentID string) error {
+	ctx = WithTenantContext(ctx, s.tenant)
 	documentID = strings.TrimSpace(documentID)
 	if documentID == "" {
 		return ErrNotFound
@@ -206,6 +211,7 @@ func (s *Service) DeleteDocument(ctx context.Context, documentID string) error {
 
 // UpdateDocumentScope retags document + chunks + embeddings without re-embedding.
 func (s *Service) UpdateDocumentScope(ctx context.Context, documentID, kmScope string) (Document, error) {
+	ctx = WithTenantContext(ctx, s.tenant)
 	documentID = strings.TrimSpace(documentID)
 	kmScope = strings.ToLower(strings.TrimSpace(kmScope))
 	if !scope.ValidScope(kmScope) {
