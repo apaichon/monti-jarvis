@@ -22,28 +22,30 @@ var (
 )
 
 type CustomerAuthSettings struct {
-	TenantID                 string    `json:"tenant_id"`
-	Enabled                  bool      `json:"enabled"`
-	AuthMode                 string    `json:"auth_mode"`
-	AllowedDomains           []string  `json:"allowed_domains"`
-	OTPTTLSeconds            int       `json:"otp_ttl_seconds"`
-	SessionTTLSeconds        int       `json:"session_ttl_seconds"`
-	RequireAuthForWorkforce  bool      `json:"require_auth_for_workforce"`
-	CustomerDailyCallSeconds int       `json:"customer_daily_call_seconds"`
-	CustomerMaxCallSeconds   int       `json:"customer_max_call_seconds"`
-	CreatedAt                time.Time `json:"created_at,omitempty"`
-	UpdatedAt                time.Time `json:"updated_at,omitempty"`
+	TenantID                       string    `json:"tenant_id"`
+	Enabled                        bool      `json:"enabled"`
+	AuthMode                       string    `json:"auth_mode"`
+	AllowedDomains                 []string  `json:"allowed_domains"`
+	OTPTTLSeconds                  int       `json:"otp_ttl_seconds"`
+	SessionTTLSeconds              int       `json:"session_ttl_seconds"`
+	RequireAuthForWorkforce        bool      `json:"require_auth_for_workforce"`
+	CustomerDailyCallSeconds       int       `json:"customer_daily_call_seconds"`
+	CustomerMaxCallSeconds         int       `json:"customer_max_call_seconds"`
+	AutoRegisterOnConversationOTP  bool      `json:"auto_register_on_conversation_otp"`
+	CreatedAt                      time.Time `json:"created_at,omitempty"`
+	UpdatedAt                      time.Time `json:"updated_at,omitempty"`
 }
 
 type CustomerAuthSettingsInput struct {
-	Enabled                  *bool
-	AuthMode                 string
-	AllowedDomains           []string
-	OTPTTLSeconds            int
-	SessionTTLSeconds        int
-	RequireAuthForWorkforce  *bool
-	CustomerDailyCallSeconds *int
-	CustomerMaxCallSeconds   *int
+	Enabled                       *bool
+	AuthMode                      string
+	AllowedDomains                []string
+	OTPTTLSeconds                 int
+	SessionTTLSeconds             int
+	RequireAuthForWorkforce       *bool
+	CustomerDailyCallSeconds      *int
+	CustomerMaxCallSeconds        *int
+	AutoRegisterOnConversationOTP *bool
 }
 
 type CustomerOTPChallenge struct {
@@ -84,6 +86,8 @@ func (s *Store) ensureCustomerAuthSchema(ctx context.Context) error {
 		fmt.Sprintf(`ALTER TABLE %s.tenant_customer_auth_settings ADD COLUMN IF NOT EXISTS require_auth_for_workforce boolean NOT NULL DEFAULT false`, schema),
 		fmt.Sprintf(`ALTER TABLE %s.tenant_customer_auth_settings ADD COLUMN IF NOT EXISTS customer_daily_call_seconds integer NOT NULL DEFAULT 0`, schema),
 		fmt.Sprintf(`ALTER TABLE %s.tenant_customer_auth_settings ADD COLUMN IF NOT EXISTS customer_max_call_seconds integer NOT NULL DEFAULT 0`, schema),
+		// Sprint 53: conversation email OTP may auto-create customer (default off).
+		fmt.Sprintf(`ALTER TABLE %s.tenant_customer_auth_settings ADD COLUMN IF NOT EXISTS auto_register_on_conversation_otp boolean NOT NULL DEFAULT false`, schema),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.customer_auth_identities (
   id text PRIMARY KEY,
   tenant_id text NOT NULL REFERENCES %s.tenants(id) ON DELETE CASCADE,
@@ -145,6 +149,7 @@ func defaultCustomerAuthSettings(tenantID string) CustomerAuthSettings {
 		TenantID: tenantID, Enabled: true, AuthMode: "required",
 		AllowedDomains: []string{}, OTPTTLSeconds: 600, SessionTTLSeconds: int((7 * 24 * time.Hour).Seconds()),
 		RequireAuthForWorkforce: true, CustomerDailyCallSeconds: 0, CustomerMaxCallSeconds: 0,
+		AutoRegisterOnConversationOTP: false,
 	}
 }
 
@@ -156,10 +161,12 @@ func (s *Store) GetCustomerAuthSettings(ctx context.Context, tenantID string) (C
 	out := defaultCustomerAuthSettings(tenantID)
 	var domains []byte
 	err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT tenant_id,enabled,auth_mode,allowed_domains,otp_ttl_seconds,session_ttl_seconds,
-require_auth_for_workforce,customer_daily_call_seconds,customer_max_call_seconds,created_at,updated_at
+require_auth_for_workforce,customer_daily_call_seconds,customer_max_call_seconds,
+COALESCE(auto_register_on_conversation_otp,false),created_at,updated_at
 FROM %s.tenant_customer_auth_settings WHERE tenant_id=$1`, schema), tenantID).Scan(
 		&out.TenantID, &out.Enabled, &out.AuthMode, &domains, &out.OTPTTLSeconds, &out.SessionTTLSeconds,
-		&out.RequireAuthForWorkforce, &out.CustomerDailyCallSeconds, &out.CustomerMaxCallSeconds, &out.CreatedAt, &out.UpdatedAt)
+		&out.RequireAuthForWorkforce, &out.CustomerDailyCallSeconds, &out.CustomerMaxCallSeconds,
+		&out.AutoRegisterOnConversationOTP, &out.CreatedAt, &out.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, nil
 	}
@@ -208,6 +215,9 @@ func (s *Store) PutCustomerAuthSettings(ctx context.Context, tenantID string, in
 	if in.CustomerMaxCallSeconds != nil {
 		cur.CustomerMaxCallSeconds = *in.CustomerMaxCallSeconds
 	}
+	if in.AutoRegisterOnConversationOTP != nil {
+		cur.AutoRegisterOnConversationOTP = *in.AutoRegisterOnConversationOTP
+	}
 	if cur.CustomerDailyCallSeconds < 0 || cur.CustomerDailyCallSeconds > 24*60*60 {
 		return CustomerAuthSettings{}, fmt.Errorf("customer_daily_call_seconds must be between 0 and 86400")
 	}
@@ -234,17 +244,20 @@ func (s *Store) PutCustomerAuthSettings(ctx context.Context, tenantID string, in
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	_, err = s.pg.Exec(ctx, fmt.Sprintf(`INSERT INTO %s.tenant_customer_auth_settings
 (tenant_id,enabled,auth_mode,allowed_domains,otp_ttl_seconds,session_ttl_seconds,
-require_auth_for_workforce,customer_daily_call_seconds,customer_max_call_seconds,created_by,updated_by)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)
+require_auth_for_workforce,customer_daily_call_seconds,customer_max_call_seconds,
+auto_register_on_conversation_otp,created_by,updated_by)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11)
 ON CONFLICT (tenant_id) DO UPDATE SET enabled=EXCLUDED.enabled,auth_mode=EXCLUDED.auth_mode,
 allowed_domains=EXCLUDED.allowed_domains,otp_ttl_seconds=EXCLUDED.otp_ttl_seconds,
 session_ttl_seconds=EXCLUDED.session_ttl_seconds,
 require_auth_for_workforce=EXCLUDED.require_auth_for_workforce,
 customer_daily_call_seconds=EXCLUDED.customer_daily_call_seconds,
 customer_max_call_seconds=EXCLUDED.customer_max_call_seconds,
+auto_register_on_conversation_otp=EXCLUDED.auto_register_on_conversation_otp,
 updated_by=EXCLUDED.updated_by,updated_at=now()`, schema),
 		tenantID, cur.Enabled, cur.AuthMode, raw, cur.OTPTTLSeconds, cur.SessionTTLSeconds,
-		cur.RequireAuthForWorkforce, cur.CustomerDailyCallSeconds, cur.CustomerMaxCallSeconds, actor)
+		cur.RequireAuthForWorkforce, cur.CustomerDailyCallSeconds, cur.CustomerMaxCallSeconds,
+		cur.AutoRegisterOnConversationOTP, actor)
 	if err != nil {
 		return CustomerAuthSettings{}, err
 	}

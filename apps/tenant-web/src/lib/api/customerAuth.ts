@@ -10,6 +10,8 @@ export type CustomerAuthSettings = {
   require_auth_for_workforce: boolean;
   customer_daily_call_seconds: number;
   customer_max_call_seconds: number;
+  /** When true, conversation email+OTP may create a customer on verify. */
+  auto_register_on_conversation_otp: boolean;
   created_at?: string;
   updated_at?: string;
 };

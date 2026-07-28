@@ -13,11 +13,22 @@
     loginPath
   } from '$lib/auth/session';
   import { logout } from '$lib/api/auth';
+  import { onMount } from 'svelte';
 
   let { children } = $props();
 
   const user = $derived(getStoredUser());
   const onLoginPage = $derived($page.url.pathname === `${base}/login` || $page.url.pathname === `${base}/login/`);
+  let appVersion = $state('');
+
+  onMount(() => {
+    void fetch('/api/version')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.version) appVersion = String(data.version);
+      })
+      .catch(() => {});
+  });
 
   $effect(() => {
     if (!browser || onLoginPage) return;
@@ -124,6 +135,9 @@
       </nav>
       <div class="admin-sidebar-foot">
         <div class="system-card"><span><i></i>System health</span><strong>All systems operational</strong></div>
+        {#if appVersion}
+          <div style="padding:2px 0 8px;font-size:11px;color:var(--muted)">Monti Admin · {appVersion}</div>
+        {/if}
         <button class="admin-account" type="button" onclick={handleLogout}><b>AD</b><span><strong>Admin</strong><small>{user?.email ?? 'Sign out'}</small></span><em>↗</em></button>
       </div>
     </aside>

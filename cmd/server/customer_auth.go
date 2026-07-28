@@ -23,14 +23,15 @@ import (
 )
 
 type customerAuthSettingsBody struct {
-	Enabled                  *bool    `json:"enabled"`
-	AuthMode                 string   `json:"auth_mode"`
-	AllowedDomains           []string `json:"allowed_domains"`
-	OTPTTLSeconds            int      `json:"otp_ttl_seconds"`
-	SessionTTLSeconds        int      `json:"session_ttl_seconds"`
-	RequireAuthForWorkforce  *bool    `json:"require_auth_for_workforce"`
-	CustomerDailyCallSeconds *int     `json:"customer_daily_call_seconds"`
-	CustomerMaxCallSeconds   *int     `json:"customer_max_call_seconds"`
+	Enabled                       *bool    `json:"enabled"`
+	AuthMode                      string   `json:"auth_mode"`
+	AllowedDomains                []string `json:"allowed_domains"`
+	OTPTTLSeconds                 int      `json:"otp_ttl_seconds"`
+	SessionTTLSeconds             int      `json:"session_ttl_seconds"`
+	RequireAuthForWorkforce       *bool    `json:"require_auth_for_workforce"`
+	CustomerDailyCallSeconds      *int     `json:"customer_daily_call_seconds"`
+	CustomerMaxCallSeconds        *int     `json:"customer_max_call_seconds"`
+	AutoRegisterOnConversationOTP *bool    `json:"auto_register_on_conversation_otp"`
 }
 
 type customerOTPRequest struct {
@@ -38,6 +39,7 @@ type customerOTPRequest struct {
 	Email        string                       `json:"email"`
 	DisplayName  string                       `json:"display_name"`
 	Locale       string                       `json:"locale"`
+	Purpose      string                       `json:"purpose"` // optional: conversation | default
 	Notification *customerOTPNotificationBody `json:"notification,omitempty"`
 }
 
@@ -85,9 +87,10 @@ func (s *server) putCustomerAuthSettings(w http.ResponseWriter, r *http.Request)
 	row, err := s.store.PutCustomerAuthSettings(r.Context(), tenantID, store.CustomerAuthSettingsInput{
 		Enabled: body.Enabled, AuthMode: body.AuthMode, AllowedDomains: body.AllowedDomains,
 		OTPTTLSeconds: body.OTPTTLSeconds, SessionTTLSeconds: body.SessionTTLSeconds,
-		RequireAuthForWorkforce:  body.RequireAuthForWorkforce,
-		CustomerDailyCallSeconds: body.CustomerDailyCallSeconds,
-		CustomerMaxCallSeconds:   body.CustomerMaxCallSeconds,
+		RequireAuthForWorkforce:       body.RequireAuthForWorkforce,
+		CustomerDailyCallSeconds:      body.CustomerDailyCallSeconds,
+		CustomerMaxCallSeconds:        body.CustomerMaxCallSeconds,
+		AutoRegisterOnConversationOTP: body.AutoRegisterOnConversationOTP,
 	})
 	if err != nil {
 		writeCustomerAuthError(w, err)
@@ -123,7 +126,9 @@ func (s *server) requestCustomerOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	customer, matched, err := s.resolveOrCreateCustomerForOTP(r.Context(), tenantID, email, req.DisplayName, req.Locale)
+	// Auto-register only creates on verify when flag is on; request may attach
+	// existing customer or leave customer_id empty for first-time auto-register.
+	customer, matched, err := s.resolveCustomerForOTP(r.Context(), tenantID, email, req.DisplayName, req.Locale, settings.AutoRegisterOnConversationOTP)
 	if err != nil {
 		writeCustomerAuthError(w, err)
 		return
@@ -131,7 +136,18 @@ func (s *server) requestCustomerOTP(w http.ResponseWriter, r *http.Request) {
 
 	code := newOTPCode()
 	codeHash := s.customerOTPHash(tenantID, email, code)
-	metadata := map[string]any{"ip": clientIP(r), "user_agent": r.UserAgent()}
+	purpose := strings.ToLower(strings.TrimSpace(req.Purpose))
+	if purpose == "" {
+		purpose = "conversation"
+	}
+	metadata := map[string]any{
+		"ip":         clientIP(r),
+		"user_agent": r.UserAgent(),
+		"purpose":    purpose,
+		"auto_register": settings.AutoRegisterOnConversationOTP,
+		"display_name":  strings.TrimSpace(req.DisplayName),
+		"locale":        strings.TrimSpace(req.Locale),
+	}
 	notification := map[string]any{"status": "not_configured"}
 	if req.Notification != nil {
 		platform := strings.ToLower(strings.TrimSpace(req.Notification.Platform))
@@ -146,13 +162,19 @@ func (s *server) requestCustomerOTP(w http.ResponseWriter, r *http.Request) {
 		metadata["notification"] = map[string]any{"platform": platform, "token_sha256": hex.EncodeToString(digest[:]), "app_version": strings.TrimSpace(req.Notification.AppVersion)}
 		notification = map[string]any{"status": "not_configured", "platform": platform}
 	}
-	chal, err := s.store.CreateCustomerOTPChallenge(r.Context(), tenantID, email, customer.ID, codeHash, time.Duration(settings.OTPTTLSeconds)*time.Second, metadata)
+	customerID := ""
+	requiresProfile := true
+	if customer != nil {
+		customerID = customer.ID
+		requiresProfile = strings.TrimSpace(customer.DisplayName) == ""
+	}
+	chal, err := s.store.CreateCustomerOTPChallenge(r.Context(), tenantID, email, customerID, codeHash, time.Duration(settings.OTPTTLSeconds)*time.Second, metadata)
 	if err != nil {
 		writeCustomerAuthError(w, err)
 		return
 	}
 	s.sendCustomerOTPEmail(r.Context(), email, code, settings.OTPTTLSeconds)
-	s.store.RecordCustomerAuthEvent(r.Context(), tenantID, customer.ID, email, "customer.auth.otp_requested", clientIP(r), r.UserAgent(), nil)
+	s.store.RecordCustomerAuthEvent(r.Context(), tenantID, customerID, email, "customer.auth.otp_requested", clientIP(r), r.UserAgent(), nil)
 
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"challenge_id": chal.ID,
@@ -166,8 +188,9 @@ func (s *server) requestCustomerOTP(w http.ResponseWriter, r *http.Request) {
 		"resend_after": 60,
 		"customer_hint": map[string]any{
 			"matched_existing_customer":   matched,
-			"requires_profile_completion": strings.TrimSpace(customer.DisplayName) == "",
+			"requires_profile_completion": requiresProfile,
 			"email_domain_policy":         "allowed",
+			"will_auto_register":          !matched && settings.AutoRegisterOnConversationOTP,
 		},
 	})
 }
@@ -201,12 +224,36 @@ func (s *server) verifyCustomerOTP(w http.ResponseWriter, r *http.Request) {
 		writeCustomerAuthError(w, err)
 		return
 	}
-	customer, err := s.store.GetCustomer(r.Context(), tenantID, chal.CustomerID)
-	if err != nil {
-		writeCustomerAuthError(w, err)
+	settings, _ := s.store.GetCustomerAuthSettings(r.Context(), tenantID)
+	var customer *store.Customer
+	if strings.TrimSpace(chal.CustomerID) != "" {
+		customer, err = s.store.GetCustomer(r.Context(), tenantID, chal.CustomerID)
+		if err != nil {
+			writeCustomerAuthError(w, err)
+			return
+		}
+	} else if settings.AutoRegisterOnConversationOTP {
+		// First-time conversation auto-register: create customer only after OTP succeeds.
+		displayName := ""
+		locale := ""
+		if chal.Metadata != nil {
+			if v, ok := chal.Metadata["display_name"].(string); ok {
+				displayName = v
+			}
+			if v, ok := chal.Metadata["locale"].(string); ok {
+				locale = v
+			}
+		}
+		customer, _, err = s.resolveCustomerForOTP(r.Context(), tenantID, chal.Email, displayName, locale, true)
+		if err != nil {
+			writeCustomerAuthError(w, err)
+			return
+		}
+	} else {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "customer not found", "code": "customer_not_found"})
 		return
 	}
-	if customer.Status != "active" {
+	if customer == nil || customer.Status != "active" {
 		writeCustomerAuthError(w, store.ErrCustomerAuthForbidden)
 		return
 	}
@@ -219,7 +266,6 @@ func (s *server) verifyCustomerOTP(w http.ResponseWriter, r *http.Request) {
 		writeCustomerAuthError(w, err)
 		return
 	}
-	settings, _ := s.store.GetCustomerAuthSettings(r.Context(), tenantID)
 	sessionTTL := time.Duration(settings.SessionTTLSeconds) * time.Second
 	session, err := s.store.CreateCustomerSession(auditctx.WithActor(r.Context(), customer.ID), tenantID, customer.ID, refreshHash, sessionTTL)
 	if err != nil {
@@ -375,11 +421,17 @@ func (s *server) checkCustomerAuthDomain(ctx context.Context, tenantID, email st
 	return store.ErrCustomerAuthForbidden
 }
 
-func (s *server) resolveOrCreateCustomerForOTP(ctx context.Context, tenantID, email, displayName, locale string) (*store.Customer, bool, error) {
+// resolveCustomerForOTP returns an existing customer, or creates one only when
+// autoRegister is true. When autoRegister is false and the email is unknown,
+// returns ErrCustomerNotFound (no row created).
+func (s *server) resolveCustomerForOTP(ctx context.Context, tenantID, email, displayName, locale string, autoRegister bool) (*store.Customer, bool, error) {
 	if customer, err := s.store.FindCustomerByEmail(ctx, tenantID, email); err == nil {
 		return customer, true, nil
 	} else if !errors.Is(err, store.ErrCustomerNotFound) {
 		return nil, false, err
+	}
+	if !autoRegister {
+		return nil, false, store.ErrCustomerNotFound
 	}
 	displayName = strings.TrimSpace(displayName)
 	if displayName == "" {
@@ -389,12 +441,42 @@ func (s *server) resolveOrCreateCustomerForOTP(ctx context.Context, tenantID, em
 		}
 	}
 	result, err := s.store.UpsertCustomer(ctx, tenantID, store.CustomerInput{
-		Email: email, DisplayName: displayName, Locale: locale, Source: "self_claim", Status: "active", Metadata: map[string]any{"claimed_by": "email_otp"},
+		Email: email, DisplayName: displayName, Locale: locale, Source: "self_claim", Status: "active",
+		Metadata: map[string]any{"claimed_by": "email_otp", "auto_register": true},
 	})
 	if err != nil {
 		return nil, false, err
 	}
 	return result.Customer, false, nil
+}
+
+// resolveOrCreateCustomerForOTP is kept for callers that always auto-create (legacy).
+func (s *server) resolveOrCreateCustomerForOTP(ctx context.Context, tenantID, email, displayName, locale string) (*store.Customer, bool, error) {
+	return s.resolveCustomerForOTP(ctx, tenantID, email, displayName, locale, true)
+}
+
+func (s *server) publicCustomerAuthPolicy(w http.ResponseWriter, r *http.Request) {
+	tenantID := strings.TrimSpace(r.PathValue("tenant_id"))
+	if tenantID == "" {
+		tenantID = s.publicCustomerTenantID(r)
+	}
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id is required")
+		return
+	}
+	settings, err := s.store.GetCustomerAuthSettings(r.Context(), tenantID)
+	if err != nil {
+		writeCustomerAuthError(w, err)
+		return
+	}
+	// Safe public booleans only — no domain list.
+	writeJSON(w, http.StatusOK, map[string]any{
+		"tenant_id": tenantID,
+		"enabled":   settings.Enabled,
+		"auth_mode": settings.AuthMode,
+		"require_auth_for_workforce":      settings.RequireAuthForWorkforce || settings.Enabled,
+		"auto_register_on_conversation_otp": settings.AutoRegisterOnConversationOTP,
+	})
 }
 
 func (s *server) customerOTPHash(tenantID, email, otp string) string {
@@ -443,7 +525,7 @@ func writeCustomerAuthError(w http.ResponseWriter, err error) {
 	case errors.Is(err, store.ErrOTPExpired):
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "otp expired", "code": "otp_expired"})
 	case errors.Is(err, store.ErrCustomerNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "customer not found", "code": "not_found"})
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "customer not found", "code": "customer_not_found"})
 	default:
 		if err != nil && (strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "must be")) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error(), "code": "validation_error"})

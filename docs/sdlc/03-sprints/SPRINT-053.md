@@ -1,7 +1,7 @@
 ---
 id: SPRINT-053
-status: planned
-start: 2026-08-01
+status: in_progress
+start: 2026-07-28
 end: 2026-08-07
 updated: 2026-07-28
 design_pack: approved
@@ -43,9 +43,9 @@ complete OTP during conversation, and display the release **app version**
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0188](../04-tasks/TASK-0188.md) Tenant setting + store for conversation auto-register OTP | 4 | todo | dev | Setting get/put; schema; defaults off |
-| [TASK-0189](../04-tasks/TASK-0189.md) Conversation email OTP auto-register API + customer UX | 5 | todo | dev | Email→OTP→create/bind in conversation |
-| [TASK-0190](../04-tasks/TASK-0190.md) App version API + UI (tenant, admin, optional customer) | 3 | todo | dev | VERSION/tag visible on shells |
+| [TASK-0188](../04-tasks/TASK-0188.md) Tenant setting + store for conversation auto-register OTP | 4 | completed | dev | Setting get/put; schema; defaults off |
+| [TASK-0189](../04-tasks/TASK-0189.md) Conversation email OTP auto-register API + customer UX | 5 | completed | dev | Email→OTP→create/bind in conversation |
+| [TASK-0190](../04-tasks/TASK-0190.md) App version API + UI (tenant, admin, optional customer) | 3 | completed | dev | VERSION/tag visible on shells |
 | **Total** | **12** | | | |
 
 ## Design pack

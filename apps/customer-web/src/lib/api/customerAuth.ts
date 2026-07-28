@@ -19,6 +19,7 @@ export type OTPRequestResponse = {
     matched_existing_customer: boolean;
     requires_profile_completion: boolean;
     email_domain_policy: string;
+    will_auto_register?: boolean;
   };
 };
 
@@ -39,6 +40,7 @@ export type CustomerPortalPolicy = {
     mode: 'optional' | 'required';
     require_auth_for_workforce: boolean;
     allow_public_no_auth: boolean;
+    auto_register_on_conversation_otp?: boolean;
   };
   quota: CustomerQuotaSummary;
 };
@@ -110,6 +112,7 @@ export async function requestCustomerOTP(body: {
   email: string;
   display_name?: string;
   locale?: string;
+  purpose?: string;
 }, opts?: { tenantId?: string; embedKey?: string; parentOrigin?: string }) {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (opts?.tenantId) headers['X-Tenant-Id'] = opts.tenantId;
