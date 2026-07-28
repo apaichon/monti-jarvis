@@ -51,6 +51,8 @@ System design artifacts for Monti Jarvis.
 | 44 | [44-ai-call-center-security-hardening-spec.md](44-ai-call-center-security-hardening-spec.md) | 41 | Browser/session, environment, read-only database, query, and tenant-isolation hardening | `review_pending` |
 | 45 | [45-harvest-course-shared-server-deployment-spec.md](45-harvest-course-shared-server-deployment-spec.md) | 49 | Harvest-course shared-server deployment of customer, admin, tenant, and product web surfaces | `approved` |
 | 46 | [46-admin-promotion-package-grant-spec.md](46-admin-promotion-package-grant-spec.md) | 50 | Admin promotional package grant: active plan + tax invoice (atomic) | **`shipped`** v2.23.0 |
+| 47 | [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md) | 52 | Tenant avatar library create; active cap = package max_ai_employees | **`shipped`** v2.24.0 |
+| 48 | [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md) | 51 | Shared Cloud checkout, Dedicated quotation, billing scheduler, current quota/next bill, and finance documents | `review_pending` |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -91,6 +93,14 @@ System design artifacts for Monti Jarvis.
 **Sprint 49:** Deployment-only shared-server track — [45-harvest-course-shared-server-deployment-spec.md](45-harvest-course-shared-server-deployment-spec.md); workflow §115; ER/API/UX Sprint 49 sections. [SPRINT-049](../03-sprints/SPRINT-049.md) · [TASK-0181](../04-tasks/TASK-0181.md).
 
 **Sprint 50:** ✅ **shipped v2.23.0** — [46-admin-promotion-package-grant-spec.md](46-admin-promotion-package-grant-spec.md); workflow §116–117; ER/API/UX Sprint 50; UX A50. [SPRINT-050](../03-sprints/SPRINT-050.md) · [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md).
+
+**Sprint 51:** Design pack drafted and `review_pending` —
+[48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md);
+workflow §120–124; ER/API Sprint 51; UX T51/A51.
+[SPRINT-051](../03-sprints/SPRINT-051.md) ·
+[FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md).
+
+**Sprint 52:** ✅ **shipped v2.24.0** — [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md); workflow §118–119; ER/API/UX Sprint 52; UX T52. [SPRINT-052](../03-sprints/SPRINT-052.md) · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md).
 
 **Sprint 41:** Design pack drafted and review-pending — [44-ai-call-center-security-hardening-spec.md](44-ai-call-center-security-hardening-spec.md); workflow §109–112; API § Sprint 41; UX S41. [SPRINT-041](../03-sprints/SPRINT-041.md) · [FEAT-0041](../01-features/FEAT-0041-ai-call-center-security-hardening.md).
 

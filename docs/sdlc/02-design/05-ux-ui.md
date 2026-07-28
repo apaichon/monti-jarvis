@@ -3900,3 +3900,302 @@ Admin table collapses to stacked cards under ~768px; grant form remains single
 column. No customer mobile change.
 
 See DES-0046, workflow §116–117, ER Sprint 50, API Sprint 50.
+
+## Sprint 51 — Commercial plans, quotation, quota, and next bill
+
+Sprint 51 changes the tenant billing page and tenant sidebar. Shared Cloud
+remains self-service payment; Dedicated VM becomes a company-information
+quotation flow. Both surfaces consume one current-plan response.
+
+### Screen map → API
+
+| UI zone | User action | API |
+| --- | --- | --- |
+| T51-A Current plan | Load authoritative plan, period, next bill, and quota | `GET /api/tenant/commercial/current-plan` |
+| T51-B Quota cards | Inspect limit, used, remaining, source, freshness | Included in current-plan response |
+| T51-C Shared packages | Load catalog and monthly/annual prices | `GET /api/tenant/packages` |
+| T51-C Calculate | Change Shared billing interval | `POST /api/tenant/commercial/calculate` |
+| T51-C Buy | Open payment flow for `self_serve` only | `POST /api/tenant/checkout` |
+| T51-D Dedicated packages | Render indicative capacity/price | `GET /api/tenant/packages` |
+| T51-D Request quotation | Open company-information form | client-only dialog |
+| T51-E Quote form | Submit company/contact/capacity information | `POST /api/tenant/commercial/quotes` |
+| T51-F Quote history | Review own submitted/quoted status | `GET /api/tenant/commercial/quotes` |
+| T51-G Documents | Open receipt/tax history | `GET /api/tenant/billing/documents` |
+| T51-S Sidebar plan | Show same plan + compact quota + next-bill link | `GET /api/tenant/commercial/current-plan` via shared store |
+| A51-A Quote queue | Platform review/filter | `GET /api/platform/commercial/quotes` |
+| A51-B Quote decision | Capacity-confirm, quote, reject, expire | `PATCH /api/platform/commercial/quotes/{id}` |
+| A51-C Billing retry | Replay eligible cycle | `POST /api/platform/billing/cycles/{id}/retry` |
+
+### Tenant billing layout — desktop
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Billing & packages                                      [Documents] [Tax]   │
+│ Shared Cloud can be purchased online. Dedicated VM requires a quotation.   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ T51-A CURRENT PLAN                                                           │
+│ Launch · Active · Shared Cloud · Monthly                                    │
+│ Current period: 28 Jul–28 Aug 2026     Next bill: 28 Aug · ฿535.00          │
+│ [View calculation] [Manage documents]                                       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ T51-B CURRENT QUOTA                                      Updated 1 min ago   │
+│ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐              │
+│ │ Storage          │ │ AI avatars       │ │ Concurrent voice │              │
+│ │ 680 MB / 1 GB    │ │ 1 / 2            │ │ 0 / 1 now        │              │
+│ │ 68%  ███████░░░  │ │ 50%  █████░░░░░  │ │ 0%   ░░░░░░░░░░  │              │
+│ │ 344 MB remaining │ │ 1 remaining      │ │ 1 available      │              │
+│ └──────────────────┘ └──────────────────┘ └──────────────────┘              │
+│ Unlimited dimensions show “Unlimited · 410 used”, without fake percent.    │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ T51-C SHARED CLOUD                                      [Monthly | Annual]  │
+│ ┌─────────────────────┐ ┌─────────────────────┐ ┌─────────────────────┐      │
+│ │ Launch              │ │ Starter             │ │ Growth              │      │
+│ │ ฿500 / month        │ │ ฿900 / month        │ │ ฿1,500 / month      │      │
+│ │ ...                 │ │ ...                 │ │ ...                 │      │
+│ │ [Current]           │ │ [Buy Starter]       │ │ [Buy Growth]        │      │
+│ └─────────────────────┘ └─────────────────────┘ └─────────────────────┘      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ T51-D DEDICATED VM · QUOTATION REQUIRED                                     │
+│ ┌──────────────────────────────┐ ┌──────────────────────────────┐            │
+│ │ Dedicated Growth             │ │ Dedicated Business           │            │
+│ │ Indicative ฿11,500 / month   │ │ Indicative ฿19,200 / month   │            │
+│ │ 12 vCPU · 48 GB · 250 calls  │ │ 16 vCPU · 64 GB · 500 calls  │            │
+│ │ [Request quotation]          │ │ [Request quotation]          │            │
+│ └──────────────────────────────┘ └──────────────────────────────┘            │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ T51-F QUOTATION STATUS   dqr_… · Dedicated Growth · Under review            │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+Dedicated cards must never render **Buy Dedicated …**, payment methods, or a
+payment confirmation modal.
+
+### T51-E Dedicated quotation dialog
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Request quotation — Dedicated Growth                   [×] │
+├─────────────────────────────────────────────────────────────┤
+│ Company legal name *   [Acme Call Center Co., Ltd.       ] │
+│ Contact name *         [Anan Example                      ] │
+│ Work email *           [anan@example.com                  ] │
+│ Phone *                [+66 81 234 5678                   ] │
+│ Tax/registration ID    [0105559999999                     ] │
+│ Company size           [201–500                        ▾ ] │
+│ Expected concurrency * [180                               ] │
+│ Preferred region       [Thailand / Bangkok             ▾ ] │
+│ Notes                  [Target go-live in Q4…             ] │
+│                                                             │
+│ No payment is taken. Sales and infrastructure will confirm │
+│ capacity, final price, terms, and provisioning date.       │
+│                                    [Cancel] [Send request] │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### T51-S Tenant sidebar plan card
+
+```text
+┌───────────────────────────────┐
+│ CURRENT PLAN                  │
+│ Launch                        │
+│ ███████░░░ 68% highest usage │
+│ Next bill 28 Aug · ฿535       │
+│ View billing →                │
+└───────────────────────────────┘
+```
+
+Rules:
+
+- Plan name/status and next bill come from T51-A's shared API store.
+- Percentage is the highest reliable finite quota utilization and includes the
+  dimension in accessible text/title.
+- If usage is unavailable, show `Usage unavailable`; never retain an old
+  percentage as current.
+- Promotion/manual plans show `No scheduled bill`.
+- Dedicated request before activation shows `Quotation in review`.
+
+### A51 platform quote review layout
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Dedicated quotations                    [Status ▾] [Package ▾] [Search]     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Tenant   Company        Plan        Capacity  Region  Status       Updated  │
+│ acme     Acme Co., Ltd. Ded Growth  180       th-bkk  Under review  5m ago  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Selected request                                                             │
+│ Company/contact/tax details · requested concurrency · notes                  │
+│ Capacity snapshot [vCPU/RAM/storage/region/date]                             │
+│ [Confirm capacity] [Issue quote] [Reject]                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Shared Cloud self-service
+
+```text
+Tenant selects monthly/annual Shared plan
+  → POST commercial/calculate
+  → review immutable itemized calculation
+  → POST checkout
+  → configured payment gateway
+  → paid callback settles subscription
+  → current plan refreshes with next bill + documents
+```
+
+### Flow B — Dedicated VM quotation
+
+```text
+Tenant selects Dedicated plan
+  → Request quotation (never Buy)
+  → company/contact/capacity form
+  → POST commercial/quotes
+  → Submitted / Under review status
+  → platform capacity confirmation + quote
+  → tenant sees final quote and expiry
+  → operator-controlled acceptance/provisioning
+```
+
+### Flow C — Current plan and quota refresh
+
+```text
+Tenant authenticates
+  → shared current-plan store loads once
+  ├─ billing page renders plan + next bill + dimension cards
+  └─ sidebar renders same package + compact highest utilization
+
+Usage source stale/unavailable
+  → keep plan and billing facts
+  → label quota freshness
+  → do not display authoritative 0%
+```
+
+### Flow D — Renewal failure and recovery
+
+```text
+Scheduler payment attempt fails
+  → current plan shows Past due / retry date
+  → bounded retry or platform retry action
+  → success: same cycle settles, documents issue once
+  → exhausted: grace then suspended state, no duplicate entitlement
+```
+
+### Component → file
+
+| Component | Planned path |
+| --- | --- |
+| Billing page | `apps/tenant-web/src/routes/billing/+page.svelte` |
+| Commercial API types/client | `apps/tenant-web/src/lib/api/billing.ts` |
+| Shared current-plan store | `apps/tenant-web/src/lib/commercial/current-plan.svelte.ts` |
+| Tenant sidebar plan card | `apps/tenant-web/src/routes/+layout.svelte` |
+| Dedicated quote dialog | `apps/tenant-web/src/lib/components/billing/DedicatedQuoteDialog.svelte` |
+| Quota dimension card | `apps/tenant-web/src/lib/components/billing/QuotaUsageCard.svelte` |
+| Platform quote queue | `apps/platform-admin-web/src/routes/billing/quotes/+page.svelte` |
+| Platform commercial API client | `apps/platform-admin-web/src/lib/api/commercial.ts` |
+| Go tenant/platform handlers | `cmd/server/commercial.go` |
+| Store/migration | `internal/store/commercial.go`, `scripts/migrations/035_commercial_operations.sql` |
+
+### Mobile collapse
+
+- Current-plan facts stack before quota cards.
+- Quota cards become one column; dimension label, used/limit, remaining, and
+  freshness stay visible.
+- Shared and Dedicated packages become one card per row.
+- Quote dialog becomes a full-width sheet with one field per row and a sticky
+  **Send request** action.
+- Sidebar compact card remains a link; no horizontal progress overflow.
+
+### Language
+
+| EN | TH |
+| --- | --- |
+| Current plan | แพ็กเกจปัจจุบัน |
+| Next bill | รอบบิลถัดไป |
+| Quota used / remaining | โควตาที่ใช้ / คงเหลือ |
+| Request quotation | ขอใบเสนอราคา |
+| Quotation in review | กำลังตรวจสอบใบเสนอราคา |
+| No scheduled bill | ไม่มีรอบบิลที่กำหนด |
+| Usage unavailable | ไม่สามารถโหลดการใช้งานได้ |
+
+See DES-0048, workflow §120–124, ER Sprint 51, and API Sprint 51.
+## Sprint 52 — Tenant avatar library (T52)
+
+**What changes:** New tenant console surface for avatar library create/activate.
+Customer portal unchanged except workforce list reflects only active agents.
+
+### Screen T52 — Avatar library
+
+```text
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Tenant · Avatars                                                    T1   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ T2 Cap meter                                                             │
+│   Active workforce  2 / 5  ·  3 slots remaining                          │
+│   [████████░░░░░░░░]                                                     │
+│   Package limit applies to active agents only — create unlimited drafts. │
+│                                                                          │
+│ T3 [ + Create avatar ]                                                   │
+│                                                                          │
+│ T4 Library                                                               │
+│ ┌────────────┬──────────┬──────────┬───────────┬───────────────────────┐ │
+│ │ Avatar     │ Role     │ Status   │ Actions   │                       │ │
+│ ├────────────┼──────────┼──────────┼───────────┼───────────────────────┤ │
+│ │ Maya       │ Sales    │ Active   │ [Deact.]  │                       │ │
+│ │ Neo        │ Support  │ Active   │ [Deact.]  │                       │ │
+│ │ Draft Luna │ VIP      │ Library  │ [Activate]│ (disabled if at cap)  │ │
+│ │ Spare Max  │ Sales    │ Library  │ [Activate]│                       │ │
+│ └────────────┴──────────┴──────────┴───────────┴───────────────────────┘ │
+│                                                                          │
+│ T5 Create modal                                                          │
+│   Name *  Role  Trait  Greeting  Portrait                                │
+│   [Cancel]  [Create — adds to library inactive]                          │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Screen map → API
+
+| UI zone | User action | API |
+| --- | --- | --- |
+| T1 Nav | Open library | navigate `/tenant/avatars` |
+| T2 Cap | Load summary | `GET /api/tenant/avatars` → `cap` |
+| T3 Create | Submit form | `POST /api/tenant/avatars` |
+| T4 Activate | Click activate | `POST /api/tenant/avatars/{id}/activate` |
+| T4 Deactivate | Click deactivate | `POST /api/tenant/avatars/{id}/deactivate` |
+| T4 Edit | Save metadata | `PUT /api/tenant/avatars/{id}` |
+
+### Flow A — Create beyond package avatar count
+
+```text
+Limit 2 active → create 3 library avatars → all succeed inactive
+  → cap meter still 0/2 until activate
+```
+
+### Flow B — Activate to cap then block
+
+```text
+Activate #1 → 1/2 · Activate #2 → 2/2 · Activate #3 → 409 toast
+  → deactivate #1 → Activate #3 succeeds
+```
+
+### Flow C — Customer workforce
+
+```text
+Customer opens agent picker → GET /api/workforce
+  → only Active library + platform active assignments
+  → Draft/Library rows never listed
+```
+
+### Component → file
+
+| Zone | Path |
+| --- | --- |
+| Library page | `apps/tenant-web/src/routes/avatars/+page.svelte` |
+| API client | `apps/tenant-web/src/lib/api/avatars.ts` |
+| Go handlers | `cmd/server` tenant avatars |
+| Store | `internal/store/avatars.go` |
+
+### Mobile
+
+Table stacks to cards; cap meter sticky at top. No customer mobile SDK change
+beyond active-only list already enforced server-side.
+
+See DES-0047, workflow §118–119, ER Sprint 52, API Sprint 52.

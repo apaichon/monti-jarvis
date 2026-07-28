@@ -427,7 +427,7 @@ func mergeAvatarUpdateBody(existing store.Avatar, body avatarUpdateBody) avatarB
 }
 
 func avatarJSON(av store.Avatar) map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"id":         av.ID,
 		"slug":       av.Slug,
 		"name":       av.Name,
@@ -442,6 +442,10 @@ func avatarJSON(av store.Avatar) map[string]any {
 		"created_at": av.CreatedAt,
 		"updated_at": av.UpdatedAt,
 	}
+	if av.OwnerTenantID != "" {
+		out["owner_tenant_id"] = av.OwnerTenantID
+	}
+	return out
 }
 
 func avatarListJSON(avatars []store.Avatar) []map[string]any {

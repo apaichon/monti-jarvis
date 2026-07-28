@@ -3446,3 +3446,264 @@ sequenceDiagram
 ```
 
 See DES-0046, ER Sprint 50, API Sprint 50, and UX A50.
+
+## 120. Catalog calculation and Shared Cloud checkout (Sprint 51)
+
+```mermaid
+sequenceDiagram
+  participant B as Tenant Browser
+  participant G as Go :8091
+  participant C as internal/commercial
+  participant S as internal/store
+  participant PG as Postgres callcenter
+  participant P as Payment Gateway
+
+  B->>G: GET /api/tenant/packages
+  G->>S: List active package versions
+  S->>PG: SELECT packages + effective package_versions
+  PG-->>B: Catalog with deployment/purchase modes
+  B->>G: POST /api/tenant/commercial/calculate<br/>{package_id, billing_interval}
+  G->>C: Calculate from effective server catalog
+  C-->>B: Itemized amount + checkout_eligible
+  alt package purchase_mode = quote
+    B->>G: POST /api/tenant/checkout
+    G-->>B: 409 PACKAGE_REQUIRES_QUOTE
+  else Shared Cloud self_serve
+    B->>G: POST /api/tenant/checkout
+    G->>S: Create pending order + subscription
+    S->>PG: INSERT immutable calculation snapshot
+    G->>P: Initialize configured payment
+    P-->>B: Payment URL
+  end
+```
+
+The server ignores browser-supplied amounts, discount, VAT, price version, and
+quota rules. Dedicated VM keeps an indicative calculation but is never
+checkout-eligible.
+
+## 121. Dedicated VM company quotation (Sprint 51)
+
+```mermaid
+sequenceDiagram
+  participant B as Tenant Browser
+  participant G as Go :8091
+  participant Q as internal/commercial/quotes
+  participant PG as Postgres callcenter
+  participant A as Platform Admin
+
+  B->>G: POST /api/tenant/commercial/quotes<br/>{package_id, company, contact, capacity}
+  G->>G: Require tenant_admin; validate quote-only package
+  alt Shared package sent to quote endpoint
+    G-->>B: 400 INVALID_COMMERCIAL_REQUEST
+  else valid Dedicated request
+    G->>Q: SubmitQuote(tenant, request, idempotency_key)
+    Q->>PG: INSERT dedicated_quote_requests status=submitted
+    PG-->>G: quote id
+    G-->>B: 201 submitted
+  end
+  Note over G,PG: No payment_order, document, subscription, or entitlement is created
+  A->>G: PATCH /api/platform/commercial/quotes/{id}
+  G->>Q: Validate transition + platform_admin
+  alt capacity not confirmed before quote
+    G-->>A: 422 QUOTE_CAPACITY_REQUIRED
+  else valid transition
+    Q->>PG: UPDATE status, capacity/price/expiry snapshot + audit
+    G-->>A: 200 quote state
+  end
+  B->>G: GET /api/tenant/commercial/quotes
+  G-->>B: Own-tenant quote history only
+```
+
+### State: Dedicated quote request
+
+| Status | Meaning | Allowed next |
+| --- | --- | --- |
+| `submitted` | Company/capacity request received | `under_review`, `withdrawn` |
+| `under_review` | Sales/ops review | `capacity_confirmed`, `rejected` |
+| `capacity_confirmed` | Infrastructure capacity approved | `quoted`, `rejected` |
+| `quoted` | Price/terms/expiry issued | `accepted`, `expired`, `rejected` |
+| `accepted` | Tenant accepted a valid quote | `provisioning` |
+| `provisioning` | Operator handoff in progress | `active`, `rejected` |
+| `active` | Dedicated service activated | terminal |
+| `rejected`, `expired`, `withdrawn` | Closed request | terminal |
+
+## 122. Renewal billing scheduler and documents (Sprint 51)
+
+```mermaid
+sequenceDiagram
+  participant W as Billing Scheduler
+  participant S as internal/store
+  participant PG as Postgres callcenter
+  participant P as Payment Gateway
+  participant D as Document Issuer
+  participant R as Redis DB4
+
+  W->>S: Claim due subscriptions
+  S->>PG: SELECT FOR UPDATE SKIP LOCKED
+  S->>PG: INSERT/SELECT billing_cycle<br/>UNIQUE(subscription_id, period_key)
+  alt cycle already settled
+    S-->>W: Existing settled result; no-op
+  else due cycle
+    S->>PG: Freeze calculation snapshot
+    S->>PG: Create/reuse one payment_order
+    S->>P: Attempt payment/finance settlement
+    alt transient payment failure
+      S->>PG: status=retry_wait, next_attempt_at, safe error code
+    else retry exhausted
+      S->>PG: cycle=failed; subscription=past_due/grace
+    else paid
+      S->>D: Issue/reuse receipt + tax invoice
+      D->>PG: INSERT issued documents
+      S->>PG: Advance entitlement + subscription period once
+      S->>R: Rebind period counters / invalidate entitlement cache
+      S->>PG: cycle=settled
+    end
+  end
+```
+
+### State: subscription
+
+| Status | Meaning |
+| --- | --- |
+| `pending_payment` | Initial Shared Cloud payment is outstanding |
+| `active` | Current period paid/approved and entitlement active |
+| `past_due` | Renewal failed and retry/dunning is active |
+| `grace` | Bounded service grace before suspension |
+| `suspended` | Entitlement restricted after grace |
+| `cancelled` | Future renewal disabled |
+| `ended` | Historical terminal state |
+
+### State: billing cycle
+
+| Status | Meaning |
+| --- | --- |
+| `scheduled` | Unique subscription/period cycle claimed |
+| `previewed` | Calculation snapshot frozen |
+| `payment_pending` | Payment/finance action exists |
+| `paid` | Settlement confirmed |
+| `documents_issued` | Receipt and tax invoice linked |
+| `settled` | Subscription/entitlement period advanced exactly once |
+| `retry_wait` | Bounded retry scheduled |
+| `failed` | Retry exhausted; subscription moves to dunning/grace |
+
+## 123. Current plan, quota usage, and next bill (Sprint 51)
+
+```mermaid
+sequenceDiagram
+  participant B as Tenant Browser / Sidebar
+  participant G as Go :8091
+  participant E as internal/entitlements
+  participant Q as internal/quota
+  participant S as internal/store
+  participant R as Redis DB4
+  participant PG as Postgres callcenter
+
+  B->>G: GET /api/tenant/commercial/current-plan
+  G->>E: Resolve active entitlement/package snapshot
+  E->>R: Read entitlement cache
+  G->>S: Resolve active subscription/quote and next billing cycle
+  S->>PG: SELECT tenant-scoped commercial state
+  G->>Q: Snapshot current quota dimensions
+  Q->>R: Read enforcement counters
+  Q->>PG: Read usage ledger projection/freshness
+  alt usage dependency unavailable
+    Q-->>G: dimensions with consumed=null, freshness=unavailable
+  else current
+    Q-->>G: limit, used, remaining, utilization, source, freshness
+  end
+  G-->>B: One current-plan response
+  B->>B: Render billing header, quota cards, next bill, sidebar
+```
+
+The compact sidebar percentage is the highest reliable utilization among
+finite quota dimensions. It is not an average. If no reliable finite dimension
+exists, the UI shows **Usage unavailable** instead of `0%`.
+
+## 124. Commercial document correction and safe replay (Sprint 51)
+
+```mermaid
+sequenceDiagram
+  participant A as Platform Admin
+  participant G as Go :8091
+  participant S as internal/store
+  participant PG as Postgres callcenter
+  participant T as Tenant Browser
+
+  A->>G: POST /api/platform/billing/documents/{id}/void<br/>{reason}
+  G->>S: Void issued document
+  S->>PG: status=voided + reason + timestamp
+  A->>G: POST /api/platform/billing/documents/{id}/reissue
+  G->>S: Reissue from immutable cycle/order snapshot
+  S->>PG: INSERT new document linked by reissued_from_id
+  T->>G: GET /api/tenant/billing/documents
+  G-->>T: Own documents with issued/voided status
+  alt scheduler retries the same settled cycle
+    S->>PG: Load existing active receipt/tax invoice
+    S-->>G: Same document ids; no duplicate numbers
+  end
+```
+
+See DES-0048, ER Sprint 51, API Sprint 51, and UX T51/A51.
+## 118. Tenant creates library avatar without active cap (Sprint 52)
+
+Tenant admin creates an avatar for their private library. Create must **not**
+call the package active-avatar quota check.
+
+```mermaid
+sequenceDiagram
+  participant T as Tenant Browser
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant S as internal/store
+  participant PG as Postgres callcenter
+
+  T->>G: POST /api/tenant/avatars {name, role, …}
+  G->>G: Require tenant_admin JWT
+  Note over G,Q: Create path does NOT call CheckAIEmployees
+  G->>S: CreateTenantAvatar(tenant, body)
+  S->>PG: INSERT ai_avatars owner_tenant_id=tenant
+  S->>PG: INSERT tenant_avatar_assignments status=disabled
+  S->>PG: optional ai_avatar_voices default
+  PG-->>S: ok
+  S-->>G: avatar + inactive assignment
+  G-->>T: 201 library avatar (inactive)
+```
+
+## 119. Tenant activates avatar under package cap (Sprint 52)
+
+```mermaid
+sequenceDiagram
+  participant T as Tenant Browser
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant S as internal/store
+  participant PG as Postgres callcenter
+
+  T->>G: POST /api/tenant/avatars/{id}/activate
+  G->>G: Require tenant_admin; avatar owned/assigned to tenant
+  G->>S: CountActiveAssignments(tenant)
+  S->>PG: COUNT active assignments
+  PG-->>S: n
+  G->>Q: CheckAIEmployees(tenant, n+1)
+  alt over package limit
+    Q-->>G: quota_exceeded
+    G-->>T: 409 active cap reached
+  else under limit
+    Q-->>G: ok
+    G->>S: ActivateAssignment(tenant, id)
+    S->>PG: UPDATE assignment status=active
+    PG-->>S: ok
+    G-->>T: 200 active avatar
+  end
+```
+
+### State table — tenant avatar library
+
+| Assignment status | Workforce visible | Counts toward max_ai_employees |
+| --- | --- | --- |
+| `disabled` (library) | no | no |
+| `active` | yes | yes |
+
+Deactivate: `active` → `disabled` frees a slot.
+
+See DES-0047, ER Sprint 52, API Sprint 52, UX T52.

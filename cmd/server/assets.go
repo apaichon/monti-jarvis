@@ -15,6 +15,36 @@ const maxAvatarImageBytes = 4 << 20
 
 func (s *server) uploadAvatarImage(w http.ResponseWriter, r *http.Request) {
 	avatarID := strings.TrimSpace(strings.ToLower(r.PathValue("id")))
+	s.handleAvatarImageUpload(w, r, avatarID, "")
+}
+
+// uploadTenantAvatarImage allows tenant admins to upload portraits for avatars
+// they own (owner_tenant_id matches JWT tenant).
+func (s *server) uploadTenantAvatarImage(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := s.tenantIDFromAuth(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	avatarID := strings.TrimSpace(r.PathValue("id"))
+	if avatarID == "" {
+		writeError(w, http.StatusBadRequest, "avatar id is required")
+		return
+	}
+	av, err := s.store.GetAvatar(r.Context(), avatarID)
+	if err != nil {
+		writeAvatarError(w, err)
+		return
+	}
+	if av.OwnerTenantID != tenantID {
+		writeError(w, http.StatusForbidden, "only tenant-owned avatars can upload images here")
+		return
+	}
+	s.handleAvatarImageUpload(w, r, avatarID, tenantID)
+}
+
+func (s *server) handleAvatarImageUpload(w http.ResponseWriter, r *http.Request, avatarID, ownerTenantID string) {
+	avatarID = strings.TrimSpace(avatarID)
 	if avatarID == "" {
 		writeError(w, http.StatusBadRequest, "avatar id is required")
 		return
@@ -44,6 +74,10 @@ func (s *server) uploadAvatarImage(w http.ResponseWriter, r *http.Request) {
 	if contentType == "" || contentType == "application/octet-stream" {
 		contentType = mimeFromFilename(header.Filename)
 	}
+	if contentType == "" {
+		writeError(w, http.StatusBadRequest, "unsupported image type; use JPEG, PNG, WebP, or GIF")
+		return
+	}
 
 	ctx, cancel := contextWithTimeout(r, 30*time.Second)
 	defer cancel()
@@ -51,7 +85,7 @@ func (s *server) uploadAvatarImage(w http.ResponseWriter, r *http.Request) {
 	_, imageURL, err := s.store.PutAvatarImage(ctx, avatarID, contentType, data)
 	if err != nil {
 		if strings.Contains(err.Error(), "unsupported image") {
-			writeError(w, http.StatusBadRequest, err.Error())
+			writeError(w, http.StatusBadRequest, "unsupported image type; use JPEG, PNG, WebP, or GIF")
 			return
 		}
 		writeError(w, http.StatusBadGateway, err.Error())
@@ -60,10 +94,18 @@ func (s *server) uploadAvatarImage(w http.ResponseWriter, r *http.Request) {
 
 	out := map[string]any{"image_url": imageURL, "status": "uploaded"}
 	if av, err := s.store.GetAvatar(ctx, avatarID); err == nil {
-		av.ImageURL = imageURL
-		if updated, err := s.store.UpdateAvatar(ctx, *av); err == nil {
-			out["avatar"] = avatarJSON(*updated)
-			out["status"] = "uploaded_and_saved"
+		// Tenant path: only update tenant-owned rows (already gated above).
+		if ownerTenantID == "" || av.OwnerTenantID == ownerTenantID {
+			av.ImageURL = imageURL
+			if updated, err := s.store.UpdateAvatar(ctx, *av); err == nil {
+				out["avatar"] = avatarJSON(*updated)
+				out["status"] = "uploaded_and_saved"
+				if ownerTenantID != "" {
+					if item, gerr := s.store.GetTenantLibraryAvatar(ctx, ownerTenantID, avatarID); gerr == nil {
+						out["tenant_avatar"] = tenantLibraryAvatarJSON(*item)
+					}
+				}
+			}
 		}
 	}
 

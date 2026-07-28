@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -20,19 +21,20 @@ var (
 )
 
 type Avatar struct {
-	ID        string
-	Slug      string
-	Name      string
-	Role      string
-	Trait     string
-	Color     string
-	ImageURL  string
-	Greeting  string
-	Status    string
-	Flags     map[string]any
-	Voices    []AvatarVoice
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             string
+	Slug           string
+	Name           string
+	Role           string
+	Trait          string
+	Color          string
+	ImageURL       string
+	Greeting       string
+	Status         string
+	OwnerTenantID  string // empty = platform catalog; set = tenant-owned library
+	Flags          map[string]any
+	Voices         []AvatarVoice
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type AvatarVoice struct {
@@ -112,6 +114,16 @@ ON %s.tenant_avatar_assignments (tenant_id) WHERE status = 'active'`, schema),
 			return err
 		}
 	}
+	// Sprint 52: tenant-owned library avatars.
+	if _, err := s.pg.Exec(ctx, fmt.Sprintf(`
+ALTER TABLE %s.ai_avatars ADD COLUMN IF NOT EXISTS owner_tenant_id text REFERENCES %s.tenants(id) ON DELETE CASCADE`, schema, schema)); err != nil {
+		return err
+	}
+	if _, err := s.pg.Exec(ctx, fmt.Sprintf(`
+CREATE INDEX IF NOT EXISTS ai_avatars_owner_tenant_idx
+ON %s.ai_avatars (owner_tenant_id) WHERE owner_tenant_id IS NOT NULL`, schema)); err != nil {
+		return err
+	}
 	return s.seedAvatars(ctx)
 }
 
@@ -170,12 +182,13 @@ ON CONFLICT (tenant_id, avatar_id) DO NOTHING`, schema), demoTenant, av.id)
 
 func (s *Store) ListAvatars(ctx context.Context, status string) ([]Avatar, error) {
 	schema := quoteIdent(s.cfg.PostgresSchema)
+	// Platform catalog list: only rows without a tenant owner.
 	q := fmt.Sprintf(`
-SELECT id, slug, name, role, trait, color, image_url, greeting, status, flags, created_at, updated_at
-FROM %s.ai_avatars`, schema)
+SELECT id, slug, name, role, trait, color, image_url, greeting, status, COALESCE(owner_tenant_id,''), flags, created_at, updated_at
+FROM %s.ai_avatars WHERE owner_tenant_id IS NULL`, schema)
 	args := []any{}
 	if status != "" {
-		q += ` WHERE status = $1`
+		q += ` AND status = $1`
 		args = append(args, status)
 	}
 	q += ` ORDER BY slug`
@@ -208,7 +221,7 @@ FROM %s.ai_avatars`, schema)
 func (s *Store) GetAvatar(ctx context.Context, id string) (*Avatar, error) {
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	row := s.pg.QueryRow(ctx, fmt.Sprintf(`
-SELECT id, slug, name, role, trait, color, image_url, greeting, status, flags, created_at, updated_at
+SELECT id, slug, name, role, trait, color, image_url, greeting, status, COALESCE(owner_tenant_id,''), flags, created_at, updated_at
 FROM %s.ai_avatars WHERE id = $1`, schema), id)
 	av, err := scanAvatarRow(row)
 	if err != nil {
@@ -238,11 +251,15 @@ func (s *Store) CreateAvatar(ctx context.Context, avatar Avatar) (*Avatar, error
 	}
 	defer tx.Rollback(ctx)
 
+	var owner any
+	if strings.TrimSpace(avatar.OwnerTenantID) != "" {
+		owner = strings.TrimSpace(avatar.OwnerTenantID)
+	}
 	_, err = tx.Exec(ctx, fmt.Sprintf(`
-INSERT INTO %s.ai_avatars (id, slug, name, role, trait, color, image_url, greeting, status, flags, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $11)`, schema),
+INSERT INTO %s.ai_avatars (id, slug, name, role, trait, color, image_url, greeting, status, owner_tenant_id, flags, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $12)`, schema),
 		avatar.ID, avatar.Slug, avatar.Name, avatar.Role, avatar.Trait, avatar.Color,
-		avatar.ImageURL, avatar.Greeting, avatar.Status, string(flagsJSON), actor)
+		avatar.ImageURL, avatar.Greeting, avatar.Status, owner, string(flagsJSON), actor)
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +554,7 @@ func scanAvatar(rows pgx.Rows) (Avatar, error) {
 	var av Avatar
 	var flagsRaw []byte
 	if err := rows.Scan(&av.ID, &av.Slug, &av.Name, &av.Role, &av.Trait, &av.Color,
-		&av.ImageURL, &av.Greeting, &av.Status, &flagsRaw, &av.CreatedAt, &av.UpdatedAt); err != nil {
+		&av.ImageURL, &av.Greeting, &av.Status, &av.OwnerTenantID, &flagsRaw, &av.CreatedAt, &av.UpdatedAt); err != nil {
 		return Avatar{}, err
 	}
 	_ = json.Unmarshal(flagsRaw, &av.Flags)
@@ -551,7 +568,7 @@ func scanAvatarRow(row pgx.Row) (*Avatar, error) {
 	var av Avatar
 	var flagsRaw []byte
 	err := row.Scan(&av.ID, &av.Slug, &av.Name, &av.Role, &av.Trait, &av.Color,
-		&av.ImageURL, &av.Greeting, &av.Status, &flagsRaw, &av.CreatedAt, &av.UpdatedAt)
+		&av.ImageURL, &av.Greeting, &av.Status, &av.OwnerTenantID, &flagsRaw, &av.CreatedAt, &av.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrAvatarNotFound
 	}
@@ -563,6 +580,261 @@ func scanAvatarRow(row pgx.Row) (*Avatar, error) {
 		av.Flags = map[string]any{}
 	}
 	return &av, nil
+}
+
+// TenantLibraryAvatar is an avatar visible in the tenant library with assignment state.
+type TenantLibraryAvatar struct {
+	Avatar           Avatar
+	AssignmentStatus string // active | disabled
+}
+
+// CreateTenantLibraryAvatar creates a tenant-owned avatar with inactive assignment.
+// Does not enforce max_ai_employees (active cap applies only on activate).
+// Optional: set avatar.Voices with a Gemini speaker name in Voice field.
+func (s *Store) CreateTenantLibraryAvatar(ctx context.Context, tenantID string, avatar Avatar) (*TenantLibraryAvatar, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" {
+		return nil, ErrTenantNotFound
+	}
+	exists, err := s.TenantExists(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrTenantNotFound
+	}
+	avatar.OwnerTenantID = tenantID
+	if avatar.Status == "" {
+		avatar.Status = "active" // catalog row active; workforce gated by assignment
+	}
+	if avatar.ID == "" {
+		avatar.ID = "av_" + newStoreID()
+	}
+	if avatar.Slug == "" {
+		base := strings.ToLower(strings.TrimSpace(avatar.Name))
+		base = strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+				return r
+			}
+			if r == ' ' || r == '-' || r == '_' {
+				return '-'
+			}
+			return -1
+		}, base)
+		if base == "" {
+			base = "agent"
+		}
+		avatar.Slug = fmt.Sprintf("t-%s-%s", shortTenantFP(tenantID), base)
+		if len(avatar.Slug) > 48 {
+			avatar.Slug = avatar.Slug[:48]
+		}
+		avatar.Slug = avatar.Slug + "-" + newStoreID()[:6]
+	}
+	// Normalize / default Gemini speaker voice (AI Studio generate-speech names).
+	avatar.Voices = normalizeTenantVoices(avatar.Voices)
+	created, err := s.CreateAvatar(ctx, avatar)
+	if err != nil {
+		return nil, err
+	}
+	actor := auditctx.ActorID(ctx)
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	_, err = s.pg.Exec(ctx, fmt.Sprintf(`
+INSERT INTO %s.tenant_avatar_assignments (tenant_id, avatar_id, status, created_by, updated_by)
+VALUES ($1, $2, 'disabled', $3, $3)
+ON CONFLICT (tenant_id, avatar_id) DO UPDATE SET status = 'disabled', updated_by = $3`, schema),
+		tenantID, created.ID, actor)
+	if err != nil {
+		return nil, err
+	}
+	return &TenantLibraryAvatar{Avatar: *created, AssignmentStatus: "disabled"}, nil
+}
+
+func shortTenantFP(tenantID string) string {
+	var sum uint32
+	for i := 0; i < len(tenantID); i++ {
+		sum = sum*33 + uint32(tenantID[i])
+	}
+	return fmt.Sprintf("%02x", sum&0xff)
+}
+
+func normalizeTenantVoices(voices []AvatarVoice) []AvatarVoice {
+	speaker := "Aoede"
+	if len(voices) > 0 {
+		if canon, ok := CanonicalGeminiSpeaker(voices[0].Voice); ok {
+			speaker = canon
+		} else if strings.TrimSpace(voices[0].Voice) != "" {
+			// reject invalid later at handler; keep empty so create can fail closed
+			speaker = strings.TrimSpace(voices[0].Voice)
+		}
+	}
+	return []AvatarVoice{{
+		VoiceProviderID: GeminiLiveProviderID,
+		VoiceID:         GeminiLiveModelKey,
+		Voice:           speaker,
+		Priority:        1,
+		Status:          "active",
+	}}
+}
+
+// SetTenantAvatarSpeaker updates the primary Gemini speaker name for a tenant-owned avatar.
+func (s *Store) SetTenantAvatarSpeaker(ctx context.Context, tenantID, avatarID, speaker string) error {
+	canon, ok := CanonicalGeminiSpeaker(speaker)
+	if !ok {
+		return fmt.Errorf("invalid gemini speaker voice")
+	}
+	av, err := s.GetAvatar(ctx, avatarID)
+	if err != nil {
+		return err
+	}
+	if av.OwnerTenantID != tenantID {
+		return ErrAvatarNotFound
+	}
+	// Ensure voice provider seed exists.
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	_, _ = s.pg.Exec(ctx, fmt.Sprintf(`
+INSERT INTO %s.voice_providers (id, provider, model_key, modality, status)
+VALUES ('voice-gemini-live', 'google', 'gemini-2.5-flash-native-audio-latest', 'audio', 'active')
+ON CONFLICT (id) DO NOTHING`, schema))
+
+	voices := []AvatarVoice{{
+		ID:              fmt.Sprintf("avvoice_%s_gemini", avatarID),
+		VoiceProviderID: GeminiLiveProviderID,
+		VoiceID:         GeminiLiveModelKey,
+		Voice:           canon,
+		Priority:        1,
+		Status:          "active",
+	}}
+	return s.ReplaceAvatarVoices(ctx, avatarID, voices)
+}
+
+// PrimarySpeakerName returns the priority-1 active voice speaker name for an avatar.
+func (s *Store) PrimarySpeakerName(ctx context.Context, avatarID string) string {
+	voices, err := s.listAvatarVoices(ctx, avatarID, "active")
+	if err != nil || len(voices) == 0 {
+		return ""
+	}
+	// lowest priority first already ordered
+	return voices[0].Voice
+}
+
+// ListTenantLibraryAvatars returns assignments for the tenant (library + active).
+func (s *Store) ListTenantLibraryAvatars(ctx context.Context, tenantID string) ([]TenantLibraryAvatar, error) {
+	assignments, err := s.ListTenantAvatarAssignments(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TenantLibraryAvatar, 0, len(assignments))
+	for _, a := range assignments {
+		if a.Avatar == nil {
+			continue
+		}
+		out = append(out, TenantLibraryAvatar{Avatar: *a.Avatar, AssignmentStatus: a.Status})
+	}
+	return out, nil
+}
+
+// GetTenantLibraryAvatar returns avatar if owned by or assigned to tenant.
+func (s *Store) GetTenantLibraryAvatar(ctx context.Context, tenantID, avatarID string) (*TenantLibraryAvatar, error) {
+	av, err := s.GetAvatar(ctx, avatarID)
+	if err != nil {
+		return nil, err
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var status string
+	err = s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT status FROM %s.tenant_avatar_assignments WHERE tenant_id = $1 AND avatar_id = $2`, schema),
+		tenantID, avatarID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Owned by tenant but missing assignment row — repair path not required; deny.
+		if av.OwnerTenantID != tenantID {
+			return nil, ErrAvatarNotFound
+		}
+		return nil, ErrAssignmentNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if av.OwnerTenantID != "" && av.OwnerTenantID != tenantID {
+		return nil, ErrAvatarNotFound
+	}
+	// Platform-catalog avatars may be assigned to the tenant.
+	if av.OwnerTenantID == "" {
+		// assigned is enough
+	}
+	return &TenantLibraryAvatar{Avatar: *av, AssignmentStatus: status}, nil
+}
+
+// UpdateTenantOwnedAvatar updates metadata only for tenant-owned avatars.
+func (s *Store) UpdateTenantOwnedAvatar(ctx context.Context, tenantID string, avatar Avatar) (*Avatar, error) {
+	existing, err := s.GetAvatar(ctx, avatar.ID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.OwnerTenantID != tenantID {
+		return nil, ErrAvatarNotFound
+	}
+	avatar.OwnerTenantID = tenantID
+	// Preserve slug if not changing ownership identity.
+	if avatar.Slug == "" {
+		avatar.Slug = existing.Slug
+	}
+	return s.UpdateAvatar(ctx, avatar)
+}
+
+// ActivateTenantAvatar sets assignment active (caller must enforce quota).
+func (s *Store) ActivateTenantAvatar(ctx context.Context, tenantID, avatarID string) (*TenantLibraryAvatar, error) {
+	item, err := s.GetTenantLibraryAvatar(ctx, tenantID, avatarID)
+	if err != nil {
+		return nil, err
+	}
+	if item.Avatar.Status == "archived" {
+		return nil, ErrAvatarNotFound
+	}
+	if item.AssignmentStatus == "active" {
+		return item, nil
+	}
+	actor := auditctx.ActorID(ctx)
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	_, err = s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.tenant_avatar_assignments SET status = 'active', updated_by = $3
+WHERE tenant_id = $1 AND avatar_id = $2`, schema), tenantID, avatarID, actor)
+	if err != nil {
+		return nil, err
+	}
+	item.AssignmentStatus = "active"
+	return item, nil
+}
+
+// DeactivateTenantAvatar sets assignment disabled.
+func (s *Store) DeactivateTenantAvatar(ctx context.Context, tenantID, avatarID string) error {
+	return s.RevokeTenantAssignment(ctx, tenantID, avatarID)
+}
+
+// ArchiveTenantOwnedAvatar disables assignment and archives the catalog row.
+func (s *Store) ArchiveTenantOwnedAvatar(ctx context.Context, tenantID, avatarID string) error {
+	av, err := s.GetAvatar(ctx, avatarID)
+	if err != nil {
+		return err
+	}
+	if av.OwnerTenantID != tenantID {
+		return ErrAvatarNotFound
+	}
+	actor := auditctx.ActorID(ctx)
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	// Force-disable assignment even if active (archive frees workforce slot).
+	_, _ = s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.tenant_avatar_assignments SET status = 'disabled', updated_by = $3
+WHERE tenant_id = $1 AND avatar_id = $2`, schema), tenantID, avatarID, actor)
+	tag, err := s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.ai_avatars SET status = 'archived', updated_by = $2 WHERE id = $1 AND owner_tenant_id = $3`, schema),
+		avatarID, actor, tenantID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrAvatarNotFound
+	}
+	return nil
 }
 
 func applyWorkforceFlags(agent *WorkforceAgent, flagsRaw []byte) {

@@ -2428,6 +2428,206 @@ package name, amount, VAT split using existing helpers. Linked via `order_id`.
 | Entity | Sprint | Status |
 | --- | --- | --- |
 | `promotion_grants` | 50 | **in design / implement S50** |
-| Shared Cloud / Dedicated subscription model | 51 | planned (does not replace S50 grants) |
+| Shared Cloud / Dedicated commercial model | 51 | design `review_pending` in DES-0048; does not replace S50 grants |
 
 See DES-0046, workflow §116–117, API Sprint 50, UX A50.
+
+## Sprint 51 — Shared Cloud and Dedicated VM commercial operations
+
+Planned migration:
+`scripts/migrations/035_commercial_operations.sql`.
+
+The migration makes purchase/deployment modes explicit, adds immutable catalog
+versions, and introduces quote, subscription, and billing-cycle lifecycles.
+Existing payment, document, entitlement, and usage tables remain authorities.
+
+```mermaid
+erDiagram
+  packages ||--o{ package_versions : versions
+  tenants ||--o{ dedicated_quote_requests : requests
+  package_versions ||--o{ dedicated_quote_requests : requested_version
+  tenants ||--o{ tenant_subscriptions : subscribes
+  package_versions ||--o{ tenant_subscriptions : priced_by
+  dedicated_quote_requests o|--o| tenant_subscriptions : activates_after_approval
+  tenant_subscriptions ||--o{ billing_cycles : bills
+  payment_orders o|--o| billing_cycles : payment
+  payment_orders ||--o{ payment_documents : issues
+  tenant_entitlements o|--o| tenant_subscriptions : enforces
+  tenants ||--o{ usage_events : consumes
+
+  packages {
+    text id PK
+    text slug UK
+    text name
+    text deployment_mode
+    text purchase_mode
+    text status
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  package_versions {
+    text id PK
+    text package_id FK
+    int version
+    int monthly_price_cents
+    int annual_price_cents
+    int annual_discount_bps
+    text currency
+    int tax_rate_bps
+    jsonb rules_snapshot
+    timestamptz effective_from
+    timestamptz effective_until
+    text status
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  dedicated_quote_requests {
+    text id PK
+    text tenant_id FK
+    text package_version_id FK
+    text company_legal_name
+    text contact_name
+    text contact_email
+    text contact_phone
+    text tax_registration_id
+    text company_size
+    int expected_concurrency
+    text preferred_region
+    text notes
+    text status
+    int quoted_amount_cents
+    text currency
+    timestamptz quote_expires_at
+    jsonb capacity_snapshot
+    text idempotency_key
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  tenant_subscriptions {
+    text id PK
+    text tenant_id FK
+    text package_version_id FK
+    text entitlement_id
+    text quote_request_id
+    text billing_interval
+    text status
+    timestamptz billing_anchor
+    timestamptz current_period_start
+    timestamptz current_period_end
+    timestamptz next_bill_at
+    timestamptz grace_until
+    jsonb calculation_snapshot
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  billing_cycles {
+    text id PK
+    text subscription_id FK
+    text period_key
+    text status
+    jsonb calculation_snapshot
+    text order_id FK
+    text receipt_id
+    text tax_invoice_id
+    int attempt_count
+    timestamptz next_attempt_at
+    text last_error_code
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Constraints and indexes
+
+| Entity | Required constraint/index |
+| --- | --- |
+| `packages` | checks for `deployment_mode IN ('shared_cloud','dedicated_vm')` and `purchase_mode IN ('self_serve','quote')` |
+| `package_versions` | unique `(package_id, version)`; non-overlapping active effective window enforced transactionally |
+| `dedicated_quote_requests` | unique `(tenant_id, idempotency_key)` where key is non-empty; index `(tenant_id, created_at DESC)` |
+| `tenant_subscriptions` | one live subscription per tenant across pending/active/dunning states |
+| `billing_cycles` | unique `(subscription_id, period_key)`; index `(status, next_attempt_at)` |
+
+### Existing table extensions/reuse
+
+| Table | Sprint 51 treatment |
+| --- | --- |
+| `payment_orders` | Add nullable `subscription_id`, `billing_cycle_id`, and immutable calculation/idempotency linkage as required by migration |
+| `payment_documents` | Reuse issued/voided/reissued lifecycle; link cycle IDs through `billing_cycles` |
+| `tenant_entitlements` | Remains the single enforcement snapshot; subscription references the active entitlement |
+| `usage_events` | Remains append-only usage authority with entitlement snapshot IDs |
+| `usage_reconciliation_runs` | Reused for freshness/reconciliation; no parallel commercial counter |
+| `promotion_grants` | Continues to activate plans and tax invoices; exposes no scheduled bill unless converted explicitly |
+
+### Redis / ClickHouse / MinIO
+
+| Boundary | Sprint 51 contract |
+| --- | --- |
+| Redis DB 4 | Reuse `monti_jarvis:entitlement:{tenant_id}` and existing quota keys; invalidate/rebind after settled period change |
+| Postgres usage ledger | Current-plan quota source for historical/reconciled usage and freshness |
+| ClickHouse | Historical analytics only; never billing or enforcement authority |
+| MinIO | No new object prefix; printable receipt/tax HTML remains generated from immutable database snapshots |
+
+### Future/entity status
+
+| Sprint | Entity | Status |
+| --- | --- | --- |
+| 50 | `promotion_grants` | shipped in migration `033_promotion_grants.sql` |
+| 51 | package mode columns, `package_versions`, `dedicated_quote_requests`, `tenant_subscriptions`, `billing_cycles` | design `review_pending`; planned migration `035_commercial_operations.sql` |
+
+See DES-0048, workflow §120–124, API Sprint 51, and UX T51/A51.
+## Sprint 52 — tenant-owned avatars (library vs active)
+
+Migration: `scripts/migrations/034_tenant_owned_avatars.sql`.
+
+### `ai_avatars` extension
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `owner_tenant_id` | text NULL FK → tenants | NULL = platform catalog; set = tenant-owned library |
+
+```mermaid
+erDiagram
+  tenants ||--o{ ai_avatars : owns
+  ai_avatars ||--o{ ai_avatar_voices : voices
+  tenants ||--o{ tenant_avatar_assignments : library
+  ai_avatars ||--o{ tenant_avatar_assignments : assigned
+```
+
+### Cap rule (enforcement point)
+
+```text
+active = COUNT(*) FROM tenant_avatar_assignments
+         WHERE tenant_id = ? AND status = 'active'
+limit  = entitlement.max_ai_employees + valid_bonus(ai_employees)
+activate iff active < limit
+create never consults this inequality
+```
+
+### Redis / MinIO
+
+| Store | Key / path | Notes |
+| --- | --- | --- |
+| Redis | (optional) none new required | Cap is Postgres count + quota service |
+| MinIO | `avatars/{tenant_id}/{avatar_id}/…` | Portrait; storage usage independent of count cap |
+
+### Future entities
+
+| Entity | Sprint | Status |
+| --- | --- | --- |
+| `ai_avatars.owner_tenant_id` | 52 | **implement S52** |
+
+See DES-0047, workflow §118–119, API Sprint 52, UX T52.

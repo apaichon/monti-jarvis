@@ -117,6 +117,9 @@
 
         <div class="nav-group">
           <div class="nav-group-label">Channels</div>
+          <a class="nav-link" href="{base}/avatars" class:active={active('/avatars')}
+            ><span>☺</span>Avatars</a
+          >
           <a class="nav-link" href="{base}/embed" class:active={active('/embed')}
             ><span>⌘</span>Embed</a
           >

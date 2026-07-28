@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S51 commercial tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
+# Monti AI Call Center — Roadmap (36 core + S37–S52 commercial/tenant tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -74,7 +74,8 @@
 | **48** | **Customer / Growth / Tenant** | **Product web for marketing, advertising, lead capture, demos, tenant registration, and package conversion** | **O** | **4, 6, 9, 17, 20, 31, 39, 46** · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md) · [SPRINT-048](../03-sprints/SPRINT-048.md) · ✅ v2.21.0 |
 | **49** | **Platform / DevOps** | **Harvest-course shared-server deployment of customer, platform-admin, tenant, and product web surfaces** | **P** | **41, 48** · [SPRINT-049](../03-sprints/SPRINT-049.md) · backlog — ON HOLD (operator rollout pending) |
 | **50** | **Platform Admin / Finance** | **Admin promotional package grant: set active plan + issue tax invoice for a tenant** | **P** | **4, 9, 10, 11, 12, 13** · ✅ v2.23.0 · [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md) · [SPRINT-050](../03-sprints/SPRINT-050.md) · [DES-0046](../02-design/46-admin-promotion-package-grant-spec.md) |
-| **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, and tax invoices** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · planned |
+| **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, and tax invoices** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · planned · [FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md) · [SPRINT-051](../03-sprints/SPRINT-051.md) · [DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) |
+| **52** | **Tenant / Platform** | **Tenant self-service avatar create/library: unlimited drafts; only active avatars capped by package `max_ai_employees`** | **D+** | **5, 13, 15, 16, 45, 50** · ✅ v2.24.0 · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md) · [SPRINT-052](../03-sprints/SPRINT-052.md) · [DES-0047](../02-design/47-tenant-avatar-create-active-cap-spec.md) |
 
 ---
 
@@ -1254,10 +1255,14 @@ hard-coded tax rates.
 
 ## Planned: SPRINT-051 — Shared Cloud and Dedicated VM Commercial Operations
 
-**Platform:** Platform / Tenant / Finance · **Feature:** Two-mode commercial
-catalog with price calculation, scheduled billing, tax-invoice compliance,
-usage tracking, and quota management · **Depends:** 9, 10, 12, 13, 25, 31, 45,
-48, 50 · **Status:** planned
+**Platform:** Platform / Tenant / Finance · **Feature:**
+[FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md)
+two-mode commercial catalog with price calculation, scheduled billing,
+tax-invoice compliance, usage tracking, and quota management · **Sprint:**
+[SPRINT-051](../03-sprints/SPRINT-051.md) · **Design:**
+[DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) ·
+**Depends:** 9, 10, 12, 13, 25, 31, 45, 48, 50 · **Status:** planned /
+design `review_pending`
 
 Sprint 51 turns the pricing reference into a single catalog and billing
 authority for two service modes:
@@ -1298,6 +1303,23 @@ The 20% annual discount is a catalog setting, not a UI-only calculation.
 \* Dedicated annual values are planning estimates only. The final price,
 discount, setup fee, capacity, SLA, and provisioning date come from the
 approved quote. Dedicated voice remains BYOK and KM/RAG remains enabled.
+
+#### Dedicated VM — no payment-gateway purchase
+
+Dedicated cards must show **Request quotation**, never **Buy**. Selecting a
+Dedicated package opens a company-information form containing legal company
+name, contact name, work email, phone, optional tax/registration ID, company
+size, expected concurrency, preferred region, and notes. Submitting the form:
+
+- creates a tenant-scoped quote request;
+- creates **no** payment order, receipt, tax invoice, entitlement, or
+  subscription;
+- enters platform capacity/sales review; and
+- requires capacity confirmation, final quote, expiry, acceptance, and an
+  explicit provisioning handoff before activation.
+
+The existing checkout endpoint remains a hard guard and returns
+`409 PACKAGE_REQUIRES_QUOTE` if a Dedicated package ID is submitted.
 
 ### Pricing and billing calculation
 
@@ -1390,6 +1412,23 @@ voice paths:
 - never silently treat unavailable usage as zero; show stale/degraded state and
   keep the correction/replay path auditable.
 
+### Tenant current plan, quota, and next bill
+
+The billing page and tenant sidebar use one tenant-scoped current-plan response:
+
+- package name, mode, status, and active entitlement snapshot;
+- billing interval, current period, next bill date, projected amount, and
+  billing state;
+- quota dimensions with unit, limit/unlimited, used, remaining, utilization,
+  source, and freshness; and
+- latest receipt/tax-invoice links where available.
+
+The sidebar must remove hard-coded `Enterprise` and `68% monthly allowance`.
+Its compact percentage is the highest reliable utilization among finite quota
+dimensions—not an invented average. When usage is unavailable it shows
+`Usage unavailable`; promotion/manual plans show `No scheduled bill`, and
+pre-activation Dedicated requests show `Quotation in review`.
+
 ### Sprint 51 deliverables
 
 | Deliverable | Scope |
@@ -1402,13 +1441,15 @@ voice paths:
 | Billing scheduler | Preview, issue, payment, retry, dunning, suspension, renewal, and safe replay |
 | Receipt and tax invoice | Immutable numbering, tax fields, download/history, void/reissue/refund workflow, and audit trail |
 | Dedicated quote flow | Capacity check, quote approval, payment terms, provisioning handoff, and no-entitlement-before-approval guard |
+| Current plan UX | One plan/quota/next-bill response shared by billing page and sidebar; no hard-coded package or usage |
 | Verification | Two modes, monthly/annual cycles, proration, tax calculations, retry/idempotency, quota exhaustion, usage reconciliation, tenant isolation, and invoice corrections |
 
 ### Sprint 51 acceptance sketch
 
-1. A customer can switch between Shared Cloud and Dedicated VM, select a plan,
-   and see an itemized monthly or annual calculation before checkout or quote
-   request.
+1. A tenant can switch between Shared Cloud and Dedicated VM and see an
+   itemized monthly or annual calculation. Shared Cloud shows **Buy** and may
+   open payment; Dedicated VM shows **Request quotation** and never opens
+   payment.
 2. Shared Cloud annual totals apply the configured 20% saving; Dedicated VM
    displays an indicative estimate and requires an approved quote before
    provisioning.
@@ -1424,7 +1465,86 @@ voice paths:
    behavior.
 7. Quota exhaustion blocks only the affected dimension, returns a stable error,
    and does not lose or double-count the usage event.
+8. Current plan and sidebar show the same active package, billing period, next
+   bill state, and quota freshness; no hard-coded plan or utilization remains.
 
 **Out (unless separately approved):** unbounded Shared Cloud overage, automatic
 plan upgrades, cross-tenant quota pooling, hidden Dedicated VM provisioning,
-hard-coded tax rules, and changing historical invoices or entitlement snapshots.
+Dedicated payment-gateway checkout, hard-coded tax rules, and changing
+historical invoices or entitlement snapshots.
+
+---
+
+## Shipped: SPRINT-052 — Tenant Avatar Create & Active Cap (Package Limit) ✅ v2.24.0
+
+**Platform:** Tenant / Platform · **Feature:** [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md)
+· **Sprint plan:** [SPRINT-052](../03-sprints/SPRINT-052.md) · **Design:** [DES-0047](../02-design/47-tenant-avatar-create-active-cap-spec.md)
+· **Depends:** 5, 13, 15, 16, 45, 50 · **Status:** shipped · **Release:** v2.24.0 · **Closed:** 2026-07-28
+
+Today, platform admins own the avatar catalog and assign avatars to tenants,
+with the package cap enforced on **active assignments**
+(`max_ai_employees` / AI avatars in the plan). Tenants cannot build their own
+avatar library. Sprint 52 moves avatar **creation** into the tenant console
+while keeping commercial control on **how many can be active at once**.
+
+### Policy (core rule)
+
+| Action | Limit rule |
+| --- | --- |
+| **Create** avatar (draft / inactive / library) | **Not** limited by package avatar count; **not** blocked solely because storage quota is used for other KM assets. Portrait/object bytes may still count toward **storage** usage when uploaded, but storage exhaustion must not silently redefine the avatar **count** policy. |
+| **Activate** avatar (set `active` for workforce / customer selection) | **Hard cap** = package entitlement `max_ai_employees` (plus any valid S46 bonus on that dimension). Activating beyond the cap returns a stable `409` / `quota_exceeded` (or equivalent) without creating a half-active state. |
+| **Deactivate** / archive | Frees an active slot; draft/inactive rows remain in the tenant library. |
+
+In short: tenants may **create many** avatars; they may **activate only up to**
+the package’s total avatar limitation.
+
+### Goals
+
+- Tenant admin can create, edit, and list tenant-owned avatars (name, persona,
+  portrait, voice binding as already supported by the catalog model).
+- Separate **library** (all tenant avatars) from **active workforce** (subset
+  eligible for customer selection / embed / mobile).
+- Enforce active count from the effective entitlement only on activate /
+  promote paths — not on create.
+- Keep platform-admin catalog + assignment paths working for shared platform
+  avatars; tenant-created avatars are scoped to the owning tenant.
+- Show in tenant UI: active count / package limit, remaining active slots, and
+  clear messaging when activation is blocked.
+
+### Sprint 52 deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Tenant avatar CRUD | Create/update/list tenant-owned avatars; optional portrait upload reusing existing MinIO patterns |
+| Active vs library states | Explicit active/inactive (or assignment) status; create defaults to inactive/draft |
+| Package active cap | Activate path checks `max_ai_employees` (+ bonus if present); create path does not |
+| Storage clarity | Avatar portrait bytes may accrue storage usage; package storage quota is independent of avatar **count**; do not refuse create solely for “avatar count” |
+| Tenant UX | Avatar library screen: create, edit, activate/deactivate, show cap meter |
+| Platform visibility | Platform admin can still list/inspect tenant avatars for support (read-only or existing ops paths) |
+| Verification | Over-create allowed; over-activate blocked; deactivate frees slot; tenant isolation; workforce API only returns active |
+
+### Sprint 52 acceptance sketch
+
+1. A tenant admin can create more avatars than `max_ai_employees` without error,
+   as long as other hard validations pass (auth, required fields).
+2. Activating avatars succeeds only while
+   `active_count < effective max_ai_employees` (package + valid bonus).
+3. When at the active cap, activate returns a stable, user-visible error; no
+   avatar becomes half-active.
+4. Deactivating an active avatar frees a slot so another library avatar can be
+   activated.
+5. Customer/workforce/embed/mobile selection surfaces only **active** tenant
+   avatars (plus any still-assigned platform catalog avatars per existing
+   rules).
+6. Tenant A cannot see or activate tenant B’s avatars.
+7. Package storage quota (KM/bytes) does not substitute for the avatar **active**
+   cap, and the avatar active cap does not rewrite storage policy.
+
+**Out (unless pulled in):** HeyGen or third-party live avatar generation,
+cross-tenant marketplace of avatars, removing platform catalog, changing S51
+commercial plan matrix, or unlimited concurrent voice.
+
+**Design note:** Prefer extending `ai_avatars` / `tenant_avatar_assignments`
+(or a tenant-owned avatar table with the same active-cap semantics) rather than
+a second workforce authority. Package rule remains `max_ai_employees` on the
+entitlement snapshot.

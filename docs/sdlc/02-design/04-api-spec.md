@@ -4025,3 +4025,474 @@ Returns the full grant payload (same shape as POST success).
   the attempted grant.
 
 See DES-0046, workflow §116–117, ER Sprint 50, UX A50.
+
+## Sprint 51 — Commercial plans, quotations, billing, and current plan
+
+All commercial endpoints require authenticated roles. `AUTH_DISABLED=true`
+does not make checkout, quotation, subscription, billing-cycle, or document
+writes public; a development bypass must still resolve an explicit tenant and
+role fixture.
+
+### Endpoint summary
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/api/tenant/packages` | `tenant_admin` | Active catalog with explicit purchase/deployment modes |
+| `POST` | `/api/tenant/commercial/calculate` | `tenant_admin` | Authoritative monthly/annual calculation |
+| `POST` | `/api/tenant/checkout` | `tenant_admin` | Shared Cloud checkout only |
+| `POST` | `/api/tenant/commercial/quotes` | `tenant_admin` | Submit Dedicated company/capacity request |
+| `GET` | `/api/tenant/commercial/quotes` | `tenant_admin` | List own tenant quote requests |
+| `GET` | `/api/tenant/commercial/current-plan` | `tenant_admin` | Active plan, subscription, quota, next bill, documents |
+| `GET` | `/api/platform/commercial/quotes` | `platform_admin` | Cross-tenant quote review queue |
+| `PATCH` | `/api/platform/commercial/quotes/{id}` | `platform_admin` | Controlled quote transition |
+| `POST` | `/api/platform/billing/cycles/{id}/retry` | `platform_admin` | Idempotent failed/retry-wait cycle replay |
+
+Existing document endpoints remain authoritative:
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| `GET` | `/api/tenant/billing/documents` | own `tenant_admin` |
+| `GET` | `/api/tenant/billing/documents/{id}` | own `tenant_admin` |
+| `GET` | `/api/platform/billing/documents` | `platform_admin` |
+| `POST` | `/api/platform/billing/documents/{id}/void` | `platform_admin` |
+| `POST` | `/api/platform/billing/documents/{id}/reissue` | `platform_admin` |
+
+### `GET /api/tenant/packages`
+
+The existing response becomes explicit and typed. `purchase_mode` and
+`deployment` are required; clients must not infer behavior from a slug,
+description, name, or price.
+
+Response `200`:
+
+```json
+{
+  "packages": [
+    {
+      "id": "pkg-shared-launch",
+      "slug": "shared-launch",
+      "name": "Launch",
+      "description": "Shared Cloud · self-serve",
+      "deployment": "shared_cloud",
+      "purchase_mode": "self_serve",
+      "quote_only": false,
+      "price_options": [
+        {
+          "billing_interval": "monthly",
+          "amount_cents": 50000,
+          "currency": "THB",
+          "catalog_version_id": "pkv_launch_3"
+        },
+        {
+          "billing_interval": "annual",
+          "amount_cents": 480000,
+          "currency": "THB",
+          "discount_bps": 2000,
+          "catalog_version_id": "pkv_launch_3"
+        }
+      ],
+      "rules_summary": {
+        "max_ai_employees": 2,
+        "max_storage_bytes": 1073741824,
+        "max_concurrent_calls": 1
+      }
+    },
+    {
+      "id": "pkg-dedicated-growth",
+      "name": "Dedicated Growth",
+      "deployment": "dedicated_vm",
+      "purchase_mode": "quote",
+      "quote_only": true,
+      "indicative_monthly_cents": 1150000,
+      "currency": "THB",
+      "rules_summary": {
+        "max_concurrent_calls": 250,
+        "max_storage_bytes": 429496729600
+      }
+    }
+  ],
+  "current_entitlement": {
+    "package_id": "pkg-shared-launch",
+    "package_name": "Launch",
+    "status": "active"
+  },
+  "payment_methods": [
+    {"id": "credit_card", "label": "Credit Card"},
+    {"id": "qr_promptpay", "label": "QR PromptPay"}
+  ]
+}
+```
+
+Payment methods apply only to `purchase_mode=self_serve`.
+
+### `POST /api/tenant/commercial/calculate`
+
+**Auth:** own `tenant_admin`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `package_id` | string | yes | Active package |
+| `billing_interval` | string | yes | `monthly` or `annual` |
+| `effective_at` | RFC3339 | no | Platform/test preview only; tenant requests use now |
+| `approved_credit_id` | string | no | Server-authorized credit reference |
+
+Request:
+
+```json
+{
+  "package_id": "pkg-shared-growth",
+  "billing_interval": "annual"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "calculation_id": "calc_01J...",
+  "catalog_version_id": "pkv_growth_2",
+  "package_id": "pkg-shared-growth",
+  "deployment": "shared_cloud",
+  "purchase_mode": "self_serve",
+  "billing_interval": "annual",
+  "currency": "THB",
+  "line_items": [
+    {"code": "base_plan", "amount_cents": 1800000},
+    {"code": "annual_discount", "amount_cents": -360000}
+  ],
+  "subtotal_cents": 1800000,
+  "discount_cents": 360000,
+  "taxable_cents": 1440000,
+  "tax_rate_bps": 700,
+  "tax_cents": 100800,
+  "amount_due_cents": 1540800,
+  "checkout_eligible": true,
+  "quote_required": false,
+  "expires_at": "2026-07-28T15:15:00Z"
+}
+```
+
+Dedicated responses set `checkout_eligible=false`,
+`quote_required=true`, and label amounts as indicative. Browser-provided
+amounts, discount, tax, and quota values are ignored.
+
+### `POST /api/tenant/checkout`
+
+The existing request remains:
+
+```json
+{"package_id": "pkg-shared-launch", "payment_method": "qr_promptpay"}
+```
+
+Server preconditions:
+
+1. package and effective catalog version are active;
+2. `purchase_mode=self_serve`;
+3. payment gateway is active;
+4. server recalculation matches the stored checkout snapshot.
+
+If a Dedicated package is submitted:
+
+```json
+{
+  "error": "Dedicated VM packages require a quotation",
+  "code": "PACKAGE_REQUIRES_QUOTE",
+  "quote_path": "/api/tenant/commercial/quotes"
+}
+```
+
+HTTP status is `409`; no `payment_orders` row is created.
+
+### `POST /api/tenant/commercial/quotes`
+
+**Auth:** own `tenant_admin`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `package_id` | string | yes | Active `purchase_mode=quote` package |
+| `company_legal_name` | string | yes | 2–200 chars |
+| `contact_name` | string | yes | 2–120 chars |
+| `contact_email` | email | yes | normalized |
+| `contact_phone` | string | yes | bounded E.164/local input |
+| `tax_registration_id` | string | no | company tax/registration ID |
+| `company_size` | string | no | bounded value |
+| `expected_concurrency` | integer | yes | positive; capacity input |
+| `preferred_region` | string | no | allowlisted deployed regions |
+| `notes` | string | no | max 2000 chars |
+| `idempotency_key` | string | no | tenant-scoped |
+
+Request:
+
+```json
+{
+  "package_id": "pkg-dedicated-growth",
+  "company_legal_name": "Acme Call Center Co., Ltd.",
+  "contact_name": "Anan Example",
+  "contact_email": "anan@example.com",
+  "contact_phone": "+66812345678",
+  "tax_registration_id": "0105559999999",
+  "company_size": "201-500",
+  "expected_concurrency": 180,
+  "preferred_region": "th-bkk",
+  "notes": "Target go-live in Q4",
+  "idempotency_key": "acme-dedicated-q4"
+}
+```
+
+Response `201` (`200` on idempotent replay):
+
+```json
+{
+  "id": "dqr_01J...",
+  "tenant_id": "acme",
+  "package": {
+    "id": "pkg-dedicated-growth",
+    "name": "Dedicated Growth",
+    "deployment": "dedicated_vm"
+  },
+  "status": "submitted",
+  "expected_concurrency": 180,
+  "payment_order_id": null,
+  "entitlement_id": null,
+  "created_at": "2026-07-28T15:00:00Z"
+}
+```
+
+### `GET /api/tenant/commercial/quotes`
+
+**Auth:** own `tenant_admin`
+
+Query: `status`, `limit` (default 50, max 100), opaque `cursor`.
+Only the authenticated tenant's records are returned. Platform pricing notes
+and internal capacity details are omitted until status `quoted`.
+
+### `GET /api/platform/commercial/quotes`
+
+**Auth:** `platform_admin`
+
+Query: `tenant_id`, `status`, `package_id`, `limit`, `cursor`.
+Returns company/contact information, requested capacity, safe capacity
+snapshot, quote amount/expiry, timestamps, and audit actor IDs.
+
+### `PATCH /api/platform/commercial/quotes/{id}`
+
+**Auth:** `platform_admin`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `status` | string | yes | One allowed next state |
+| `capacity_snapshot` | object | conditional | Required for `capacity_confirmed` |
+| `quoted_amount_cents` | integer | conditional | Required for `quoted` |
+| `currency` | string | conditional | Required for `quoted` |
+| `quote_expires_at` | RFC3339 | conditional | Required for `quoted` |
+| `reason` | string | conditional | Required for reject/expire/manual rollback |
+
+Request:
+
+```json
+{
+  "status": "quoted",
+  "quoted_amount_cents": 1175000,
+  "currency": "THB",
+  "quote_expires_at": "2026-08-15T16:59:59Z",
+  "reason": "Capacity confirmed in th-bkk"
+}
+```
+
+An update to `quoted` is rejected with `422 QUOTE_CAPACITY_REQUIRED` unless the
+prior state is `capacity_confirmed`. Invalid/stale transitions return
+`409 QUOTE_STATE_CONFLICT`.
+
+### `GET /api/tenant/commercial/current-plan`
+
+**Auth:** own `tenant_admin`
+
+Response `200`:
+
+```json
+{
+  "tenant_id": "acme",
+  "plan": {
+    "package_id": "pkg-shared-launch",
+    "package_name": "Launch",
+    "deployment": "shared_cloud",
+    "purchase_mode": "self_serve",
+    "status": "active",
+    "entitlement_id": "ent_acme_launch"
+  },
+  "billing": {
+    "state": "scheduled",
+    "billing_interval": "monthly",
+    "current_period_start": "2026-07-28T00:00:00Z",
+    "current_period_end": "2026-08-28T00:00:00Z",
+    "next_bill_at": "2026-08-28T00:00:00Z",
+    "projected_amount_cents": 53500,
+    "currency": "THB",
+    "calculation_status": "current"
+  },
+  "quota": {
+    "period": "2026-07",
+    "freshness": "current",
+    "compact_utilization_bps": 6800,
+    "compact_dimension": "storage_bytes",
+    "dimensions": [
+      {
+        "dimension": "storage_bytes",
+        "unit": "bytes",
+        "limit": 1073741824,
+        "unlimited": false,
+        "used": 730144440,
+        "remaining": 343597384,
+        "utilization_bps": 6800,
+        "source": "usage_events",
+        "freshness": "2026-07-28T14:59:00Z"
+      },
+      {
+        "dimension": "monthly_call_minutes",
+        "unit": "minutes",
+        "limit": null,
+        "unlimited": true,
+        "used": 410,
+        "remaining": null,
+        "utilization_bps": null,
+        "source": "usage_events",
+        "freshness": "2026-07-28T14:59:00Z"
+      }
+    ]
+  },
+  "documents": {
+    "latest_receipt_id": "pdoc_receipt_...",
+    "latest_tax_invoice_id": "pdoc_tax_..."
+  }
+}
+```
+
+Special billing states:
+
+| State | `next_bill_at` | Meaning |
+| --- | --- | --- |
+| `scheduled` | timestamp | Active Shared subscription |
+| `no_scheduled_bill` | null | Promotion/manual entitlement |
+| `quote_pending` | null | Dedicated request not activated |
+| `past_due` / `grace` / `suspended` | timestamp or null | Billing lifecycle state |
+| `unavailable` | null | Subscription source unavailable |
+
+When usage cannot be read, dimensions return `used`, `remaining`, and
+`utilization_bps` as null with `freshness=unavailable`; the API does not
+silently emit zero.
+
+### `POST /api/platform/billing/cycles/{id}/retry`
+
+**Auth:** `platform_admin`
+
+Request:
+
+```json
+{"reason": "gateway recovered", "idempotency_key": "retry-bcy-123-2"}
+```
+
+Allowed only for `retry_wait` or eligible `failed` cycles. A settled cycle
+returns its existing result and never creates new documents or entitlement
+periods.
+
+### Sprint 51 error codes
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `INVALID_COMMERCIAL_REQUEST` | Invalid interval, company, contact, or capacity fields |
+| 401 | `AUTH_REQUIRED` | Missing/expired session |
+| 403 | `FORBIDDEN` | Wrong role or tenant |
+| 404 | `PACKAGE_NOT_FOUND` | Unknown/retired package/version |
+| 404 | `QUOTE_NOT_FOUND` | Missing or cross-tenant quote |
+| 409 | `PACKAGE_REQUIRES_QUOTE` | Dedicated plan sent to checkout |
+| 409 | `QUOTE_STATE_CONFLICT` | Invalid/stale quote transition |
+| 409 | `BILLING_CYCLE_CONFLICT` | Incompatible claim/replay |
+| 422 | `QUOTE_CAPACITY_REQUIRED` | Quote attempted before capacity confirmation |
+| 503 | `PAYMENT_GATEWAY_UNAVAILABLE` | Shared checkout/renewal gateway unavailable |
+| 503 | `USAGE_UNAVAILABLE` | Strict usage read cannot be satisfied |
+
+See DES-0048, workflow §120–124, ER Sprint 51, and UX T51/A51.
+## Sprint 52 — Tenant avatar library and active cap
+
+Tenant-admin APIs for private avatar library. **Create** has no active-count
+check; **activate** enforces package `max_ai_employees` (+ bonus).
+
+### `GET /api/tenant/avatars`
+
+**Auth:** `tenant_admin`
+
+```json
+{
+  "avatars": [
+    {
+      "id": "av_t_acme_01",
+      "slug": "t-acme-maya",
+      "name": "Maya",
+      "role": "Sales",
+      "status": "active",
+      "assignment_status": "disabled",
+      "owner_tenant_id": "acme",
+      "image_url": "",
+      "greeting": "Hello"
+    }
+  ],
+  "cap": { "active": 1, "limit": 5, "remaining": 4 }
+}
+```
+
+### `POST /api/tenant/avatars`
+
+**Auth:** `tenant_admin` · **Cap check:** none
+
+Request:
+
+```json
+{
+  "name": "Maya",
+  "role": "Sales assistant",
+  "trait": "friendly",
+  "color": "#38bdf8",
+  "greeting": "Hi, how can I help?",
+  "image_url": ""
+}
+```
+
+Response `201`: avatar with `assignment_status: "disabled"`.
+
+### `GET /api/tenant/avatars/{id}` / `PUT /api/tenant/avatars/{id}`
+
+**Auth:** `tenant_admin` · owned or assigned to tenant only.
+
+### `POST /api/tenant/avatars/{id}/activate`
+
+**Auth:** `tenant_admin` · **Cap check:** yes (`CheckAIEmployees`)
+
+Success `200`: `assignment_status: "active"`.  
+At cap: `409` with `error` / code indicating quota exceeded.
+
+### `POST /api/tenant/avatars/{id}/deactivate`
+
+**Auth:** `tenant_admin` · sets assignment `disabled`.
+
+### `DELETE /api/tenant/avatars/{id}`
+
+**Auth:** `tenant_admin` · archive owned avatar; disable assignment.
+
+### Unchanged
+
+| Route | Note |
+| --- | --- |
+| `GET /api/workforce` | Active assignments only |
+| Platform `/api/platform/avatars*` | Catalog; prefer `owner_tenant_id IS NULL` for global UI |
+| Platform tenant assign | Still capped on activate/assign |
+
+### Error codes
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `INVALID_BODY` | missing name |
+| 403 | `FORBIDDEN` | not tenant_admin |
+| 404 | `AVATAR_NOT_FOUND` | cross-tenant or missing |
+| 409 | `quota_exceeded` | activate at package active cap |
+
+See DES-0047, workflow §118–119, ER Sprint 52, UX T52.
