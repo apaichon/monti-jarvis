@@ -3132,3 +3132,317 @@ sequenceDiagram
 
 See DES-0043, 43-product-web-growth-spec.md, ER Sprint 48, API Sprint 48,
 and UX P48/A48.
+
+## 109. Browser session-storage migration and secure re-authentication (Sprint 41)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant W as Tenant/Customer Web
+  participant G as Go :8091
+  participant PG as Postgres
+
+  B->>W: Load session envelope or legacy keys
+  W->>W: Detect version; remove tokens from URL/history
+  alt refresh cookie present
+    W->>G: Request session refresh with HttpOnly cookie
+    G->>PG: Validate hash/revocation/expiry
+    PG-->>G: Session state
+    G-->>W: Short-lived access result; no refresh token body
+  else legacy plaintext key
+    W->>W: Clear legacy keys and show re-authentication
+  end
+  alt logout, expiry, tenant switch, or migration failure
+    W->>G: Revoke session when possible
+    G->>PG: Revoke refresh session
+    W->>B: Clear current and legacy browser keys
+  end
+```
+
+The Web Crypto envelope is limited to approved low-sensitivity state. A key
+must not be persisted beside the ciphertext; XSS protection remains a server
+cookie and content-security concern.
+
+## 110. Production configuration and split database authority (Sprint 41)
+
+```mermaid
+sequenceDiagram
+  participant O as Operator
+  participant G as Go :8091
+  participant W as Writer Pool
+  participant R as Read-Only Pool
+  participant PG as Postgres
+
+  O->>G: Start or readiness request
+  G->>G: Validate APP_ENV, JWT, cookies, origins, policy flags
+  G->>W: Open writer pool
+  G->>R: Open read pool with distinct role
+  G->>PG: Verify grants/policy inventory without logging values
+  alt production invariant missing
+    G-->>O: Fail closed / degraded readiness with remediation code
+  else valid
+    G-->>O: Ready; posture exposes booleans only
+  end
+```
+
+Read handlers select `R` explicitly. Mutation handlers select `W`; no handler
+silently falls back from a required read pool to a writer credential.
+
+## 111. Tenant-scoped read with transaction-local policy (Sprint 41)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser / REST Client
+  participant G as Go :8091
+  participant A as internal/auth + scope
+  participant R as Read-Only Pool
+  participant PG as Postgres RLS
+
+  B->>G: Authenticated request with filters
+  G->>A: Resolve subject, role, and tenant from token
+  A-->>G: Authorized tenant context
+  G->>R: Begin transaction
+  G->>R: SET LOCAL app.tenant_id = authenticated tenant
+  G->>PG: Parameterized query with bounded/allowlisted filters
+  alt missing or mismatched tenant context
+    PG-->>G: Empty/denied result
+    G-->>B: Safe 403/404 without cross-tenant detail
+  else authorized
+    PG-->>G: Tenant-scoped rows only
+    G->>R: Commit/rollback before pool release
+    G-->>B: Redacted response
+  end
+```
+
+`SET LOCAL` is transaction-scoped. Session-level tenant settings are
+forbidden because pooled connections can otherwise carry one tenant into the
+next request.
+
+## 112. Security regression and two-tenant UAT (Sprint 41)
+
+```mermaid
+sequenceDiagram
+  participant T as Test Runner
+  participant A as Tenant A Fixture
+  participant B as Tenant B Fixture
+  participant G as Go :8091
+  participant PG as Postgres
+
+  T->>A: Seed isolated tenant data
+  T->>B: Seed isolated tenant data
+  T->>G: Request A-scoped read with A credentials
+  G->>PG: Read under A transaction context
+  PG-->>G: A rows only
+  T->>G: Attempt B data through A token/filter
+  G->>PG: Authorization + policy evaluation
+  PG-->>G: Deny/empty without leakage
+  T->>PG: Attempt write using read-only role
+  PG-->>T: Permission denied
+  T->>T: Scan logs, bundles, storage, and diagnostics for secrets
+```
+
+See DES-0044, 44-ai-call-center-security-hardening-spec.md, ER Sprint 41,
+API Sprint 41, and UX S41.
+
+## 113. AI agent conversation uses read-only KM database user (Sprint 41)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser / Embed
+  participant G as Go :8091
+  participant R as internal/rag + internal/km
+  participant K as monti_ai_km_ro
+  participant PG as Postgres KM
+  participant C as Conversation Writer
+
+  B->>G: POST /api/chat or GET /ws/voice
+  G->>G: Resolve authenticated/embed tenant context
+  G->>R: Retrieve KM context for agent and tenant
+  R->>K: Open read-only tenant-scoped transaction
+  K->>PG: SELECT approved KM rows with SET LOCAL app.tenant_id
+  PG-->>K: Tenant-scoped chunks only
+  K-->>R: Sources/context; no mutation capability
+  R-->>G: Grounded response context
+  opt usage/session/transcript persistence
+    G->>C: Dispatch separate controlled writer operation
+  end
+  G-->>B: Chat response or voice events
+  alt attempted write or wrong tenant
+    PG-->>K: Permission denied / empty result
+    G-->>B: Safe service or authorization error
+  end
+```
+
+The AI/KM principal cannot create tickets, change KM, update entitlements, or
+write arbitrary conversation records. Any conversation persistence uses a
+separate explicitly authorized writer path.
+
+## 114. Customer-confirmed ticket uses separate write database user (Sprint 41)
+
+```mermaid
+sequenceDiagram
+  participant B as Customer
+  participant G as Go :8091
+  participant T as internal/tickets
+  participant W as monti_ticket_rw
+  participant PG as Postgres Tickets
+  participant R as Redis idempotency
+
+  B->>G: POST /api/customer/tickets with confirmation
+  G->>G: Resolve customer + tenant; validate source conversation
+  G->>R: SETNX tenant-scoped ticket idempotency key
+  G->>T: Create confirmed ticket command
+  T->>W: Open write transaction for authenticated tenant
+  W->>PG: INSERT tickets + ticket_events with tenant policy
+  PG-->>W: Ticket ID / commit
+  W-->>T: Created ticket
+  T-->>G: Safe ticket response
+  G-->>B: 201 ticket {id,status}
+  alt duplicate retry
+    R-->>G: Existing tenant-scoped ticket ID
+    G-->>B: 200 existing ticket
+  end
+  alt wrong tenant or missing confirmation
+    G-->>B: 403/404/400 without cross-tenant detail
+  end
+```
+
+`monti_ticket_rw` is not the AI KM read user. It can write only the ticket
+boundary required by the confirmed request, and tenant A's transaction cannot
+insert or select tenant B's ticket rows.
+
+## 115. Harvest-course shared-server deployment (Sprint 49)
+
+The four web surfaces share one same-origin public host. Nginx routes the
+browser paths to one Monti Jarvis process; the Go server serves each built
+portal and proxies the existing API/WebSocket boundary.
+
+```mermaid
+sequenceDiagram
+  participant O as Host Operator
+  participant M as Monti Wrapper
+  participant D as HarvestMax Deploy
+  participant B as Docker Build
+  participant C as Compose/Dependencies
+  participant N as Host Nginx
+  participant G as Go :8091
+  participant H as Browser Smoke
+
+  O->>M: deploy-shared-server.sh --environment production
+  M->>D: deploy --source monti-jarvis
+  D->>D: Validate source, env, and four package locks
+  D->>B: Build sanitized Docker context
+  B-->>D: Four portal assets + Go runtime image
+  D->>C: Compose up Monti Jarvis and dependencies
+  C-->>D: Dependencies healthy
+  D->>N: Install vhost and run nginx -t
+  alt nginx configuration invalid
+    N-->>D: Error; keep previous configuration
+  else configuration valid
+    D->>N: Reload Nginx
+    N->>G: Proxy public origin paths
+    G-->>H: /healthz, /, /admin/, /tenant/, /product/
+    alt Any portal smoke check fails
+      H-->>D: Deployment failure; preserve rollback target
+    else All portal checks pass
+      H-->>D: Deployment accepted
+    end
+  end
+```
+
+### Operator flow
+
+1. Confirm the production env file contains the real domain, secrets, LiveKit
+   settings, and `MONTI_PRODUCT_WEB_ENABLED=true`.
+2. Run `./scripts/deploy-shared-server.sh --environment production` from
+   `monti-jarvis`, optionally passing `--no-build` only when the exact image
+   has already been validated.
+3. The deployment script validates all four portal lockfiles, builds the
+   image, starts the Compose stack, validates Nginx, reloads it, and checks
+   every public portal path.
+4. If a smoke check fails, retain the previous image/configuration and use the
+   deployment guide's rollback command before retrying.
+
+The deployment changes the delivery topology only. It introduces no new
+business workflow, authorization rule, database entity, or public API.
+
+See DES-0045, ER Sprint 49, API Sprint 49, and UX Sprint 49.
+
+## 116. Platform admin grants promotional package (Sprint 50)
+
+A platform administrator grants a promotional quota package to a tenant. The
+grant **must** set the active plan and issue a tax invoice in one transaction.
+
+```mermaid
+sequenceDiagram
+  participant A as Admin Browser
+  participant G as Go :8091
+  participant E as internal/entitlements
+  participant S as internal/store
+  participant PG as Postgres callcenter
+  participant R as Redis DB4
+
+  A->>G: POST /api/platform/tenants/{id}/promotion-grants<br/>{package_id, reason, valid_until?}
+  G->>G: Require platform_admin JWT
+  alt forbidden
+    G-->>A: 403 FORBIDDEN
+  end
+  G->>S: GrantPromotion(tenant, package, reason, …)
+  S->>PG: BEGIN
+  S->>PG: Validate tenant + active package
+  alt idempotency hit
+    PG-->>S: Existing grant + order + tax invoice
+    S-->>G: Prior success payload
+    G-->>A: 200 same grant (no new invoice)
+  else new grant
+    S->>PG: INSERT payment_orders paid provider=promotion
+    S->>PG: UPDATE tenant_entitlements active → revoked
+    S->>PG: INSERT tenant_entitlements status=active
+    S->>PG: INSERT payment_documents tax_invoice issued
+    S->>PG: INSERT promotion_grants (links)
+    alt any step fails
+      S->>PG: ROLLBACK
+      S-->>G: error
+      G-->>A: 4xx/5xx; no plan/invoice change
+    else success
+      S->>PG: COMMIT
+      S->>R: DEL monti_jarvis:entitlement:{tenant_id}
+      S-->>G: grant + entitlement + tax_invoice
+      G-->>A: 201 {grant_id, entitlement, tax_invoice.doc_number}
+    end
+  end
+```
+
+### State table — promotion grant
+
+| Status | Meaning | Next |
+| --- | --- | --- |
+| `issued` | Order paid(promotion), active plan set, tax invoice issued | terminal |
+| (rolled back) | Pre-commit failure | no row / no side effects |
+
+### State table — tenant plan after grant
+
+| Prior | Action | Result |
+| --- | --- | --- |
+| no active entitlement | grant | one active plan for package |
+| active package A | grant package B | A revoked; B active; tax invoice for B |
+
+## 117. Admin promotion grant UI confirmation (Sprint 50)
+
+```mermaid
+sequenceDiagram
+  participant A as Admin Browser
+  participant G as Go :8091
+
+  A->>G: GET /api/platform/packages?status=active
+  G-->>A: catalog
+  A->>G: GET /api/platform/tenants/{id}/entitlement
+  G-->>A: current plan or 404
+  A->>A: Admin enters reason, selects package, confirms
+  A->>G: POST …/promotion-grants
+  G-->>A: 201 active plan + tax invoice number
+  A->>G: GET /api/platform/billing/… or receipts search (existing)
+  G-->>A: tax_invoice visible for tenant
+```
+
+See DES-0046, ER Sprint 50, API Sprint 50, and UX A50.

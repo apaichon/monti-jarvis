@@ -48,6 +48,9 @@ System design artifacts for Monti Jarvis.
 | 41 | [41-roadmap-45-codex-cli-skills-artifacts.md](41-roadmap-45-codex-cli-skills-artifacts.md) | 45 | Feature 43 skills applied to bounded Codex CLI jobs and downloadable HTML/image/report artifacts | `backlog — ON HOLD` |
 | 42 | [42-aiaas-packages-usage-reconciliation-spec.md](42-aiaas-packages-usage-reconciliation-spec.md) | 45 | AiaaS package tiers, dimensioned quotas, usage ledger, reconciliation, and mobile enforcement | `approved` |
 | 43 | [43-product-web-growth-spec.md](43-product-web-growth-spec.md) | 48 | Product web marketing shell, lead capture, public pricing, conversion redirects, sales leads | `approved` |
+| 44 | [44-ai-call-center-security-hardening-spec.md](44-ai-call-center-security-hardening-spec.md) | 41 | Browser/session, environment, read-only database, query, and tenant-isolation hardening | `review_pending` |
+| 45 | [45-harvest-course-shared-server-deployment-spec.md](45-harvest-course-shared-server-deployment-spec.md) | 49 | Harvest-course shared-server deployment of customer, admin, tenant, and product web surfaces | `approved` |
+| 46 | [46-admin-promotion-package-grant-spec.md](46-admin-promotion-package-grant-spec.md) | 50 | Admin promotional package grant: active plan + tax invoice (atomic) | **`shipped`** v2.23.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -84,6 +87,12 @@ System design artifacts for Monti Jarvis.
 **Sprint 44:** **ON HOLD pending security review; runtime removed** — [40-customer-generative-workspace-spec.md](40-customer-generative-workspace-spec.md). [SPRINT-044](../03-sprints/SPRINT-044.md) · [FEAT-0038](../01-features/FEAT-0038-customer-generative-ai.md).
 
 **Sprint 48:** ✅ **shipped v2.21.0** — [43-product-web-growth-spec.md](43-product-web-growth-spec.md); workflow §105–108; API § Sprint 48 product web/leads; UX P48/A48. [SPRINT-048](../03-sprints/SPRINT-048.md) · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md).
+
+**Sprint 49:** Deployment-only shared-server track — [45-harvest-course-shared-server-deployment-spec.md](45-harvest-course-shared-server-deployment-spec.md); workflow §115; ER/API/UX Sprint 49 sections. [SPRINT-049](../03-sprints/SPRINT-049.md) · [TASK-0181](../04-tasks/TASK-0181.md).
+
+**Sprint 50:** ✅ **shipped v2.23.0** — [46-admin-promotion-package-grant-spec.md](46-admin-promotion-package-grant-spec.md); workflow §116–117; ER/API/UX Sprint 50; UX A50. [SPRINT-050](../03-sprints/SPRINT-050.md) · [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md).
+
+**Sprint 41:** Design pack drafted and review-pending — [44-ai-call-center-security-hardening-spec.md](44-ai-call-center-security-hardening-spec.md); workflow §109–112; API § Sprint 41; UX S41. [SPRINT-041](../03-sprints/SPRINT-041.md) · [FEAT-0041](../01-features/FEAT-0041-ai-call-center-security-hardening.md).
 
 **Sprint 45:** Design pack approved; implementation started — [42-aiaas-packages-usage-reconciliation-spec.md](42-aiaas-packages-usage-reconciliation-spec.md); workflow §100–104; API § Sprint 45; UX T24/A24/M2. [SPRINT-045](../03-sprints/SPRINT-045.md) · [FEAT-0039](../01-features/FEAT-0039-aiaas-packages-usage-reconciliation.md).
 

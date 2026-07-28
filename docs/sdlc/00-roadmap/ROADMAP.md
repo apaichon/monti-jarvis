@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S48 shipped tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
+# Monti AI Call Center — Roadmap (36 core + S37–S51 commercial tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -64,7 +64,7 @@
 | **38** | **Customer / Platform** | **Central call center brand portal** (all tenants’ brands) | **J** | **1, 5, 6, 7** · [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · backlog |
 | **39** | **Tenant / Platform** | **Theme branding & color customization** | **D+** | **14, 16** · [FEAT-0035](../01-features/FEAT-0035-theme-color-customization.md) ✅ v2.15.0 · [SPRINT-039](../03-sprints/SPRINT-039.md) |
 | **40** | **Tenant / Integrator** | **Outbound calling with Twilio** | **G** | **1, 20, 27** · backlog |
-| **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · backlog |
+| **41** | **Security / Platform** | **AI call-center security hardening: encrypted localStorage, env secrets, read-only DB, tenant isolation** | **H** | **19, 20, 32, 33** · [FEAT-0041](../01-features/FEAT-0041-ai-call-center-security-hardening.md) · [SPRINT-041](../03-sprints/SPRINT-041.md) · in_progress |
 | **42** | **Quality / Tenant** | **Bug fix: session, login menu, nav scroll/grouping, document scope** | **Q** | **3, 15, 20** · [FEAT-0036](../01-features/FEAT-0036-tenant-ux-bugfix.md) ✅ v2.16.0 · [SPRINT-042](../03-sprints/SPRINT-042.md) |
 | **43** | **Tenant / Platform** | **Embed auth mode · env config groups · tenant Gemini key · system prompt · tools · skills** | **D+** | **14, 15, 16, 39** · [FEAT-0037](../01-features/FEAT-0037-tenant-ai-config-extensibility.md) · [SPRINT-043](../03-sprints/SPRINT-043.md) ✅ v2.17.0 |
 | **44** | **Customer / Tenant** | **Customer generative AI (Claude · Codex · Antigravity · Grok CLI) → HTML/image/canvas/link/report/doc** | **K** | **1, 20, 21, 43** · [SPRINT-044](../03-sprints/SPRINT-044.md) · backlog — ON HOLD |
@@ -72,6 +72,9 @@
 | **46** | **Platform / Tenant / Growth** | **Tenant referral affiliate program with configurable bonus-quota rewards and referral usage tracking** | **M** | **9, 10, 13, 31, 45** · [SPRINT-046](../03-sprints/SPRINT-046.md) · ✅ v2.20.0 · manual UAT deferred |
 | **47** | **Platform / AI Operations** | **Langfuse real-time LLM observability and evaluation across chat, voice, mobile, RAG, tools, and generative jobs** | **N** | **21, 25, 27, 31, 43, 44** · backlog |
 | **48** | **Customer / Growth / Tenant** | **Product web for marketing, advertising, lead capture, demos, tenant registration, and package conversion** | **O** | **4, 6, 9, 17, 20, 31, 39, 46** · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md) · [SPRINT-048](../03-sprints/SPRINT-048.md) · ✅ v2.21.0 |
+| **49** | **Platform / DevOps** | **Harvest-course shared-server deployment of customer, platform-admin, tenant, and product web surfaces** | **P** | **41, 48** · [SPRINT-049](../03-sprints/SPRINT-049.md) · backlog — ON HOLD (operator rollout pending) |
+| **50** | **Platform Admin / Finance** | **Admin promotional package grant: set active plan + issue tax invoice for a tenant** | **P** | **4, 9, 10, 11, 12, 13** · ✅ v2.23.0 · [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md) · [SPRINT-050](../03-sprints/SPRINT-050.md) · [DES-0046](../02-design/46-admin-promotion-package-grant-spec.md) |
+| **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, and tax invoices** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · planned |
 
 ---
 
@@ -432,7 +435,7 @@ Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · B
 
 ## Backlog add: SPRINT-041 — AI Call-Center Security Hardening
 
-**Platform:** Security / Platform · **Feature:** Defense-in-depth browser, environment, database, and tenant-isolation controls · **Depends:** 19, 20, 32, 33 · **Status:** backlog
+**Platform:** Security / Platform · **Feature:** Defense-in-depth browser, environment, database, and tenant-isolation controls · **Depends:** 19, 20, 32, 33 · **Status:** in_progress · [FEAT-0041](../01-features/FEAT-0041-ai-call-center-security-hardening.md) · [SPRINT-041](../03-sprints/SPRINT-041.md)
 
 | Deliverable | Notes |
 | --- | --- |
@@ -441,6 +444,13 @@ Feature: [FEAT-0018](../01-features/FEAT-0018-central-brand-call-portal.md) · B
 | Read-only AI/reporting database role | Route AI call-center and reporting read paths through a dedicated least-privilege read-only user; keep writes on separate controlled roles |
 | Injection-resistant data access | Require parameterized, allowlisted queries and bounded inputs; read-only credentials are an additional containment layer, not a substitute for query safety |
 | Tenant database isolation | Enforce tenant-scoped authorization and database policies/RLS where applicable so a tenant can read only its own data; add cross-tenant denial tests |
+
+Sprint 41 is planned for **14 points** based on the last three recorded
+closed-slice velocities (12, 13, 17). Implementation is gated on the
+`review_pending` design pack and security-owner approval. See
+[DES-0044](../02-design/44-ai-call-center-security-hardening-spec.md), the
+[manual UAT plan](../06-manual-tests/SPRINT-041-security-manual.md), and the
+[SPRINT-041 commitment](../03-sprints/SPRINT-041.md).
 
 ## Shipped: SPRINT-042 — Bug Fix (Quality / Tenant UX)
 
@@ -1187,3 +1197,234 @@ Product web landing page with source + campaign attribution
 replacement, automatic marketing emails without consent, arbitrary third-party
 redirects, public tenant data, public payment handling, and hard-coded package
 prices that bypass the platform catalog.
+
+## Shipped: SPRINT-050 — Admin Promotional Package Grant (Active Plan + Tax Invoice) ✅ v2.23.0
+
+**Platform:** Platform Admin / Finance · **Feature:** [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md)
+· **Sprint plan:** [SPRINT-050](../03-sprints/SPRINT-050.md) · **Design:** [DES-0046](../02-design/46-admin-promotion-package-grant-spec.md)
+· **Depends:** 4, 9, 10, 11, 12, 13 · **Status:** shipped · **Release:** v2.23.0 · **Closed:** 2026-07-28
+
+Sprint 50 lets platform admins **give a promotional quota package to a tenant**
+from the admin web. A promotion grant is not a silent entitlement tweak: the
+operator **must** select an active catalog plan and the system **must** set that
+plan as the tenant's **active entitlement** and **issue a tax invoice** for the
+tenant in the same grant workflow.
+
+### Why now
+
+Operators already have package catalog management and a basic
+`POST /api/platform/tenants/{id}/entitlement` assign path, but that path does
+not create commercial documents. Promotional / complimentary / sales-approved
+grants still need a finance-grade trail: active plan snapshot, tax invoice, and
+audit of who granted what and why.
+
+### Sprint 50 deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Promotion grant API | `platform_admin` endpoint that assigns an active package as the tenant's active plan and issues a tax invoice atomically (or rolls back) |
+| Active plan enforcement | One active entitlement per tenant; promotion always results in `status=active` for the granted plan; previous active entitlement is superseded with an auditable reason |
+| Tax invoice on grant | Create/issue a tax invoice for the tenant with package line items, promotion source, seller/buyer tax fields, immutable document number |
+| Admin web UX | Tenant surface (e.g. entitlement / promotion grant form) to pick package, set validity/reason, confirm active plan + tax invoice outcome |
+| Audit & isolation | Platform-only write path; tenant can read own active plan and own tax invoice; no cross-tenant leakage |
+| Verification | Unit/API tests for atomic grant, UI smoke, UAT checklist |
+
+### Sprint 50 acceptance sketch
+
+1. A platform admin can open a tenant in admin web and grant a **promotion
+   package** from the active catalog without using tenant checkout or payment
+   providers.
+2. Completing a grant **sets the selected package as the tenant's sole active
+   plan/entitlement** with a rules snapshot and optional `valid_until`.
+3. Completing a grant **issues a tax invoice** for that tenant tied to the
+   promotion order/source; document is visible in platform receipt/tax search
+   and to the tenant billing history when applicable.
+4. Partial failure is not allowed: if tax invoice issuance fails, the active
+   plan must not remain half-applied (transactional grant or compensating
+   rollback).
+5. Non-`platform_admin` roles cannot grant promotions; tenant A cannot see
+   tenant B's grant or invoice.
+6. Existing paid checkout and referral bonus-quota flows remain unchanged.
+
+**Out (unless pulled into S51):** Shared Cloud / Dedicated VM catalog redesign,
+billing scheduler, proration calculator, dedicated quote provisioning, and
+hard-coded tax rates.
+
+---
+
+## Planned: SPRINT-051 — Shared Cloud and Dedicated VM Commercial Operations
+
+**Platform:** Platform / Tenant / Finance · **Feature:** Two-mode commercial
+catalog with price calculation, scheduled billing, tax-invoice compliance,
+usage tracking, and quota management · **Depends:** 9, 10, 12, 13, 25, 31, 45,
+48, 50 · **Status:** planned
+
+Sprint 51 turns the pricing reference into a single catalog and billing
+authority for two service modes:
+
+1. **Shared Cloud** — self-serve monthly or annual packages for startups and
+   SMEs.
+2. **Dedicated VM** — capacity-backed packages for larger organizations,
+   subject to quote confirmation and infrastructure availability.
+
+The values below are the proposed commercial baseline from the pricing
+reference. They supersede the earlier S45 presentation values only after
+catalog approval and migration. Existing tenant entitlement snapshots must not
+be rewritten by a catalog edit.
+
+### Commercial modes and package baseline
+
+#### Shared Cloud — self-serve
+
+| Plan | Monthly | Annual at 20% saving | AI avatars | KM/storage allowance | Concurrent voice | Voice / RAG |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Launch | ฿500 | ฿4,800/year (฿400 effective/mo) | 2 | Up to 1 GB | 1 | BYOK voice; RAG enabled |
+| Starter | ฿900 | ฿8,640/year (฿720 effective/mo) | 5 | Up to 5 GB | 2 | BYOK voice; RAG enabled |
+| Growth | ฿1,500 | ฿14,400/year (฿1,200 effective/mo) | 10 | Up to 10 GB | 4 | BYOK voice; RAG enabled |
+| Business | ฿2,000 | ฿19,200/year (฿1,600 effective/mo) | 20 | Up to 20 GB | 6 | BYOK voice; RAG enabled |
+
+Annual calculation: `monthly_price × 12 × (1 - annual_discount)`.
+The 20% annual discount is a catalog setting, not a UI-only calculation.
+
+#### Dedicated VM — quote and capacity confirmation
+
+| Plan | Monthly reference | Annual estimate at 20% saving* | AI avatars | KM/storage allowance | Concurrent voice | Commercial flow |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Dedicated Launch | ฿3,800 | ฿36,480/year | Unlimited | Up to 300 GB | 100 | Request quote |
+| Dedicated Growth | ฿11,500 | ฿110,400/year | Unlimited | Up to 400 GB | 250 | Request quote |
+| Dedicated Business | ฿19,200 | ฿184,320/year | Unlimited | Up to 500 GB | 500 | Request quote |
+| Dedicated Enterprise | ฿32,700 | ฿313,920/year | Unlimited | Up to 600 GB | 1,000 | Request quote |
+
+\* Dedicated annual values are planning estimates only. The final price,
+discount, setup fee, capacity, SLA, and provisioning date come from the
+approved quote. Dedicated voice remains BYOK and KM/RAG remains enabled.
+
+### Pricing and billing calculation
+
+The calculator must use catalog data and return a transparent breakdown:
+
+```text
+subtotal       = base_plan_price + approved_addons + setup_fees
+discount       = catalog_discount + approved_credits
+taxable_amount = max(subtotal - discount, 0)
+tax            = taxable_amount × configured_tax_rate
+amount_due     = taxable_amount + tax
+```
+
+- Monthly plans bill at the tenant's billing anchor; annual plans bill once
+  for twelve months after the annual discount is applied.
+- Upgrades are prorated for the unused portion of the current period.
+- Downgrades take effect at the next renewal unless finance explicitly approves
+  a credit or immediate change.
+- Quote-only Dedicated VM plans cannot create an entitlement until capacity,
+  quote, payment terms, and provisioning approval are complete.
+- Overage, auto-upgrade, setup fees, credits, and tax rates are configuration
+  values. They must not be hard-coded in the pricing page or calculated from
+  browser-supplied amounts.
+
+### Billing scheduler
+
+Implement one idempotent scheduler around the existing billing authority:
+
+| Scheduled stage | Responsibility | Required outcome |
+| --- | --- | --- |
+| Renewal preview | Calculate next period, quota reset, discount, tax, and amount due | Tenant sees the upcoming charge and package/quota context |
+| Invoice issue | Create one invoice for the billing period | Immutable invoice number and calculation snapshot |
+| Payment attempt | Charge the approved payment method or create a finance task | Idempotent provider reference and payment status |
+| Retry / dunning | Retry transient failures and notify the tenant | Bounded retry schedule, no duplicate invoice or entitlement |
+| Grace / suspension | Apply configured grace period and restrict service safely | No silent quota reset or data deletion |
+| Renewal settlement | Mark paid, extend entitlement, reset period counters | Subscription, invoice, payment, and quota period agree |
+
+Scheduler requirements:
+
+- Use the tenant billing timezone and a deterministic billing-period key.
+- Re-running a job must produce the same result; provider callbacks and cron
+  retries must be safe to replay.
+- Keep payment state, invoice state, entitlement state, and quota state
+  separate, with an auditable transition linking them.
+- Dedicated provisioning must be a separate post-payment/capacity workflow and
+  must not be hidden inside the monthly renewal job.
+
+### Tax invoice and receipt roadmap
+
+Every paid commercial mode must support receipt and tax-invoice documents with:
+
+- seller identity, buyer legal name, billing address, tax ID, branch number,
+  currency, service mode, plan, billing period, line items, discount, tax rate,
+  tax amount, total, payment reference, and issue timestamp;
+- immutable document numbers and states: `draft`, `issued`, `paid`, `void`,
+  `reissued`, and `refunded`;
+- a correction/reissue path that preserves the original document and reason;
+- tenant download/history in billing and platform finance search with strict
+  tenant isolation;
+- a configurable tax policy, with the actual applicable rate and tax-invoice
+  eligibility determined by the finance configuration rather than frontend
+  constants.
+
+### Usage tracking and quota management
+
+Both modes use the same dimensioned usage contract. Each event identifies
+`tenant_id`, `subscription_id`, `service_mode`, `dimension`, `period_start`,
+`period_end`, `quantity`, `unit`, `source`, and an idempotency key.
+
+| Dimension | Shared Cloud policy | Dedicated VM policy |
+| --- | --- | --- |
+| AI avatars | Hard limit by plan: 2 / 5 / 10 / 20 | Unlimited by plan; operational capacity is quote-controlled |
+| KM/RAG storage | Hard storage limit: 1 / 5 / 10 / 20 GB | Hard storage limit: 300 / 400 / 500 / 600 GB |
+| Concurrent voice | Hard limit: 1 / 2 / 4 / 6 | Capacity limit: 100 / 250 / 500 / 1,000 |
+| Platform voice minutes | BYOK and commercially unlimited; track minutes, failures, and provider metadata | Same; track against the dedicated tenant and infrastructure |
+| KM documents / retrieval | Track document lifecycle, bytes, retrievals, and failures | Same dimensions, isolated to the dedicated tenant |
+| Mobile / embed calls | Track call minutes and concurrency if enabled | Same dimensions, with dedicated capacity attribution |
+
+Quota behavior is explicit and consistent across web, embed, mobile, KM, and
+voice paths:
+
+- reject a request before incrementing a hard quota;
+- release concurrent usage on disconnect, timeout, failed start, and retry;
+- distinguish current enforcement counters from historical usage facts;
+- show limit, used, remaining, utilization, period, and source in tenant and
+  platform views;
+- use Postgres `callcenter` as the billing/entitlement authority, Redis DB 4
+  with the `monti_jarvis:` prefix for fast enforcement counters, and ClickHouse
+  for reconciled historical analytics;
+- never silently treat unavailable usage as zero; show stale/degraded state and
+  keep the correction/replay path auditable.
+
+### Sprint 51 deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Commercial catalog | Shared Cloud and Dedicated VM modes, plans, prices, discounts, tax settings, add-ons, and versioned effective dates |
+| Pricing calculator | Monthly/annual totals, discount, tax, proration, credits, quote state, and line-item explanation |
+| Subscription and entitlement model | Billing anchor, mode, plan version, period, renewal state, quota snapshot, and dedicated provisioning state |
+| Usage ledger and projections | Idempotent calls, voice minutes, concurrency, avatars, KM/RAG, storage, mobile, and embed usage with reconciliation |
+| Quota management | Shared hard ceilings, dedicated capacity ceilings, reset/grace behavior, and tenant/platform usage views |
+| Billing scheduler | Preview, issue, payment, retry, dunning, suspension, renewal, and safe replay |
+| Receipt and tax invoice | Immutable numbering, tax fields, download/history, void/reissue/refund workflow, and audit trail |
+| Dedicated quote flow | Capacity check, quote approval, payment terms, provisioning handoff, and no-entitlement-before-approval guard |
+| Verification | Two modes, monthly/annual cycles, proration, tax calculations, retry/idempotency, quota exhaustion, usage reconciliation, tenant isolation, and invoice corrections |
+
+### Sprint 51 acceptance sketch
+
+1. A customer can switch between Shared Cloud and Dedicated VM, select a plan,
+   and see an itemized monthly or annual calculation before checkout or quote
+   request.
+2. Shared Cloud annual totals apply the configured 20% saving; Dedicated VM
+   displays an indicative estimate and requires an approved quote before
+   provisioning.
+3. A paid subscription creates one entitlement snapshot with the selected mode,
+   plan version, billing period, quota limits, and next billing date.
+4. Renewal, retry, callback, and scheduler replay cannot create duplicate
+   charges, invoices, quota resets, or entitlements.
+5. Usage dashboards and quota enforcement agree for both modes across web,
+   embed, mobile, voice, avatars, KM/RAG, and storage; two tenants cannot see
+   each other's usage or invoices.
+6. Paid orders produce receipt/tax-invoice documents with correct line items,
+   tax calculation, immutable numbering, and auditable correction/reissue
+   behavior.
+7. Quota exhaustion blocks only the affected dimension, returns a stable error,
+   and does not lose or double-count the usage event.
+
+**Out (unless separately approved):** unbounded Shared Cloud overage, automatic
+plan upgrades, cross-tenant quota pooling, hidden Dedicated VM provisioning,
+hard-coded tax rules, and changing historical invoices or entitlement snapshots.

@@ -145,7 +145,7 @@ Same API mapping; vanilla JS in `internal/web/public/index.html`. Useful referen
 
 ## Platform Admin Portal (Sprint 4)
 
-**App:** `apps/platform-admin-web` · **URL:** `http://localhost:8091/admin`  
+**App:** `apps/platform-admin-web` · **URL:** `http://localhost:8091/admin`
 Customer portal `/` unchanged. Requires `AUTH_DISABLED=false` for login.
 
 ### Global screen index
@@ -663,7 +663,7 @@ Flow 3 — Customer portal (UI unchanged)
 
 ## Tenant Portal (Sprint 6)
 
-**App:** `apps/tenant-web` · **URL:** `http://localhost:8091/tenant`  
+**App:** `apps/tenant-web` · **URL:** `http://localhost:8091/tenant`
 Prospect-facing signup. Customer portal `/` unchanged. Platform admin gains optional tenants list (P11).
 
 ### Global screen index (tenant)
@@ -1216,7 +1216,7 @@ Customer portal **unchanged** when `AUTH_DISABLED=true` (default). No login scre
 
 **Mobile:** single column; nav collapses; bars stack full width; Refresh full-width button.
 
-**Copy (EN primary):** “Usage”, “Limit”, “No active package”, “Refresh”.  
+**Copy (EN primary):** “Usage”, “Limit”, “No active package”, “Refresh”.
 TH optional: “การใช้งาน”, “ขีดจำกัด”, “ไม่มีแพ็กเกจ”.
 
 ### Customer error (optional toast)
@@ -3642,3 +3642,261 @@ Try live demo → / customer portal
 | Static serve | `internal/productweb/serve.go` |
 
 See DES-0043, workflow §105–108, ER Sprint 48, API Sprint 48.
+
+## Sprint 41 — AI call-center security hardening (S41)
+
+**Change vs prior sprint:** no new customer product surface. Existing login,
+checkout return, preview, and tenant/customer workflows gain safer session
+migration and failure states. Platform operators receive a metadata-only
+posture surface; database role/policy operations remain CLI/deployment work.
+
+### Screen map → API
+
+| UI zone | User action | API / operation |
+| --- | --- | --- |
+| S41-A Session bootstrap | Return from login/checkout/preview | `POST /api/auth/refresh` with HttpOnly cookie; one-time URL token cleanup |
+| S41-B Re-auth state | Continue after expired/migrated session | Existing login/register route; no token rendered in URL after bootstrap |
+| S41-C Posture summary | Platform admin views security state | `GET /api/platform/security/posture` |
+| S41-D Readiness | Operator checks deployment readiness | `GET /readyz` |
+| S41-E Database policy | DevOps applies grants/policies | `scripts/migrations/032_security_hardening.sql` / CLI; no browser API |
+| S41-F Isolation evidence | Tester runs two-tenant probe | Isolated fixture + `go test`; no production endpoint |
+
+### S41-C — Platform posture (desktop)
+
+```text
+┌──────────────────────────────────────────────────────────────────────────┐
+│ A  Monti Platform Admin · Security posture                                │
+├──────────────────────────────────────────────────────────────────────────┤
+│ B  Overall: HEALTHY / DEGRADED       Last checked: 2026-07-26             │
+├───────────────────────────────┬──────────────────────────────────────────┤
+│ C  Browser sessions            │ D  Database boundary                    │
+│ ✓ Secure cookie policy         │ ✓ Writer/read roles distinct            │
+│ ✓ Legacy storage disabled      │ ✓ Read-only pool connected              │
+│ ✓ URL tokens cleaned           │ ✓ Tenant policy inventory loaded         │
+├───────────────────────────────┴──────────────────────────────────────────┤
+│ E  Remediation codes: none                                                │
+│    Values, credentials, SQL, tenant IDs, and raw errors are never shown. │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### S41-B — Safe re-authentication state
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Session security update                                      │
+├──────────────────────────────────────────────────────────────┤
+│ Your session needs to be refreshed for security.             │
+│ Your saved credentials were cleared.                         │
+│                                                              │
+│ [Sign in again]                       [ภาษาไทย / English]    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Flow A — Browser session migration
+
+```text
+Load page → detect versioned envelope
+  ├─ secure refresh cookie → refresh → memory access token → continue
+  ├─ legacy plaintext key → clear keys → safe re-authentication
+  └─ invalid/expired envelope → clear → safe re-authentication
+```
+
+### Flow B — Operator posture check
+
+```text
+Platform admin opens posture → GET /api/platform/security/posture
+  ├─ healthy → show aggregate checks only
+  ├─ degraded → show remediation code, never raw secret/config value
+  └─ forbidden → standard 403; do not reveal whether a check exists
+```
+
+### Flow C — Tenant isolation verification
+
+```text
+Tester seeds Tenant A + Tenant B → authenticates A
+  → reads A data: pass
+  → requests B data: deny/empty
+  → attempts read-role write: permission denied
+  → scans storage/logs/bundle: no secret
+```
+
+### Component → file
+
+| Zone | Path |
+| --- | --- |
+| Session wrapper | `apps/tenant-web/src/lib/auth/session.ts` |
+| Customer session wrapper | `apps/customer-web/src/lib/api/customerAuth.ts` |
+| Re-auth state | Existing tenant/customer login route components |
+| Platform posture page | `apps/platform-admin-web/src/routes/security/posture/+page.svelte` (planned) |
+| Go posture handler | `cmd/server/security_posture.go` (planned) |
+| Configuration validator | `internal/env/` |
+| Read pool / policy checks | `internal/store/` and `scripts/migrations/032_security_hardening.sql` |
+
+See DES-0044, workflow §109–112, ER Sprint 41, and API Sprint 41.
+
+## Sprint 49 — Harvest-course shared-server operator surface
+
+There is no customer-facing UI redesign in this sprint. The UX surface is the
+operator's deployment and verification flow for four portals on one origin.
+
+```text
++----------------------+     +----------------------+     +----------------------+
+| D1 Build / deploy    | --> | D2 Compose runtime    | --> | D3 Nginx gate        |
+| wrapper command      |     | image + dependencies  |     | config test + reload |
++----------------------+     +----------------------+     +----------------------+
+                                                                  |
+                                                                  v
+                         +----------------------+     +----------------------+
+                         | D4 Portal smoke      | --> | D5 Accepted / rollback|
+                         | health + four paths  |     | previous image/config |
+                         +----------------------+     +----------------------+
+```
+
+### Operator flows
+
+- Flow A — Deploy: run the shared-server wrapper, validate configuration,
+  build the four portal assets, and start the stack.
+- Flow B — Verify: check `/healthz`, `/readyz`, `/`, `/admin/`, `/tenant/`, and
+  `/product/`; inspect logs if any check fails.
+- Flow C — Recover: keep the prior image and Nginx configuration available,
+  roll back, then repeat verification before accepting the release.
+
+### Screen map → API / operation
+
+| UI zone | User action | API / operation |
+| --- | --- | --- |
+| D1 Build / deploy | Select the Monti checkout and start deployment | `./scripts/deploy-shared-server.sh --environment production` |
+| D2 Compose runtime | Validate the rendered environment before start | `docker compose ... config` and dependency health checks |
+| D3 Nginx gate | Validate and reload the full-origin proxy | `nginx -t`; reload only after validation passes |
+| D4 Portal smoke | Verify liveness and each portal path | `GET /healthz`, `GET /`, `GET /admin/`, `GET /tenant/`, `GET /product/` |
+| D5 Accepted / rollback | Restore the prior image/configuration after a failed check | Deployment rollback command; rerun the D4 smoke checks |
+
+| Operator surface | Implementation boundary |
+| --- | --- |
+| Deployment command | `monti-jarvis/scripts/deploy-shared-server.sh` |
+| Four-portal image build | `harvest-deployment/docker/monti-jarvis/Dockerfile` |
+| Runtime and env contract | `harvest-deployment/prod/docker-compose-monti.yml` |
+| Public path routing | `harvest-deployment/prod/nginx-monti.conf` |
+| Deployment gates | `harvest-deployment/scripts/deploy-monti.sh` and `prod/scripts/health-check-monti.sh` |
+
+No new Svelte route or component is required; existing portal routes are
+verified as independently reachable through the shared origin.
+
+Mobile behavior is unchanged: there is no new responsive screen, mobile
+collapse, or customer interaction in Sprint 49. Operators use the same CLI,
+Compose, Nginx, and HTTP smoke-check surfaces from any terminal.
+
+See DES-0045, workflow §115, ER Sprint 49, and API Sprint 49.
+
+## Sprint 50 — Admin promotional package grant (A50)
+
+**What changes:** Platform admin tenant entitlement surface gains a
+**Promotion grant** card that always sets the active plan and issues a tax
+invoice. Customer and tenant purchase UIs are unchanged.
+
+### Screen A50 — Tenant entitlement + promotion grant
+
+```text
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Monti Admin · Tenants · {tenant_id} · Entitlement                     A1 │
+├──────────────────────────────────────────────────────────────────────────┤
+│ A2 Current plan                                                          │
+│ ┌──────────────────────────────────────────────────────────────────────┐ │
+│ │ Package: Starter (pkg-starter)     Status: active                    │ │
+│ │ Rules: max_ai_employees: 2 · …     Valid: 2026-07-01 → open          │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│ A3 Promotion grant  (sets active plan + issues tax invoice)              │
+│ ┌──────────────────────────────────────────────────────────────────────┐ │
+│ │ Package *     [ Growth            v ]   (active catalog only)        │ │
+│ │ Reason *      [ Q3 sales complimentary trial              ]          │ │
+│ │ Valid until   [ 2026-12-31 ]  (optional)                             │ │
+│ │ Amount (¢)    [ 0 ]  default complimentary                           │ │
+│ │ Idempotency   [ promo-acme-2026-q3 ] (optional)                      │ │
+│ │                                                                      │ │
+│ │ ⚠ This action will:                                                  │ │
+│ │   1. Set the selected package as the tenant active plan              │ │
+│ │   2. Issue a tax invoice for this tenant                             │ │
+│ │                                                                      │ │
+│ │            [ Cancel ]   [ Grant promotion ]                          │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│ A4 Result (after success)                                                │
+│ ┌──────────────────────────────────────────────────────────────────────┐ │
+│ │ Active plan: Growth · Tax invoice: TAX-PR12AB…   [Open receipts →]   │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                          │
+│ A5 Recent promotion grants                                               │
+│ ┌──────────┬──────────┬────────────┬────────────────┬──────────────────┐ │
+│ │ When     │ Package  │ Amount     │ Tax invoice    │ Reason           │ │
+│ ├──────────┼──────────┼────────────┼────────────────┼──────────────────┤ │
+│ │ 07-28    │ Growth   │ 0          │ TAX-PR12AB…    │ Q3 sales…        │ │
+│ └──────────┴──────────┴────────────┴────────────────┴──────────────────┘ │
+│                                                                          │
+│ A6 Ops (optional / existing)  Assign package only — no tax invoice       │
+│     [plain assign remains separate; not used for promotions]             │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Screen map → API
+
+| UI zone | User action | API |
+| --- | --- | --- |
+| A1 Header | Open tenant entitlement | navigate `/admin/tenants/{id}/entitlement` |
+| A2 Current plan | Load active plan | `GET /api/platform/tenants/{id}/entitlement` |
+| A3 Package select | Load catalog | `GET /api/platform/packages?status=active` |
+| A3 Grant promotion | Submit grant | `POST /api/platform/tenants/{id}/promotion-grants` |
+| A4 Result | Show invoice link | display `tax_invoice.doc_number`; link `/admin/billing/receipts` |
+| A5 History | List grants | `GET /api/platform/tenants/{id}/promotion-grants` |
+| A6 Plain assign | Optional non-promo assign | `POST /api/platform/tenants/{id}/entitlement` (no invoice) |
+
+### Flow A — Successful promotion grant
+
+```text
+Admin opens tenant entitlement
+  → sees current plan (or none)
+  → selects active package + enters reason
+  → confirms "active plan + tax invoice"
+  → POST promotion-grants
+  → UI shows new plan name + TAX-… number
+  → receipts console lists tax_invoice for tenant
+```
+
+### Flow B — Failure / rollback
+
+```text
+Admin submits grant
+  → store fails tax invoice insert
+  → TX rollback
+  → UI error GRANT_FAILED / validation message
+  → prior active plan unchanged; no new tax invoice
+```
+
+### Flow C — Idempotent retry
+
+```text
+Admin resubmits same idempotency_key + body
+  → 200 same grant_id + same tax_invoice number
+  → no second active supersede, no second invoice
+```
+
+### Component → file
+
+| Zone | Path |
+| --- | --- |
+| Entitlement + promotion page | `apps/platform-admin-web/src/routes/tenants/[id]/entitlement/+page.svelte` |
+| API client | `apps/platform-admin-web/src/lib/api/packages.ts` (or `promotion.ts`) |
+| Grant handler | `cmd/server` platform promotion routes |
+| Store | `internal/store` promotion grant + documents |
+
+### Languages
+
+- EN primary labels; TH-ready strings for "Promotion grant", "Active plan",
+  "Tax invoice", "Reason".
+
+### Mobile
+
+Admin table collapses to stacked cards under ~768px; grant form remains single
+column. No customer mobile change.
+
+See DES-0046, workflow §116–117, ER Sprint 50, API Sprint 50.

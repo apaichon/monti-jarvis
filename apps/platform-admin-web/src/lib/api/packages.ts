@@ -36,8 +36,8 @@ export type Entitlement = {
   status: string;
   rules_schema_id: string;
   rules: Record<string, boolean | number>;
-  valid_from: string;
-  valid_until: string | null;
+  valid_from?: string;
+  valid_until?: string | null;
 };
 
 export function listRuleSchemas() {
@@ -86,4 +86,56 @@ export function revokeTenantEntitlement(tenantId: string) {
   return apiFetch<{ status: string }>(`/api/platform/tenants/${tenantId}/entitlement`, {
     method: 'DELETE'
   });
+}
+
+export type PromotionTaxInvoice = {
+  id: string;
+  doc_type: string;
+  doc_number: string;
+  status: string;
+  amount_cents: number;
+  currency: string;
+  issued_at: string;
+};
+
+export type PromotionGrant = {
+  id: string;
+  tenant_id: string;
+  package_id: string;
+  order_id: string;
+  reason: string;
+  amount_cents: number;
+  status: string;
+  created_at: string;
+  created_by?: string;
+  valid_until?: string | null;
+  idempotency_key?: string;
+  entitlement?: Entitlement;
+  tax_invoice?: PromotionTaxInvoice;
+  tax_invoice_id?: string;
+  tax_invoice_number?: string;
+  replayed?: boolean;
+  currency?: string;
+};
+
+export type CreatePromotionGrantBody = {
+  package_id: string;
+  reason: string;
+  valid_until?: string;
+  amount_cents?: number;
+  idempotency_key?: string;
+};
+
+export function createPromotionGrant(tenantId: string, body: CreatePromotionGrantBody) {
+  return apiFetch<PromotionGrant>(`/api/platform/tenants/${encodeURIComponent(tenantId)}/promotion-grants`, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+}
+
+export function listPromotionGrants(tenantId: string, limit = 50) {
+  const q = limit ? `?limit=${limit}` : '';
+  return apiFetch<{ grants: PromotionGrant[] }>(
+    `/api/platform/tenants/${encodeURIComponent(tenantId)}/promotion-grants${q}`
+  );
 }

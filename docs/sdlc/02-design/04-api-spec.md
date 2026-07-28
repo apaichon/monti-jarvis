@@ -8,12 +8,12 @@ sprint: SPRINT-030
 
 # API Specification — Monti Jarvis
 
-**Base URL:** `http://localhost:8091`  
-**Auth:** `AUTH_DISABLED=true` (default) — same as v0.3.0 for customer paths. When `AUTH_DISABLED=false`, use `Authorization: Bearer <access_token>` on protected routes. See [06-auth-spec.md](06-auth-spec.md).  
-**Packages (Sprint 4):** Platform catalog + entitlements require auth on — see [08-packages-spec.md](08-packages-spec.md).  
-**Avatars (Sprint 5):** Platform avatar catalog + tenant assignment — see [10-avatars-spec.md](10-avatars-spec.md).  
-**Tenant register (Sprint 6):** Public signup + platform tenant list — see [11-tenant-register-spec.md](11-tenant-register-spec.md).  
-**Quota (Sprint 13):** Redis quotas + rate limits on hot paths; platform usage read API — see [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md).  
+**Base URL:** `http://localhost:8091`
+**Auth:** `AUTH_DISABLED=true` (default) — same as v0.3.0 for customer paths. When `AUTH_DISABLED=false`, use `Authorization: Bearer <access_token>` on protected routes. See [06-auth-spec.md](06-auth-spec.md).
+**Packages (Sprint 4):** Platform catalog + entitlements require auth on — see [08-packages-spec.md](08-packages-spec.md).
+**Avatars (Sprint 5):** Platform avatar catalog + tenant assignment — see [10-avatars-spec.md](10-avatars-spec.md).
+**Tenant register (Sprint 6):** Public signup + platform tenant list — see [11-tenant-register-spec.md](11-tenant-register-spec.md).
+**Quota (Sprint 13):** Redis quotas + rate limits on hot paths; platform usage read API — see [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md).
 **CORS:** `*` — methods `GET, POST, PUT, DELETE, OPTIONS`; headers `Content-Type`, `Authorization`
 
 ## Health & infra
@@ -60,7 +60,7 @@ Dependency health.
 }
 ```
 
-`entitlement_cache`: `ok` | `disabled` | `unavailable` *(Sprint 4, when `ENTITLEMENT_CACHE_ENABLED`)*  
+`entitlement_cache`: `ok` | `disabled` | `unavailable` *(Sprint 4, when `ENTITLEMENT_CACHE_ENABLED`)*
 `payment_gateway`: *(Sprint 8)* `configured` bool · `provider` `chillpay`|`mock` · `mode` `test`|`live` · `status` `inactive`|`active`
 
 ## Workforce
@@ -1037,7 +1037,7 @@ Platform admin UI calls JSON APIs on same origin (`8091`); tokens in `sessionSto
 
 ## Quota & rate limit (Sprint 13)
 
-Base: `http://localhost:8091`. Deep spec: [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md).  
+Base: `http://localhost:8091`. Deep spec: [16-quota-rate-limit-spec.md](16-quota-rate-limit-spec.md).
 Workflows: [02-workflow.md](02-workflow.md) §32–36 · UX: [05-ux-ui.md](05-ux-ui.md) § P14.
 
 ### Platform usage
@@ -1221,7 +1221,7 @@ Chat/voice from embed: existing `POST /api/chat`, `GET /ws/voice` with `X-Tenant
 
 ## Tenant KM / Scope (Sprint 15)
 
-Auth: **Bearer** `tenant_admin` + tenant **active** (`RequireTenantAdminActive`).  
+Auth: **Bearer** `tenant_admin` + tenant **active** (`RequireTenantAdminActive`).
 **Tenant id always from JWT** — never accept `tenant_id` from body/query for these routes.
 
 | Method | Path | Purpose |
@@ -3678,7 +3678,7 @@ See DES-0042, workflow §100–104, ER Sprint 45, and UX T24/A24/M2.
 
 ## Sprint 48 — Product web, leads, public packages, funnel
 
-Base: `http://localhost:8091`. Deep spec: [43-product-web-growth-spec.md](43-product-web-growth-spec.md).  
+Base: `http://localhost:8091`. Deep spec: [43-product-web-growth-spec.md](43-product-web-growth-spec.md).
 Workflows: [02-workflow.md](02-workflow.md) §105–108 · UX: [05-ux-ui.md](05-ux-ui.md) P48/A48.
 
 ### Static routes (add)
@@ -3800,3 +3800,228 @@ No email/name/phone in funnel body.
 | 503 | `LEAD_DISABLED` / `PACKAGE_PUBLIC_UNAVAILABLE` | feature disabled |
 
 See DES-0043, workflow §105–108, ER Sprint 48, UX P48/A48.
+
+## Sprint 41 — Security hardening diagnostics and boundaries
+
+Sprint 41 adds no customer-facing API. The operator contract is metadata-only;
+database role setup, policy application, and isolation probes remain startup,
+migration, or test-runner concerns.
+
+### `GET /api/platform/security/posture`
+
+| Field | Contract |
+| --- | --- |
+| Auth | Platform admin; platform role required |
+| Purpose | Show aggregate security posture and remediation codes |
+| Tenant scope | Platform aggregate only; no tenant records or IDs |
+| Response | Booleans, enum states, version, and safe remediation codes |
+| Mutation | None |
+
+```json
+{
+  "app_env": "production",
+  "auth": {"jwt_configured": true, "dev_bypass": false},
+  "browser_session": {"secure_cookie_policy": true, "legacy_storage_allowed": false},
+  "database": {"writer_configured": true, "readonly_pool": true, "roles_distinct": true},
+  "tenant_policy": {"rls_enforced": true, "inventory_version": "2026-07-26"},
+  "status": "healthy",
+  "remediation_codes": []
+}
+```
+
+Forbidden response fields include connection strings, usernames when they
+identify infrastructure, JWTs, cookies, provider keys, SQL, prompts, tenant
+IDs, request bodies, and raw error strings.
+
+### `GET /healthz` and `GET /readyz`
+
+| Endpoint | Auth | Sprint 41 rule |
+| --- | --- | --- |
+| `GET /healthz` | Public/liveness | Liveness only; never reports secrets or tenant data |
+| `GET /readyz` | Operator | Reports safe booleans and fails/degrades when required production controls are absent |
+
+### Error codes
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 401 | `AUTH_REQUIRED` | No valid platform session for posture |
+| 403 | `SECURITY_POSTURE_FORBIDDEN` | Authenticated non-platform actor requests posture |
+| 503 | `SECURITY_CONFIG_INVALID` | Production configuration is unsafe or incomplete |
+| 503 | `READONLY_POOL_UNAVAILABLE` | Required read pool cannot be opened |
+| 403/404 | standard safe authorization | Tenant context missing or cross-tenant resource is addressed |
+
+### Query contract for touched read paths
+
+All tenant-scoped read endpoints use authenticated tenant context. `tenant_id`
+from a query/body is ignored or rejected when it differs from the subject.
+Limits are capped, sort fields map to fixed SQL fragments, and all values use
+parameters. A read-only database role is an additional containment layer, not
+a substitute for authorization or injection-safe query construction.
+
+See DES-0044, workflow §109–112, ER Sprint 41, and UX S41.
+
+## Sprint 49 — Shared-server deployment contract
+
+No new JSON API endpoint is introduced. The deployment exposes the existing
+same-origin route contract through the Harvest-course host so browser cookies,
+API calls, and WebSocket connections remain on one origin.
+
+| Method/path | Consumer | Contract | Deployment check |
+| --- | --- | --- | --- |
+| `GET /healthz` | Load balancer/operator | Existing liveness response; no secrets | Required before acceptance |
+| `GET /readyz` | Operator | Existing readiness response | Required for production diagnosis |
+| `GET /` and assets | Customer browser | Existing customer portal HTML/static assets | HTTP success check |
+| `GET /admin/*` and assets | Platform admin browser | Existing admin portal HTML/static assets | HTTP success check |
+| `GET /tenant/*` and assets | Tenant browser | Existing tenant portal HTML/static assets | HTTP success check |
+| `GET /product/*` and assets | Product visitor | Existing product portal HTML/static assets | HTTP success check |
+| `/api/*` | All portals | Existing Go API and auth/session behavior | Proxied to `:8091` |
+| `/ws/*` | Realtime clients | Existing WebSocket upgrade behavior | Proxied with upgrade headers |
+
+Nginx must preserve the request host, forwarding headers, cookies, and
+WebSocket upgrade headers. It must not rewrite one portal into another or
+expose the Go listener directly to the public network.
+
+The expected failure responses remain the existing application/proxy
+responses: `404` for an unknown route, `502` when the upstream is unavailable,
+and `503` for health/readiness failure. No new request or response schema is
+required for this deployment.
+
+### Access and failure contract
+
+| Surface | Access rule | Expected failure behavior |
+| --- | --- | --- |
+| `/healthz` | Public liveness probe; no tenant or secret data | `503` when the process cannot serve liveness |
+| `/readyz` | Host operator / load balancer | `401` or `403` when the existing operator policy requires auth; `503` when not ready |
+| `/`, `/admin/*`, `/tenant/*`, `/product/*` | Static shell delivery; application authentication remains unchanged | `404` for an unknown path; shell must not bypass in-app RBAC |
+| `/api/*`, `/ws/*` | Existing application/session RBAC | Preserve existing `401`/`403` responses and WebSocket handshake policy |
+
+The deployment wrapper and Nginx are host-operator operations, not browser
+APIs. They must not accept browser-supplied tenant IDs, credentials, image
+tags, or configuration values as authorization input. Existing portal response
+shapes and health payloads remain the source of truth; Sprint 49 adds only the
+same-origin delivery and verification boundary.
+
+See DES-0045, workflow §115, ER Sprint 49, and UX Sprint 49.
+
+## Sprint 50 — Admin promotional package grant
+
+Platform-admin-only grant path that **sets the active plan** and **issues a tax
+invoice** for a tenant. Distinct from plain
+`POST /api/platform/tenants/{tenant_id}/entitlement` (plan only).
+
+### `POST /api/platform/tenants/{tenant_id}/promotion-grants`
+
+**Auth:** `platform_admin`
+
+Request:
+
+```json
+{
+  "package_id": "pkg-starter",
+  "reason": "Q3 sales complimentary Growth trial",
+  "valid_until": "2026-12-31T00:00:00Z",
+  "amount_cents": 0,
+  "idempotency_key": "promo-acme-2026-q3"
+}
+```
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `package_id` | yes | Must reference an **active** catalog package |
+| `reason` | yes | Non-empty operator reason (audit) |
+| `valid_until` | no | Optional entitlement end; null = open-ended |
+| `amount_cents` | no | Default `0` (complimentary); used on order + tax invoice |
+| `idempotency_key` | no | Tenant-scoped; retries return same grant |
+
+Success `201 Created` (or `200` on idempotent replay):
+
+```json
+{
+  "id": "pgr_01H…",
+  "tenant_id": "acme",
+  "package_id": "pkg-starter",
+  "order_id": "ord_…",
+  "reason": "Q3 sales complimentary Growth trial",
+  "amount_cents": 0,
+  "currency": "764",
+  "status": "issued",
+  "entitlement": {
+    "tenant_id": "acme",
+    "package": {"id": "pkg-starter", "slug": "starter", "name": "Starter"},
+    "status": "active",
+    "rules_schema_id": "rules-v2",
+    "rules": {"max_ai_employees": 2},
+    "valid_from": "2026-07-28T04:00:00Z",
+    "valid_until": "2026-12-31T00:00:00Z"
+  },
+  "tax_invoice": {
+    "id": "pdoc_…",
+    "doc_type": "tax_invoice",
+    "doc_number": "TAX-PR…",
+    "status": "issued",
+    "amount_cents": 0,
+    "currency": "764",
+    "issued_at": "2026-07-28T04:00:00Z"
+  },
+  "created_at": "2026-07-28T04:00:00Z",
+  "created_by": "user_admin_1"
+}
+```
+
+### `GET /api/platform/tenants/{tenant_id}/promotion-grants`
+
+**Auth:** `platform_admin`
+**Query:** `limit` (default 50, max 100)
+
+```json
+{
+  "grants": [
+    {
+      "id": "pgr_01H…",
+      "package_id": "pkg-starter",
+      "order_id": "ord_…",
+      "tax_invoice_id": "pdoc_…",
+      "tax_invoice_number": "TAX-PR…",
+      "reason": "…",
+      "amount_cents": 0,
+      "status": "issued",
+      "created_at": "2026-07-28T04:00:00Z"
+    }
+  ]
+}
+```
+
+### `GET /api/platform/promotion-grants/{grant_id}`
+
+**Auth:** `platform_admin`
+Returns the full grant payload (same shape as POST success).
+
+### Unchanged related routes
+
+| Method | Path | Sprint 50 note |
+| --- | --- | --- |
+| `POST` | `/api/platform/tenants/{tenant_id}/entitlement` | Plan assign only — **does not** issue tax invoice |
+| `GET` | `/api/platform/tenants/{tenant_id}/entitlement` | Reflects plan after grant |
+| `GET` | platform billing receipts search (existing) | Finds `tax_invoice` for tenant |
+
+### Error codes
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `INVALID_BODY` | missing `package_id` or `reason` |
+| 400 | `PACKAGE_NOT_ACTIVE` | package not active |
+| 403 | `FORBIDDEN` | not platform_admin |
+| 404 | `TENANT_NOT_FOUND` | unknown tenant |
+| 404 | `PACKAGE_NOT_FOUND` | unknown package |
+| 404 | `GRANT_NOT_FOUND` | unknown grant_id |
+| 409 | `IDEMPOTENCY_CONFLICT` | same key, different body |
+| 500 | `GRANT_FAILED` | unexpected failure |
+
+### Atomicity contract
+
+- Successful response implies **both** active entitlement for the package and
+  an issued tax invoice linked via `order_id`.
+- Failures leave no new active entitlement and no new issued tax invoice for
+  the attempted grant.
+
+See DES-0046, workflow §116–117, ER Sprint 50, UX A50.

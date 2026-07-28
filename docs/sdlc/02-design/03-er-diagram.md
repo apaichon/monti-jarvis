@@ -799,7 +799,7 @@ erDiagram
 | `notes` | text | Tenant notes |
 | audit | | `created_at`, `updated_at`, `created_by`, `updated_by` |
 
-**Unique:** `(tenant_id, agent_id, question_hash)`  
+**Unique:** `(tenant_id, agent_id, question_hash)`
 **Index:** `(tenant_id, status, last_seen_at DESC)`
 
 **Write path:** when chat RAG sets `missing_km=true` → `RecordKMGap` (Postgres) **and** existing ClickHouse `qa_events` (`event_type=missing_km`).
@@ -822,9 +822,9 @@ km/{tenant_id}/{agent_id}/{document_id}/original/{filename}
 
 ### Delete cascade (document-level) — implement in `internal/km`
 
-1. Load doc by id; require `doc.tenant_id == jwt.tenant_id` else 404  
-2. ClickHouse: `ALTER … DELETE WHERE tenant_id AND document_id` (existing client helper)  
-3. MinIO: delete `object_key`  
+1. Load doc by id; require `doc.tenant_id == jwt.tenant_id` else 404
+2. ClickHouse: `ALTER … DELETE WHERE tenant_id AND document_id` (existing client helper)
+3. MinIO: delete `object_key`
 4. Postgres: delete document (chunks via `ON DELETE CASCADE`)
 
 ### Document status (code constants)
@@ -2239,3 +2239,195 @@ Redis keys: `monti_jarvis:lead:rl:{ip}`, `monti_jarvis:funnel:rl:{ip}`.
 Migration: `scripts/migrations/029_product_web_leads.sql`.
 
 See DES-0043, workflow §105–108, API Sprint 48, UX P48/A48.
+
+## Sprint 41 — Security hardening policy and role boundary
+
+Sprint 41 introduces no new business entity. The security boundary is
+represented by PostgreSQL roles, grants, transaction-local context, and an
+explicit policy inventory over existing tenant-owned tables.
+
+```mermaid
+erDiagram
+  tenants ||--o{ users : owns
+  tenants ||--o{ calls : scopes
+  tenants ||--o{ knowledge_documents : scopes
+  tenants ||--o{ usage_events : scopes
+  tenants ||--o{ tenant_entitlements : owns
+
+  tenants {
+    uuid id PK
+    timestamptz created_at
+    timestamptz updated_at
+    uuid created_by
+    uuid updated_by
+  }
+  users {
+    uuid id PK
+    uuid tenant_id FK
+    timestamptz created_at
+    timestamptz updated_at
+    uuid created_by
+    uuid updated_by
+  }
+  calls {
+    uuid id PK
+    uuid tenant_id FK
+    timestamptz created_at
+    timestamptz updated_at
+    uuid created_by
+    uuid updated_by
+  }
+  knowledge_documents {
+    uuid id PK
+    uuid tenant_id FK
+    timestamptz created_at
+    timestamptz updated_at
+    uuid created_by
+    uuid updated_by
+  }
+  usage_events {
+    uuid id PK
+    uuid tenant_id FK
+    timestamptz created_at
+    timestamptz updated_at
+    uuid created_by
+    uuid updated_by
+  }
+  tenant_entitlements {
+    uuid id PK
+    uuid tenant_id FK
+    timestamptz created_at
+    timestamptz updated_at
+    uuid created_by
+    uuid updated_by
+  }
+```
+
+### Role and policy inventory
+
+| Boundary | Contract | Verification |
+| --- | --- | --- |
+| Writer role | Existing mutation authority; no browser exposure | Migration grants + startup role distinction |
+| `POSTGRES_READONLY_URL` role | `CONNECT`, schema usage, approved `SELECT` only | Fixture attempts DML/DDL and expects permission denied |
+| Tenant context | `set_config('app.tenant_id', value, true)` inside transaction | Pool reuse test confirms no context retention |
+| Tenant policies | Deny rows where `tenant_id` differs from context on prioritized tables | Two-tenant API and direct read-pool tests |
+| Audit records | Reuse existing audit/event boundaries; no secret payloads | Redaction and tenant attribution assertions |
+
+### Capability user map
+
+| Principal | Tenant boundary | Database authority |
+| --- | --- | --- |
+| `monti_ai_km_ro` | Authenticated tenant context + RLS; distinct per tenant on dedicated DBs | KM/context reads only; no ticket or KM writes |
+| `monti_km_rw` | Tenant admin context + RLS | Tenant KM ingest/reset/update only |
+| `monti_ticket_rw` | Customer/tenant actor context + RLS | Ticket and ticket-event writes plus minimum scoped source reads |
+| `monti_app_rw` | Existing service authorization + RLS | Other explicitly bounded application mutations |
+
+`monti_ai_km_ro` must be the only database principal used by the AI agent's
+KM retrieval hop. `monti_ticket_rw` is a separate principal for the confirmed
+ticket write transaction. Neither principal can cross a tenant boundary, even
+if a request contains another tenant's ID.
+
+Proposed migration: `scripts/migrations/032_security_hardening.sql`. It adds
+grants, policies, and policy-inventory metadata only; it does not create a new
+business table. Redis and MinIO paths remain tenant-prefixed and must not be
+used to bypass Postgres authorization.
+
+See DES-0044, workflow §109–112, API Sprint 41, and UX S41.
+
+## Sprint 49 — Shared-server deployment inventory (no schema change)
+
+This deployment is infrastructure-only. It does not add or alter PostgreSQL
+tables, Redis keys, NATS subjects, ClickHouse tables, or MinIO buckets.
+
+| Existing boundary | Sprint 49 treatment | Verification |
+| --- | --- | --- |
+| PostgreSQL application data | Reused by the existing Go process | Compose health and application smoke checks |
+| Redis cache/session data | Reused with existing key prefixes | Redis dependency health check |
+| NATS and ClickHouse | Unchanged; no new subjects or tables | Existing service health checks |
+| MinIO/object storage | Unchanged; no new buckets or object prefixes | Existing storage configuration |
+| Docker volumes | Runtime persistence only; not business entities | Compose volume inspection |
+
+```mermaid
+flowchart LR
+  Origin[harvest-course public origin]
+  Origin --> Customer[/ / customer portal/]
+  Origin --> Admin[/admin/ platform admin/]
+  Origin --> Tenant[/tenant/ tenant web/]
+  Origin --> Product[/product/ product web/]
+  Customer & Admin & Tenant & Product --> Go[Monti Jarvis Go runtime]
+  Go --> Existing[(Existing data and messaging boundaries)]
+```
+
+The route map is a delivery boundary, not a new persistence relationship.
+Tenant isolation and existing authorization remain enforced by the current
+application paths.
+
+See DES-0045, workflow §115, API Sprint 49, and UX Sprint 49.
+
+## Sprint 50 — promotion grants (active plan + tax invoice)
+
+Promotion grants reuse `payment_orders` and `payment_documents` as the
+commercial document source and add an audit ledger for operator grants.
+
+Migration: `scripts/migrations/033_promotion_grants.sql`.
+
+```mermaid
+erDiagram
+  tenants ||--o{ promotion_grants : receives
+  packages ||--o{ promotion_grants : granted_as
+  payment_orders ||--|| promotion_grants : commercial_source
+  payment_orders ||--o{ payment_documents : issues
+  tenants ||--o{ tenant_entitlements : plan
+  packages ||--o{ tenant_entitlements : from_package
+  promotion_grants }o--|| tenant_entitlements : activates
+```
+
+### `promotion_grants`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | text PK | `pgr_…` |
+| `tenant_id` | text FK → tenants | |
+| `package_id` | text FK → packages | |
+| `order_id` | text FK → payment_orders UNIQUE | paid promotion order |
+| `entitlement_id` | text | active entitlement created |
+| `tax_invoice_id` | text | issued tax invoice document id |
+| `reason` | text NOT NULL | operator reason |
+| `idempotency_key` | text NOT NULL DEFAULT '' | unique per tenant when set |
+| `valid_until` | timestamptz | optional plan end |
+| `amount_cents` | int NOT NULL DEFAULT 0 | invoice amount |
+| `status` | text NOT NULL DEFAULT 'issued' | `issued` |
+| `created_at` / `updated_at` | timestamptz | audit |
+| `created_by` / `updated_by` | text | acting platform admin |
+
+**Indexes:** `(tenant_id, created_at DESC)`; unique `(tenant_id, idempotency_key)` where key non-empty; unique `order_id`.
+
+### Promotion order convention (`payment_orders`)
+
+| Field | Value |
+| --- | --- |
+| `provider` | `promotion` |
+| `payment_method` | `promotion` |
+| `status` | `paid` |
+| `paid_at` | grant timestamp |
+| `amount_cents` | grant amount (default 0) |
+
+### Tax invoice (`payment_documents`)
+
+Mandatory `doc_type = tax_invoice`, `status = issued`, buyer/seller snapshots,
+package name, amount, VAT split using existing helpers. Linked via `order_id`.
+
+### Redis
+
+| Key | Action on grant |
+| --- | --- |
+| `monti_jarvis:entitlement:{tenant_id}` | DELETE after successful commit |
+
+### Future entities
+
+| Entity | Sprint | Status |
+| --- | --- | --- |
+| `promotion_grants` | 50 | **in design / implement S50** |
+| Shared Cloud / Dedicated subscription model | 51 | planned (does not replace S50 grants) |
+
+See DES-0046, workflow §116–117, API Sprint 50, UX A50.
