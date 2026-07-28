@@ -4496,3 +4496,75 @@ At cap: `409` with `error` / code indicating quota exceeded.
 | 409 | `quota_exceeded` | activate at package active cap |
 
 See DES-0047, workflow §118–119, ER Sprint 52, UX T52.
+## Sprint 53 — Conversation auto-register OTP + app version
+
+### Customer auth settings (tenant) — field addition
+
+Existing GET/PUT tenant customer-auth settings body includes:
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `auto_register_on_conversation_otp` | boolean | false | When true, successful OTP may create customer |
+
+### `GET /api/public/tenants/{tenant_id}/customer-auth-policy`
+
+**Auth:** none (tenant must exist)
+
+```json
+{
+  "tenant_id": "acme",
+  "enabled": true,
+  "auth_mode": "optional",
+  "require_auth_for_workforce": false,
+  "auto_register_on_conversation_otp": true
+}
+```
+
+No allowed_domains list in public response (enforced server-side only).
+
+### `POST /api/customer/auth/request-otp` (Sprint 53 behavior)
+
+When `purpose` is `conversation` (or default conversation path):
+
+- If `auto_register_on_conversation_otp` is false **and** product requires
+  known customer for this path → may still send OTP only if customer exists,
+  else `403 auto_register_disabled` / `404 customer_not_found` per DES-0048.
+- If setting true → allow OTP for unknown emails (create on verify).
+
+### `POST /api/customer/auth/verify-otp`
+
+On success with auto_register **true**:
+
+1. Upsert customer by tenant + normalized email
+2. Ensure auth identity
+3. Issue session
+
+On success with auto_register **false** and unknown email:
+
+- `404` `{ "error": "customer not found", "code": "customer_not_found" }`
+
+### `GET /api/version`
+
+**Auth:** none
+
+```json
+{
+  "version": "v2.24.0",
+  "version_raw": "2.24.0"
+}
+```
+
+### `GET /healthz`
+
+Include `"version": "v2.24.0"` (same canonical display string).
+
+### Error codes
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 403 | `auto_register_disabled` | conversation OTP blocked for unknown email |
+| 404 | `customer_not_found` | verify without auto-create |
+| 429 | rate limit | existing OTP rate keys |
+| 400 | `domain_not_allowed` | existing domain policy |
+
+See DES-0048, workflow §120–122, ER Sprint 53, UX T53/C53/A53.

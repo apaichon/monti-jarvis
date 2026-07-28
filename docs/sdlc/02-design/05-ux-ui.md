@@ -4199,3 +4199,91 @@ Table stacks to cards; cap meter sticky at top. No customer mobile SDK change
 beyond active-only list already enforced server-side.
 
 See DES-0047, workflow §118–119, ER Sprint 52, API Sprint 52.
+## Sprint 53 — Conversation auto-register + app version (T53 / C53 / A53)
+
+### Screen T53 — Tenant settings (customer auth)
+
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│ Settings · Customer auth                                        T1   │
+├──────────────────────────────────────────────────────────────────────┤
+│ ☑ Enable customer OTP auth                                           │
+│ Mode: [ optional ▾ ]                                                 │
+│ Require OTP before workforce: [ ]                                    │
+│                                                                      │
+│ ☑ Auto-register customer when email + OTP in conversation            │
+│   When on, a customer who enters email during chat/voice receives    │
+│   an OTP; on verify we create their customer account if missing.     │
+│   Default off. Domain rules and rate limits still apply.             │
+│                                                                      │
+│ [ Save ]                                                             │
+│                                                                      │
+│ T2 Sidebar footer:  App v2.24.0                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Screen C53 — Conversation email OTP (customer)
+
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│ Conversation · identity (when auto-register enabled)            C1   │
+├──────────────────────────────────────────────────────────────────────┤
+│ Continue as guest or identify yourself for a better experience       │
+│ Email [ customer@company.com     ]  [ Send code ]                    │
+│ Code  [ ______ ]  [ Verify & continue ]                              │
+│                                                                      │
+│ After verify: badge "Signed in as customer@…" · chat continues       │
+│ Footer: Monti v2.24.0                                                │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+When setting **off**, C1 identity panel is hidden (unless require-workforce
+auth uses the existing full auth gate).
+
+### Screen A53 — Platform admin version
+
+```text
+Admin sidebar footer:  Monti Admin · v2.24.0
+```
+
+### Screen map → API
+
+| UI zone | Action | API |
+| --- | --- | --- |
+| T1 Save setting | Toggle auto-register | `PUT` tenant customer-auth settings |
+| C1 policy probe | Load whether to show panel | `GET /api/public/tenants/{id}/customer-auth-policy` |
+| C1 Send code | Request OTP | `POST /api/customer/auth/request-otp` |
+| C1 Verify | Verify + session | `POST /api/customer/auth/verify-otp` |
+| T2/A53/C footer | Show version | `GET /api/version` or build embed |
+
+### Flow A — Auto-register on
+
+```text
+Setting on → customer enters email → OTP → verify
+  → customer row created if new → session → continue conversation
+```
+
+### Flow B — Setting off
+
+```text
+No mid-conversation identity panel for auto-register
+  → anonymous path remains (subject to require_auth_for_workforce)
+```
+
+### Flow C — Version
+
+```text
+Deploy tag v2.25.0 → VERSION 2.25.0 → UI shows v2.25.0 everywhere
+```
+
+### Component → file
+
+| Zone | Path |
+| --- | --- |
+| Tenant settings | `apps/tenant-web/src/routes/settings/+page.svelte` |
+| Customer conversation | `apps/customer-web/src/routes/+page.svelte` |
+| Version footer | tenant/admin layouts |
+| Go version | `cmd/server` embed VERSION |
+| Auth store | `internal/store/customer_auth.go` |
+
+See DES-0048, workflow §120–122, ER Sprint 53, API Sprint 53.

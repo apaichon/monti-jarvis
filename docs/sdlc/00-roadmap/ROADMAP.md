@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S52 commercial/tenant tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
+# Monti AI Call Center — Roadmap (36 core + S37–S53 commercial/tenant tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -76,6 +76,7 @@
 | **50** | **Platform Admin / Finance** | **Admin promotional package grant: set active plan + issue tax invoice for a tenant** | **P** | **4, 9, 10, 11, 12, 13** · ✅ v2.23.0 · [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md) · [SPRINT-050](../03-sprints/SPRINT-050.md) · [DES-0046](../02-design/46-admin-promotion-package-grant-spec.md) |
 | **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, and tax invoices** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · planned · [FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md) · [SPRINT-051](../03-sprints/SPRINT-051.md) · [DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) |
 | **52** | **Tenant / Platform** | **Tenant self-service avatar create/library: unlimited drafts; only active avatars capped by package `max_ai_employees`** | **D+** | **5, 13, 15, 16, 45, 50** · ✅ v2.24.0 · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md) · [SPRINT-052](../03-sprints/SPRINT-052.md) · [DES-0047](../02-design/47-tenant-avatar-create-active-cap-spec.md) |
+| **53** | **Tenant / Customer** | **Tenant settings: auto-register customer when email + OTP is entered in conversation; show app/tag version on UI** | **D+** | **16, 19, 20, 21, 52** · planned · design **approved** · [FEAT-0045](../01-features/FEAT-0045-conversation-auto-register-app-version.md) · [SPRINT-053](../03-sprints/SPRINT-053.md) · [DES-0048](../02-design/48-conversation-auto-register-app-version-spec.md) |
 
 ---
 
@@ -1548,3 +1549,17 @@ commercial plan matrix, or unlimited concurrent voice.
 (or a tenant-owned avatar table with the same active-cap semantics) rather than
 a second workforce authority. Package rule remains `max_ai_employees` on the
 entitlement snapshot.
+
+---
+
+## Planned: SPRINT-053 — Conversation Auto Customer Register (Email OTP) + App Version on UI
+
+**Platform:** Tenant / Customer · **Feature:** [FEAT-0045](../01-features/FEAT-0045-conversation-auto-register-app-version.md)
+· **Sprint plan:** [SPRINT-053](../03-sprints/SPRINT-053.md) · **Design:** [DES-0048](../02-design/48-conversation-auto-register-app-version-spec.md)
+· **Depends:** 16, 19, 20, 21, 52 · **Status:** planned · **Design pack:** approved · **Worktree:** `.worktrees/SPRINT-053`
+
+See sprint doc for deliverables, ACs, and design pack links. Summary:
+
+1. Tenant setting `auto_register_on_conversation_otp` (default off).
+2. Conversation email → OTP → auto-create/reuse customer → session bind when on.
+3. App version on UI matches `VERSION` / git tag via `/api/version` and shell footers.

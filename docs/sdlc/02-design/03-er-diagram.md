@@ -2631,3 +2631,32 @@ create never consults this inequality
 | `ai_avatars.owner_tenant_id` | 52 | **implement S52** |
 
 See DES-0047, workflow §118–119, API Sprint 52, UX T52.
+## Sprint 53 — conversation auto-register setting + version (no new business entity)
+
+Migration: `scripts/migrations/035_conversation_auto_register.sql`.
+
+### `tenant_customer_auth_settings` extension
+
+| Column | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `auto_register_on_conversation_otp` | boolean NOT NULL | false | Conversation email OTP may create customer |
+
+```mermaid
+erDiagram
+  tenants ||--|| tenant_customer_auth_settings : configures
+  tenants ||--o{ customers : owns
+  customers ||--o{ customer_auth_identities : has
+  tenants ||--o{ customer_auth_events : audits
+```
+
+OTP challenges and sessions remain existing tables/Redis keys from S20.
+No new version table — version is process metadata from `VERSION` file.
+
+### Redis
+
+| Key | Use |
+| --- | --- |
+| `monti_jarvis:rate:customer_auth:{tenant}:{email_hash}` | unchanged OTP abuse limit |
+| `monti_jarvis:customer_otp:{challenge_id}` | optional challenge cache |
+
+See DES-0048, workflow §120–122, API Sprint 53, UX T53/C53.
