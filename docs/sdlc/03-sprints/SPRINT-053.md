@@ -1,11 +1,13 @@
 ---
 id: SPRINT-053
-status: in_progress
+status: completed
+closed: 2026-07-29
 start: 2026-07-28
 end: 2026-08-07
-updated: 2026-07-28
-design_pack: approved
-release_target: v2.25.0
+updated: 2026-07-29
+design_pack: shipped
+release_target: v2.26.0
+release: v2.26.0
 roadmap_sprint: 53
 feature: FEAT-0046
 platform: Tenant / Customer
@@ -96,3 +98,14 @@ Manual checklist: `docs/sdlc/06-manual-tests/SPRINT-053-auto-register-version-ma
 | Open registration spam | Default off; domain policy; OTP rate limit |
 | Version drift vs static assets | Single embed of VERSION at build/serve |
 | Clash with require-workforce-auth | Spec co-existence rules in DES-0050 |
+
+
+## Shipped summary (v2.26.0)
+
+- Tenant setting `auto_register_on_conversation_otp` (default off)
+- OTP verify can auto-create customer when enabled
+- `GET /api/version` + UI version surfaces (tenant/admin)
+- Migration `036_conversation_auto_register.sql`
+- Design: DES-0050 · FEAT-0046 · TASK-0188, 0189, 0198
+
+**Closed:** 2026-07-29

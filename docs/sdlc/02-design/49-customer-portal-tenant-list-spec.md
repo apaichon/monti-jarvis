@@ -1,7 +1,8 @@
 ---
 id: DES-0049
 title: Customer Portal Tenant List to Call Specification
-status: approved
+status: shipped
+release: v2.27.0
 updated: 2026-07-29
 sprint: SPRINT-054
 owner: SA

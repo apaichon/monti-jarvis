@@ -1,17 +1,19 @@
 ---
 id: SPRINT-054
-status: in_progress
+status: completed
+closed: 2026-07-29
 start: 2026-07-29
 end: 2026-08-05
 updated: 2026-07-29
-design_pack: approved
+design_pack: shipped
 roadmap_sprint: 54
 feature: FEAT-0045
 platform: Customer / Platform
 depends_on: [SPRINT-001, SPRINT-005, SPRINT-006, SPRINT-020, SPRINT-021, SPRINT-027]
 goal: "Customer portal lists call-to tenants and removes required ?tenant_id= from the primary entry path."
 velocity_basis: "Last 3 closed with velocity: S46=17, S50=12, S52=12 → avg 13.7; commit 12"
-release_target: v2.25.0
+release_target: v2.27.0
+release: v2.27.0
 ---
 
 # SPRINT-054 — Customer Portal Tenant List to Call
@@ -91,6 +93,17 @@ cd apps/customer-web && npm run check
 branch: feature/sprint-054-customer-tenant-list
 ```
 
+
+## Shipped summary (v2.27.0)
+
+- Public brands directory + `GET /api/public/tenants` alias
+- Customer portal brand picker at `/`; desk at `/t/{slug}`
+- No required `?tenant_id=` (legacy preselect still works)
+- Customer-facing system status: **Live · OK** (no infra jargon)
+- Design: DES-0049 · FEAT-0045 · TASK-0195–0197
+- Manual UAT: [SPRINT-054-customer-tenant-list-manual.md](../06-manual-tests/SPRINT-054-customer-tenant-list-manual.md)
+
+**Closed:** 2026-07-29
 
 ## Implementation notes (worktree)
 

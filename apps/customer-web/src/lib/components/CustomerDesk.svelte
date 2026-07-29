@@ -13,7 +13,7 @@
   } from '$lib/api/calls';
   import { sendChat, type ChatMessage as ChatHistoryEntry, type ChatSource, type TicketOffer } from '$lib/api/chat';
   import { createCustomerTicket } from '$lib/api/tickets';
-  import { formatInfra, loadInfra } from '$lib/api/infra';
+  import { formatSystemLive, loadInfra, systemLiveState, type SystemLiveState } from '$lib/api/infra';
   import { classifyTone } from '$lib/tone';
   import { loadWorkforce, type Agent } from '$lib/api/workforce';
   import { GeminiVoice } from '$lib/voice/gemini';
@@ -90,10 +90,10 @@
     }
   ]);
   let input = $state('');
-  let infraStatus = $state('checking infra');
+  let systemLive = $state('Checking…');
+  let systemLiveKind = $state<SystemLiveState>('checking');
   let chatEl: HTMLElement | undefined = $state();
   let tenantLabel = $derived(tenantName || tenantSlug || tenantId);
-  let appVersion = $state('');
   let brand = $state(resolveBranding(null));
   let customer = $state<CustomerProfile | null>(null);
   let customerEmail = $state('');
@@ -134,12 +134,6 @@
 
   onMount(async () => {
     customer = getStoredCustomer();
-    void fetch('/api/version')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.version) appVersion = String(data.version);
-      })
-      .catch(() => {});
     if (tenantId) {
       const theme = await fetchPublicTheme(window.location.origin, tenantId);
       brand = resolveBranding(
@@ -160,7 +154,8 @@
       error = err instanceof Error ? err.message : 'Failed to load agents';
     }
     const infra = await loadInfra();
-    infraStatus = formatInfra(infra);
+    systemLiveKind = systemLiveState(infra);
+    systemLive = formatSystemLive(infra);
   });
 
   function agentInitial(name?: string) {
@@ -981,7 +976,10 @@
           {/each}
         </div>
       </div>
-      <div class="infra">{infraStatus}{appVersion ? ` · ${appVersion}` : ''}</div>
+      <div class="system-live" class:ok={systemLiveKind === 'ok'} class:issues={systemLiveKind === 'issues'} class:offline={systemLiveKind === 'offline'} aria-live="polite">
+        <span class="system-live-dot" aria-hidden="true"></span>
+        <span>{systemLive}</span>
+      </div>
     </header>
 
     <section class="chat" aria-live="polite" bind:this={chatEl}>

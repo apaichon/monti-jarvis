@@ -1,7 +1,8 @@
 ---
 id: FEAT-0045
 title: "Customer portal tenant list to call (no required tenant_id query)"
-status: implemented
+status: shipped
+release: v2.27.0
 roadmap_sprint: 54
 priority: C
 depends_on: [SPRINT-001, SPRINT-005, SPRINT-006, SPRINT-020, SPRINT-021, SPRINT-027, SPRINT-038]

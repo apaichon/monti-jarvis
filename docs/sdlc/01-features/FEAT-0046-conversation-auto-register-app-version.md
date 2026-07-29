@@ -1,13 +1,14 @@
 ---
 id: FEAT-0046
 title: "Conversation auto-register customer via email OTP + app version on UI"
-status: planned
+status: shipped
+release: v2.26.0
 roadmap_sprint: 53
 priority: D+
 depends_on: [SPRINT-016, SPRINT-019, SPRINT-020, SPRINT-021, SPRINT-052]
 design: DES-0050
 design_spec: ../02-design/50-conversation-auto-register-app-version-spec.md
-updated: 2026-07-28
+updated: 2026-07-29
 ---
 
 # FEAT-0046: Conversation Auto-Register (Email OTP) + App Version on UI

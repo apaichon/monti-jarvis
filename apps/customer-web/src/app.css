@@ -728,6 +728,53 @@ button {
   text-align: right;
 }
 
+/* Customer-facing overall system health (no infra component names) */
+.system-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: right;
+}
+
+.system-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  box-shadow: 0 0 0 3px rgb(143 165 191 / 12%);
+}
+
+.system-live.ok {
+  color: var(--green);
+}
+
+.system-live.ok .system-live-dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgb(18 242 165 / 16%);
+}
+
+.system-live.issues {
+  color: #f5c542;
+}
+
+.system-live.issues .system-live-dot {
+  background: #f5c542;
+  box-shadow: 0 0 0 3px rgb(245 197 66 / 16%);
+}
+
+.system-live.offline {
+  color: var(--red);
+}
+
+.system-live.offline .system-live-dot {
+  background: var(--red);
+  box-shadow: 0 0 0 3px rgb(255 59 59 / 16%);
+}
+
 .chat {
   min-height: 0;
   overflow: auto;

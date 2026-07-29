@@ -1,8 +1,9 @@
 ---
 id: DES-0050
 title: Conversation Auto-Register Email OTP and App Version Specification
-status: approved
-updated: 2026-07-28
+status: shipped
+release: v2.26.0
+updated: 2026-07-29
 sprint: SPRINT-053
 owner: SA
 feature: FEAT-0046

@@ -53,8 +53,8 @@ System design artifacts for Monti Jarvis.
 | 46 | [46-admin-promotion-package-grant-spec.md](46-admin-promotion-package-grant-spec.md) | 50 | Admin promotional package grant: active plan + tax invoice (atomic) | **`shipped`** v2.23.0 |
 | 47 | [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md) | 52 | Tenant avatar library create; active cap = package max_ai_employees | **`shipped`** v2.24.0 |
 | 48 | [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md) | 51 | Shared Cloud checkout, Dedicated quotation, billing scheduler, current quota/next bill, and finance documents | **`shipped`** v2.25.0 |
-| 50 | [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md) | 53 | Conversation auto-register email OTP + app version on UI | **`approved`** (merged) |
-| 49 | [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md) | 54 | Customer portal tenant/brand picker; no required `?tenant_id=` | **`approved`** |
+| 50 | [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md) | 53 | Conversation auto-register email OTP + app version on UI | **`shipped`** v2.26.0 |
+| 49 | [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md) | 54 | Customer portal tenant/brand picker; no required `?tenant_id=` | **`shipped`** v2.27.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
