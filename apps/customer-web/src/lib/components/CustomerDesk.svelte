@@ -115,6 +115,13 @@
   let audioBusy = $state(false);
   let audioNote = $state('');
   let speakerSelectable = $state(false);
+  let audioOpen = $state(true);
+  let audioTesting = $state(false);
+  let micLevel = $state(0);
+  let openPanel = $state<'notifications' | 'language' | 'security' | 'about' | ''>('');
+  let appVersion = $state('');
+  let audioTestStream: MediaStream | null = null;
+  let audioTestRaf = 0;
   let customer = $state<CustomerProfile | null>(null);
   let customerEmail = $state('');
   let customerName = $state('');
@@ -180,6 +187,12 @@
     selectedSpeakerId = getStoredOutputDeviceId();
     speakerSelectable = supportsSpeakerSelection();
     void refreshAudioDevices(false);
+    void fetch('/api/version')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.version) appVersion = String(data.version);
+      })
+      .catch(() => {});
   });
 
   async function refreshAudioDevices(requestPermission: boolean) {
@@ -221,6 +234,81 @@
     selectedSpeakerId = id;
     storeOutputDeviceId(id);
   }
+
+  function togglePanel(id: typeof openPanel) {
+    openPanel = openPanel === id ? '' : id;
+  }
+
+  function stopAudioTest() {
+    if (audioTestRaf) cancelAnimationFrame(audioTestRaf);
+    audioTestRaf = 0;
+    if (audioTestStream) {
+      for (const t of audioTestStream.getTracks()) t.stop();
+      audioTestStream = null;
+    }
+    audioTesting = false;
+    micLevel = 0;
+  }
+
+  async function startAudioTest() {
+    if (audioTesting) {
+      stopAudioTest();
+      audioNote = 'Audio test stopped.';
+      return;
+    }
+    audioNote = '';
+    audioBusy = true;
+    try {
+      await refreshAudioDevices(true);
+      const constraints: MediaStreamConstraints = {
+        audio: selectedMicId
+          ? { deviceId: { ideal: selectedMicId }, echoCancellation: true, noiseSuppression: true }
+          : { echoCancellation: true, noiseSuppression: true }
+      };
+      audioTestStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const ctx = new AudioContext();
+      const source = ctx.createMediaStreamSource(audioTestStream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      audioTesting = true;
+      audioNote = 'Testing microphone… speak now.';
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (const v of data) sum += v;
+        micLevel = Math.min(100, Math.round((sum / data.length / 255) * 140));
+        audioTestRaf = requestAnimationFrame(tick);
+      };
+      tick();
+      window.setTimeout(() => {
+        if (audioTesting) {
+          stopAudioTest();
+          void ctx.close().catch(() => {});
+          audioNote = 'Audio test finished. Mic and speaker look ready.';
+        }
+      }, 6000);
+    } catch (err) {
+      stopAudioTest();
+      audioNote = friendlyMediaError(err);
+    } finally {
+      audioBusy = false;
+    }
+  }
+
+  function selectedMicLabel() {
+    return audioInputs.find((d) => d.deviceId === selectedMicId)?.label || 'Default microphone';
+  }
+
+  function selectedSpeakerLabel() {
+    if (!speakerSelectable) return 'System default speaker';
+    return audioOutputs.find((d) => d.deviceId === selectedSpeakerId)?.label || 'Default speaker';
+  }
+
+  const onlineLabel = $derived(
+    systemLiveKind === 'ok' ? 'Online' : systemLiveKind === 'issues' ? 'Limited' : systemLiveKind === 'offline' ? 'Offline' : 'Checking…'
+  );
 
   function agentInitial(name?: string) {
     return (name || 'A').slice(0, 1).toUpperCase();
@@ -813,20 +901,40 @@
     class:live-collapsed={callStarted && !callControlsExpanded}
     class:live-expanded={callStarted && callControlsExpanded}
   >
+    <!-- 1. Monti brand header -->
     <header class="desk-branding">
       <div class="monti-desk-hero">
         <div class="monti-desk-ring">
           <img class="monti-desk-logo" src="/images/monti-logo.png" width="96" height="96" alt="Monti" />
         </div>
         <div class="monti-desk-copy">
-          <span class="monti-desk-title">MONTI</span>
+          <div class="monti-title-row">
+            <span class="monti-desk-title">MONTI</span>
+            <span
+              class="online-pill"
+              class:ok={systemLiveKind === 'ok'}
+              class:issues={systemLiveKind === 'issues'}
+              class:offline={systemLiveKind === 'offline'}
+            >
+              <i></i>
+              {onlineLabel}
+            </span>
+          </div>
           <span class="monti-desk-tag">AI CALL CENTER</span>
           <p class="monti-desk-tagline">Your AI assistant. <em>Always here to help.</em></p>
         </div>
       </div>
 
+      <!-- 2. Selected tenant -->
       <section class="company-card" aria-label="Selected brand">
-        <div class="company-card-label">Your selected tenant · แบรนด์ปัจจุบัน</div>
+        <div class="company-card-top">
+          <span class="company-card-label">Selected tenant</span>
+          {#if onChangeTenant && !live}
+            <button class="link-btn" type="button" onclick={() => onChangeTenant?.()}>
+              Change tenant ⌃
+            </button>
+          {/if}
+        </div>
         <div class="company-card-row">
           <div class="company-logo">
             {#if brand.logo_url && !brand.logo_url.includes('monti-logo')}
@@ -841,13 +949,9 @@
             {#if tenantSlug || tenantLabel}
               <span class="company-brand-line">Brand · {tenantName || tenantLabel}</span>
             {/if}
+            <span class="active-pill">Active</span>
           </div>
         </div>
-        {#if onChangeTenant && !live}
-          <button class="plain-button change-brand" type="button" onclick={() => onChangeTenant?.()}>
-            ← Brands · เปลี่ยนแบรนด์
-          </button>
-        {/if}
       </section>
     </header>
 
@@ -868,66 +972,172 @@
     {/if}
 
     {#if showCallDetails}
+      <!-- 3. Quick actions -->
+      <nav class="quick-actions" aria-label="Quick actions">
+        <button type="button" class="qa-btn" disabled={!onChangeTenant || live} onclick={() => onChangeTenant?.()}>
+          <span class="qa-ico" aria-hidden="true">🏢</span>
+          <span>My tenants</span>
+        </button>
+        <button
+          type="button"
+          class="qa-btn"
+          onclick={() => {
+            audioOpen = true;
+            void startAudioTest();
+          }}
+        >
+          <span class="qa-ico" aria-hidden="true">🎧</span>
+          <span>Audio test</span>
+        </button>
+        <button
+          type="button"
+          class="qa-btn"
+          onclick={() => {
+            const el = document.getElementById('desk-account');
+            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }}
+        >
+          <span class="qa-ico" aria-hidden="true">👤</span>
+          <span>Profile</span>
+        </button>
+        <button type="button" class="qa-btn" onclick={() => (audioOpen = !audioOpen)}>
+          <span class="qa-ico" aria-hidden="true">⚙️</span>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <!-- 4. Audio settings (collapsible) -->
       <section class="voice-card audio-card" aria-label="Audio settings">
-        <div class="audio-card-head">
-          <strong>Audio settings · ตั้งค่าเสียง</strong>
-          <button
-            class="plain-button"
-            type="button"
-            disabled={audioBusy}
-            onclick={() => void refreshAudioDevices(true)}
-          >
-            {audioBusy ? '…' : 'Refresh devices'}
-          </button>
-        </div>
-        <label class="audio-field">
-          <span>Microphone · ไมโครโฟน</span>
-          <select
-            value={selectedMicId}
-            disabled={audioBusy || audioInputs.length === 0 || live}
-            onchange={(e) => onMicChange((e.currentTarget as HTMLSelectElement).value)}
-          >
-            {#if audioInputs.length === 0}
-              <option value="">Default microphone</option>
-            {:else}
-              {#each audioInputs as dev (dev.deviceId)}
-                <option value={dev.deviceId}>{dev.label}</option>
-              {/each}
+        <button type="button" class="collapse-head" onclick={() => (audioOpen = !audioOpen)} aria-expanded={audioOpen}>
+          <div>
+            <strong>🔊 Audio settings</strong>
+            <p>Configure your microphone and speaker</p>
+          </div>
+          <span class="chev">{audioOpen ? '⌃' : '⌄'}</span>
+        </button>
+        {#if audioOpen}
+          <div class="audio-body">
+            <label class="audio-field audio-device-row">
+              <span class="audio-device-label">
+                <span class="dev-ico" aria-hidden="true">🎤</span>
+                <span>
+                  <b>Microphone</b>
+                  <small>{selectedMicLabel()}</small>
+                </span>
+                <span class="level-bars" aria-hidden="true">
+                  {#each [0, 1, 2, 3, 4] as i}
+                    <i class:on={micLevel > i * 18}></i>
+                  {/each}
+                </span>
+              </span>
+              <select
+                value={selectedMicId}
+                disabled={audioBusy || live}
+                onchange={(e) => onMicChange((e.currentTarget as HTMLSelectElement).value)}
+              >
+                {#if audioInputs.length === 0}
+                  <option value="">Default microphone</option>
+                {:else}
+                  {#each audioInputs as dev (dev.deviceId)}
+                    <option value={dev.deviceId}>{dev.label}</option>
+                  {/each}
+                {/if}
+              </select>
+            </label>
+
+            <label class="audio-field audio-device-row">
+              <span class="audio-device-label">
+                <span class="dev-ico" aria-hidden="true">🔈</span>
+                <span>
+                  <b>Speaker</b>
+                  <small>{selectedSpeakerLabel()}</small>
+                </span>
+                <span class="level-bars idle" aria-hidden="true">
+                  {#each [0, 1, 2, 3, 4] as i}
+                    <i class:on={i < 3}></i>
+                  {/each}
+                </span>
+              </span>
+              <select
+                value={selectedSpeakerId}
+                disabled={audioBusy || !speakerSelectable || live}
+                onchange={(e) => onSpeakerChange((e.currentTarget as HTMLSelectElement).value)}
+              >
+                {#if !speakerSelectable}
+                  <option value="">System default speaker</option>
+                {:else if audioOutputs.length === 0}
+                  <option value="">Default speaker</option>
+                {:else}
+                  {#each audioOutputs as dev (dev.deviceId)}
+                    <option value={dev.deviceId}>{dev.label}</option>
+                  {/each}
+                {/if}
+              </select>
+            </label>
+
+            <div class="audio-test-row">
+              <div>
+                <strong>Test your audio</strong>
+                <p>Make sure your mic and speaker work properly.</p>
+              </div>
+              <button class="voice-button test-btn" type="button" disabled={audioBusy || live} onclick={() => void startAudioTest()}>
+                {audioTesting ? 'Stop test' : 'Start test'}
+              </button>
+            </div>
+            {#if audioNote}
+              <div class="voice-state">{audioNote}</div>
             {/if}
-          </select>
-        </label>
-        <label class="audio-field">
-          <span>Speaker · ลำโพง</span>
-          <select
-            value={selectedSpeakerId}
-            disabled={audioBusy || !speakerSelectable || audioOutputs.length === 0 || live}
-            onchange={(e) => onSpeakerChange((e.currentTarget as HTMLSelectElement).value)}
-          >
-            {#if !speakerSelectable}
-              <option value="">System default speaker</option>
-            {:else if audioOutputs.length === 0}
-              <option value="">Default speaker</option>
-            {:else}
-              {#each audioOutputs as dev (dev.deviceId)}
-                <option value={dev.deviceId}>{dev.label}</option>
-              {/each}
-            {/if}
-          </select>
-        </label>
-        {#if audioNote}
-          <div class="voice-state">{audioNote}</div>
+          </div>
         {/if}
       </section>
 
-      <section class={`voice-card auth-card ${callStarted ? 'auth-card-compact' : ''}`} aria-label="Customer sign in">
+      <!-- 5. Collapsible utility sections -->
+      <div class="util-stack">
+        <button type="button" class="util-row" onclick={() => togglePanel('notifications')} aria-expanded={openPanel === 'notifications'}>
+          <span>🔔 Notifications</span>
+          <span class="chev">{openPanel === 'notifications' ? '⌃' : '⌄'}</span>
+        </button>
+        {#if openPanel === 'notifications'}
+          <div class="util-body">Alert preferences stay on your device for this session. Email alerts follow tenant policy after sign-in.</div>
+        {/if}
+
+        <button type="button" class="util-row" onclick={() => togglePanel('language')} aria-expanded={openPanel === 'language'}>
+          <span>🌐 Language</span>
+          <span class="chev">{openPanel === 'language' ? '⌃' : '⌄'}</span>
+        </button>
+        {#if openPanel === 'language'}
+          <div class="util-body">Conversation language follows the agent and topic. UI labels support EN · TH.</div>
+        {/if}
+
+        <button type="button" class="util-row" onclick={() => togglePanel('security')} aria-expanded={openPanel === 'security'}>
+          <span>🛡️ Security</span>
+          <span class="chev">{openPanel === 'security' ? '⌃' : '⌄'}</span>
+        </button>
+        {#if openPanel === 'security'}
+          <div class="util-body">Your call data is tenant-scoped and encrypted in transit. Sign out clears this browser session.</div>
+        {/if}
+
+        <button type="button" class="util-row" onclick={() => togglePanel('about')} aria-expanded={openPanel === 'about'}>
+          <span>ℹ️ About</span>
+          <span class="chev">{openPanel === 'about' ? '⌃' : '⌄'}</span>
+        </button>
+        {#if openPanel === 'about'}
+          <div class="util-body">Monti AI Call Center{appVersion ? ` · ${appVersion}` : ''}. Multi-tenant inbound chat and voice.</div>
+        {/if}
+      </div>
+
+      <!-- 6. Account / sign-in -->
+      <section id="desk-account" class={`voice-card auth-card ${callStarted ? 'auth-card-compact' : ''}`} aria-label="Customer account">
         {#if customer}
-          <div class="customer-session">
-            {#if callStarted}
-              <div class="customer-initial">{customerLabel.slice(0, 1).toUpperCase()}</div>
-            {/if}
-            <div class="customer-session-main">
-              <div class="customer-name">{customerLabel}</div>
-              <div class="voice-state customer-meta">{callStarted ? 'Signed in' : `Signed in · ${customer.email}`}</div>
+          <div class="account-card">
+            <div class="account-avatar">{customerLabel.slice(0, 1).toUpperCase()}</div>
+            <div class="account-meta">
+              <div class="account-name-row">
+                <strong>{customerLabel}</strong>
+                <span class="agent-badge">Customer</span>
+              </div>
+              <div class="voice-state customer-meta">{customer.email}</div>
+              <div class="voice-state customer-meta">Signed in</div>
             </div>
             <button class="voice-button signout-button" type="button" onclick={signOutCustomer}>Sign out</button>
           </div>
@@ -977,6 +1187,12 @@
           <div class="voice-state" style="margin-top:8px">{authStatus}</div>
         {/if}
       </section>
+
+      <!-- 7. Footer -->
+      <footer class="desk-footer">
+        <span>🛡️ Your data is encrypted and secure.</span>
+        <span>{appVersion || 'Monti'}</span>
+      </footer>
     {/if}
 
     {#if authRequired}
