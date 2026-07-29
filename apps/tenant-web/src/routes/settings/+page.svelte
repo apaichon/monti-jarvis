@@ -38,6 +38,7 @@
   let otpTTL = $state(600);
   let customerSessionTTL = $state(604800);
   let requireAuthForWorkforce = $state(false);
+  let autoRegisterOnConversationOTP = $state(false);
   let customerDailyCallMinutes = $state(0);
   let customerMaxCallMinutes = $state(0);
 
@@ -138,6 +139,7 @@
       otpTTL = ca.otp_ttl_seconds || 600;
       customerSessionTTL = ca.session_ttl_seconds || 604800;
       requireAuthForWorkforce = !!ca.require_auth_for_workforce;
+      autoRegisterOnConversationOTP = !!ca.auto_register_on_conversation_otp;
       customerDailyCallMinutes = Math.floor((ca.customer_daily_call_seconds || 0) / 60);
       customerMaxCallMinutes = Math.floor((ca.customer_max_call_seconds || 0) / 60);
     } catch (err) {
@@ -199,7 +201,8 @@
         session_ttl_seconds: Number(customerSessionTTL) || 604800,
         require_auth_for_workforce: requireAuthForWorkforce,
         customer_daily_call_seconds: Math.max(0, Number(customerDailyCallMinutes) || 0) * 60,
-        customer_max_call_seconds: Math.max(0, Number(customerMaxCallMinutes) || 0) * 60
+        customer_max_call_seconds: Math.max(0, Number(customerMaxCallMinutes) || 0) * 60,
+        auto_register_on_conversation_otp: autoRegisterOnConversationOTP
       });
       customerAuthDomains = (customerAuth.allowed_domains || []).join('\n');
       feedback.success('Customer auth settings saved');
@@ -354,6 +357,16 @@
       <label style="flex-direction:row;align-items:center;gap:10px">
         <input type="checkbox" bind:checked={requireAuthForWorkforce} style="width:auto" />
         <span>Require OTP before AI workforce selection (always enforced when OTP is enabled)</span>
+      </label>
+      <label style="flex-direction:row;align-items:flex-start;gap:10px">
+        <input type="checkbox" bind:checked={autoRegisterOnConversationOTP} style="width:auto;margin-top:3px" />
+        <span>
+          <strong>Auto-register customer when email + OTP in conversation</strong><br />
+          <span style="font-size:12px;color:var(--muted)">
+            When on, a customer who enters email during chat/voice receives an OTP; on verify we create
+            their customer account if missing. Default off. Domain rules and rate limits still apply.
+          </span>
+        </span>
       </label>
       <label>
         <span>Customer daily call minutes (0 = unset)</span>

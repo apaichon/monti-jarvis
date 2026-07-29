@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/libra/monti-jarvis/internal/appversion"
 	"github.com/libra/monti-jarvis/internal/audit"
 	"github.com/libra/monti-jarvis/internal/auth"
 	"github.com/libra/monti-jarvis/internal/calls"
@@ -321,6 +322,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
+	mux.HandleFunc("GET /api/version", s.appVersion)
 	mux.HandleFunc("GET /readyz", s.ready)
 	mux.HandleFunc("GET /api/infra", s.infra)
 	mux.HandleFunc("GET /api/public/brands", s.publicBrands)
@@ -568,6 +570,7 @@ func main() {
 	mux.Handle("GET /api/tenant/system-performance", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantSystemPerformance)))
 	mux.HandleFunc("POST /api/customer/auth/request-otp", s.requestCustomerOTP)
 	mux.HandleFunc("POST /api/customer/auth/verify-otp", s.verifyCustomerOTP)
+	mux.HandleFunc("GET /api/public/tenants/{tenant_id}/customer-auth-policy", s.publicCustomerAuthPolicy)
 	mux.HandleFunc("POST /api/customer/auth/refresh", s.refreshCustomerAuth)
 	mux.HandleFunc("POST /api/customer/auth/logout", s.logoutCustomerAuth)
 	mux.HandleFunc("GET /api/customer/me", s.customerMe)
@@ -705,9 +708,19 @@ func (s *server) securityPosture(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  status,
 		"checks":  checks,
-		"version": "SPRINT-041",
+		"version": appVersionDisplay(),
 	})
 }
+
+func (s *server) appVersion(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"version":     appVersionDisplay(),
+		"version_raw": appVersionRaw(),
+	})
+}
+
+func appVersionDisplay() string { return appversion.Display() }
+func appVersionRaw() string     { return appversion.Raw() }
 
 func (s *server) infra(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)

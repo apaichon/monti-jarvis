@@ -82,6 +82,7 @@
   ]);
   let input = $state('');
   let infraStatus = $state('checking infra');
+  let appVersion = $state('');
   let chatEl: HTMLElement | undefined = $state();
   let tenantId = $state('');
   let brand = $state(resolveBranding(null));
@@ -143,6 +144,12 @@
     }
     const infra = await loadInfra();
     infraStatus = formatInfra(infra);
+    void fetch('/api/version')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.version) appVersion = String(data.version);
+      })
+      .catch(() => {});
   });
 
   function agentInitial(name?: string) {
@@ -156,6 +163,7 @@
   // Start call / chat / workforce require a signed-in customer session.
   // Policy still drives backend enforcement; UI always gates on session presence.
   const authRequired = $derived(!customer);
+  const autoRegister = $derived(!!portalPolicy?.customer_auth?.auto_register_on_conversation_otp);
   const quotaExhausted = $derived(quota?.state === 'quota_exhausted');
   const quotaLabel = $derived(formatQuota(quota));
 
@@ -599,13 +607,21 @@
     authBusy = true;
     authStatus = '';
     try {
-      const res = await requestCustomerOTP({
-        tenant_id: tenantId || undefined,
-        email: customerEmail.trim(),
-        display_name: customerName.trim()
-      }, tenantId ? { tenantId } : undefined);
+      const res = await requestCustomerOTP(
+        {
+          tenant_id: tenantId || undefined,
+          email: customerEmail.trim(),
+          display_name: customerName.trim(),
+          purpose: 'conversation'
+        },
+        tenantId ? { tenantId } : undefined
+      );
       challengeId = res.challenge_id;
-      authStatus = `OTP sent to ${res.delivery.to}`;
+      const willRegister = (res as { customer_hint?: { will_auto_register?: boolean } }).customer_hint
+        ?.will_auto_register;
+      authStatus = willRegister
+        ? `OTP sent to ${res.delivery.to} — new account will be created on verify`
+        : `OTP sent to ${res.delivery.to}`;
     } catch (err) {
       authStatus = err instanceof Error ? err.message : 'Failed to send OTP';
     } finally {
@@ -769,7 +785,13 @@
           </div>
         {:else}
           <form onsubmit={challengeId ? verifyOTP : sendOTP} style="display:grid;gap:10px">
-            <div class="voice-state">Sign in required before starting a call or chat.</div>
+            <div class="voice-state">
+              {#if autoRegister}
+                Enter your email — we'll send a code. New customers are registered automatically after verify.
+              {:else}
+                Sign in required before starting a call or chat.
+              {/if}
+            </div>
             <input
               type="email"
               bind:value={customerEmail}
@@ -948,7 +970,7 @@
           {/each}
         </div>
       </div>
-      <div class="infra">{infraStatus}</div>
+      <div class="infra">{infraStatus}{appVersion ? ` · ${appVersion}` : ''}</div>
     </header>
 
     <section class="chat" aria-live="polite" bind:this={chatEl}>

@@ -53,6 +53,7 @@ System design artifacts for Monti Jarvis.
 | 46 | [46-admin-promotion-package-grant-spec.md](46-admin-promotion-package-grant-spec.md) | 50 | Admin promotional package grant: active plan + tax invoice (atomic) | **`shipped`** v2.23.0 |
 | 47 | [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md) | 52 | Tenant avatar library create; active cap = package max_ai_employees | **`shipped`** v2.24.0 |
 | 48 | [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md) | 51 | Shared Cloud checkout, Dedicated quotation, billing scheduler, current quota/next bill, and finance documents | **`shipped`** v2.25.0 |
+| 50 | [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md) | 53 | Conversation auto-register email OTP + app version on UI | **`approved`** (merged) |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -99,6 +100,8 @@ System design artifacts for Monti Jarvis.
 workflow §120–124; ER/API Sprint 51; UX T51/A51.
 [SPRINT-051](../03-sprints/SPRINT-051.md) ·
 [FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md).
+
+**Sprint 53:** Design pack **approved** — [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md); workflow §120–122; ER/API/UX Sprint 53; UX T53/C53/A53. [SPRINT-053](../03-sprints/SPRINT-053.md) · [FEAT-0045](../01-features/FEAT-0046-conversation-auto-register-app-version.md). Worktree `.worktrees/SPRINT-053`.
 
 **Sprint 52:** ✅ **shipped v2.24.0** — [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md); workflow §118–119; ER/API/UX Sprint 52; UX T52. [SPRINT-052](../03-sprints/SPRINT-052.md) · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md).
 

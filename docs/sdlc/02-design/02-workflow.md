@@ -3707,3 +3707,79 @@ sequenceDiagram
 Deactivate: `active` → `disabled` frees a slot.
 
 See DES-0047, ER Sprint 52, API Sprint 52, UX T52.
+## 120. Tenant enables conversation auto-register OTP (Sprint 53)
+
+```mermaid
+sequenceDiagram
+  participant T as Tenant Browser
+  participant G as Go :8091
+  participant S as internal/store
+  participant PG as Postgres callcenter
+
+  T->>G: PUT /api/tenant/customer-auth-settings<br/>{auto_register_on_conversation_otp:true}
+  G->>G: Require tenant_admin active
+  G->>S: UpsertCustomerAuthSettings
+  S->>PG: UPDATE tenant_customer_auth_settings
+  PG-->>S: ok
+  S-->>G: settings
+  G-->>T: 200 settings (flag true)
+```
+
+## 121. Conversation email OTP auto-registers customer (Sprint 53)
+
+```mermaid
+sequenceDiagram
+  participant C as Customer Browser
+  participant G as Go :8091
+  participant S as internal/store
+  participant PG as Postgres
+  participant R as Redis DB4
+  participant M as Email sender
+
+  C->>G: GET /api/public/tenants/{tid}/customer-auth-policy
+  G-->>C: {auto_register_on_conversation_otp:true}
+  C->>G: POST /api/customer/auth/request-otp {tenant_id,email,purpose:conversation}
+  G->>S: GetCustomerAuthSettings
+  alt setting off
+    G-->>C: 403 auto_register_disabled (or hide UI)
+  else setting on
+    G->>S: Domain + rate check
+    G->>R: rate limit key
+    G->>S: Create OTP challenge
+    G->>M: Send OTP email
+    G-->>C: 200 {challenge_id}
+    C->>G: POST /api/customer/auth/verify-otp {challenge_id,otp}
+    G->>S: Verify OTP
+    alt auto_register true and customer missing
+      S->>PG: INSERT customers + identity
+    else customer exists
+      S->>PG: load customer
+    end
+    S->>PG: create customer session
+    G-->>C: 200 {session, customer}
+    C->>G: subsequent chat/voice with customer auth
+  end
+```
+
+### State table — auto-register
+
+| Setting | Unknown email on verify | Known email |
+| --- | --- | --- |
+| auto_register **on** | create customer + session | reuse + session |
+| auto_register **off** | `customer_not_found` (no create) | session if product allows |
+
+## 122. App version shown on UI (Sprint 53)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser shell
+  participant G as Go :8091
+
+  B->>G: GET /api/version
+  G-->>B: {version:"v2.24.0", version_raw:"2.24.0"}
+  B->>B: Render sidebar/footer version label
+```
+
+Server embeds `VERSION` file at build; tag `vX.Y.Z` must match `version` field.
+
+See DES-0048, ER Sprint 53, API Sprint 53, UX T53/C53/A53.

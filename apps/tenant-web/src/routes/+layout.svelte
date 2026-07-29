@@ -17,6 +17,7 @@
   // Reactive tick so first login re-renders shell without hard refresh (SPRINT-042).
   let sessionTick = $state(0);
   let sessionReady = $state(false);
+  let appVersion = $state('');
 
   onMount(() => {
     const unsubscribe = subscribeSession(() => {
@@ -31,6 +32,12 @@
       .finally(() => {
         sessionReady = true;
       });
+    void fetch('/api/version')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.version) appVersion = String(data.version);
+      })
+      .catch(() => {});
     return unsubscribe;
   });
 
@@ -181,6 +188,9 @@
           <span><i style={`width:${planUsagePercent()}%`}></i></span>
           <small>{planUsageLabel()}</small>
         </a>
+        {#if appVersion}
+          <div style="padding:4px 12px 8px;font-size:11px;color:var(--muted)">App {appVersion}</div>
+        {/if}
         <button class="account-button" type="button" onclick={logout}
           ><span class="workspace-avatar">AD</span><span
             ><strong>Admin</strong><small>Sign out</small></span

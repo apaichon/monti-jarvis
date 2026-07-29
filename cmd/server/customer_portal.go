@@ -31,10 +31,11 @@ func (s *server) customerPortalPolicy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"tenant_id": tenantID,
 		"customer_auth": map[string]any{
-			"enabled":                    settings.Enabled,
-			"mode":                       settings.AuthMode,
-			"require_auth_for_workforce": requireAuth || settings.RequireAuthForWorkforce,
-			"allow_public_no_auth":       !requireAuth,
+			"enabled":                           settings.Enabled,
+			"mode":                              settings.AuthMode,
+			"require_auth_for_workforce":        requireAuth || settings.RequireAuthForWorkforce,
+			"allow_public_no_auth":              !requireAuth,
+			"auto_register_on_conversation_otp": settings.AutoRegisterOnConversationOTP,
 		},
 		"quota": summary,
 	})
