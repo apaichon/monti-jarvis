@@ -55,6 +55,7 @@ System design artifacts for Monti Jarvis.
 | 48 | [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md) | 51 | Shared Cloud checkout, Dedicated quotation, billing scheduler, current quota/next bill, and finance documents | **`shipped`** v2.25.0 |
 | 50 | [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md) | 53 | Conversation auto-register email OTP + app version on UI | **`shipped`** v2.26.0 |
 | 49 | [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md) | 54 | Customer portal tenant/brand picker; no required `?tenant_id=` | **`shipped`** v2.27.0 |
+| 51 | [51-tenant-call-center-topic-statistics-spec.md](51-tenant-call-center-topic-statistics-spec.md) | 55 | Tenant call-center statistics grouped and filtered by topic | **`shipped`** v2.28.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -107,6 +108,8 @@ workflow §120–124; ER/API Sprint 51; UX T51/A51.
 **Sprint 52:** ✅ **shipped v2.24.0** — [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md); workflow §118–119; ER/API/UX Sprint 52; UX T52. [SPRINT-052](../03-sprints/SPRINT-052.md) · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md).
 
 **Sprint 54:** Design pack **approved** — [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md); workflow §125–126; ER/API/UX Sprint 54; UX C54. [SPRINT-054](../03-sprints/SPRINT-054.md) · [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md).
+
+**Sprint 55:** ✅ Shipped v2.28.0 — [51-tenant-call-center-topic-statistics-spec.md](51-tenant-call-center-topic-statistics-spec.md); workflow §127–128; ER/API/UX Sprint 55; UX T55. [SPRINT-055](../03-sprints/SPRINT-055.md) · [FEAT-0047](../01-features/FEAT-0047-tenant-call-center-topic-statistics.md).
 
 **Sprint 41:** Design pack drafted and review-pending — [44-ai-call-center-security-hardening-spec.md](44-ai-call-center-security-hardening-spec.md); workflow §109–112; API § Sprint 41; UX S41. [SPRINT-041](../03-sprints/SPRINT-041.md) · [FEAT-0041](../01-features/FEAT-0041-ai-call-center-security-hardening.md).
 

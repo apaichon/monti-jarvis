@@ -9,6 +9,7 @@
 
   let startDate = $state(localISODate());
   let endDate = $state(localISODate());
+  let topic = $state('');
   let stats = $state<CallCenterStatistics | null>(null);
   let loading = $state(true);
   let applying = $state(false);
@@ -31,7 +32,7 @@
     loading = true;
     loadError = '';
     try {
-      stats = await getCallCenterStatistics({ startDate, endDate });
+      stats = await getCallCenterStatistics({ startDate, endDate, topic: topic || undefined });
     } catch (err) {
       loadError = err instanceof ApiError ? err.message : 'Failed to load call-center statistics';
       feedback.error(loadError);
@@ -49,6 +50,7 @@
   async function resetToday() {
     startDate = localISODate();
     endDate = startDate;
+    topic = '';
     await load();
   }
 
@@ -60,6 +62,10 @@
 
   function percent(value: number, total: number) {
     return total > 0 ? Math.min(100, (value / total) * 100) : 0;
+  }
+
+  function topicName(bucket: { topic?: string; label?: string }) {
+    return bucket.label || bucket.topic || 'Unknown';
   }
 </script>
 
@@ -74,6 +80,16 @@
   <form class="filters card" onsubmit={applyFilters}>
     <label>Start date<input type="date" bind:value={startDate} /></label>
     <label>End date<input type="date" bind:value={endDate} /></label>
+    <label>Topic
+      <select bind:value={topic}>
+        <option value="">All topics</option>
+        <option value="general">General</option>
+        <option value="billing">Billing</option>
+        <option value="technical">Technical</option>
+        <option value="sales">Sales</option>
+        <option value="unknown">Unknown</option>
+      </select>
+    </label>
     <div class="filter-actions"><button class="btn" type="submit" disabled={applying}>{applying ? 'Loading...' : 'Apply'}</button><button class="btn ghost" type="button" onclick={resetToday}>Today</button></div>
   </form>
 
@@ -86,7 +102,7 @@
       <article class="card kpi"><span>Completed conversations</span><strong>{stats.total_completed_conversations}</strong><small>{stats.range.start_date} to {stats.range.end_date}</small></article>
       <article class="card kpi"><span>Total talk time</span><strong>{duration(stats.total_duration_seconds)}</strong><small>{stats.timezone}</small></article>
       <article class="card kpi"><span>Average conversation</span><strong>{duration(stats.average_duration_seconds)}</strong><small>Across archived records</small></article>
-      <article class="card kpi"><span>Daily package usage</span><strong>{stats.daily_usage.call_minutes} min</strong><small>{stats.call_limits?.max_call_minutes_per_day ? `Daily cap ${stats.call_limits.max_call_minutes_per_day} min` : 'No daily cap set'}</small></article>
+      <article class="card kpi"><span>Topic filter</span><strong>{stats.topic === 'all' ? 'All' : stats.topic}</strong><small>{stats.daily_usage.call_minutes} daily package minutes</small></article>
     </section>
 
     {#if stats.total_completed_conversations === 0}
@@ -96,8 +112,9 @@
         <section class="card usage-card">
           <div class="section-head"><div><h2>Monthly call minutes</h2><p class="muted">Package allowance</p></div><strong>{stats.quota?.usage?.monthly_call_minutes ?? 0} / {stats.quota?.limits?.max_monthly_call_minutes ?? 'unlimited'}</strong></div>
           <div class="progress"><i style={`width: ${percent(stats.quota?.usage?.monthly_call_minutes ?? 0, stats.quota?.limits?.max_monthly_call_minutes ?? 0)}%`}></i></div>
-          <div class="usage-meta"><span>{stats.quota?.package?.name ?? 'No package assigned'}</span><span>{stats.quota?.period ?? 'Current period'}</span></div>
+          <div class="usage-meta"><span>{stats.quota?.package?.name ?? 'No package assigned'}</span><span>{stats.call_limits?.max_call_minutes_per_day ? `Daily cap ${stats.call_limits.max_call_minutes_per_day} min` : 'No daily cap set'}</span><span>{stats.quota?.period ?? 'Current period'}</span></div>
         </section>
+        <section class="card breakdown"><div class="section-head"><h2>By topic</h2><span>{stats.by_topic.length}</span></div>{#each stats.by_topic as bucket (bucket.topic)}<div class="breakdown-row"><span><strong>{topicName(bucket)}</strong><small>{bucket.completed} completed · {Math.round(percent(bucket.completed, stats.total_completed_conversations))}% share</small></span><b>{duration(bucket.total_duration_seconds)}</b></div>{/each}</section>
         <section class="card breakdown"><div class="section-head"><h2>By channel</h2><span>{stats.by_channel.length}</span></div>{#each stats.by_channel as bucket (bucket.channel)}<div class="breakdown-row"><span><strong>{bucket.channel || 'Unknown'}</strong><small>{bucket.completed} completed</small></span><b>{duration(bucket.total_duration_seconds)}</b></div>{/each}</section>
         <section class="card breakdown"><div class="section-head"><h2>By AI employee</h2><span>{stats.by_avatar.length}</span></div>{#each stats.by_avatar as bucket (bucket.id)}<div class="breakdown-row"><span><strong>{bucket.name || bucket.id || 'Unknown avatar'}</strong><small>{bucket.completed} completed</small></span><b>{duration(bucket.total_duration_seconds)}</b></div>{/each}</section>
       </div>
@@ -116,9 +133,9 @@
   h2 { font-size: 16px; }
   .muted, .kpi span, .kpi small, .usage-meta, .freshness { color: var(--muted); }
   .scope-badge, .section-head > span { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; color: var(--muted); font-size: 11px; white-space: nowrap; }
-  .filters { display: grid; grid-template-columns: repeat(2, minmax(150px, 220px)) auto; gap: 12px; align-items: end; }
+  .filters { display: grid; grid-template-columns: repeat(3, minmax(150px, 220px)) auto; gap: 12px; align-items: end; }
   label { display: grid; gap: 6px; color: var(--muted); font-size: 11px; }
-  input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; color: var(--ink); background: rgb(4 9 20 / 74%); }
+  input, select { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; color: var(--ink); background: rgb(4 9 20 / 74%); }
   .filter-actions { display: flex; gap: 8px; }
   .btn { border: 1px solid rgb(74 135 255 / 46%); border-radius: 9px; padding: 9px 13px; background: linear-gradient(100deg, var(--blue), var(--violet)); color: var(--ink); font-weight: 650; white-space: nowrap; }
   .btn.ghost { background: rgb(13 23 42 / 62%); }

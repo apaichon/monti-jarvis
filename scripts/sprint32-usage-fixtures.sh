@@ -101,8 +101,8 @@ load_redis() {
 load_clickhouse() {
   local call_rows ai_rows
   call_rows=$(cat <<JSON
-{"fact_id":"${SCOPE}-call-1","tenant_id":"${TENANT_ID}","call_id":"${SCOPE}-call-1","conversation_record_id":"${SCOPE}-conversation-1","avatar_id":"fixture-avatar","channel":"chat","source":"chat","status":"archived","started_at":"${START_DATE} 00:20:00","ended_at":"${START_DATE} 00:22:00","usage_date":"${START_DATE}","duration_seconds":120,"source_updated_at":"${START_DATE} 00:22:00","created_at":"${START_DATE} 00:22:00","updated_at":"${START_DATE} 00:22:00","created_by":"sprint32-fixture","updated_by":"sprint32-fixture"}
-{"fact_id":"${SCOPE}-call-mismatch","tenant_id":"${SECONDARY_TENANT_ID}","call_id":"${SCOPE}-call-mismatch","conversation_record_id":"${SCOPE}-conversation-mismatch","avatar_id":"fixture-avatar","channel":"voice","source":"voice","status":"archived","started_at":"${START_DATE} 01:20:00","ended_at":"${START_DATE} 01:21:00","usage_date":"${START_DATE}","duration_seconds":60,"source_updated_at":"${START_DATE} 01:21:00","created_at":"${START_DATE} 01:21:00","updated_at":"${START_DATE} 01:21:00","created_by":"sprint32-fixture","updated_by":"sprint32-fixture"}
+{"fact_id":"${SCOPE}-call-1","tenant_id":"${TENANT_ID}","call_id":"${SCOPE}-call-1","conversation_record_id":"${SCOPE}-conversation-1","avatar_id":"fixture-avatar","channel":"chat","topic":"billing","source":"chat","status":"archived","started_at":"${START_DATE} 00:20:00","ended_at":"${START_DATE} 00:22:00","usage_date":"${START_DATE}","duration_seconds":120,"source_updated_at":"${START_DATE} 00:22:00","created_at":"${START_DATE} 00:22:00","updated_at":"${START_DATE} 00:22:00","created_by":"sprint32-fixture","updated_by":"sprint32-fixture"}
+{"fact_id":"${SCOPE}-call-mismatch","tenant_id":"${SECONDARY_TENANT_ID}","call_id":"${SCOPE}-call-mismatch","conversation_record_id":"${SCOPE}-conversation-mismatch","avatar_id":"fixture-avatar","channel":"voice","topic":"technical","source":"voice","status":"archived","started_at":"${START_DATE} 01:20:00","ended_at":"${START_DATE} 01:21:00","usage_date":"${START_DATE}","duration_seconds":60,"source_updated_at":"${START_DATE} 01:21:00","created_at":"${START_DATE} 01:21:00","updated_at":"${START_DATE} 01:21:00","created_by":"sprint32-fixture","updated_by":"sprint32-fixture"}
 JSON
 )
   ai_rows=$(cat <<JSON
@@ -112,7 +112,7 @@ JSON
 {"fact_id":"${SCOPE}-ai-unavailable","tenant_id":"${TENANT_ID}","call_id":"${SCOPE}-call-1","conversation_record_id":"${SCOPE}-conversation-1","provider":"gemini","model":"fixture-unknown","modality":"text","measurement_state":"unavailable","input_units":0,"output_units":0,"audio_seconds":0,"rate_version":"unconfigured","cost_microunits":0,"currency":"USD","usage_date":"${START_DATE}","source_updated_at":"${START_DATE} 00:24:00","updated_at":"${START_DATE} 00:24:00"}
 JSON
 )
-  ch_query "INSERT INTO ${CLICKHOUSE_DB}.call_center_usage_facts (fact_id, tenant_id, call_id, conversation_record_id, avatar_id, channel, source, status, started_at, ended_at, usage_date, duration_seconds, source_updated_at, created_at, updated_at, created_by, updated_by) FORMAT JSONEachRow" "$call_rows"
+  ch_query "INSERT INTO ${CLICKHOUSE_DB}.call_center_usage_facts (fact_id, tenant_id, call_id, conversation_record_id, avatar_id, channel, topic, source, status, started_at, ended_at, usage_date, duration_seconds, source_updated_at, created_at, updated_at, created_by, updated_by) FORMAT JSONEachRow" "$call_rows"
   ch_query "INSERT INTO ${CLICKHOUSE_DB}.ai_cost_usage_facts (fact_id, tenant_id, call_id, conversation_record_id, provider, model, modality, measurement_state, input_units, output_units, audio_seconds, rate_version, cost_microunits, currency, usage_date, source_updated_at, updated_at) FORMAT JSONEachRow" "$ai_rows"
 }
 

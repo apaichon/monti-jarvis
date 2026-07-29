@@ -4394,3 +4394,106 @@ collapse of agent list.
 | Change brand | เปลี่ยนแบรนด์ |
 
 See DES-0049, workflow §125–126, ER Sprint 54, API Sprint 54.
+
+## T55 — Tenant call-center statistics grouped by topic (Sprint 55)
+
+**What changed:** The existing tenant Call Center dashboard gains a topic filter
+and a `By topic` breakdown. Existing KPI, channel, avatar, quota, and freshness
+sections remain.
+
+### Screen map → API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| T55-A Date filters | Change start/end date | `GET /api/tenant/call-center/statistics?start_date&end_date` |
+| T55-B Topic filter | Select all/billing/technical/general/unknown | `GET /api/tenant/call-center/statistics?topic=` |
+| T55-C Topic breakdown | Inspect topic demand | Same statistics response `by_topic` |
+| T55-D KPI row | Inspect totals under selected topic | Same statistics response totals |
+| T55-E Existing breakdowns | Compare channel and AI employee under selected topic | Same statistics response `by_channel`, `by_avatar` |
+| T55-F Empty/unavailable | Retry after empty/error state | Repeat same GET |
+
+### Layout — desktop
+
+```text
+┌─ Tenant shell / Call center ───────────────────────────────────────────────┐
+│ Call center statistics / สถิติศูนย์บริการ                 [Tenant scoped] │
+├────────────────────────────────────────────────────────────────────────────┤
+│ [Start date] [End date] [Topic: All topics ▾] [Apply] [Today]             │
+├───────────────┬───────────────┬───────────────┬──────────────────────────┤
+│ Completed     │ Total talk    │ Average       │ Daily package usage      │
+│ conversations │ time          │ conversation  │                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│ By topic                                                                  │
+│ ┌───────────┬────────────┬────────────┬────────────┬───────────────────┐ │
+│ │ Topic     │ Completed  │ Share      │ Talk time  │ Avg conversation  │ │
+│ ├───────────┼────────────┼────────────┼────────────┼───────────────────┤ │
+│ │ Billing   │ 12         │ 52%        │ 24m 00s    │ 2m 00s            │ │
+│ │ Technical │ 8          │ 35%        │ 18m 20s    │ 2m 17s            │ │
+│ │ Unknown   │ 3          │ 13%        │ 04m 10s    │ 1m 23s            │ │
+│ └───────────┴────────────┴────────────┴────────────┴───────────────────┘ │
+├──────────────────────────────┬─────────────────────────────────────────────┤
+│ By channel                   │ By AI employee                              │
+│ Chat / Voice rows            │ Agent rows                                  │
+├────────────────────────────────────────────────────────────────────────────┤
+│ Monthly call minutes package allowance                                     │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Mobile
+
+```text
+Filters stack:
+[Start] [End]
+[Topic]
+[Apply] [Today]
+KPI cards
+By topic
+By channel
+By AI employee
+Quota
+```
+
+### Flow A — all topics
+
+```text
+Open dashboard
+  → GET statistics with date range
+  → render KPI totals + by_topic rows
+```
+
+### Flow B — topic filter
+
+```text
+Select Billing
+  → GET statistics?topic=billing
+  → KPI/channel/avatar/topic rows reflect billing only
+```
+
+### Flow C — unknown bucket
+
+```text
+Historical record has no topic
+  → analytics stores topic=unknown
+  → UI displays "Unknown / unset"
+```
+
+### Component → file
+
+| Zone | Path |
+| --- | --- |
+| Tenant dashboard | `apps/tenant-web/src/routes/dashboard/+page.svelte` |
+| API client types | `apps/tenant-web/src/lib/api/callCenter.ts` |
+| Tenant statistics handler | `cmd/server/tenant_call_center.go` |
+| ClickHouse analytics | `internal/clickhouse/call_center.go` |
+| Projection | `cmd/server/tenant_call_center.go` `projectCallCenterRecord` |
+
+### Copy
+
+| EN | TH |
+| --- | --- |
+| By topic | แยกตามหัวข้อ |
+| All topics | ทุกหัวข้อ |
+| Unknown / unset | ไม่ทราบ / ยังไม่ได้ระบุ |
+| Share of conversations | สัดส่วนบทสนทนา |
+
+See DES-0051, workflow §127–128, ER Sprint 55, API Sprint 55.

@@ -1,11 +1,11 @@
 ---
 id: READINESS-RELEASE
 status: completed
-updated: 2026-07-25
-current_sprint: SPRINT-047
-release_target: v2.19.0
-release: v2.19.0
-git_tag: v2.19.0
+updated: 2026-07-29
+current_sprint: SPRINT-055
+release_target: v2.28.0
+release: v2.28.0
+git_tag: v2.28.0
 ---
 
 # Release Readiness Checklist
@@ -157,6 +157,21 @@ curl -fsS http://localhost:8091/api/workforce
 - [x] Full Go tests, Go vet, server build, and diff validation.
 - [ ] Manual referral UAT; deferred with the close remark **test later**.
 
+### SPRINT-055 (v2.28.0)
+
+- [x] TASK-0199 topic dimension projected into ClickHouse call-center facts
+  with `unknown` fallback and unchanged fact idempotency.
+- [x] TASK-0200 tenant call-center statistics API returns `topic` and
+  `by_topic`, and supports exact topic filtering.
+- [x] TASK-0201 tenant dashboard renders topic selector, topic KPI, topic
+  breakdown, and preserves existing quota/channel/avatar surfaces.
+- [x] `go test ./internal/clickhouse ./cmd/server -count=1`.
+- [x] `git diff --check`.
+- [x] `cd apps/tenant-web && npm run check`.
+- [x] `cd apps/tenant-web && npm run build`.
+- [ ] Browser/staging UAT re-run; automated release gate accepted by user for
+  v2.28.0 close.
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -184,6 +199,10 @@ curl -fsS http://localhost:8091/api/workforce
 | Tester | Codex release verification | 2026-07-25 | Automated verification passed; manual UAT deferred — test later |
 | PM | User-authorized release close | 2026-07-25 | v2.19.0 closes S46 as a partial release; 7 points carry over |
 | DevOps | Codex release verification | 2026-07-25 | v2.19.0 tag and feature branch pushed to origin |
+| Dev | Codex release verification | 2026-07-29 | S55 topic projection, tenant API, dashboard UI, and regression checks |
+| Tester | Codex release verification | 2026-07-29 | Automated Go/Svelte/build checks passed; browser/staging UAT deferred |
+| PM | User-authorized release close | 2026-07-29 | User requested close, merge to main, push, and tag |
+| DevOps | Codex release verification | 2026-07-29 | VERSION v2.28.0, merge/tag/push prepared |
 
 ## H. Release-cut (PM + DevOps)
 
@@ -201,6 +220,10 @@ git push origin v2.13.0
 - [x] `_velocity.json` updated
 - [x] ROADMAP Sprint 46 partial slice marked v2.19.0 and next sprint pointer advanced to Sprint 47
 - [x] Tag `v2.19.0` pushed to `origin`
+- [x] Sprint 55 marked `completed` in `03-sprints/`
+- [x] `_velocity.json` updated for SPRINT-055
+- [x] ROADMAP Sprint 55 marked v2.28.0
+- [x] Tag `v2.28.0` pushed to `origin`
 
 ## Quick demo script (stakeholder, ~10 min)
 

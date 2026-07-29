@@ -2724,3 +2724,59 @@ AND COALESCE(kyc.status, 'approved') = 'approved'
 | Full FEAT-0018 marketing hub | later | still backlog beyond list→call |
 
 See DES-0049, workflow §125–126, API Sprint 54, UX C54.
+
+## Sprint 55 — tenant call-center topic statistics
+
+S55 extends the existing ClickHouse activity fact with one normalized topic
+dimension. No new Postgres table is required.
+
+### ClickHouse `call_center_usage_facts` extension
+
+```mermaid
+erDiagram
+  tenants ||--o{ call_center_usage_facts : scopes
+  conversation_records ||--o{ call_center_usage_facts : projects
+  call_sessions ||--o{ call_center_usage_facts : supplies_source
+  ai_avatars ||--o{ call_center_usage_facts : handled_by
+
+  call_center_usage_facts {
+    string fact_id
+    string tenant_id
+    string call_id
+    string conversation_record_id
+    string avatar_id
+    string channel
+    string source
+    string topic
+    string status
+    datetime started_at
+    datetime ended_at
+    date usage_date
+    uint32 duration_seconds
+    datetime source_updated_at
+    datetime created_at
+    datetime updated_at
+    string created_by
+    string updated_by
+  }
+```
+
+### Migration / bootstrap
+
+| Store | Change |
+| --- | --- |
+| ClickHouse | `ALTER TABLE ... ADD COLUMN IF NOT EXISTS topic String DEFAULT 'unknown'` |
+| Postgres | No table change; source topic comes from `conversation_records.summary.topic` |
+| Redis | No new key |
+| MinIO | No change |
+
+### Topic normalization
+
+| Input | Stored |
+| --- | --- |
+| blank / missing | `unknown` |
+| `General` | `general` |
+| `billing` | `billing` |
+| invalid / too long | `unknown` or bounded normalized code per DES-0051 |
+
+See DES-0051, workflow §127–128, API Sprint 55, UX T55.

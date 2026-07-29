@@ -78,7 +78,7 @@
 | **52** | **Tenant / Platform** | **Tenant self-service avatar create/library: unlimited drafts; only active avatars capped by package `max_ai_employees`** | **D+** | **5, 13, 15, 16, 45, 50** · ✅ v2.24.0 · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md) · [SPRINT-052](../03-sprints/SPRINT-052.md) · [DES-0047](../02-design/47-tenant-avatar-create-active-cap-spec.md) |
 | **53** | **Tenant / Customer** | **Tenant settings: auto-register customer when email + OTP is entered in conversation; show app/tag version on UI** | **D+** | **16, 19, 20, 21, 52** · ✅ **v2.26.0** · [FEAT-0046](../01-features/FEAT-0046-conversation-auto-register-app-version.md) · [SPRINT-053](../03-sprints/SPRINT-053.md) · [DES-0050](../02-design/50-conversation-auto-register-app-version-spec.md) |
 | **54** | **Customer / Platform** | **Customer portal: pick tenant from list to call (no `tenant_id` query string required)** | **J** | **1, 5, 6, 20, 21, 38, 53** · ✅ **v2.27.0** · [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md) · [SPRINT-054](../03-sprints/SPRINT-054.md) · [DES-0049](../02-design/49-customer-portal-tenant-list-spec.md) |
-| **55** | **Tenant** | **Call Center Statistics grouped by topic** | **F+** | **22, 25, 30** · planned · extends [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
+| **55** | **Tenant** | **Call Center Statistics grouped by topic** | **F+** | **22, 25, 30** · ✅ **v2.28.0** · [FEAT-0047](../01-features/FEAT-0047-tenant-call-center-topic-statistics.md) · [SPRINT-055](../03-sprints/SPRINT-055.md) · [DES-0051](../02-design/51-tenant-call-center-topic-statistics-spec.md) · extends [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
 
 ---
 
@@ -1735,11 +1735,11 @@ exist.
 
 ---
 
-## Planned: SPRINT-055 — Tenant Call Center Statistics Grouped by Topic
+## Shipped: SPRINT-055 — Tenant Call Center Statistics Grouped by Topic
 
 **Platform:** Tenant · **Feature:** Extend tenant call-center statistics with
 **group by topic** breakdowns (conversation/call topic tags) · **Depends:** 22,
-25, 30 · **Status:** planned · **Extends:** [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md)
+25, 30 · **Status:** shipped v2.28.0 · **Extends:** [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md)
 (S25 dashboard)
 
 ### Problem
