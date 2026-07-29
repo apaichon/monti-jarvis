@@ -3853,3 +3853,65 @@ sequenceDiagram
 | Legacy preselect | `/?tenant_id=` → redirect | set after resolve | same as desk |
 
 See DES-0049, ER Sprint 54, API Sprint 54, UX C54.
+
+## 127. Completed conversation projects topic into analytics (Sprint 55)
+
+```mermaid
+sequenceDiagram
+  participant C as Customer browser / voice client
+  participant G as Go :8091
+  participant S as internal/store
+  participant PG as Postgres callcenter
+  participant CH as ClickHouse monti_jarvis
+
+  C->>G: Chat / voice conversation with topic
+  G->>S: Archive conversation record
+  S->>PG: conversation_records.summary.topic = selected topic
+  G->>S: GetConversationAnalyticsContext(record_id)
+  S-->>G: record + source + summary
+  G->>G: normalizeTopic(summary.topic) or "unknown"
+  G->>CH: INSERT call_center_usage_facts {fact_id, tenant_id, topic, ...}
+  alt replay / retry
+    G->>CH: INSERT same fact_id with newer updated_at
+    CH-->>G: ReplacingMergeTree latest row wins
+  else ClickHouse unavailable
+    G->>G: log projection failure; source record remains authoritative
+  end
+```
+
+## 128. Tenant filters call-center statistics by topic (Sprint 55)
+
+```mermaid
+sequenceDiagram
+  participant B as Tenant admin browser
+  participant G as Go :8091
+  participant Q as quota service
+  participant CH as ClickHouse monti_jarvis
+
+  B->>G: GET /api/tenant/call-center/statistics?start_date&end_date&topic=billing
+  G->>G: tenant_id from auth; validate date + topic
+  G->>CH: SELECT tenant-scoped FINAL aggregates grouped by avatar/channel/topic
+  CH-->>G: aggregate rows only
+  G->>Q: Snapshot + daily call minutes
+  Q-->>G: quota block
+  G-->>B: {totals, by_channel, by_avatar, by_topic, quota}
+  B->>B: Render topic breakdown + filtered totals
+
+  alt topic omitted
+    G->>CH: same query without topic filter
+    G-->>B: "topic":"all" + all topic buckets
+  else invalid topic
+    G-->>B: 400 validation_error
+  end
+```
+
+### State table — topic analytics
+
+| Source topic | Stored analytics topic | UI label |
+| --- | --- | --- |
+| `general` | `general` | General |
+| `billing` | `billing` | Billing |
+| `technical` | `technical` | Technical |
+| blank / missing / invalid | `unknown` | Unknown / unset |
+
+See DES-0051, ER Sprint 55, API Sprint 55, UX T55.

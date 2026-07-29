@@ -13,20 +13,20 @@ func TestQueryCallCenterStatsAggregatesDimensions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		query := string(body)
-		for _, expected := range []string{"tenant_id = 'tenant''s'", "toDate('2026-07-14')", "FINAL"} {
+		for _, expected := range []string{"tenant_id = 'tenant''s'", "toDate('2026-07-14')", "FINAL", "GROUP BY avatar_id, channel, topic"} {
 			if !strings.Contains(query, expected) {
 				t.Fatalf("query missing %q: %s", expected, query)
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[
-{"avatar_id":"ava","channel":"voice","sessions":"2","total_duration_seconds":"90","freshness":"2026-07-14 09:00:00"},
-{"avatar_id":"ava","channel":"chat","sessions":"1","total_duration_seconds":"30","freshness":"2026-07-14 09:05:00"},
-{"avatar_id":"neo","channel":"voice","sessions":"1","total_duration_seconds":"120","freshness":"2026-07-14 09:03:00"}]}`))
+{"avatar_id":"ava","channel":"voice","topic":"billing","sessions":"2","total_duration_seconds":"90","freshness":"2026-07-14 09:00:00"},
+{"avatar_id":"ava","channel":"chat","topic":"billing","sessions":"1","total_duration_seconds":"30","freshness":"2026-07-14 09:05:00"},
+{"avatar_id":"neo","channel":"voice","topic":"technical","sessions":"1","total_duration_seconds":"120","freshness":"2026-07-14 09:03:00"}]}`))
 	}))
 	defer server.Close()
 
-	stats, err := New(server.URL, "monti_jarvis", "", "").QueryCallCenterStats(context.Background(), "tenant's", "2026-07-14", "2026-07-14")
+	stats, err := New(server.URL, "monti_jarvis", "", "").QueryCallCenterStats(context.Background(), "tenant's", "2026-07-14", "2026-07-14", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,11 +36,36 @@ func TestQueryCallCenterStatsAggregatesDimensions(t *testing.T) {
 	if stats.AverageDurationSeconds != 60 {
 		t.Fatalf("unexpected average: %v", stats.AverageDurationSeconds)
 	}
-	if len(stats.ByAvatar) != 2 || len(stats.ByChannel) != 2 {
-		t.Fatalf("unexpected dimensions: avatars=%+v channels=%+v", stats.ByAvatar, stats.ByChannel)
+	if len(stats.ByAvatar) != 2 || len(stats.ByChannel) != 2 || len(stats.ByTopic) != 2 {
+		t.Fatalf("unexpected dimensions: avatars=%+v channels=%+v topics=%+v", stats.ByAvatar, stats.ByChannel, stats.ByTopic)
+	}
+	if stats.ByTopic[0].Topic != "billing" || stats.ByTopic[0].CompletedConversations != 3 {
+		t.Fatalf("unexpected topic aggregate: %+v", stats.ByTopic)
 	}
 	if stats.Freshness.IsZero() || stats.Freshness.Hour() != 9 || stats.Freshness.Minute() != 5 {
 		t.Fatalf("unexpected freshness: %v", stats.Freshness)
+	}
+}
+
+func TestQueryCallCenterStatsFiltersTopic(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		query := string(body)
+		if !strings.Contains(query, "AND topic = 'billing'") {
+			t.Fatalf("query missing topic filter: %s", query)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[
+{"avatar_id":"ava","channel":"chat","topic":"billing","sessions":"1","total_duration_seconds":"45","freshness":"2026-07-14 09:05:00"}]}`))
+	}))
+	defer server.Close()
+
+	stats, err := New(server.URL, "monti_jarvis", "", "").QueryCallCenterStats(context.Background(), "tenant-1", "2026-07-14", "2026-07-14", "billing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.CompletedConversations != 1 || len(stats.ByTopic) != 1 || stats.ByTopic[0].Topic != "billing" {
+		t.Fatalf("unexpected filtered stats: %+v", stats)
 	}
 }
 

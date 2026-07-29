@@ -90,7 +90,7 @@ func (s *server) analyticsHealthReader(tenantID string) observability.AnalyticsR
 			loc = time.UTC
 		}
 		today := time.Now().In(loc).Format("2006-01-02")
-		stats, err := s.ch.QueryCallCenterStats(ctx, tenantID, today, today)
+		stats, err := s.ch.QueryCallCenterStats(ctx, tenantID, today, today, "")
 		if err != nil {
 			return observability.Analytics{Status: observability.AnalyticsUnavailable, GeneratedAt: &generated}
 		}

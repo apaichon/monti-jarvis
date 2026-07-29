@@ -20,6 +20,7 @@ type CallCenterUsageFact struct {
 	ConversationID  string `json:"conversation_record_id"`
 	AvatarID        string `json:"avatar_id"`
 	Channel         string `json:"channel"`
+	Topic           string `json:"topic"`
 	Source          string `json:"source"`
 	Status          string `json:"status"`
 	StartedAt       string `json:"started_at"`
@@ -39,12 +40,14 @@ type CallCenterStats struct {
 	AverageDurationSeconds float64
 	ByAvatar               []CallCenterBucket
 	ByChannel              []CallCenterBucket
+	ByTopic                []CallCenterBucket
 	Freshness              time.Time
 }
 
 type CallCenterBucket struct {
 	ID                     string
 	Channel                string
+	Topic                  string
 	CompletedConversations int
 	TotalDurationSeconds   int
 	AverageDurationSeconds float64
@@ -74,6 +77,7 @@ type PlatformCallCenterBucket struct {
 type callCenterQueryRow struct {
 	AvatarID     string        `json:"avatar_id"`
 	Channel      string        `json:"channel"`
+	Topic        string        `json:"topic"`
 	Sessions     clickhouseInt `json:"sessions"`
 	TotalSeconds clickhouseInt `json:"total_duration_seconds"`
 	Freshness    string        `json:"freshness"`
@@ -121,6 +125,7 @@ func (c *Client) EnsureCallCenterSchema(ctx context.Context) error {
   conversation_record_id String,
   avatar_id String,
   channel String,
+  topic String DEFAULT 'unknown',
   source String,
   status String,
   started_at DateTime,
@@ -134,7 +139,10 @@ func (c *Client) EnsureCallCenterSchema(ctx context.Context) error {
   updated_by String DEFAULT 'system'
 ) ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (tenant_id, usage_date, call_id, fact_id)`, quoteIdent(c.db))
-	return c.exec(ctx, stmt)
+	if err := c.exec(ctx, stmt); err != nil {
+		return err
+	}
+	return c.exec(ctx, fmt.Sprintf("ALTER TABLE %s.call_center_usage_facts ADD COLUMN IF NOT EXISTS topic String DEFAULT 'unknown'", quoteIdent(c.db)))
 }
 
 func (c *Client) UpsertCallCenterFact(ctx context.Context, fact CallCenterUsageFact) error {
@@ -145,25 +153,29 @@ func (c *Client) UpsertCallCenterFact(ctx context.Context, fact CallCenterUsageF
 	if err := json.NewEncoder(&body).Encode(fact); err != nil {
 		return fmt.Errorf("encode call center fact: %w", err)
 	}
-	query := fmt.Sprintf("INSERT INTO %s.call_center_usage_facts (fact_id, tenant_id, call_id, conversation_record_id, avatar_id, channel, source, status, started_at, ended_at, usage_date, duration_seconds, source_updated_at, created_at, updated_at, created_by, updated_by) FORMAT JSONEachRow", quoteIdent(c.db))
+	query := fmt.Sprintf("INSERT INTO %s.call_center_usage_facts (fact_id, tenant_id, call_id, conversation_record_id, avatar_id, channel, topic, source, status, started_at, ended_at, usage_date, duration_seconds, source_updated_at, created_at, updated_at, created_by, updated_by) FORMAT JSONEachRow", quoteIdent(c.db))
 	return c.execInsert(ctx, query, body.Bytes())
 }
 
-func (c *Client) QueryCallCenterStats(ctx context.Context, tenantID, startDate, endDate string) (CallCenterStats, error) {
+func (c *Client) QueryCallCenterStats(ctx context.Context, tenantID, startDate, endDate, topicFilter string) (CallCenterStats, error) {
 	if !c.Enabled() {
 		return CallCenterStats{}, fmt.Errorf("clickhouse is not configured")
 	}
+	topicClause := ""
+	if strings.TrimSpace(topicFilter) != "" {
+		topicClause = "\n  AND topic = '" + escape(topicFilter) + "'"
+	}
 	query := fmt.Sprintf(`
-SELECT avatar_id, channel, count() AS sessions,
+SELECT avatar_id, channel, topic, count() AS sessions,
        sum(duration_seconds) AS total_duration_seconds,
        formatDateTime(max(updated_at), '%%Y-%%m-%%d %%H:%%i:%%s') AS freshness
 FROM %s.call_center_usage_facts FINAL
 WHERE tenant_id = '%s'
   AND usage_date BETWEEN toDate('%s') AND toDate('%s')
-  AND status = 'archived'
-GROUP BY avatar_id, channel
+  AND status = 'archived'%s
+GROUP BY avatar_id, channel, topic
 ORDER BY sessions DESC
-FORMAT JSON`, quoteIdent(c.db), escape(tenantID), escape(startDate), escape(endDate))
+FORMAT JSON`, quoteIdent(c.db), escape(tenantID), escape(startDate), escape(endDate), topicClause)
 	body, err := c.query(ctx, query)
 	if err != nil {
 		return CallCenterStats{}, err
@@ -177,6 +189,7 @@ FORMAT JSON`, quoteIdent(c.db), escape(tenantID), escape(startDate), escape(endD
 	stats := CallCenterStats{}
 	avatar := make(map[string]*CallCenterBucket)
 	channel := make(map[string]*CallCenterBucket)
+	topic := make(map[string]*CallCenterBucket)
 	for _, row := range parsed.Data {
 		sessions := int(row.Sessions)
 		totalSeconds := int(row.TotalSeconds)
@@ -197,6 +210,14 @@ FORMAT JSON`, quoteIdent(c.db), escape(tenantID), escape(startDate), escape(endD
 			}
 			bucket.CompletedConversations += sessions
 			bucket.TotalDurationSeconds += totalSeconds
+
+			bucket = topic[row.Topic]
+			if bucket == nil {
+				bucket = &CallCenterBucket{Topic: row.Topic}
+				topic[row.Topic] = bucket
+			}
+			bucket.CompletedConversations += sessions
+			bucket.TotalDurationSeconds += totalSeconds
 		}
 		if parsedTime, parseErr := time.Parse("2006-01-02 15:04:05", row.Freshness); parseErr == nil && parsedTime.After(stats.Freshness) {
 			stats.Freshness = parsedTime
@@ -211,11 +232,18 @@ FORMAT JSON`, quoteIdent(c.db), escape(tenantID), escape(startDate), escape(endD
 		bucket.AverageDurationSeconds = averageSeconds(bucket.TotalDurationSeconds, bucket.CompletedConversations)
 		stats.ByChannel = append(stats.ByChannel, *bucket)
 	}
+	for _, bucket := range topic {
+		bucket.AverageDurationSeconds = averageSeconds(bucket.TotalDurationSeconds, bucket.CompletedConversations)
+		stats.ByTopic = append(stats.ByTopic, *bucket)
+	}
 	sort.Slice(stats.ByAvatar, func(i, j int) bool {
 		return stats.ByAvatar[i].CompletedConversations > stats.ByAvatar[j].CompletedConversations
 	})
 	sort.Slice(stats.ByChannel, func(i, j int) bool {
 		return stats.ByChannel[i].CompletedConversations > stats.ByChannel[j].CompletedConversations
+	})
+	sort.Slice(stats.ByTopic, func(i, j int) bool {
+		return stats.ByTopic[i].CompletedConversations > stats.ByTopic[j].CompletedConversations
 	})
 	return stats, nil
 }

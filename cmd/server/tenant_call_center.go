@@ -17,8 +17,10 @@ type tenantCallCenterStatistics struct {
 	TotalCompleted         int               `json:"total_completed_conversations"`
 	TotalDurationSeconds   int               `json:"total_duration_seconds"`
 	AverageDurationSeconds float64           `json:"average_duration_seconds"`
+	Topic                  string            `json:"topic"`
 	ByAvatar               []map[string]any  `json:"by_avatar"`
 	ByChannel              []map[string]any  `json:"by_channel"`
+	ByTopic                []map[string]any  `json:"by_topic"`
 	Quota                  any               `json:"quota"`
 	DailyUsage             map[string]any    `json:"daily_usage"`
 	CallLimits             any               `json:"call_limits"`
@@ -58,11 +60,16 @@ func (s *server) getTenantCallCenterStatistics(w http.ResponseWriter, r *http.Re
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "start_date must be on or before end_date", "code": "validation_error"})
 		return
 	}
+	topicFilter, topicErr := parseCallCenterTopicFilter(r.URL.Query().Get("topic"))
+	if topicErr != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "topic must contain only lowercase letters, numbers, and underscores", "code": "validation_error"})
+		return
+	}
 	if s.ch == nil || !s.ch.Enabled() {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "analytics unavailable", "code": "analytics_unavailable"})
 		return
 	}
-	stats, err := s.ch.QueryCallCenterStats(r.Context(), tenantID, startDate, endDate)
+	stats, err := s.ch.QueryCallCenterStats(r.Context(), tenantID, startDate, endDate, topicFilter)
 	if err != nil {
 		log.Printf("call center statistics tenant=%s: %v", tenantID, err)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "analytics unavailable", "code": "analytics_unavailable"})
@@ -91,10 +98,22 @@ func (s *server) getTenantCallCenterStatistics(w http.ResponseWriter, r *http.Re
 	for _, bucket := range stats.ByChannel {
 		byChannel = append(byChannel, map[string]any{"channel": bucket.Channel, "completed": bucket.CompletedConversations, "total_duration_seconds": bucket.TotalDurationSeconds, "average_duration_seconds": bucket.AverageDurationSeconds})
 	}
+	byTopic := make([]map[string]any, 0, len(stats.ByTopic))
+	for _, bucket := range stats.ByTopic {
+		topic := bucket.Topic
+		if strings.TrimSpace(topic) == "" {
+			topic = "unknown"
+		}
+		byTopic = append(byTopic, map[string]any{"topic": topic, "label": callCenterTopicLabel(topic), "completed": bucket.CompletedConversations, "total_duration_seconds": bucket.TotalDurationSeconds, "average_duration_seconds": bucket.AverageDurationSeconds})
+	}
+	selectedTopic := topicFilter
+	if selectedTopic == "" {
+		selectedTopic = "all"
+	}
 	out := tenantCallCenterStatistics{
-		Range: map[string]string{"start_date": startDate, "end_date": endDate}, Timezone: tz,
+		Range: map[string]string{"start_date": startDate, "end_date": endDate}, Timezone: tz, Topic: selectedTopic,
 		TotalCompleted: stats.CompletedConversations, TotalDurationSeconds: stats.TotalDurationSeconds,
-		AverageDurationSeconds: stats.AverageDurationSeconds, ByAvatar: byAvatar, ByChannel: byChannel,
+		AverageDurationSeconds: stats.AverageDurationSeconds, ByAvatar: byAvatar, ByChannel: byChannel, ByTopic: byTopic,
 		DailyUsage: map[string]any{"call_minutes": 0, "timezone": tz},
 	}
 	if !stats.Freshness.IsZero() {
@@ -147,7 +166,7 @@ func (s *server) projectCallCenterRecord(ctx context.Context, tenantID, recordID
 	fact := clickhouse.CallCenterUsageFact{
 		FactID: "ccf_" + analytics.Record.ID, TenantID: analytics.Record.TenantID, CallID: analytics.Record.CallID,
 		ConversationID: analytics.Record.ID, AvatarID: analytics.Record.AvatarID, Channel: analytics.Record.Channel,
-		Source: source, Status: analytics.Record.Status, StartedAt: formatCHTime(analytics.Record.StartedAt),
+		Topic: callCenterTopicFromSummary(analytics.Record.Summary), Source: source, Status: analytics.Record.Status, StartedAt: formatCHTime(analytics.Record.StartedAt),
 		EndedAt: formatCHTime(endedAt), UsageDate: endedAt.In(loc).Format("2006-01-02"),
 		DurationSeconds: analytics.Record.DurationSeconds, SourceUpdatedAt: formatCHTime(updatedAt),
 		CreatedAt: formatCHTime(time.Now().UTC()), UpdatedAt: formatCHTime(updatedAt), CreatedBy: "system", UpdatedBy: "system",
@@ -179,4 +198,87 @@ func formatCHTime(value time.Time) string {
 		value = time.Now().UTC()
 	}
 	return value.UTC().Format("2006-01-02 15:04:05")
+}
+
+func callCenterTopicFromSummary(summary map[string]any) string {
+	if summary == nil {
+		return "unknown"
+	}
+	topic, _ := summary["topic"]
+	return normalizeCallCenterTopic(topic)
+}
+
+func normalizeCallCenterTopic(value any) string {
+	text, ok := value.(string)
+	if !ok {
+		return "unknown"
+	}
+	normalized, valid := normalizeCallCenterTopicText(text)
+	if !valid || normalized == "" {
+		return "unknown"
+	}
+	return normalized
+}
+
+func parseCallCenterTopicFilter(value string) (string, error) {
+	if strings.TrimSpace(value) == "" {
+		return "", nil
+	}
+	normalized, valid := normalizeCallCenterTopicText(value)
+	if !valid || normalized == "" {
+		return "", errInvalidCallCenterTopic
+	}
+	return normalized, nil
+}
+
+var errInvalidCallCenterTopic = errValidation("invalid call center topic")
+
+type errValidation string
+
+func (e errValidation) Error() string { return string(e) }
+
+func normalizeCallCenterTopicText(value string) (string, bool) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "", false
+	}
+	var builder strings.Builder
+	lastUnderscore := false
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z' || r >= '0' && r <= '9':
+			builder.WriteRune(r)
+			lastUnderscore = false
+		case r == '_' || r == '-' || r == ' ' || r == '\t' || r == '\n':
+			if builder.Len() > 0 && !lastUnderscore {
+				builder.WriteByte('_')
+				lastUnderscore = true
+			}
+		default:
+			return "", false
+		}
+		if builder.Len() > 48 {
+			return "", false
+		}
+	}
+	normalized := strings.Trim(builder.String(), "_")
+	if normalized == "" || len(normalized) > 48 {
+		return "", false
+	}
+	return normalized, true
+}
+
+func callCenterTopicLabel(topic string) string {
+	topic = normalizeCallCenterTopic(topic)
+	if topic == "unknown" {
+		return "Unknown"
+	}
+	parts := strings.Split(topic, "_")
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(part[:1]) + part[1:]
+	}
+	return strings.Join(parts, " ")
 }

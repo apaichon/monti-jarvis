@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS monti_jarvis.call_center_usage_facts (
   conversation_record_id String,
   avatar_id String,
   channel String,
+  topic String DEFAULT 'unknown',
   source String,
   status String,
   started_at DateTime,
@@ -20,3 +21,6 @@ CREATE TABLE IF NOT EXISTS monti_jarvis.call_center_usage_facts (
   updated_by String DEFAULT 'system'
 ) ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (tenant_id, usage_date, call_id, fact_id);
+
+ALTER TABLE monti_jarvis.call_center_usage_facts
+  ADD COLUMN IF NOT EXISTS topic String DEFAULT 'unknown';

@@ -4644,3 +4644,70 @@ See DES-0048, workflow §120–122, ER Sprint 53, UX T53/C53/A53.
 | Embed public routes | Still embed-key based |
 
 See DES-0049, workflow §125–126, ER Sprint 54, UX C54.
+
+## Sprint 55 — Tenant Call-Center Topic Statistics
+
+Sprint 55 extends the existing tenant call-center statistics endpoint. It does
+not create a second analytics endpoint.
+
+### `GET /api/tenant/call-center/statistics` additions
+
+**Auth:** `tenant_admin` for the active tenant. `tenant_id` is always derived
+from auth context.
+
+#### Query additions
+
+| Param | Required | Description |
+| --- | --- | --- |
+| `topic` | no | Optional normalized topic code. Omit for all topics. |
+
+Existing `start_date` and `end_date` behavior is unchanged.
+
+#### Response additions
+
+```json
+{
+  "range": {"start_date": "2026-07-29", "end_date": "2026-07-29"},
+  "topic": "all",
+  "total_completed_conversations": 18,
+  "by_topic": [
+    {
+      "topic": "billing",
+      "label": "Billing",
+      "completed": 10,
+      "total_duration_seconds": 1440,
+      "average_duration_seconds": 144
+    },
+    {
+      "topic": "unknown",
+      "label": "Unknown / unset",
+      "completed": 1,
+      "total_duration_seconds": 60,
+      "average_duration_seconds": 60
+    }
+  ]
+}
+```
+
+When `topic=billing` is present, totals, `by_channel`, `by_avatar`, and
+`by_topic` are filtered to billing rows. The `by_topic` array should contain the
+matching bucket only unless no rows match.
+
+#### Error codes
+
+| HTTP | Code | When |
+| ---: | --- | --- |
+| 400 | `validation_error` | Invalid topic code or date range |
+| 401 | `unauthorized` | Missing tenant-admin context |
+| 503 | `analytics_unavailable` | ClickHouse unavailable |
+| 502 | `quota_unavailable` | Quota snapshot unavailable |
+
+#### Topic validation
+
+```text
+trim -> lowercase -> spaces to underscores -> max 48 chars
+blank or invalid source values become "unknown"
+query topic must either be "unknown" or match the normalized topic pattern
+```
+
+See DES-0051, workflow §127–128, ER Sprint 55, UX T55.

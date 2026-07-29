@@ -228,6 +228,16 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 
 ---
 
+## SPRINT-055 — Tenant Call-Center Topic Statistics
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T55-01 | 1–2, 6 | Projection stores normalized topic and `unknown` fallback without changing fact idempotency | Auto + Manual | `go test ./cmd/server ./internal/clickhouse -count=1` · [UAT-055](../06-manual-tests/SPRINT-055-topic-statistics-manual.md) | Pass |
+| T55-02 | 3–4 | Tenant statistics API returns `by_topic` and filters totals/channel/avatar/topic by `topic=` | Auto + Manual | `go test ./internal/clickhouse ./cmd/server -count=1` · [UAT-055](../06-manual-tests/SPRINT-055-topic-statistics-manual.md) | Pass |
+| T55-03 | 5 | Tenant dashboard renders topic selector, topic KPI, topic breakdown, and keeps existing sections | Auto + Manual | `cd apps/tenant-web && npm run check && npm run build` · [UAT-055](../06-manual-tests/SPRINT-055-topic-statistics-manual.md) | Pass (auto) |
+
+---
+
 ## Coverage gaps (planned)
 
 | Area | Gap | Target |
