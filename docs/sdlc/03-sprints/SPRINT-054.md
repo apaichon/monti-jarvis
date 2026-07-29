@@ -1,6 +1,6 @@
 ---
 id: SPRINT-054
-status: design_approved
+status: in_progress
 start: 2026-07-29
 end: 2026-08-05
 updated: 2026-07-29
@@ -33,10 +33,10 @@ tenant only. Optional deep links may preselect a tenant via path slug.
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0195](../04-tasks/TASK-0195.md) Public directory contract + tenant resolve | 5 | todo | dev | Safe list/resolve APIs; document reuse of public brands |
-| [TASK-0196](../04-tasks/TASK-0196.md) Customer portal picker + path context | 4 | todo | dev | Picker UI; `/t/{slug}`; no required query |
-| [TASK-0197](../04-tasks/TASK-0197.md) Isolation verification + UAT | 3 | todo | tester/dev | A/B isolation; deep link; manual checklist |
-| **Total** | **12** | **0/12** | | |
+| [TASK-0195](../04-tasks/TASK-0195.md) Public directory contract + tenant resolve | 5 | completed | dev | Safe list/resolve APIs; document reuse of public brands |
+| [TASK-0196](../04-tasks/TASK-0196.md) Customer portal picker + path context | 4 | completed | dev | Picker UI; `/t/{slug}`; no required query |
+| [TASK-0197](../04-tasks/TASK-0197.md) Isolation verification + UAT | 3 | completed | tester/dev | A/B isolation; deep link; manual checklist |
+| **Total** | **12** | **12/12** | | |
 
 ## Design pack
 
@@ -90,3 +90,11 @@ cd apps/customer-web && npm run check
 .worktrees/SPRINT-054
 branch: feature/sprint-054-customer-tenant-list
 ```
+
+
+## Implementation notes (worktree)
+
+- `GET /api/public/tenants` alias of public brands
+- Customer portal picker at `/`; desk at `/t/{slug}`
+- sessionStorage `monti_jarvis:selected_tenant`
+- Manual UAT: [SPRINT-054-customer-tenant-list-manual.md](../06-manual-tests/SPRINT-054-customer-tenant-list-manual.md)

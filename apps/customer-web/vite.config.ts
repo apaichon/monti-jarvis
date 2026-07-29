@@ -7,7 +7,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': 'http://localhost:8091',
-      '/healthz': 'http://localhost:8091'
+      '/healthz': 'http://localhost:8091',
+      '/ws': { target: 'http://localhost:8091', ws: true }
     }
   }
 });
