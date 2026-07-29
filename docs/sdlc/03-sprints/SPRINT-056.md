@@ -1,6 +1,6 @@
 ---
 id: SPRINT-056
-status: design_approved
+status: in_progress
 start: 2026-07-29
 end: 2026-08-08
 updated: 2026-07-29
@@ -33,10 +33,10 @@ calls without technical infra jargon.
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0199](../04-tasks/TASK-0199.md) Tenant list + call desk logo branding revamp | 5 | todo | dev | Large Monti + company logos per mockups |
-| [TASK-0200](../04-tasks/TASK-0200.md) Mic/speaker device settings for voice | 4 | todo | dev | Enumerate, select, apply, persist devices |
-| [TASK-0201](../04-tasks/TASK-0201.md) Branding + audio UAT and verification | 3 | todo | tester/dev | Manual checklist; logo A/B; permission paths |
-| **Total** | **12** | **0/12** | | |
+| [TASK-0199](../04-tasks/TASK-0199.md) Tenant list + call desk logo branding revamp | 5 | completed | dev | Large Monti + company logos per mockups |
+| [TASK-0200](../04-tasks/TASK-0200.md) Mic/speaker device settings for voice | 4 | completed | dev | Enumerate, select, apply, persist devices |
+| [TASK-0201](../04-tasks/TASK-0201.md) Branding + audio UAT and verification | 3 | completed | tester/dev | Manual checklist; logo A/B; permission paths |
+| **Total** | **12** | **12/12** | | |
 
 ## Design pack
 
@@ -89,3 +89,11 @@ cd apps/customer-web && npm run check
 .worktrees/SPRINT-056
 branch: feature/sprint-056-caller-desk-branding-audio
 ```
+
+
+## Implementation notes
+
+- `TenantPicker` large Monti hero + logo cards
+- `CustomerDesk` Monti hero + company logo card + audio settings
+- `lib/audio/devices.ts` enumerate/persist; GeminiVoice deviceId options
+- Manual UAT: [SPRINT-056-caller-desk-branding-audio-manual.md](../06-manual-tests/SPRINT-056-caller-desk-branding-audio-manual.md)

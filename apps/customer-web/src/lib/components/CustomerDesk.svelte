@@ -40,6 +40,18 @@
     resolveBranding,
     type ThemeBranding
   } from '$lib/theme/applyTheme';
+  import { brandMonogram } from '$lib/brandMark';
+  import {
+    ensureAudioPermission,
+    friendlyMediaError,
+    getStoredInputDeviceId,
+    getStoredOutputDeviceId,
+    listAudioDevices,
+    storeInputDeviceId,
+    storeOutputDeviceId,
+    supportsSpeakerSelection,
+    type AudioDevice
+  } from '$lib/audio/devices';
 
   type Props = {
     tenantId: string;
@@ -93,8 +105,16 @@
   let systemLive = $state('Checking…');
   let systemLiveKind = $state<SystemLiveState>('checking');
   let chatEl: HTMLElement | undefined = $state();
-  let tenantLabel = $derived(tenantName || tenantSlug || tenantId);
   let brand = $state(resolveBranding(null));
+  let tenantLabel = $derived(tenantName || tenantSlug || tenantId);
+  let companyMonogram = $derived(brandMonogram(tenantName || brand.brand_name, tenantSlug));
+  let audioInputs = $state<AudioDevice[]>([]);
+  let audioOutputs = $state<AudioDevice[]>([]);
+  let selectedMicId = $state('');
+  let selectedSpeakerId = $state('');
+  let audioBusy = $state(false);
+  let audioNote = $state('');
+  let speakerSelectable = $state(false);
   let customer = $state<CustomerProfile | null>(null);
   let customerEmail = $state('');
   let customerName = $state('');
@@ -156,7 +176,51 @@
     const infra = await loadInfra();
     systemLiveKind = systemLiveState(infra);
     systemLive = formatSystemLive(infra);
+    selectedMicId = getStoredInputDeviceId();
+    selectedSpeakerId = getStoredOutputDeviceId();
+    speakerSelectable = supportsSpeakerSelection();
+    void refreshAudioDevices(false);
   });
+
+  async function refreshAudioDevices(requestPermission: boolean) {
+    audioBusy = true;
+    audioNote = '';
+    try {
+      if (requestPermission) {
+        await ensureAudioPermission();
+      }
+      const { inputs, outputs } = await listAudioDevices();
+      audioInputs = inputs;
+      audioOutputs = outputs;
+      if (selectedMicId && !inputs.some((d) => d.deviceId === selectedMicId)) {
+        selectedMicId = inputs[0]?.deviceId || '';
+      } else if (!selectedMicId && inputs[0]) {
+        selectedMicId = inputs[0].deviceId;
+      }
+      if (selectedSpeakerId && !outputs.some((d) => d.deviceId === selectedSpeakerId)) {
+        selectedSpeakerId = outputs[0]?.deviceId || '';
+      } else if (!selectedSpeakerId && outputs[0]) {
+        selectedSpeakerId = outputs[0].deviceId;
+      }
+      if (!speakerSelectable && outputs.length === 0) {
+        audioNote = 'This browser uses the system default speaker.';
+      }
+    } catch (err) {
+      audioNote = friendlyMediaError(err);
+    } finally {
+      audioBusy = false;
+    }
+  }
+
+  function onMicChange(id: string) {
+    selectedMicId = id;
+    storeInputDeviceId(id);
+  }
+
+  function onSpeakerChange(id: string) {
+    selectedSpeakerId = id;
+    storeOutputDeviceId(id);
+  }
 
   function agentInitial(name?: string) {
     return (name || 'A').slice(0, 1).toUpperCase();
@@ -498,7 +562,12 @@
             error = message;
           }
         },
-        { lang: 'auto', tenantId: tenantId || undefined }
+        {
+          lang: 'auto',
+          tenantId: tenantId || undefined,
+          audioInputId: selectedMicId || undefined,
+          audioOutputId: selectedSpeakerId || undefined
+        }
       );
 
       voice = gemini;
@@ -744,20 +813,42 @@
     class:live-collapsed={callStarted && !callControlsExpanded}
     class:live-expanded={callStarted && callControlsExpanded}
   >
-    <header class="brand">
-      <img class="brand-mark" src={brand.logo_url} width="46" height="46" alt={brand.logo_alt} />
-      <div>
-        <h1>{brand.brand_name}</h1>
-        <p>{brand.subtitle}</p>
-        {#if tenantLabel}
-          <p>Brand · {tenantLabel}</p>
-        {/if}
+    <header class="desk-branding">
+      <div class="monti-desk-hero">
+        <div class="monti-desk-ring">
+          <img class="monti-desk-logo" src="/images/monti-logo.png" width="96" height="96" alt="Monti" />
+        </div>
+        <div class="monti-desk-copy">
+          <span class="monti-desk-title">MONTI</span>
+          <span class="monti-desk-tag">AI CALL CENTER</span>
+          <p class="monti-desk-tagline">Your AI assistant. <em>Always here to help.</em></p>
+        </div>
+      </div>
+
+      <section class="company-card" aria-label="Selected brand">
+        <div class="company-card-label">Your selected tenant · แบรนด์ปัจจุบัน</div>
+        <div class="company-card-row">
+          <div class="company-logo">
+            {#if brand.logo_url && !brand.logo_url.includes('monti-logo')}
+              <img src={brand.logo_url} alt={brand.logo_alt || tenantLabel} />
+            {:else}
+              <span class="company-monogram">{companyMonogram}</span>
+            {/if}
+          </div>
+          <div class="company-meta">
+            <strong>{tenantName || brand.brand_name || tenantLabel}</strong>
+            <span>AI · Text &amp; Voice</span>
+            {#if tenantSlug || tenantLabel}
+              <span class="company-brand-line">Brand · {tenantName || tenantLabel}</span>
+            {/if}
+          </div>
+        </div>
         {#if onChangeTenant && !live}
           <button class="plain-button change-brand" type="button" onclick={() => onChangeTenant?.()}>
             ← Brands · เปลี่ยนแบรนด์
           </button>
         {/if}
-      </div>
+      </section>
     </header>
 
     {#if callStarted}
@@ -777,6 +868,57 @@
     {/if}
 
     {#if showCallDetails}
+      <section class="voice-card audio-card" aria-label="Audio settings">
+        <div class="audio-card-head">
+          <strong>Audio settings · ตั้งค่าเสียง</strong>
+          <button
+            class="plain-button"
+            type="button"
+            disabled={audioBusy}
+            onclick={() => void refreshAudioDevices(true)}
+          >
+            {audioBusy ? '…' : 'Refresh devices'}
+          </button>
+        </div>
+        <label class="audio-field">
+          <span>Microphone · ไมโครโฟน</span>
+          <select
+            value={selectedMicId}
+            disabled={audioBusy || audioInputs.length === 0 || live}
+            onchange={(e) => onMicChange((e.currentTarget as HTMLSelectElement).value)}
+          >
+            {#if audioInputs.length === 0}
+              <option value="">Default microphone</option>
+            {:else}
+              {#each audioInputs as dev (dev.deviceId)}
+                <option value={dev.deviceId}>{dev.label}</option>
+              {/each}
+            {/if}
+          </select>
+        </label>
+        <label class="audio-field">
+          <span>Speaker · ลำโพง</span>
+          <select
+            value={selectedSpeakerId}
+            disabled={audioBusy || !speakerSelectable || audioOutputs.length === 0 || live}
+            onchange={(e) => onSpeakerChange((e.currentTarget as HTMLSelectElement).value)}
+          >
+            {#if !speakerSelectable}
+              <option value="">System default speaker</option>
+            {:else if audioOutputs.length === 0}
+              <option value="">Default speaker</option>
+            {:else}
+              {#each audioOutputs as dev (dev.deviceId)}
+                <option value={dev.deviceId}>{dev.label}</option>
+              {/each}
+            {/if}
+          </select>
+        </label>
+        {#if audioNote}
+          <div class="voice-state">{audioNote}</div>
+        {/if}
+      </section>
+
       <section class={`voice-card auth-card ${callStarted ? 'auth-card-compact' : ''}`} aria-label="Customer sign in">
         {#if customer}
           <div class="customer-session">

@@ -55,7 +55,7 @@ button {
 .app {
   height: 100vh;
   display: grid;
-  grid-template-columns: minmax(310px, 390px) minmax(0, 920px);
+  grid-template-columns: minmax(320px, 420px) minmax(0, 920px);
   gap: clamp(18px, 4vw, 42px);
   align-items: start;
   justify-content: center;
@@ -116,6 +116,185 @@ button {
   margin: 2px 0 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* Sprint 56 — large Monti hero + selected company card */
+.desk-branding {
+  display: grid;
+  gap: 14px;
+}
+
+.monti-desk-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.monti-desk-ring {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  padding: 3px;
+  flex-shrink: 0;
+  background:
+    radial-gradient(circle at 50% 30%, rgb(0 183 255 / 35%), transparent 55%),
+    linear-gradient(145deg, rgb(0 183 255 / 45%), rgb(0 80 200 / 15%));
+  box-shadow: 0 0 28px rgb(0 140 255 / 30%);
+  display: grid;
+  place-items: center;
+}
+
+.monti-desk-logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgb(0 183 255 / 35%);
+  background: #04101f;
+}
+
+.monti-desk-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.monti-desk-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1;
+}
+
+.monti-desk-tag {
+  color: var(--cyan);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.monti-desk-tagline {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.monti-desk-tagline em {
+  color: var(--cyan);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.company-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgb(5 16 31 / 70%);
+  display: grid;
+  gap: 10px;
+}
+
+.company-card-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.company-card-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.company-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 109 255 / 16%);
+  border: 1px solid rgb(0 183 255 / 28%);
+}
+
+.company-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.company-monogram {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--cyan);
+}
+
+.company-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.company-meta strong {
+  font-size: 0.98rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.company-meta span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.company-brand-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change-brand {
+  justify-self: start;
+  padding: 4px 0 !important;
+  color: var(--cyan) !important;
+}
+
+.audio-card {
+  display: grid;
+  gap: 10px;
+}
+
+.audio-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.audio-card-head strong {
+  font-size: 0.9rem;
+}
+
+.audio-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.audio-field select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #071120;
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
 }
 
 .assistant-orb {

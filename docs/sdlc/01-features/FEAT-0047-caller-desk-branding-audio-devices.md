@@ -1,7 +1,7 @@
 ---
 id: FEAT-0047
 title: "Caller desk branding revamp + mic/speaker device settings"
-status: design_approved
+status: implemented
 roadmap_sprint: 56
 priority: A+
 depends_on: [SPRINT-001, SPRINT-005, SPRINT-039, SPRINT-054]
