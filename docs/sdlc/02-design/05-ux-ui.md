@@ -4394,3 +4394,110 @@ collapse of agent list.
 | Change brand | เปลี่ยนแบรนด์ |
 
 See DES-0049, workflow §125–126, ER Sprint 54, API Sprint 54.
+
+## C56 — Caller desk branding + mic/speaker settings (Sprint 56)
+
+**What changed:** Large Monti + company logos on directory and desk; audio
+device settings for voice. Mockups: `02-design/mockups/s56-caller-desk-branding/`.
+
+### Screen map → API / browser
+
+| UI zone | User action | API / browser |
+| --- | --- | --- |
+| C56-A Directory hero | Open `/` | Monti static asset |
+| C56-A Brand cards | View logos | `GET /api/public/brands` |
+| C56-A Call | Select brand | navigate `/t/{slug}` |
+| C56-B Desk hero | View Monti + company | brand + `GET /api/public/theme/{id}` |
+| C56-B Change brand | Back to directory | clear session → `/` |
+| C56-C Audio settings | Open device panel | `enumerateDevices` |
+| C56-C Mic/Speaker | Select devices | localStorage + voice start options |
+| C56-D System status | — | Live · OK (no infra names) |
+
+### Layout — tenant list (mockup-aligned)
+
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│  [ LARGE MONTI HERO ]     MONTI AI CALL CENTER                   │
+│                           Choose who to call                     │
+│                           เลือกแบรนด์… · Select a brand…          │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ 🔍 Search brands… · ค้นหาแบรนด์…                           │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐   │
+│  │ [BIG LOGO] │ │ [BIG LOGO] │ │ [BIG LOGO] │ │ [MONOGRAM] │   │
+│  │ Company A  │ │ Company B  │ │ …          │ │ …          │   │
+│  │ slug       │ │            │ │            │ │            │   │
+│  │ AI·Text&V  │ │            │ │            │ │            │   │
+│  │ [ Call → ] │ │ [ Call → ] │ │ [ Call → ] │ │ [ Call → ] │   │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Layout — call desk (mockup-aligned)
+
+```text
+┌─────────────────────┬────────────────────────────────────────────┐
+│ [ LARGE MONTI ]     │ Caller Desk              ● Live · OK       │
+│ MONTI AI CALL CENTER│ [General] [Billing] [Technical]            │
+│ Always here to help │                                            │
+│ ┌─────────────────┐ │  conversation…                             │
+│ │ [CO LOGO] Name  │ │                                            │
+│ │ AI · Text&Voice  │ │                                            │
+│ │ ← Brands        │ │                                            │
+│ └─────────────────┘ │                                            │
+│ Sign-in / OTP…      │  [mic] [speaker settings]  [composer][Send]│
+│ [ Audio: Mic ▾ ]    │                                            │
+│ [ Audio: Speaker ▾] │                                            │
+└─────────────────────┴────────────────────────────────────────────┘
+```
+
+### Flow A — branded list → desk
+
+```text
+Open /
+  → large Monti + brand logo cards
+  → Call on brand A
+  → /t/{slugA}
+  → large Monti + company A logo card
+```
+
+### Flow B — mic/speaker before voice
+
+```text
+On desk (signed in)
+  → open Audio settings
+  → allow mic if prompted
+  → pick Mic X, Speaker Y
+  → prefs saved
+  → Start voice uses X/Y
+```
+
+### Flow C — permission denied
+
+```text
+User denies microphone
+  → “Microphone access is needed for voice calls. You can still chat.”
+  → no stack traces; chat remains available
+```
+
+### Component → file
+
+| Zone | Path |
+| --- | --- |
+| Directory | `apps/customer-web/src/lib/components/TenantPicker.svelte` |
+| Desk | `apps/customer-web/src/lib/components/CustomerDesk.svelte` |
+| Devices helper | `apps/customer-web/src/lib/audio/devices.ts` (new) |
+| Voice | `apps/customer-web/src/lib/voice/gemini.ts` |
+| Styles | `apps/customer-web/src/app.css` |
+
+### Copy (EN / TH)
+
+| EN | TH |
+| --- | --- |
+| Choose who to call | เลือกแบรนด์ที่ต้องการติดต่อ |
+| Microphone | ไมโครโฟน |
+| Speaker | ลำโพง |
+| Audio settings | ตั้งค่าเสียง |
+| Microphone access is needed for voice calls. You can still chat. | ต้องการสิทธิ์ไมโครโฟนสำหรับสายเสียง คุณยังแชทได้ |
+
+See DES-0051, workflow §127–129, ER Sprint 56, API Sprint 56.
