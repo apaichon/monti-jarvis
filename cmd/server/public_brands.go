@@ -20,6 +20,10 @@ type brandProfileRequest struct {
 }
 
 func (s *server) publicBrands(w http.ResponseWriter, r *http.Request) {
+	if s.store == nil {
+		writeError(w, http.StatusBadGateway, "public brand directory unavailable")
+		return
+	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	limit, offset = normalizePublicBrandPageRequest(limit, offset)
@@ -32,6 +36,10 @@ func (s *server) publicBrands(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) publicBrand(w http.ResponseWriter, r *http.Request) {
+	if s.store == nil {
+		writeError(w, http.StatusBadGateway, "public brand directory unavailable")
+		return
+	}
 	brand, err := s.store.GetPublicBrand(r.Context(), strings.TrimSpace(r.PathValue("slug")))
 	if err != nil {
 		if errors.Is(err, store.ErrTenantNotFound) {

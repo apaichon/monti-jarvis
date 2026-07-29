@@ -327,6 +327,9 @@ func main() {
 	mux.HandleFunc("GET /api/infra", s.infra)
 	mux.HandleFunc("GET /api/public/brands", s.publicBrands)
 	mux.HandleFunc("GET /api/public/brands/{slug}", s.publicBrand)
+	// Sprint 54: customer-portal alias (same public brand directory payload)
+	mux.HandleFunc("GET /api/public/tenants", s.publicBrands)
+	mux.HandleFunc("GET /api/public/tenants/{slug}", s.publicBrand)
 	// Sprint 48: product web leads, public packages, funnel
 	mux.HandleFunc("POST /api/public/leads", s.createPublicLead)
 	mux.HandleFunc("GET /api/public/packages", s.publicPackages)

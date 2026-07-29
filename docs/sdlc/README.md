@@ -18,7 +18,7 @@ Numbered folders keep artifacts ordered and easy to navigate.
 
 **Latest shipped:** [`SPRINT-052`](03-sprints/SPRINT-052.md) — Tenant avatar library (active cap) · **v2.24.0**
 
-**Current focus:** Residual S45 usage ledger/UAT · next [`SPRINT-051`](03-sprints/SPRINT-051.md) commercial ops planned / design `review_pending` ([DES-0048](02-design/48-commercial-plans-billing-operations-spec.md)) · S49 held · S47 Langfuse · S44 ON HOLD
+**Current focus:** Residual S45 usage ledger/UAT · next [`SPRINT-051`](03-sprints/SPRINT-051.md) commercial ops planned / design `review_pending` ([DES-0048](02-design/48-commercial-plans-billing-operations-spec.md)) · S49 held · S47 Langfuse · S44 ON HOLD · [SPRINT-054](03-sprints/SPRINT-054.md) customer portal tenant list (design approved)
 
 **Parallel build:** none
 

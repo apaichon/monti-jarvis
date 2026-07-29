@@ -4568,3 +4568,79 @@ Include `"version": "v2.24.0"` (same canonical display string).
 | 400 | `domain_not_allowed` | existing domain policy |
 
 See DES-0048, workflow §120–122, ER Sprint 53, UX T53/C53/A53.
+
+## Sprint 54 — Customer portal tenant list (public directory)
+
+**Auth:** none for directory · customer APIs after pick use existing optional bearer + tenant binding.
+
+### Directory (reuse; document for portal)
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/public/brands` | none | List listable brands (`q`, `limit`, `offset`) |
+| GET | `/api/public/brands/{slug}` | none | One brand by **slug or tenant id** |
+| GET | `/api/public/tenants` | none | Optional alias of brands list (same body) |
+
+#### `GET /api/public/brands`
+
+**Query**
+
+| Param | Default | Notes |
+| --- | --- | --- |
+| `q` | `""` | ILIKE on slug, name, category |
+| `limit` | 50 | clamped |
+| `offset` | 0 | pagination |
+
+**Response `200`**
+
+```json
+{
+  "items": [
+    {
+      "id": "tenant-acme",
+      "slug": "acme",
+      "name": "Acme Support",
+      "blurb": "Orders and returns",
+      "logo_url": "",
+      "category": "retail",
+      "languages": ["en", "th"],
+      "listed": true,
+      "status": "active"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+#### `GET /api/public/brands/{slug}`
+
+**Response `200`:** `{ "item": { …PublicBrand } }`  
+**404** if not listable. **502** if directory store unavailable.
+
+### After selection (existing)
+
+| Method | Path | Tenant binding |
+| --- | --- | --- |
+| GET | `/api/public/theme/{tenant_id}` | path |
+| GET | `/api/customer/workforce` | prefer `X-Tenant-Id`; query fallback ok |
+| POST | `/api/calls` (or existing start) | body / header tenant |
+| WS/SSE voice | existing | query `tenant_id` allowed for EventSource limits |
+
+### Error codes
+
+| HTTP | When |
+| ---: | --- |
+| 404 | brand not listable / unknown |
+| 502 | public brand directory unavailable |
+
+### Unchanged
+
+| Route | Note |
+| --- | --- |
+| `PUT /api/tenant/brand` | Tenant admin listed profile |
+| `PUT /api/platform/tenants/{tenant_id}/brand-listing` | Platform force unlist |
+| Embed public routes | Still embed-key based |
+
+See DES-0049, workflow §125–126, ER Sprint 54, UX C54.

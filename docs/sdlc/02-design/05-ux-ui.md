@@ -4287,3 +4287,110 @@ Deploy tag v2.25.0 → VERSION 2.25.0 → UI shows v2.25.0 everywhere
 | Auth store | `internal/store/customer_auth.go` |
 
 See DES-0048, workflow §120–122, ER Sprint 53, API Sprint 53.
+
+## C54 — Customer portal tenant list to call (Sprint 54)
+
+**What changed:** Customer root no longer requires `?tenant_id=`. Callers see a
+tenant/brand picker, then enter the desk at `/t/{slug}`.
+
+### Screen map → API
+
+| UI zone | User action | API / nav |
+| --- | --- | --- |
+| C54-A Picker | Open portal without tenant | `GET /api/public/brands` |
+| C54-A Search | Filter brands | `GET /api/public/brands?q=` |
+| C54-A Card | Select brand | navigate `/t/{slug}` + sessionStorage |
+| C54-B Desk | Load theme + agents | `GET /api/public/theme/{id}`, `GET /api/customer/workforce` + `X-Tenant-Id` |
+| C54-B Switch | Change tenant | clear session → `/` picker |
+| C54-C Legacy | `?tenant_id=` bookmark | resolve → `/t/{slug}` |
+| C54-D Empty | No listed brands | empty state (no API desk calls) |
+
+### Layout — picker (desktop)
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  Monti · Call a brand                              [EN|TH]   │
+├──────────────────────────────────────────────────────────────┤
+│  Choose who to call                                          │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ 🔍 Search brands…                                      │  │
+│  └────────────────────────────────────────────────────────┘  │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐             │
+│  │ [logo]     │  │ [logo]     │  │ [logo]     │             │
+│  │ Acme       │  │ Beta Co    │  │ …          │             │
+│  │ blurb…     │  │ blurb…     │  │            │             │
+│  │ [Call →]   │  │ [Call →]   │  │            │             │
+│  └────────────┘  └────────────┘  └────────────┘             │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Layout — desk after pick
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  ← Brands   Acme Support                    [theme chrome]   │
+├──────────────┬───────────────────────────────────────────────┤
+│ Agents       │  Conversation / voice (existing desk)         │
+│ (workforce)  │                                               │
+└──────────────┴───────────────────────────────────────────────┘
+```
+
+### Flow A — first visit, no query
+
+```text
+Open /
+  → no session tenant
+  → GET /api/public/brands
+  → show picker
+  → select Acme
+  → sessionStorage + /t/acme
+  → theme + workforce
+  → Start chat / voice
+```
+
+### Flow B — legacy deep link
+
+```text
+Open /?tenant_id=acme
+  → GET /api/public/brands/acme (or resolve id)
+  → replace URL /t/acme
+  → desk
+```
+
+### Flow C — isolation switch
+
+```text
+On /t/acme with open transcript
+  → ← Brands
+  → clear session + transcript
+  → picker
+  → select Beta
+  → /t/beta workforce only (no Acme agents/messages)
+```
+
+### Component → file
+
+| Zone | Path |
+| --- | --- |
+| Picker / root gate | `apps/customer-web/src/routes/+page.svelte` (and/or picker component) |
+| Path desk | `apps/customer-web/src/routes/t/[slug]/+page.svelte` (preferred) |
+| Public brands client | `apps/customer-web/src/lib/api/brands.ts` (new or extend) |
+| Tenant context | `apps/customer-web/src/lib/tenantContext.ts` (session + header helper) |
+| Existing desk APIs | `src/lib/api/workforce.ts`, `calls.ts`, voice client |
+
+### Mobile
+
+Picker cards stack full-width; search sticky. Desk reuses existing mobile
+collapse of agent list.
+
+### Copy (EN / TH)
+
+| EN | TH |
+| --- | --- |
+| Choose who to call | เลือกแบรนด์ที่ต้องการติดต่อ |
+| Search brands… | ค้นหาแบรนด์… |
+| Call | โทร / เริ่มสนทนา |
+| No brands available | ยังไม่มีแบรนด์ที่เปิดให้บริการ |
+| Change brand | เปลี่ยนแบรนด์ |
+
+See DES-0049, workflow §125–126, ER Sprint 54, API Sprint 54.

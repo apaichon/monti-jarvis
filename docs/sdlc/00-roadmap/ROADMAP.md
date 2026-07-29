@@ -77,7 +77,7 @@
 | **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, tax invoices, and admin quote monitoring** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · ✅ v2.25.0 · [FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md) · [SPRINT-051](../03-sprints/SPRINT-051.md) · [DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) |
 | **52** | **Tenant / Platform** | **Tenant self-service avatar create/library: unlimited drafts; only active avatars capped by package `max_ai_employees`** | **D+** | **5, 13, 15, 16, 45, 50** · ✅ v2.24.0 · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md) · [SPRINT-052](../03-sprints/SPRINT-052.md) · [DES-0047](../02-design/47-tenant-avatar-create-active-cap-spec.md) |
 | **53** | **Tenant / Customer** | **Tenant settings: auto-register customer when email + OTP is entered in conversation; show app/tag version on UI** | **D+** | **16, 19, 20, 21, 52** · merged · [FEAT-0046](../01-features/FEAT-0046-conversation-auto-register-app-version.md) · [SPRINT-053](../03-sprints/SPRINT-053.md) · [DES-0050](../02-design/50-conversation-auto-register-app-version-spec.md) |
-| **54** | **Customer / Platform** | **Customer portal: pick tenant from list to call (no `tenant_id` query string required)** | **J** | **1, 5, 6, 20, 21, 38, 53** · planned |
+| **54** | **Customer / Platform** | **Customer portal: pick tenant from list to call (no `tenant_id` query string required)** | **J** | **1, 5, 6, 20, 21, 38, 53** · merged · [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md) · [SPRINT-054](../03-sprints/SPRINT-054.md) · [DES-0049](../02-design/49-customer-portal-tenant-list-spec.md) |
 | **55** | **Tenant** | **Call Center Statistics grouped by topic** | **F+** | **22, 25, 30** · planned · extends [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
 
 ---
@@ -1655,11 +1655,11 @@ auto-register work if both stay small; ship together under S53.
 
 ---
 
-## Planned: SPRINT-054 — Customer Portal Tenant List to Call (No `tenant_id` Query)
+## Merged: SPRINT-054 — Customer Portal Tenant List to Call (No `tenant_id` Query)
 
 **Platform:** Customer / Platform · **Feature:** Customer portal entry by
 selecting a tenant (brand) from a list, without requiring `?tenant_id=` on the
-URL · **Depends:** 1, 5, 6, 20, 21, 38, 53 · **Status:** planned
+URL · **Depends:** 1, 5, 6, 20, 21, 38, 53 · **Status:** merged to main · **Feature:** [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md) · **Design:** [DES-0049](../02-design/49-customer-portal-tenant-list-spec.md) · **Sprint:** [SPRINT-054](../03-sprints/SPRINT-054.md)
 
 ### Problem today
 
