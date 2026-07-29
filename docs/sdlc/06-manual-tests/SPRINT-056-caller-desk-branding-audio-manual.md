@@ -1,6 +1,6 @@
 # SPRINT-056 — Caller desk branding + mic/speaker manual UAT
 
-**Feature:** FEAT-0047 · **Design:** DES-0051  
+**Feature:** FEAT-0048 · **Design:** DES-0052  
 **Updated:** 2026-07-29
 
 ## Preconditions

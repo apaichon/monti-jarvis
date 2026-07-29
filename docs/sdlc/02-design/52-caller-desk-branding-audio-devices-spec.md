@@ -1,20 +1,20 @@
 ---
-id: DES-0051
+id: DES-0052
 title: Caller Desk Branding and Audio Device Settings Specification
 status: approved
 updated: 2026-07-29
 sprint: SPRINT-056
 owner: SA
-feature: FEAT-0047
+feature: FEAT-0048
 release_target: v2.28.0
 ---
 
-# DES-0051 — Caller Desk Branding + Mic/Speaker Settings
+# DES-0052 — Caller Desk Branding + Mic/Speaker Settings
 
 **Sprint:** SPRINT-056 · **Release target:** v2.28.0  
-**Feature:** [FEAT-0047](../01-features/FEAT-0047-caller-desk-branding-audio-devices.md)  
-**Tasks:** [TASK-0199](../04-tasks/TASK-0199.md), [TASK-0200](../04-tasks/TASK-0200.md),
-[TASK-0201](../04-tasks/TASK-0201.md)  
+**Feature:** [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md)  
+**Tasks:** [TASK-0202](../04-tasks/TASK-0202.md), [TASK-0203](../04-tasks/TASK-0203.md),
+[TASK-0204](../04-tasks/TASK-0204.md)  
 **Mockups:** [call-page.png](mockups/s56-caller-desk-branding/call-page.png) ·
 [tenant-list.png](mockups/s56-caller-desk-branding/tenant-list.png) ·
 [composite](mockups/s56-caller-desk-branding/new-call-design-composite.png)  
@@ -97,14 +97,14 @@ Optional later (out of sprint): none.
 
 ```bash
 cd apps/customer-web && npm run check
-# Manual per TASK-0201 checklist
+# Manual per TASK-0204 checklist
 ```
 
 ## 9. Implementation sequence
 
-1. **TASK-0199** — branding layouts from mockups  
-2. **TASK-0200** — device settings + voice wiring  
-3. **TASK-0201** — UAT checklist + verification  
+1. **TASK-0202** — branding layouts from mockups  
+2. **TASK-0203** — device settings + voice wiring  
+3. **TASK-0204** — UAT checklist + verification  
 
 ## See also
 

@@ -79,7 +79,7 @@
 | **53** | **Tenant / Customer** | **Tenant settings: auto-register customer when email + OTP is entered in conversation; show app/tag version on UI** | **D+** | **16, 19, 20, 21, 52** · ✅ **v2.26.0** · [FEAT-0046](../01-features/FEAT-0046-conversation-auto-register-app-version.md) · [SPRINT-053](../03-sprints/SPRINT-053.md) · [DES-0050](../02-design/50-conversation-auto-register-app-version-spec.md) |
 | **54** | **Customer / Platform** | **Customer portal: pick tenant from list to call (no `tenant_id` query string required)** | **J** | **1, 5, 6, 20, 21, 38, 53** · ✅ **v2.27.0** · [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md) · [SPRINT-054](../03-sprints/SPRINT-054.md) · [DES-0049](../02-design/49-customer-portal-tenant-list-spec.md) |
 | **55** | **Tenant** | **Call Center Statistics grouped by topic** | **F+** | **22, 25, 30** · planned · extends [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
-| **56** | **Customer** | **Caller desk UX revamp: mic/speaker device settings; larger Monti + per-company brand logos on call page and tenant list** | **A+** | **1, 5, 39, 54** · design **approved** · [FEAT-0047](../01-features/FEAT-0047-caller-desk-branding-audio-devices.md) · [SPRINT-056](../03-sprints/SPRINT-056.md) · [DES-0051](../02-design/51-caller-desk-branding-audio-devices-spec.md) · mockups [call-page](../02-design/mockups/s56-caller-desk-branding/call-page.png) · [tenant-list](../02-design/mockups/s56-caller-desk-branding/tenant-list.png) |
+| **56** | **Customer** | **Caller desk UX revamp: mic/speaker device settings; larger Monti + per-company brand logos on call page and tenant list** | **A+** | **1, 5, 39, 54** · design **approved** · [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · [SPRINT-056](../03-sprints/SPRINT-056.md) · [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) · mockups [call-page](../02-design/mockups/s56-caller-desk-branding/call-page.png) · [tenant-list](../02-design/mockups/s56-caller-desk-branding/tenant-list.png) |
 
 ---
 
@@ -1814,7 +1814,7 @@ contracts with a `topic` dimension rather than a second analytics product.
 
 **Platform:** Customer · **Feature:** Revamp customer call desk and tenant/brand
 list for stronger Monti + company brand presence; add microphone and speaker
-device selection for voice · **Depends:** 1, 5, 39, 54 · **Status:** design_approved · **Sprint:** [SPRINT-056](../03-sprints/SPRINT-056.md) · **Feature:** [FEAT-0047](../01-features/FEAT-0047-caller-desk-branding-audio-devices.md) · **Design:** [DES-0051](../02-design/51-caller-desk-branding-audio-devices-spec.md) ·
+device selection for voice · **Depends:** 1, 5, 39, 54 · **Status:** design_approved · **Sprint:** [SPRINT-056](../03-sprints/SPRINT-056.md) · **Feature:** [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · **Design:** [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) ·
 **Mockups:** [call page](../02-design/mockups/s56-caller-desk-branding/call-page.png) ·
 [tenant list](../02-design/mockups/s56-caller-desk-branding/tenant-list.png) ·
 [composite](../02-design/mockups/s56-caller-desk-branding/new-call-design-composite.png)
@@ -1897,6 +1897,6 @@ UI, or multi-language voice device naming beyond browser labels.
 `GeminiVoice` / LiveKit paths; do not invent a server audio device registry.
 Reuse `GET /api/public/theme/{tenant_id}` and public brand `logo_url` for marks.
 
-**Tasks:** TASK-0199 (branding), TASK-0200 (mic/speaker), TASK-0201 (UAT).  
+**Tasks:** TASK-0202 (branding), TASK-0203 (mic/speaker), TASK-0204 (UAT).  
 **Worktree:** `.worktrees/SPRINT-056` · branch `feature/sprint-056-caller-desk-branding-audio`
 

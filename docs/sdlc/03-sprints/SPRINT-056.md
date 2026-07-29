@@ -6,7 +6,7 @@ end: 2026-08-08
 updated: 2026-07-29
 design_pack: approved
 roadmap_sprint: 56
-feature: FEAT-0047
+feature: FEAT-0048
 platform: Customer
 depends_on: [SPRINT-001, SPRINT-005, SPRINT-039, SPRINT-054]
 goal: "Revamp caller desk and tenant list branding (large Monti + company logos) and add mic/speaker device settings for voice."
@@ -33,17 +33,17 @@ calls without technical infra jargon.
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0199](../04-tasks/TASK-0199.md) Tenant list + call desk logo branding revamp | 5 | completed | dev | Large Monti + company logos per mockups |
-| [TASK-0200](../04-tasks/TASK-0200.md) Mic/speaker device settings for voice | 4 | completed | dev | Enumerate, select, apply, persist devices |
-| [TASK-0201](../04-tasks/TASK-0201.md) Branding + audio UAT and verification | 3 | completed | tester/dev | Manual checklist; logo A/B; permission paths |
+| [TASK-0202](../04-tasks/TASK-0202.md) Tenant list + call desk logo branding revamp | 5 | completed | dev | Large Monti + company logos per mockups |
+| [TASK-0203](../04-tasks/TASK-0203.md) Mic/speaker device settings for voice | 4 | completed | dev | Enumerate, select, apply, persist devices |
+| [TASK-0204](../04-tasks/TASK-0204.md) Branding + audio UAT and verification | 3 | completed | tester/dev | Manual checklist; logo A/B; permission paths |
 | **Total** | **12** | **12/12** | | |
 
 ## Design pack
 
 | Artifact | Status | Scope |
 | --- | --- | --- |
-| Feature | [FEAT-0047](../01-features/FEAT-0047-caller-desk-branding-audio-devices.md) | design_approved |
-| Deep spec | **`approved`** | [DES-0051](../02-design/51-caller-desk-branding-audio-devices-spec.md) |
+| Feature | [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) | design_approved |
+| Deep spec | **`approved`** | [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) |
 | Workflow | **`approved`** | [02-workflow.md](../02-design/02-workflow.md) §127–129 |
 | ER | **`approved`** | [03-er-diagram.md](../02-design/03-er-diagram.md) Sprint 56 |
 | API | **`approved`** | [04-api-spec.md](../02-design/04-api-spec.md) Sprint 56 |

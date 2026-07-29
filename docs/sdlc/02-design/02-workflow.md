@@ -3912,4 +3912,4 @@ sequenceDiagram
   end
 ```
 
-See DES-0051, ER Sprint 56, API Sprint 56, UX C56.
+See DES-0052, ER Sprint 56, API Sprint 56, UX C56.

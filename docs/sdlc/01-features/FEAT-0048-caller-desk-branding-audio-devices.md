@@ -1,16 +1,16 @@
 ---
-id: FEAT-0047
+id: FEAT-0048
 title: "Caller desk branding revamp + mic/speaker device settings"
 status: implemented
 roadmap_sprint: 56
 priority: A+
 depends_on: [SPRINT-001, SPRINT-005, SPRINT-039, SPRINT-054]
-design: DES-0051
-design_spec: ../02-design/51-caller-desk-branding-audio-devices-spec.md
+design: DES-0052
+design_spec: ../02-design/52-caller-desk-branding-audio-devices-spec.md
 updated: 2026-07-29
 ---
 
-# FEAT-0047: Caller Desk Branding + Mic/Speaker Settings
+# FEAT-0048: Caller Desk Branding + Mic/Speaker Settings
 
 ## Purpose
 
@@ -71,4 +71,4 @@ the desk, and an expectation of controllable audio I/O.
   public theme/brand APIs, S54 routing
 - mockups: [call-page](../02-design/mockups/s56-caller-desk-branding/call-page.png),
   [tenant-list](../02-design/mockups/s56-caller-desk-branding/tenant-list.png)
-- design: [DES-0051](../02-design/51-caller-desk-branding-audio-devices-spec.md)
+- design: [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md)

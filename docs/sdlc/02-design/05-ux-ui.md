@@ -4500,4 +4500,4 @@ User denies microphone
 | Audio settings | ตั้งค่าเสียง |
 | Microphone access is needed for voice calls. You can still chat. | ต้องการสิทธิ์ไมโครโฟนสำหรับสายเสียง คุณยังแชทได้ |
 
-See DES-0051, workflow §127–129, ER Sprint 56, API Sprint 56.
+See DES-0052, workflow §127–129, ER Sprint 56, API Sprint 56.
