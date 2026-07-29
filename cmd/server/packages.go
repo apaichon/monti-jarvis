@@ -55,15 +55,17 @@ func (s *server) getPackage(w http.ResponseWriter, r *http.Request) {
 }
 
 type packageBody struct {
-	Slug          string         `json:"slug"`
-	Name          string         `json:"name"`
-	Description   string         `json:"description"`
-	Status        string         `json:"status"`
-	PriceCents    int            `json:"price_cents"`
-	Currency      string         `json:"currency"`
-	BillingPeriod string         `json:"billing_period"`
-	RulesSchemaID string         `json:"rules_schema_id"`
-	Rules         map[string]any `json:"rules"`
+	Slug           string         `json:"slug"`
+	Name           string         `json:"name"`
+	Description    string         `json:"description"`
+	Status         string         `json:"status"`
+	PriceCents     int            `json:"price_cents"`
+	Currency       string         `json:"currency"`
+	BillingPeriod  string         `json:"billing_period"`
+	DeploymentMode string         `json:"deployment_mode"`
+	PurchaseMode   string         `json:"purchase_mode"`
+	RulesSchemaID  string         `json:"rules_schema_id"`
+	Rules          map[string]any `json:"rules"`
 }
 
 func (s *server) createPackage(w http.ResponseWriter, r *http.Request) {
@@ -236,30 +238,34 @@ func (s *server) buildPackageFromBody(r *http.Request, body packageBody, id stri
 		id = "pkg-" + slug
 	}
 	return &store.Package{
-		ID:            id,
-		Slug:          slug,
-		Name:          name,
-		Description:   strings.TrimSpace(body.Description),
-		Status:        status,
-		PriceCents:    body.PriceCents,
-		Currency:      currency,
-		BillingPeriod: billing,
-		RulesSchemaID: schemaID,
-		Rules:         body.Rules,
+		ID:             id,
+		Slug:           slug,
+		Name:           name,
+		Description:    strings.TrimSpace(body.Description),
+		Status:         status,
+		PriceCents:     body.PriceCents,
+		Currency:       currency,
+		BillingPeriod:  billing,
+		DeploymentMode: strings.TrimSpace(body.DeploymentMode),
+		PurchaseMode:   strings.TrimSpace(body.PurchaseMode),
+		RulesSchemaID:  schemaID,
+		Rules:          body.Rules,
 	}, nil
 }
 
 func mergePackageBody(existing store.Package, body packageBody) packageBody {
 	out := packageBody{
-		Slug:          existing.Slug,
-		Name:          existing.Name,
-		Description:   existing.Description,
-		Status:        existing.Status,
-		PriceCents:    existing.PriceCents,
-		Currency:      existing.Currency,
-		BillingPeriod: existing.BillingPeriod,
-		RulesSchemaID: existing.RulesSchemaID,
-		Rules:         existing.Rules,
+		Slug:           existing.Slug,
+		Name:           existing.Name,
+		Description:    existing.Description,
+		Status:         existing.Status,
+		PriceCents:     existing.PriceCents,
+		Currency:       existing.Currency,
+		BillingPeriod:  existing.BillingPeriod,
+		DeploymentMode: existing.DeploymentMode,
+		PurchaseMode:   existing.PurchaseMode,
+		RulesSchemaID:  existing.RulesSchemaID,
+		Rules:          existing.Rules,
 	}
 	if body.Slug != "" {
 		out.Slug = body.Slug
@@ -278,6 +284,12 @@ func mergePackageBody(existing store.Package, body packageBody) packageBody {
 	}
 	if body.BillingPeriod != "" {
 		out.BillingPeriod = body.BillingPeriod
+	}
+	if body.DeploymentMode != "" {
+		out.DeploymentMode = body.DeploymentMode
+	}
+	if body.PurchaseMode != "" {
+		out.PurchaseMode = body.PurchaseMode
 	}
 	out.PriceCents = body.PriceCents
 	if body.RulesSchemaID != "" {
@@ -299,6 +311,8 @@ func packageJSON(p store.Package) map[string]any {
 		"price_cents":     p.PriceCents,
 		"currency":        p.Currency,
 		"billing_period":  p.BillingPeriod,
+		"deployment_mode": store.PackageDeployment(p),
+		"purchase_mode":   store.PackagePurchaseMode(p),
 		"rules_schema_id": p.RulesSchemaID,
 		"rules":           p.Rules,
 		"created_at":      p.CreatedAt,
@@ -367,4 +381,3 @@ func writeEntitlementError(w http.ResponseWriter, err error) {
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "unique")
 }
-

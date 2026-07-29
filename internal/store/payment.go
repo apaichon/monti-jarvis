@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -55,30 +54,30 @@ type CreatePaymentOrderInput struct {
 
 // PaymentDocument is a receipt or tax invoice issued for a paid order.
 type PaymentDocument struct {
-	ID              string
-	OrderID         string
-	TenantID        string
-	DocType         string // receipt | tax_invoice
-	DocNumber       string
-	Status          string // issued | voided
-	BuyerName       string
-	BuyerAddress    string
-	BuyerTaxID      string
-	SellerName      string
-	SellerAddress   string
-	SellerTaxID     string
-	PackageName     string
-	AmountCents     int
-	Currency        string
-	VATRateBps      int // basis points, e.g. 700 = 7%
-	NetCents        int
-	VATCents        int
-	PaymentMethod   string
-	ReissuedFromID  string
-	VoidReason      string
-	VoidedAt        *time.Time
-	IssuedAt        time.Time
-	CreatedAt       time.Time
+	ID             string
+	OrderID        string
+	TenantID       string
+	DocType        string // receipt | tax_invoice
+	DocNumber      string
+	Status         string // issued | voided
+	BuyerName      string
+	BuyerAddress   string
+	BuyerTaxID     string
+	SellerName     string
+	SellerAddress  string
+	SellerTaxID    string
+	PackageName    string
+	AmountCents    int
+	Currency       string
+	VATRateBps     int // basis points, e.g. 700 = 7%
+	NetCents       int
+	VATCents       int
+	PaymentMethod  string
+	ReissuedFromID string
+	VoidReason     string
+	VoidedAt       *time.Time
+	IssuedAt       time.Time
+	CreatedAt      time.Time
 }
 
 const (
@@ -102,12 +101,12 @@ const PlatformSellerBrandingID = "default"
 
 // TenantTaxProfile holds buyer tax invoice fields (Sprint 12).
 type TenantTaxProfile struct {
-	TenantID     string
-	CompanyName  string
-	TaxID        string
-	Branch       string
-	Address      string
-	UpdatedAt    time.Time
+	TenantID    string
+	CompanyName string
+	TaxID       string
+	Branch      string
+	Address     string
+	UpdatedAt   time.Time
 }
 
 // PaymentOrderListFilter for platform billing ledger (Sprint 10).
@@ -172,15 +171,15 @@ type PaymentGatewayUpsert struct {
 }
 
 type PaymentCallbackEvent struct {
-	ID             string
-	Provider       string
-	TransactionID  string
-	OrderNo        string
-	PaymentStatus  string
-	Amount         string
-	CustomerID     string
-	PayloadHash    string
-	ReceivedAt     time.Time
+	ID            string
+	Provider      string
+	TransactionID string
+	OrderNo       string
+	PaymentStatus string
+	Amount        string
+	CustomerID    string
+	PayloadHash   string
+	ReceivedAt    time.Time
 }
 
 func (s *Store) ensurePaymentSchema(ctx context.Context) error {
@@ -651,16 +650,6 @@ func (s *Store) FulfillPaymentOrder(ctx context.Context, orderNo, transactionID,
 func (s *Store) markOrderPaidAndAssignEntitlement(ctx context.Context, order *PaymentOrder, transactionID string) (bool, error) {
 	actor := auditctx.ActorID(ctx)
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	pkg, err := s.GetPackage(ctx, order.PackageID)
-	if err != nil {
-		return false, err
-	}
-	snapJSON, err := json.Marshal(pkg.Rules)
-	if err != nil {
-		return false, err
-	}
-	// New id each fulfillment so re-buy after revoke does not collide on PK.
-	entID := "ent_" + order.TenantID + "_" + order.PackageID + "_" + newStoreID()
 	txnID := strings.TrimSpace(transactionID)
 
 	tx, err := s.pg.Begin(ctx)
@@ -683,6 +672,56 @@ WHERE id = $1 AND status = 'pending'`, schema), order.ID, actor, txnID)
 		return false, nil
 	}
 
+	// Renewal orders already have an immutable subscription and entitlement.
+	// Do not run the initial-purchase replacement path: doing so would apply the
+	// latest package rules to a historical subscription and churn entitlements.
+	var renewalSubscriptionID string
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
+SELECT subscription_id
+FROM %s.billing_cycles
+WHERE order_id = $1
+FOR UPDATE`, schema), order.ID).Scan(&renewalSubscriptionID)
+	if err == nil {
+		if err := tx.Commit(ctx); err != nil {
+			return false, err
+		}
+		if err := s.issueDocumentsAndSettlePaidOrder(ctx, order.ID); err != nil {
+			// Payment is durable. The scheduler replay path recovers document or
+			// settlement failures without charging or granting again.
+			return false, nil
+		}
+		return false, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return false, err
+	}
+
+	// Initial commercial checkout reads the package-version rules captured by
+	// the pending subscription. Legacy orders without a subscription fall back
+	// to the current package row for backward compatibility.
+	var packageID, rulesSchemaID string
+	var rulesJSON []byte
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
+SELECT pv.package_id, pl.rules_schema_id, pv.rules_snapshot
+FROM %s.tenant_subscriptions s
+JOIN %s.package_versions pv ON pv.id = s.package_version_id
+JOIN %s.package_limits pl ON pl.package_id = pv.package_id
+WHERE s.initial_order_id = $1 AND s.status = 'pending_payment'
+FOR UPDATE OF s`, schema, schema, schema), order.ID).Scan(&packageID, &rulesSchemaID, &rulesJSON)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = tx.QueryRow(ctx, fmt.Sprintf(`
+SELECT p.id, pl.rules_schema_id, pl.rules
+FROM %s.packages p
+JOIN %s.package_limits pl ON pl.package_id = p.id
+WHERE p.id = $1`, schema, schema), order.PackageID).Scan(&packageID, &rulesSchemaID, &rulesJSON)
+	}
+	if err != nil {
+		return false, err
+	}
+
+	// New id each fulfillment so re-buy after revoke does not collide on PK.
+	entID := "ent_" + order.TenantID + "_" + packageID + "_" + newStoreID()
+
 	// Revoke current active plan, then assign purchased package rules (quota).
 	_, err = tx.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.tenant_entitlements SET status = 'revoked', updated_by = $2
@@ -694,8 +733,11 @@ WHERE tenant_id = $1 AND status = 'active'`, schema), order.TenantID, actor)
 	_, err = tx.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s.tenant_entitlements (id, tenant_id, package_id, rules_schema_id, rules_snapshot, status, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5::jsonb, 'active', $6, $6)`, schema),
-		entID, order.TenantID, order.PackageID, pkg.RulesSchemaID, string(snapJSON), actor)
+		entID, order.TenantID, packageID, rulesSchemaID, string(rulesJSON), actor)
 	if err != nil {
+		return false, err
+	}
+	if err := s.activateSubscriptionForPaidOrderTx(ctx, tx, order, entID, actor); err != nil {
 		return false, err
 	}
 
@@ -703,12 +745,18 @@ VALUES ($1, $2, $3, $4, $5::jsonb, 'active', $6, $6)`, schema),
 		return false, err
 	}
 
-	// Issue receipt + tax invoice (idempotent). Failures after entitlement must not roll back payment.
-	if err := s.IssuePaymentDocuments(ctx, order.ID); err != nil {
-		// Log-style: surface via returning still success on entitlement; caller may re-issue via GET.
-		_ = err
-	}
+	// Failures after entitlement do not roll back payment. Document GET and the
+	// scheduler recovery path can replay both operations idempotently.
+	_ = s.issueDocumentsAndSettlePaidOrder(ctx, order.ID)
 	return true, nil
+}
+
+func (s *Store) issueDocumentsAndSettlePaidOrder(ctx context.Context, orderID string) error {
+	if err := s.IssuePaymentDocuments(ctx, orderID); err != nil {
+		return err
+	}
+	// Initial checkout orders have no cycle and are a harmless no-op.
+	return s.SettleBillingCycleForPaidOrder(ctx, orderID)
 }
 
 func (s *Store) updatePaymentOrderFailed(ctx context.Context, orderID, transactionID string) error {
@@ -755,11 +803,23 @@ func (s *Store) IssuePaymentDocuments(ctx context.Context, orderID string) error
 	if err != nil {
 		return err
 	}
+	packageName := pkg.Name
+	vatRateBps := 700 // legacy order fallback
+	net, vat := splitVATInclusive(order.AmountCents, vatRateBps)
+	if calculation, calculationErr := s.GetOrderCommercialCalculation(ctx, order.ID); calculationErr == nil {
+		if strings.TrimSpace(calculation.PackageName) != "" {
+			packageName = calculation.PackageName
+		}
+		vatRateBps = calculation.TaxRateBps
+		net, vat = splitVATInclusive(order.AmountCents, vatRateBps)
+		if calculation.TaxableAmountCents+calculation.TaxCents == order.AmountCents {
+			net = calculation.TaxableAmountCents
+			vat = calculation.TaxCents
+		}
+	}
 	buyerName, buyerAddr, buyerTaxID := s.resolveBuyerFields(ctx, order.TenantID)
 	seller, _ := s.GetSellerBranding(ctx)
 
-	const vatRateBps = 700 // 7% Thailand VAT
-	net, vat := splitVATInclusive(order.AmountCents, vatRateBps)
 	actor := auditctx.ActorID(ctx)
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	issuedAt := time.Now().UTC()
@@ -804,7 +864,7 @@ INSERT INTO %s.payment_documents (
 			id, order.ID, order.TenantID, d.docType, docNo,
 			buyerName, buyerAddr, buyerTaxID,
 			seller.Name, seller.Address, seller.TaxID,
-			pkg.Name, order.AmountCents, order.Currency, vatRateBps, net, vat,
+			packageName, order.AmountCents, order.Currency, vatRateBps, net, vat,
 			order.PaymentMethod, issuedAt, actor,
 		)
 		if err != nil {

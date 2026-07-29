@@ -97,6 +97,10 @@ type Config struct {
 	ChillPayReturnURL        string
 	PaymentCallbackDevBypass bool
 	PaymentMockAutoFulfill   bool
+	BillingSchedulerEnabled  bool
+	BillingSchedulerPoll     time.Duration
+	BillingGracePeriod       time.Duration
+	BillingRetryDelays       []time.Duration
 	// Quota / rate limit (SPRINT-013)
 	QuotaEnabled         bool
 	QuotaFailOpen        bool
@@ -228,6 +232,10 @@ func Load() Config {
 		ChillPayReturnURL:        os.Getenv("CHILLPAY_RETURN_URL"),
 		PaymentCallbackDevBypass: envBool("PAYMENT_CALLBACK_DEV_BYPASS", false),
 		PaymentMockAutoFulfill:   envBool("PAYMENT_MOCK_AUTO_FULFILL", false),
+		BillingSchedulerEnabled:  envBool("BILLING_SCHEDULER_ENABLED", false),
+		BillingSchedulerPoll:     envDuration("BILLING_SCHEDULER_POLL_INTERVAL", time.Minute),
+		BillingGracePeriod:       envDuration("BILLING_GRACE_PERIOD", 72*time.Hour),
+		BillingRetryDelays:       envDurationList("BILLING_RETRY_DELAYS", []time.Duration{time.Hour, 6 * time.Hour, 24 * time.Hour}),
 		// Default on when Redis is configured (same pattern as entitlement cache).
 		QuotaEnabled:              envBool("QUOTA_ENABLED", os.Getenv("REDIS_URL") != ""),
 		QuotaFailOpen:             envBool("QUOTA_FAIL_OPEN", true),
@@ -259,6 +267,26 @@ func Load() Config {
 		AuditLogRetryBackoff:      envDuration("AUDIT_LOG_RETRY_BACKOFF", time.Second),
 		AppEnv:                    appEnv,
 	}
+}
+
+func envDurationList(key string, fallback []time.Duration) []time.Duration {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return append([]time.Duration(nil), fallback...)
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]time.Duration, 0, len(parts))
+	for _, part := range parts {
+		value, err := time.ParseDuration(strings.TrimSpace(part))
+		if err != nil || value <= 0 {
+			return append([]time.Duration(nil), fallback...)
+		}
+		out = append(out, value)
+	}
+	if len(out) == 0 {
+		return append([]time.Duration(nil), fallback...)
+	}
+	return out
 }
 
 // ValidateProductionSecurity enforces the Sprint 41 capability split before

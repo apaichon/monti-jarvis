@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/libra/monti-jarvis/internal/auth"
 	"github.com/libra/monti-jarvis/internal/payment"
@@ -16,8 +17,9 @@ import (
 )
 
 type checkoutBody struct {
-	PackageID     string `json:"package_id"`
-	PaymentMethod string `json:"payment_method"`
+	PackageID       string `json:"package_id"`
+	PaymentMethod   string `json:"payment_method"`
+	BillingInterval string `json:"billing_interval"`
 }
 
 func (s *server) listTenantPackages(w http.ResponseWriter, r *http.Request) {
@@ -27,8 +29,7 @@ func (s *server) listTenantPackages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ac, _ := auth.FromContext(r.Context())
-	tenantID := strings.TrimSpace(ac.TenantID)
+	tenantID, _ := s.commercialTenantID(r)
 
 	var current map[string]any
 	ent, err := s.store.GetActiveEntitlement(r.Context(), tenantID)
@@ -61,6 +62,13 @@ func (s *server) listTenantPackages(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 	ac, ok := auth.FromContext(r.Context())
+	if !ok && s.cfg.AuthDisabled {
+		tenantID, resolved := s.commercialTenantID(r)
+		if resolved {
+			ac = auth.AuthContext{UserID: "dev_fixture", TenantID: tenantID, Role: auth.RoleTenantAdmin}
+			ok = true
+		}
+	}
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
@@ -103,7 +111,10 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 	// Dedicated / enterprise capacity plans require a sales quote and server
 	// resource check — never self-serve via payment gateway.
 	if store.PackageIsQuoteOnly(*pkg) {
-		writeError(w, http.StatusConflict, "package requires quote: contact sales to verify dedicated capacity")
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error": "package requires quotation; submit company and capacity information",
+			"code":  "PACKAGE_REQUIRES_QUOTE",
+		})
 		return
 	}
 
@@ -120,21 +131,16 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	provider := strings.ToLower(strings.TrimSpace(resolved.Provider))
-	currency := strings.TrimSpace(resolved.Currency)
-	if currency == "" {
-		currency = "764"
-	}
-
-	order, err := s.store.CreatePaymentOrder(r.Context(), store.CreatePaymentOrderInput{
-		TenantID:      tenantID,
-		PackageID:     packageID,
-		AmountCents:   pkg.PriceCents,
-		Currency:      currency,
-		Provider:      provider,
-		PaymentMethod: method,
+	order, subscription, err := s.store.CreateCommercialPaymentOrder(r.Context(), store.CreateCommercialOrderInput{
+		TenantID:        tenantID,
+		PackageID:       packageID,
+		BillingInterval: strings.TrimSpace(body.BillingInterval),
+		Provider:        provider,
+		PaymentMethod:   method,
+		At:              time.Now().UTC(),
 	})
 	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
+		writeCommercialError(w, err)
 		return
 	}
 
@@ -174,7 +180,7 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 			CallbackURL:  resolved.CallbackURL,
 			ReturnURL:    chillPayReturnURL,
 		})
-		amountBaht := float64(pkg.PriceCents) / 100.0
+		amountBaht := float64(order.AmountCents) / 100.0
 		clientIP := clientIPFromRequest(r)
 		// ChillPay CustName must be a person name — not an email (error 2032).
 		custName := ""
@@ -211,17 +217,19 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"order_id":           order.ID,
-		"order_no":           order.OrderNo,
-		"package_id":         packageID,
-		"amount_cents":       order.AmountCents,
-		"currency":           order.Currency,
-		"status":             order.Status,
-		"payment_url":        paymentURL,
-		"provider":           provider,
-		"payment_method":     method,
-		"return_url":         spaReturnURL,
+		"order_id":            order.ID,
+		"order_no":            order.OrderNo,
+		"package_id":          packageID,
+		"amount_cents":        order.AmountCents,
+		"currency":            order.Currency,
+		"status":              order.Status,
+		"payment_url":         paymentURL,
+		"provider":            provider,
+		"payment_method":      method,
+		"return_url":          spaReturnURL,
 		"chillpay_return_url": chillPayReturnURL,
+		"subscription_id":     subscription.ID,
+		"billing_interval":    subscription.BillingInterval,
 	})
 }
 
@@ -520,11 +528,17 @@ func (s *server) getTenantOrderDocument(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *server) mockPayOrder(w http.ResponseWriter, r *http.Request) {
-	if s.cfg.AppEnv == "prod" {
+	if strings.EqualFold(s.cfg.AppEnv, "prod") || strings.EqualFold(s.cfg.AppEnv, "production") {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
 	ac, ok := auth.FromContext(r.Context())
+	if !ok && s.cfg.AuthDisabled {
+		if tenantID, resolved := s.commercialTenantID(r); resolved {
+			ac = auth.AuthContext{UserID: "dev_fixture", TenantID: tenantID, Role: auth.RoleTenantAdmin}
+			ok = true
+		}
+	}
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
@@ -598,17 +612,17 @@ func tenantPackageJSON(p store.Package) map[string]any {
 
 func paymentOrderJSON(o store.PaymentOrder, docs []store.PaymentDocument) map[string]any {
 	out := map[string]any{
-		"id":              o.ID,
-		"order_no":        o.OrderNo,
-		"package_id":      o.PackageID,
-		"status":          o.Status,
-		"amount_cents":    o.AmountCents,
-		"currency":        o.Currency,
-		"payment_method":  o.PaymentMethod,
-		"provider":        o.Provider,
-		"transaction_id":  o.TransactionID,
-		"created_at":      o.CreatedAt,
-		"documents":       paymentDocumentsJSON(docs),
+		"id":             o.ID,
+		"order_no":       o.OrderNo,
+		"package_id":     o.PackageID,
+		"status":         o.Status,
+		"amount_cents":   o.AmountCents,
+		"currency":       o.Currency,
+		"payment_method": o.PaymentMethod,
+		"provider":       o.Provider,
+		"transaction_id": o.TransactionID,
+		"created_at":     o.CreatedAt,
+		"documents":      paymentDocumentsJSON(docs),
 	}
 	if o.PaidAt != nil {
 		out["paid_at"] = o.PaidAt.UTC()

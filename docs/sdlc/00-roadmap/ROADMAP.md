@@ -74,7 +74,7 @@
 | **48** | **Customer / Growth / Tenant** | **Product web for marketing, advertising, lead capture, demos, tenant registration, and package conversion** | **O** | **4, 6, 9, 17, 20, 31, 39, 46** · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md) · [SPRINT-048](../03-sprints/SPRINT-048.md) · ✅ v2.21.0 |
 | **49** | **Platform / DevOps** | **Harvest-course shared-server deployment of customer, platform-admin, tenant, and product web surfaces** | **P** | **41, 48** · [SPRINT-049](../03-sprints/SPRINT-049.md) · backlog — ON HOLD (operator rollout pending) |
 | **50** | **Platform Admin / Finance** | **Admin promotional package grant: set active plan + issue tax invoice for a tenant** | **P** | **4, 9, 10, 11, 12, 13** · ✅ v2.23.0 · [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md) · [SPRINT-050](../03-sprints/SPRINT-050.md) · [DES-0046](../02-design/46-admin-promotion-package-grant-spec.md) |
-| **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, and tax invoices** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · planned · [FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md) · [SPRINT-051](../03-sprints/SPRINT-051.md) · [DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) |
+| **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, and tax invoices** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · implementation complete · manual UAT/release pending · [FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md) · [SPRINT-051](../03-sprints/SPRINT-051.md) · [DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) |
 | **52** | **Tenant / Platform** | **Tenant self-service avatar create/library: unlimited drafts; only active avatars capped by package `max_ai_employees`** | **D+** | **5, 13, 15, 16, 45, 50** · ✅ v2.24.0 · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md) · [SPRINT-052](../03-sprints/SPRINT-052.md) · [DES-0047](../02-design/47-tenant-avatar-create-active-cap-spec.md) |
 
 ---
@@ -1261,8 +1261,8 @@ two-mode commercial catalog with price calculation, scheduled billing,
 tax-invoice compliance, usage tracking, and quota management · **Sprint:**
 [SPRINT-051](../03-sprints/SPRINT-051.md) · **Design:**
 [DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) ·
-**Depends:** 9, 10, 12, 13, 25, 31, 45, 48, 50 · **Status:** planned /
-design `review_pending`
+**Depends:** 9, 10, 12, 13, 25, 31, 45, 48, 50 · **Status:**
+implementation complete; manual UAT/release pending
 
 Sprint 51 turns the pricing reference into a single catalog and billing
 authority for two service modes:

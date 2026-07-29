@@ -284,6 +284,7 @@ func main() {
 		aiMeter:         aiMeter,
 	}
 	s.backfillCallCenterAnalytics(rootCtx)
+	s.startBillingScheduler(rootCtx)
 	voiceRelay.AgentResolver = s.resolveAssignedWorkforceAgent
 	voiceRelay.ToolResolver = func(ctx context.Context, tenantID, agentID string) ([]live.ToolDeclaration, error) {
 		if st == nil || strings.TrimSpace(tenantID) == "" {
@@ -443,8 +444,11 @@ func main() {
 	mux.Handle("GET /api/platform/billing/documents/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformBillingDocument)))
 	mux.Handle("POST /api/platform/billing/documents/{id}/void", guard.RequirePlatformAdmin(http.HandlerFunc(s.voidPlatformBillingDocument)))
 	mux.Handle("POST /api/platform/billing/documents/{id}/reissue", guard.RequirePlatformAdmin(http.HandlerFunc(s.reissuePlatformBillingDocument)))
+	mux.Handle("POST /api/platform/billing/cycles/{id}/retry", guard.RequirePlatformAdmin(http.HandlerFunc(s.retryPlatformBillingCycle)))
 	mux.Handle("GET /api/platform/billing/seller-branding", guard.RequirePlatformAdmin(http.HandlerFunc(s.getSellerBranding)))
 	mux.Handle("PUT /api/platform/billing/seller-branding", guard.RequirePlatformAdmin(http.HandlerFunc(s.putSellerBranding)))
+	mux.Handle("GET /api/platform/commercial/quotes", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformDedicatedQuotes)))
+	mux.Handle("PATCH /api/platform/commercial/quotes/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.transitionPlatformDedicatedQuote)))
 	mux.HandleFunc("POST /api/callbacks/chillpay", s.chillpayCallback)
 	// Browser return from ChillPay (GET or POST) → fulfill if paid → SPA status page.
 	// Path may include /{orderRef} because ChillPay often strips query strings.
@@ -569,6 +573,10 @@ func main() {
 	mux.HandleFunc("GET /api/customer/me", s.customerMe)
 
 	mux.Handle("GET /api/tenant/packages", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantPackages)))
+	mux.Handle("POST /api/tenant/commercial/calculate", guard.RequireTenantAdminActive(http.HandlerFunc(s.calculateTenantCommercialPlan)))
+	mux.Handle("POST /api/tenant/commercial/quotes", guard.RequireTenantAdminActive(http.HandlerFunc(s.createTenantDedicatedQuote)))
+	mux.Handle("GET /api/tenant/commercial/quotes", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantDedicatedQuotes)))
+	mux.Handle("GET /api/tenant/commercial/current-plan", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCurrentCommercialPlan)))
 	mux.Handle("POST /api/tenant/checkout", guard.RequireTenantAdminActive(http.HandlerFunc(s.tenantCheckout)))
 	mux.Handle("GET /api/tenant/orders/{id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrder)))
 	mux.Handle("GET /api/tenant/orders/{id}/documents/{doc_type}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantOrderDocument)))

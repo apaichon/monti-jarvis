@@ -30,18 +30,20 @@ type RuleSchema struct {
 }
 
 type Package struct {
-	ID            string
-	Slug          string
-	Name          string
-	Description   string
-	Status        string
-	PriceCents    int
-	Currency      string
-	BillingPeriod string
-	RulesSchemaID string
-	Rules         map[string]any
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID             string
+	Slug           string
+	Name           string
+	Description    string
+	Status         string
+	PriceCents     int
+	Currency       string
+	BillingPeriod  string
+	DeploymentMode string
+	PurchaseMode   string
+	RulesSchemaID  string
+	Rules          map[string]any
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type TenantEntitlement struct {
@@ -79,7 +81,9 @@ const rulesV2Fields = `{
   "rag_enabled": {"type":"bool","required":true,"default":true}
 }`
 
-// Purchase modes encoded in package description for catalog routing.
+// Commercial deployment and purchase modes are persisted on packages. The
+// helpers retain a narrow legacy fallback for rows created before migration
+// 035; new writes must always provide explicit modes.
 const (
 	PurchaseModeSelfServe = "self_serve" // startups/SME — payment gateway
 	PurchaseModeQuote     = "quote"      // dedicated — request quote / capacity check
@@ -89,8 +93,12 @@ const (
 	platformUnlimitedMinutes = 99_999_999
 )
 
-// PackagePurchaseMode returns self_serve or quote from slug/description.
+// PackagePurchaseMode returns the persisted purchase mode, with a pre-migration
+// fallback for legacy rows only.
 func PackagePurchaseMode(p Package) string {
+	if mode := strings.ToLower(strings.TrimSpace(p.PurchaseMode)); mode == PurchaseModeSelfServe || mode == PurchaseModeQuote {
+		return mode
+	}
 	slug := strings.ToLower(strings.TrimSpace(p.Slug))
 	desc := strings.ToLower(p.Description)
 	switch {
@@ -107,8 +115,12 @@ func PackagePurchaseMode(p Package) string {
 	}
 }
 
-// PackageDeployment returns shared_cloud or dedicated_vm.
+// PackageDeployment returns the persisted deployment mode, with a
+// pre-migration fallback for legacy rows only.
 func PackageDeployment(p Package) string {
+	if mode := strings.ToLower(strings.TrimSpace(p.DeploymentMode)); mode == DeploymentSharedCloud || mode == DeploymentDedicatedVM {
+		return mode
+	}
 	if strings.HasPrefix(strings.ToLower(p.Slug), "dedicated-") {
 		return DeploymentDedicatedVM
 	}
@@ -226,7 +238,11 @@ func (s *Store) ensurePackagesSchema(ctx context.Context) error {
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
   price_cents int NOT NULL DEFAULT 0,
   currency text NOT NULL DEFAULT 'USD',
-  billing_period text NOT NULL DEFAULT 'monthly',%s
+  billing_period text NOT NULL DEFAULT 'monthly',
+  deployment_mode text NOT NULL DEFAULT 'shared_cloud'
+    CHECK (deployment_mode IN ('shared_cloud', 'dedicated_vm')),
+  purchase_mode text NOT NULL DEFAULT 'self_serve'
+    CHECK (purchase_mode IN ('self_serve', 'quote')),%s
 )`, schema, auditColumnsDDL),
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s.package_limits (
   package_id text PRIMARY KEY REFERENCES %s.packages(id) ON DELETE CASCADE,
@@ -261,6 +277,19 @@ ON %s.tenant_entitlements (tenant_id) WHERE status = 'active'`, schema),
 )`, schema, auditColumnsDDL),
 	}
 	for _, stmt := range stmts {
+		if _, err := s.pg.Exec(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	migrations := []string{
+		fmt.Sprintf(`ALTER TABLE %s.packages ADD COLUMN IF NOT EXISTS deployment_mode text NOT NULL DEFAULT 'shared_cloud'`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.packages ADD COLUMN IF NOT EXISTS purchase_mode text NOT NULL DEFAULT 'self_serve'`, schema),
+		fmt.Sprintf(`UPDATE %s.packages SET deployment_mode = 'dedicated_vm', purchase_mode = 'quote'
+WHERE id LIKE 'pkg-dedicated-%%' OR slug LIKE 'dedicated-%%'`, schema),
+		fmt.Sprintf(`UPDATE %s.packages SET deployment_mode = 'shared_cloud', purchase_mode = 'self_serve'
+WHERE id LIKE 'pkg-shared-%%' OR slug LIKE 'shared-%%'`, schema),
+	}
+	for _, stmt := range migrations {
 		if _, err := s.pg.Exec(ctx, stmt); err != nil {
 			return err
 		}
@@ -305,8 +334,11 @@ WHERE id IN (
 	upsert := append(monttiSharedCloudPackages(), monttiDedicatedPackages()...)
 	for _, p := range upsert {
 		_, err = s.pg.Exec(ctx, fmt.Sprintf(`
-INSERT INTO %s.packages (id, slug, name, description, status, price_cents, currency, billing_period, created_by, updated_by)
-VALUES ($1, $2, $3, $4, 'active', $5, $6, 'monthly', 'system', 'system')
+INSERT INTO %s.packages (
+  id, slug, name, description, status, price_cents, currency, billing_period,
+  deployment_mode, purchase_mode, created_by, updated_by
+)
+VALUES ($1, $2, $3, $4, 'active', $5, $6, 'monthly', $7, $8, 'system', 'system')
 ON CONFLICT (id) DO UPDATE SET
   slug = EXCLUDED.slug,
   name = EXCLUDED.name,
@@ -315,9 +347,12 @@ ON CONFLICT (id) DO UPDATE SET
   price_cents = EXCLUDED.price_cents,
   currency = EXCLUDED.currency,
   billing_period = 'monthly',
+  deployment_mode = EXCLUDED.deployment_mode,
+  purchase_mode = EXCLUDED.purchase_mode,
   updated_by = 'system',
   updated_at = now()`, schema),
-			p.id, p.slug, p.name, p.description, p.priceCents, p.currency)
+			p.id, p.slug, p.name, p.description, p.priceCents, p.currency,
+			PackageDeployment(Package{Slug: p.slug}), PackagePurchaseMode(Package{Slug: p.slug, Description: p.description, PriceCents: p.priceCents}))
 		if err != nil {
 			return err
 		}
@@ -407,6 +442,7 @@ func (s *Store) ListPackages(ctx context.Context, status string) ([]Package, err
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	q := fmt.Sprintf(`
 SELECT p.id, p.slug, p.name, p.description, p.status, p.price_cents, p.currency, p.billing_period,
+       p.deployment_mode, p.purchase_mode,
        pl.rules_schema_id, pl.rules, p.created_at, p.updated_at
 FROM %s.packages p
 JOIN %s.package_limits pl ON pl.package_id = p.id`, schema, schema)
@@ -430,6 +466,7 @@ func scanPackages(rows pgx.Rows) ([]Package, error) {
 		var p Package
 		var rulesRaw []byte
 		if err := rows.Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.Status, &p.PriceCents, &p.Currency, &p.BillingPeriod,
+			&p.DeploymentMode, &p.PurchaseMode,
 			&p.RulesSchemaID, &rulesRaw, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -445,11 +482,13 @@ func (s *Store) GetPackage(ctx context.Context, id string) (*Package, error) {
 	var rulesRaw []byte
 	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
 SELECT p.id, p.slug, p.name, p.description, p.status, p.price_cents, p.currency, p.billing_period,
+       p.deployment_mode, p.purchase_mode,
        pl.rules_schema_id, pl.rules, p.created_at, p.updated_at
 FROM %s.packages p
 JOIN %s.package_limits pl ON pl.package_id = p.id
 WHERE p.id = $1`, schema, schema), id).
 		Scan(&p.ID, &p.Slug, &p.Name, &p.Description, &p.Status, &p.PriceCents, &p.Currency, &p.BillingPeriod,
+			&p.DeploymentMode, &p.PurchaseMode,
 			&p.RulesSchemaID, &rulesRaw, &p.CreatedAt, &p.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrPackageNotFound
@@ -475,9 +514,13 @@ func (s *Store) CreatePackage(ctx context.Context, p Package) (*Package, error) 
 	defer tx.Rollback(ctx)
 
 	_, err = tx.Exec(ctx, fmt.Sprintf(`
-INSERT INTO %s.packages (id, slug, name, description, status, price_cents, currency, billing_period, created_by, updated_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)`, schema),
-		p.ID, p.Slug, p.Name, p.Description, p.Status, p.PriceCents, p.Currency, p.BillingPeriod, actor)
+INSERT INTO %s.packages (
+  id, slug, name, description, status, price_cents, currency, billing_period,
+  deployment_mode, purchase_mode, created_by, updated_by
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)`, schema),
+		p.ID, p.Slug, p.Name, p.Description, p.Status, p.PriceCents, p.Currency, p.BillingPeriod,
+		PackageDeployment(p), PackagePurchaseMode(p), actor)
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +534,14 @@ VALUES ($1, $2, $3::jsonb, $4, $4)`, schema),
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
-	return s.GetPackage(ctx, p.ID)
+	created, err := s.GetPackage(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.SyncPackageCatalogVersion(ctx, *created); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 func (s *Store) UpdatePackage(ctx context.Context, p Package) (*Package, error) {
@@ -503,9 +553,11 @@ func (s *Store) UpdatePackage(ctx context.Context, p Package) (*Package, error) 
 	}
 	tag, err := s.pg.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.packages
-SET slug = $2, name = $3, description = $4, status = $5, price_cents = $6, currency = $7, billing_period = $8, updated_by = $9
+SET slug = $2, name = $3, description = $4, status = $5, price_cents = $6,
+    currency = $7, billing_period = $8, deployment_mode = $9, purchase_mode = $10, updated_by = $11
 WHERE id = $1`, schema),
-		p.ID, p.Slug, p.Name, p.Description, p.Status, p.PriceCents, p.Currency, p.BillingPeriod, actor)
+		p.ID, p.Slug, p.Name, p.Description, p.Status, p.PriceCents, p.Currency, p.BillingPeriod,
+		PackageDeployment(p), PackagePurchaseMode(p), actor)
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +570,14 @@ UPDATE %s.package_limits SET rules_schema_id = $2, rules = $3::jsonb, updated_by
 	if err != nil {
 		return nil, err
 	}
-	return s.GetPackage(ctx, p.ID)
+	updated, err := s.GetPackage(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.SyncPackageCatalogVersion(ctx, *updated); err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func (s *Store) ArchivePackage(ctx context.Context, id string) error {
@@ -564,6 +623,7 @@ func (s *Store) GetActiveEntitlement(ctx context.Context, tenantID string) (*Ten
 	return s.scanEntitlement(ctx, fmt.Sprintf(`
 SELECT e.id, e.tenant_id, e.package_id, e.rules_schema_id, e.rules_snapshot, e.status, e.valid_from, e.valid_until,
        p.id, p.slug, p.name, p.description, p.status, p.price_cents, p.currency, p.billing_period,
+       p.deployment_mode, p.purchase_mode,
        pl.rules_schema_id, pl.rules, p.created_at, p.updated_at
 FROM %s.tenant_entitlements e
 JOIN %s.packages p ON p.id = e.package_id
@@ -580,6 +640,7 @@ func scanEntitlementRow(row pgx.Row) (*TenantEntitlement, error) {
 	err := row.Scan(
 		&e.ID, &e.TenantID, &e.PackageID, &e.RulesSchemaID, &snapRaw, &e.Status, &e.ValidFrom, &validUntil,
 		&pkg.ID, &pkg.Slug, &pkg.Name, &pkg.Description, &pkg.Status, &pkg.PriceCents, &pkg.Currency, &pkg.BillingPeriod,
+		&pkg.DeploymentMode, &pkg.PurchaseMode,
 		&pkg.RulesSchemaID, &rulesRaw, &pkg.CreatedAt, &pkg.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

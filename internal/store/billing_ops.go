@@ -188,6 +188,10 @@ func (s *Store) ReissuePaymentDocument(ctx context.Context, docID, reason string
 	if err != nil {
 		return nil, err
 	}
+	packageName := pkg.Name
+	if calculation, calculationErr := s.GetOrderCommercialCalculation(ctx, order.ID); calculationErr == nil && strings.TrimSpace(calculation.PackageName) != "" {
+		packageName = calculation.PackageName
+	}
 	buyerName, buyerAddr, buyerTaxID := s.resolveBuyerFields(ctx, order.TenantID)
 	seller, _ := s.GetSellerBranding(ctx)
 	net, vat := splitVATInclusive(order.AmountCents, old.VATRateBps)
@@ -224,7 +228,7 @@ INSERT INTO %s.payment_documents (
 		id, order.ID, order.TenantID, old.DocType, docNo,
 		buyerName, buyerAddr, buyerTaxID,
 		seller.Name, seller.Address, seller.TaxID,
-		pkg.Name, order.AmountCents, order.Currency, vatRate, net, vat,
+		packageName, order.AmountCents, order.Currency, vatRate, net, vat,
 		order.PaymentMethod, old.ID, issuedAt, actor,
 	)
 	if err != nil {

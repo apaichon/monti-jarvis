@@ -4,6 +4,7 @@
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
+  import { currentPlan } from '$lib/currentPlan.svelte';
   import {
     clearSession,
     bootstrapSession,
@@ -21,9 +22,15 @@
     const unsubscribe = subscribeSession(() => {
       sessionTick += 1;
     });
-    void bootstrapSession().finally(() => {
-      sessionReady = true;
-    });
+    void bootstrapSession()
+      .then(() => {
+        if (hasRegistrationSession()) {
+          void currentPlan.load().catch(() => {});
+        }
+      })
+      .finally(() => {
+        sessionReady = true;
+      });
     return unsubscribe;
   });
 
@@ -37,11 +44,24 @@
   function logout() {
     void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     clearSession();
+    currentPlan.clear();
     window.location.href = `${base}/login`;
   }
 
   function active(pathPart: string) {
     return $page.url.pathname.includes(pathPart);
+  }
+
+  function planUsagePercent(): number {
+    const value = currentPlan.data?.compact_utilization;
+    if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(100, Math.round(value * 100)));
+  }
+
+  function planUsageLabel(): string {
+    if (currentPlan.loading && !currentPlan.data) return 'Loading allowance…';
+    if (currentPlan.data?.compact_utilization == null) return 'Usage unavailable';
+    return `${planUsagePercent()}% highest quota usage`;
   }
 </script>
 
@@ -155,11 +175,12 @@
       </nav>
 
       <div class="tenant-sidebar-foot">
-        <div class="plan-card">
-          <small>CURRENT PLAN</small><strong>Enterprise</strong><span><i></i></span><small
-            >68% monthly allowance</small
-          >
-        </div>
+        <a class="plan-card plan-card-link" href="{base}/billing">
+          <small>CURRENT PLAN</small>
+          <strong>{currentPlan.data?.package?.name ?? (currentPlan.loading ? 'Loading…' : 'No active plan')}</strong>
+          <span><i style={`width:${planUsagePercent()}%`}></i></span>
+          <small>{planUsageLabel()}</small>
+        </a>
         <button class="account-button" type="button" onclick={logout}
           ><span class="workspace-avatar">AD</span><span
             ><strong>Admin</strong><small>Sign out</small></span
