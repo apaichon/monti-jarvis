@@ -1,13 +1,14 @@
 ---
 id: FEAT-0044
 title: "Shared Cloud and Dedicated VM commercial plans and billing operations"
-status: completed
+status: shipped
 roadmap_sprint: 51
 priority: P
 depends_on: [SPRINT-009, SPRINT-010, SPRINT-012, SPRINT-013, SPRINT-025, SPRINT-031, SPRINT-045, SPRINT-048, SPRINT-050]
 design: DES-0048
 design_spec: ../02-design/48-commercial-plans-billing-operations-spec.md
-updated: 2026-07-28
+updated: 2026-07-29
+release: v2.25.0
 ---
 
 # FEAT-0044: Shared Cloud and Dedicated VM Commercial Operations
@@ -36,7 +37,8 @@ renewal scheduling, receipts, and tax invoices.
 
 ## Delivery state
 
-The implementation and automated/integration verification are complete on the
-Sprint 51 worktree. Release remains gated by
-[SPRINT-051 manual UAT](../06-manual-tests/SPRINT-051-commercial-operations-manual.md)
-and explicit production enablement of the billing scheduler.
+Shipped in **v2.25.0**. The release includes Shared Cloud checkout, Dedicated
+quotation operations, current-plan quota/next-bill contracts, replay-safe
+billing cycles, receipt/tax-invoice issuance, and a visible platform admin quote
+request monitor. Production scheduler activation remains an environment
+enablement step because `BILLING_SCHEDULER_ENABLED` defaults to `false`.

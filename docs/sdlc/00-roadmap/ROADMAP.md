@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S52 commercial/tenant tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
+# Monti AI Call Center — Roadmap (36 core + S37–S55 commercial/tenant tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -74,8 +74,11 @@
 | **48** | **Customer / Growth / Tenant** | **Product web for marketing, advertising, lead capture, demos, tenant registration, and package conversion** | **O** | **4, 6, 9, 17, 20, 31, 39, 46** · [FEAT-0040](../01-features/FEAT-0040-product-web-growth.md) · [SPRINT-048](../03-sprints/SPRINT-048.md) · ✅ v2.21.0 |
 | **49** | **Platform / DevOps** | **Harvest-course shared-server deployment of customer, platform-admin, tenant, and product web surfaces** | **P** | **41, 48** · [SPRINT-049](../03-sprints/SPRINT-049.md) · backlog — ON HOLD (operator rollout pending) |
 | **50** | **Platform Admin / Finance** | **Admin promotional package grant: set active plan + issue tax invoice for a tenant** | **P** | **4, 9, 10, 11, 12, 13** · ✅ v2.23.0 · [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md) · [SPRINT-050](../03-sprints/SPRINT-050.md) · [DES-0046](../02-design/46-admin-promotion-package-grant-spec.md) |
-| **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, and tax invoices** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · implementation complete · manual UAT/release pending · [FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md) · [SPRINT-051](../03-sprints/SPRINT-051.md) · [DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) |
+| **51** | **Platform / Tenant / Finance** | **Shared Cloud and Dedicated VM commercial plans: calculator, usage/quota controls, billing scheduler, receipts, tax invoices, and admin quote monitoring** | **P** | **9, 10, 12, 13, 25, 31, 45, 48, 50** · ✅ v2.25.0 · [FEAT-0044](../01-features/FEAT-0044-commercial-plans-billing-operations.md) · [SPRINT-051](../03-sprints/SPRINT-051.md) · [DES-0048](../02-design/48-commercial-plans-billing-operations-spec.md) |
 | **52** | **Tenant / Platform** | **Tenant self-service avatar create/library: unlimited drafts; only active avatars capped by package `max_ai_employees`** | **D+** | **5, 13, 15, 16, 45, 50** · ✅ v2.24.0 · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md) · [SPRINT-052](../03-sprints/SPRINT-052.md) · [DES-0047](../02-design/47-tenant-avatar-create-active-cap-spec.md) |
+| **53** | **Tenant / Customer** | **Tenant settings: auto-register customer when email + OTP is entered in conversation; show app/tag version on UI** | **D+** | **16, 19, 20, 21, 52** · planned |
+| **54** | **Customer / Platform** | **Customer portal: pick tenant from list to call (no `tenant_id` query string required)** | **J** | **1, 5, 6, 20, 21, 38, 53** · planned |
+| **55** | **Tenant** | **Call Center Statistics grouped by topic** | **F+** | **22, 25, 30** · planned · extends [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
 
 ---
 
@@ -1548,3 +1551,258 @@ commercial plan matrix, or unlimited concurrent voice.
 (or a tenant-owned avatar table with the same active-cap semantics) rather than
 a second workforce authority. Package rule remains `max_ai_employees` on the
 entitlement snapshot.
+
+---
+
+## Planned: SPRINT-053 — Conversation Auto Customer Register (Email OTP) + App Version on UI
+
+**Platform:** Tenant / Customer · **Feature:** Tenant setting to auto-register
+customers when they enter email and complete OTP during conversation; surface
+the same app/tag version across portals · **Depends:** 16, 19, 20, 21, 52 ·
+**Status:** planned
+
+### 1) Tenant settings — auto-register customer via email OTP in conversation
+
+Today customer OTP auth (S20/S21) can gate workforce selection when required.
+Sprint 53 adds a **tenant-controlled auto-register path inside the live
+conversation**:
+
+- Tenant Settings exposes a toggle (working name:
+  **auto-register customer on conversation email OTP**).
+- When **enabled**, a customer in chat/voice can enter an **email** in the
+  conversation UI; the system **sends an OTP** to that email.
+- On successful OTP verify:
+  - if no `customers` row exists for that tenant+email, **create** (register)
+    the customer automatically;
+  - bind the conversation/session to that customer identity;
+  - continue the conversation under the registered customer (quota/attribution
+    as existing customer-aware paths).
+- When **disabled**, conversation does not offer this auto-register flow
+  (existing optional/required auth policies remain unchanged unless combined
+  explicitly).
+- Respect existing domain allow/deny rules, rate limits, and tenant isolation
+  from S19–S20.
+
+#### Goals
+
+- Capture identity mid-conversation without forcing full signup before first
+  message when the tenant wants friction-light registration.
+- One tenant setting, clear customer UX for email → OTP → continue.
+- Reuse customer OTP challenge, session, and `customers` directory authorities
+  — do not invent a second identity store.
+
+#### Acceptance sketch (auto-register)
+
+1. Tenant admin can enable/disable auto-register-on-conversation-OTP in
+   Settings; default is **off** (safe).
+2. With setting **on**, customer conversation UI prompts for email, requests
+   OTP, and on verify creates or reuses the tenant-scoped customer and attaches
+   the session.
+3. With setting **off**, conversation does not auto-create customers via this
+   path.
+4. OTP abuse limits and domain policy still apply; wrong tenant cannot claim
+   another tenant’s customer.
+5. Existing “require OTP before workforce” policy continues to work and can
+   coexist without double-registering.
+
+### 2) Show app version (same as git tag / `VERSION`) on UI
+
+Operators and tenants need to know which release is running.
+
+- Expose a single **app version** string equal to the release tag / `VERSION`
+  file (e.g. `v2.24.0` or `2.24.0` — pick one canonical format and use it
+  everywhere).
+- Show it on primary shells:
+  - tenant console (e.g. sidebar footer or settings),
+  - platform admin,
+  - optionally customer portal footer (small, non-intrusive).
+- Prefer build-time injection from `VERSION` (or `/api` health/version field)
+  so UI always matches the tagged binary/static assets.
+
+#### Acceptance sketch (version)
+
+1. `VERSION` / release tag `vX.Y.Z` and UI version label match for a given
+   deploy.
+2. Version is visible without opening browser devtools.
+3. No secrets or environment names are leaked via the version display.
+
+### Sprint 53 deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Tenant setting | Boolean (or enum) for conversation auto-register via email OTP |
+| Conversation UX | Email input → send OTP → verify → continue under customer |
+| Customer store | Auto-create `customers` row when missing; reuse when present |
+| Session bind | Attach verified customer to active conversation/session |
+| API | Settings get/put; conversation OTP request/verify hooks |
+| App version | Single source from `VERSION`/tag; show on tenant (+ admin) UI |
+| Verification | Setting off/on, domain/rate limit, isolation, version match |
+
+### Sprint 53 acceptance sketch (combined)
+
+1. Auto-register flow works end-to-end when enabled; no auto-create when disabled.
+2. OTP + domain + rate-limit gates match S20 behavior.
+3. Tenant A cannot register or bind customers for tenant B.
+4. UI shows app version matching the deployed `VERSION` / git tag.
+5. Workforce/quota attribution uses the registered customer after verify.
+
+**Out (unless pulled in):** SMS OTP, social login, mandatory email on every
+anonymous demo path, changing S51 commercial catalog, marketing email blasts.
+
+**Design note:** Extend S16 settings + S20 customer auth OTP rather than a new
+auth product. Version display should not require a separate sprint from the
+auto-register work if both stay small; ship together under S53.
+
+---
+
+## Planned: SPRINT-054 — Customer Portal Tenant List to Call (No `tenant_id` Query)
+
+**Platform:** Customer / Platform · **Feature:** Customer portal entry by
+selecting a tenant (brand) from a list, without requiring `?tenant_id=` on the
+URL · **Depends:** 1, 5, 6, 20, 21, 38, 53 · **Status:** planned
+
+### Problem today
+
+The customer portal scopes the session with a query string:
+
+```text
+/ ?tenant_id=acme
+```
+
+Callers must know or be handed a tenant id. That blocks a clean multi-brand
+entry surface and couples deep links to internal ids.
+
+### Goal
+
+1. **Tenant list to call to** — Customer portal shows a list of call-to
+   tenants (public brand listings / active tenants eligible for inbound), then
+   the caller picks one and continues to avatar selection / conversation.
+2. **Remove required `tenant_id` query string** — Primary path does not depend
+   on `?tenant_id=`. Tenant context is chosen in-app (and may still be
+   optionally deep-linked for share/bookmark, but is not required).
+
+### Scope
+
+### In
+
+- Public (or lightly gated) **tenant list** API for customers: safe fields only
+  (display name, logo/brand, locale, slug/id for selection — no secrets).
+- Customer portal **picker screen** before workforce/conversation when no
+  tenant is selected.
+- After pick: set tenant context in session/state (memory, path segment, or
+  allowlisted slug route such as `/t/{slug}`) and load avatars/chat/voice for
+  that tenant only.
+- Deprecate **required** `tenant_id` query param; optional deep link may still
+  preselect a tenant then strip or replace with cleaner routing.
+- Tenant isolation: list and subsequent APIs never mix data across tenants.
+- Align with S38 central brand portal intent where useful; S54 can be the
+  minimal “list → call” slice without full multi-brand marketing hub.
+
+### Out
+
+- Full S38 multi-brand marketing portal (unless already in scope)
+- Cross-tenant conversation history
+- Platform admin bulk brand CMS redesign
+- Changing OTP/auto-register rules beyond consuming selected tenant_id
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Public tenant list API | Active/listable tenants for inbound call entry |
+| Customer portal tenant picker | UI list → select → enter desk |
+| Context without query string | In-app selection; optional slug/path deep link |
+| Migration from `?tenant_id=` | Optional preselect; primary UX no longer requires it |
+| Verification | Pick A vs B isolation; no list leak; call/chat after pick |
+
+### Acceptance sketch
+
+1. Opening the customer portal **without** `tenant_id` shows a tenant list (or
+   empty state), not a broken desk.
+2. Selecting a tenant loads that tenant’s workforce and conversation only.
+3. Chat/voice APIs use the selected tenant context (header/session/path), not a
+   required query string.
+4. Optional deep link may preselect a tenant; primary docs and CTAs do not
+   require `?tenant_id=`.
+5. Tenant A’s customers/agents/KM are never visible after selecting tenant B.
+
+**Out (unless pulled in):** S38 full brand portal polish, paid listing ranking,
+or removing platform demo single-tenant defaults entirely.
+
+**Design note:** Prefer `slug` or path-based deep links over raw `tenant_id`
+query params. Reuse brand listing / public theme surfaces where they already
+exist.
+
+---
+
+## Planned: SPRINT-055 — Tenant Call Center Statistics Grouped by Topic
+
+**Platform:** Tenant · **Feature:** Extend tenant call-center statistics with
+**group by topic** breakdowns (conversation/call topic tags) · **Depends:** 22,
+25, 30 · **Status:** planned · **Extends:** [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md)
+(S25 dashboard)
+
+### Problem
+
+Sprint 25 shipped tenant call-center statistics and quota usage (volume,
+channels, satisfaction, package context). Tenants still cannot see **which
+topics** drive traffic — e.g. billing vs technical vs general — so staffing and
+KM investment stay guesswork.
+
+Customer desk already exposes coarse topics (`general`, `billing`, `technical`
+and similar). Those should flow into analytics facts and tenant dashboards.
+
+### Goal
+
+- Tenant Call Center Statistics dashboard can **group and filter by topic**.
+- Metrics (calls, minutes, chat sessions, satisfaction where available) break
+  down **per topic** for a date range, tenant-scoped only.
+- Topic values come from conversation/call metadata already captured (or a
+  small extension to persist topic on completed records / ClickHouse facts).
+
+### Scope
+
+### In
+
+- Persist or project **topic** on analytics path (Postgres completed records
+  and/or ClickHouse call-center facts used by S25 APIs).
+- Tenant stats API: series and/or rows **grouped by topic** (and date where
+  already supported).
+- Tenant dashboard UI: topic breakdown table/chart; optional topic filter.
+- Empty/unknown topic bucket when topic was not set.
+- Strict tenant isolation (same as S25).
+
+### Out
+
+- Free-form multi-label taxonomy admin product (unless a minimal allowlist is
+  needed)
+- Platform-wide cross-tenant topic leaderboard (S30-style) unless a thin
+  follow-on
+- Changing customer topic picker UX beyond ensuring topic is stored
+- Replacing S25 quota usage views
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Topic on facts | Write topic into stats pipeline from conversation/call end |
+| API group-by-topic | Tenant statistics endpoint(s) return topic aggregates |
+| Dashboard | Tenant Call Center Stats: group by topic table/chart + date range |
+| Isolation | Tenant A never sees tenant B topic totals |
+| Verification | Seed two topics; counts match; unknown bucket; date filter |
+
+### Acceptance sketch
+
+1. Completed conversations/calls with a topic appear in tenant stats **grouped
+   by that topic**.
+2. Tenant can open Call Center Statistics and see topic breakdown for a chosen
+   date range (counts and, where already shown, minutes/satisfaction).
+3. Rows with missing topic land in a stable **Unknown / unset** bucket.
+4. Changing date range refreshes topic aggregates without cross-tenant leak.
+5. Existing non-topic S25 summary metrics remain available and consistent.
+
+**Out (unless pulled in):** ML auto-topic classification, multi-select topics
+per call, or platform topic benchmarking.
+
+**Design note:** Prefer extending existing S25 ClickHouse/Postgres stats
+contracts with a `topic` dimension rather than a second analytics product.

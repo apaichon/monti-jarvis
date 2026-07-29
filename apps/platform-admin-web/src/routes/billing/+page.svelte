@@ -38,10 +38,10 @@
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
   <div>
     <h1 style="margin:0;font-size:24px">Billing ledger</h1>
-    <p style="margin:6px 0 0;color:var(--muted);font-size:13px">Cross-tenant payment orders (Sprint 10)</p>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:13px">Cross-tenant payment orders and commercial operations</p>
   </div>
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <a class="btn ghost" href="{base}/billing/quotes">Dedicated quotes</a>
+    <a class="btn ghost" href="{base}/billing/quotes">Monitor quote requests</a>
     <a class="btn ghost" href="{base}/billing/usage">Usage</a>
     <a class="btn ghost" href="{base}/billing/receipts">Receipts</a>
     <a class="btn ghost" href="{base}/billing/seller">Seller branding</a>

@@ -74,10 +74,17 @@
         </a>
         <a
           class="nav-link"
-          class:active={$page.url.pathname.startsWith(`${base}/billing`)}
+          class:active={$page.url.pathname.startsWith(`${base}/billing`) && !$page.url.pathname.startsWith(`${base}/billing/quotes`)}
           href="{base}/billing"
         >
           <span>▣</span>Billing
+        </a>
+        <a
+          class="nav-link sub-link"
+          class:active={$page.url.pathname.startsWith(`${base}/billing/quotes`)}
+          href="{base}/billing/quotes"
+        >
+          <span>▥</span>Quote requests
         </a>
         <a
           class="nav-link"

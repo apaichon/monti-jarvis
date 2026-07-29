@@ -106,6 +106,12 @@ button {
 }
 
 .nav-link > span { width: 17px; text-align: center; color: #71809c; font-size: 15px; }
+.nav-link.sub-link {
+  margin-left: 22px;
+  min-height: 34px;
+  padding-left: 10px;
+  font-size: 11px;
+}
 
 .nav-link.active,
 .nav-link:hover {

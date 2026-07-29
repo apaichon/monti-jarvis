@@ -1,12 +1,14 @@
 ---
 id: SPRINT-051
-status: backlog
-implementation_status: verify
-release_gate: manual_uat
+status: completed
+implementation_status: shipped
+release_gate: passed
 start: 2026-08-15
 end: 2026-08-21
-updated: 2026-07-28
-design_pack: approved
+closed: 2026-07-29
+updated: 2026-07-29
+design_pack: shipped
+release: v2.25.0
 release_target: v2.25.0
 roadmap_sprint: 51
 feature: FEAT-0044
@@ -20,10 +22,11 @@ parallel_track: true
 
 ## Status
 
-Implementation and automated/integration verification are complete in the
-isolated Sprint 51 worktree. The sprint remains in the roadmap backlog so it
-does not replace the active parallel sprint. Manual browser UAT and production
-scheduler enablement are still open; Sprint 51 is not released or closed.
+Sprint 51 shipped as **v2.25.0**. The release closes the Shared Cloud checkout,
+Dedicated VM quotation, current-plan quota/next-bill, billing scheduler,
+receipt, and tax-invoice operations scope. The platform admin now exposes the
+Dedicated quotation queue directly from the admin sidebar for operator
+monitoring.
 
 ## Commitment
 
@@ -34,7 +37,7 @@ scheduler enablement are still open; Sprint 51 is not released or closed.
 | [TASK-0192](../04-tasks/TASK-0192.md) | 3 | completed | Idempotent renewal, retries, documents, settlement |
 | [TASK-0193](../04-tasks/TASK-0193.md) | 3 | completed | Composite current-plan, quota freshness, next bill |
 | [TASK-0194](../04-tasks/TASK-0194.md) | 2 | completed | Tenant/platform UX and automated verification |
-| **Total** | **14** | **14/14 built** | **UAT pending** |
+| **Total** | **14** | **14/14** | **Shipped v2.25.0** |
 
 ## Scope boundary
 
@@ -56,6 +59,18 @@ scheduler enablement are still open; Sprint 51 is not released or closed.
 | Dedicated smoke | full lifecycle; zero payment artifacts on request |
 | Scheduler replay | one cycle/order; settled once after documents |
 | Temp verification DB | removed after test |
+| Platform quote monitor visibility | direct admin sidebar link and billing ledger entry |
 
 Manual checklist:
 [SPRINT-051-commercial-operations-manual.md](../06-manual-tests/SPRINT-051-commercial-operations-manual.md).
+
+## Shipped summary (v2.25.0)
+
+- Explicit Shared Cloud vs Dedicated VM commercial catalog modes.
+- Server-authoritative monthly/annual calculator with immutable package versions.
+- Shared Cloud checkout creates payment, subscription, receipt, tax invoice, and entitlement.
+- Dedicated VM request quotation flow creates no tenant gateway payment artifacts.
+- Platform admin quote queue supports review, capacity confirmation, quote, acceptance, provisioning, and activation.
+- Tenant current-plan contract shows quota usage, compact utilization, next bill, and finance documents.
+- Billing scheduler is replay-safe and remains disabled by default until production enablement.
+- Platform admin navigation exposes the Dedicated quote request monitor at `/billing/quotes`.

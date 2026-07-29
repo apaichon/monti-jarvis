@@ -1,11 +1,12 @@
 ---
 id: DES-0048
 title: Shared Cloud and Dedicated VM Commercial Operations Specification
-status: approved
-updated: 2026-07-28
+status: shipped
+updated: 2026-07-29
 sprint: SPRINT-051
 owner: SA
 feature: FEAT-0044
+release: v2.25.0
 ---
 
 # DES-0048 — Shared Cloud and Dedicated VM Commercial Operations
@@ -125,7 +126,8 @@ claims use `FOR UPDATE SKIP LOCKED`; retries never create a second cycle/order.
 - Repeated scheduler ticks produced one cycle and one order; payment settled
   the cycle and advanced the subscription once.
 
-## Approval
+## Release
 
-The product-owner instruction to build Sprint 51 authorizes implementation of
-this design. Release remains subject to the linked manual UAT checklist.
+Shipped as **v2.25.0** with the platform admin quote request monitor exposed in
+navigation. Production billing scheduler enablement remains explicit through
+`BILLING_SCHEDULER_ENABLED`.

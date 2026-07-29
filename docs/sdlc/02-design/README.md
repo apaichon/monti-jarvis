@@ -52,7 +52,7 @@ System design artifacts for Monti Jarvis.
 | 45 | [45-harvest-course-shared-server-deployment-spec.md](45-harvest-course-shared-server-deployment-spec.md) | 49 | Harvest-course shared-server deployment of customer, admin, tenant, and product web surfaces | `approved` |
 | 46 | [46-admin-promotion-package-grant-spec.md](46-admin-promotion-package-grant-spec.md) | 50 | Admin promotional package grant: active plan + tax invoice (atomic) | **`shipped`** v2.23.0 |
 | 47 | [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md) | 52 | Tenant avatar library create; active cap = package max_ai_employees | **`shipped`** v2.24.0 |
-| 48 | [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md) | 51 | Shared Cloud checkout, Dedicated quotation, billing scheduler, current quota/next bill, and finance documents | `review_pending` |
+| 48 | [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md) | 51 | Shared Cloud checkout, Dedicated quotation, billing scheduler, current quota/next bill, and finance documents | **`shipped`** v2.25.0 |
 
 **Sprint design pack:** Run **`sprint-tech-specs`** when opening each sprint — updates `02`–`05` (cumulative) and adds `NN-<domain>-spec.md` when needed. Templates: `.claude/skills/sprint-tech-specs/references/`.
 
@@ -94,7 +94,7 @@ System design artifacts for Monti Jarvis.
 
 **Sprint 50:** ✅ **shipped v2.23.0** — [46-admin-promotion-package-grant-spec.md](46-admin-promotion-package-grant-spec.md); workflow §116–117; ER/API/UX Sprint 50; UX A50. [SPRINT-050](../03-sprints/SPRINT-050.md) · [FEAT-0042](../01-features/FEAT-0042-admin-promotion-package-grant.md).
 
-**Sprint 51:** Design pack drafted and `review_pending` —
+**Sprint 51:** ✅ **shipped v2.25.0** —
 [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md);
 workflow §120–124; ER/API Sprint 51; UX T51/A51.
 [SPRINT-051](../03-sprints/SPRINT-051.md) ·
