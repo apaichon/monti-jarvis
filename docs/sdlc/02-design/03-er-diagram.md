@@ -2631,3 +2631,67 @@ create never consults this inequality
 | `ai_avatars.owner_tenant_id` | 52 | **implement S52** |
 
 See DES-0047, workflow §118–119, API Sprint 52, UX T52.
+
+## Sprint 54 — customer portal tenant list (no new tables)
+
+S54 reuses the existing brand directory model. No migration required for MVP.
+
+### Entities reused
+
+```mermaid
+erDiagram
+  tenants ||--o| brands : has
+  tenants ||--o| tenant_kyc_profiles : kyc
+  brands {
+    text tenant_id PK
+    text name
+    text blurb
+    text logo_url
+    text category
+    jsonb languages
+    boolean listed
+    boolean platform_listed
+    text status
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+  tenants {
+    text id PK
+    text slug UK
+    text status
+  }
+```
+
+### Listability predicate (public directory)
+
+```text
+tenants.status = 'active'
+AND brands.status = 'active'
+AND brands.listed = true
+AND brands.platform_listed = true
+AND COALESCE(kyc.status, 'approved') = 'approved'
+```
+
+### Client context (not Postgres)
+
+| Store | Key | Value |
+| --- | --- | --- |
+| sessionStorage | `monti_jarvis:selected_tenant` | `{ id, slug, name }` |
+
+### Redis / MinIO
+
+| Store | Change |
+| --- | --- |
+| Redis | None required (optional list cache later) |
+| MinIO | None; logos via `brands.logo_url` |
+
+### Future entities
+
+| Entity | Sprint | Status |
+| --- | --- | --- |
+| Brand directory public list | 27 / 38 | **shipped** (API); **S54** web picker consumes it |
+| Full FEAT-0018 marketing hub | later | still backlog beyond list→call |
+
+See DES-0049, workflow §125–126, API Sprint 54, UX C54.

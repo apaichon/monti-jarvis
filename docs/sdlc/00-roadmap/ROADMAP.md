@@ -1548,3 +1548,87 @@ commercial plan matrix, or unlimited concurrent voice.
 (or a tenant-owned avatar table with the same active-cap semantics) rather than
 a second workforce authority. Package rule remains `max_ai_employees` on the
 entitlement snapshot.
+
+---
+
+## Planned: SPRINT-053 — Conversation Auto Customer Register (Email OTP) + App Version on UI
+
+**Platform:** Customer / Platform · **Feature:** Optional auto-register customer
+on conversation OTP + show app version on UI · **Depends:** 16, 20 · **Status:** planned
+
+*(Full scope lives on main / S53 worktree; S54 does not implement S53.)*
+
+---
+
+## Design-approved: SPRINT-054 — Customer Portal Tenant List to Call (No `tenant_id` Query)
+
+**Platform:** Customer / Platform · **Feature:** [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md) · **Design:** [DES-0049](../02-design/49-customer-portal-tenant-list-spec.md) · **Sprint:** [SPRINT-054](../03-sprints/SPRINT-054.md) · **Depends:** 1, 5, 6, 20, 21, 27 · **Status:** design_approved
+
+### Problem today
+
+The customer portal scopes the session with a query string:
+
+```text
+/?tenant_id=acme
+```
+
+Callers must know or be handed a tenant id. That blocks a clean multi-brand
+entry surface and couples deep links to internal ids.
+
+### Goal
+
+1. **Tenant list to call to** — Customer portal shows a list of call-to
+   tenants (public brand listings / active tenants eligible for inbound), then
+   the caller picks one and continues to avatar selection / conversation.
+2. **Remove required `tenant_id` query string** — Primary path does not depend
+   on `?tenant_id=`. Tenant context is chosen in-app via `/t/{slug}` (and
+   session storage); optional deep link may still preselect.
+
+### Scope
+
+### In
+
+- Public **tenant/brand list** API for customers (reuse `GET /api/public/brands`)
+- Customer portal **picker screen** before workforce when no tenant selected
+- Path context `/t/{slug}` + session; prefer `X-Tenant-Id` after pick
+- Deprecate **required** page `tenant_id` query; optional preselect only
+- Tenant isolation: list and desk never mix data across tenants
+- Minimal “list → call” slice (FEAT-0018 hub remains larger backlog)
+
+### Out
+
+- Full multi-brand marketing portal polish
+- Cross-tenant conversation history
+- Embed path changes
+- S53 auto-register / version (separate)
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Public tenant list API | Active/listable brands (existing + optional alias) |
+| Customer portal tenant picker | UI list → select → enter desk |
+| Context without query string | `/t/{slug}` + session |
+| Migration from `?tenant_id=` | Optional preselect → normalize |
+| Verification | Pick A vs B isolation; no list leak |
+
+### Acceptance sketch
+
+1. Opening the customer portal **without** `tenant_id` shows a tenant list (or empty state).
+2. Selecting a tenant loads that tenant’s workforce and conversation only.
+3. Chat/voice APIs use selected tenant context (header/session/path), not a required page query.
+4. Optional deep link may preselect; primary CTAs do not require `?tenant_id=`.
+5. Tenant A data never visible after selecting tenant B.
+
+**Tasks:** TASK-0195 (directory), TASK-0196 (picker UX), TASK-0197 (UAT).  
+**Worktree:** `.worktrees/SPRINT-054` · branch `feature/sprint-054-customer-tenant-list`
+
+---
+
+## Planned: SPRINT-055 — Tenant Call Center Statistics Grouped by Topic
+
+**Platform:** Tenant · **Feature:** Extend tenant call-center statistics with
+**group by topic** breakdowns · **Depends:** 22, 25, 30 · **Status:** planned ·
+**Extends:** [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md)
+
+*(Roadmap placeholder; not design-approved in this sprint pack.)*

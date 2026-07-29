@@ -3707,3 +3707,73 @@ sequenceDiagram
 Deactivate: `active` → `disabled` frees a slot.
 
 See DES-0047, ER Sprint 52, API Sprint 52, UX T52.
+
+## 125. Customer opens portal without tenant and picks a brand (Sprint 54)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser customer-web
+  participant G as Go :8091
+  participant S as internal/store
+  participant PG as Postgres callcenter
+
+  B->>B: Open / (no selected tenant)
+  B->>G: GET /api/public/brands?limit=50
+  G->>S: ListPublicBrands(q, limit, offset)
+  S->>PG: brands ⋈ tenants ⋈ kyc filters listed
+  PG-->>S: rows
+  S-->>G: items, total
+  G-->>B: 200 { items, total }
+
+  alt empty directory
+    B->>B: Show empty state (no desk)
+  else has brands
+    B->>B: Render picker cards
+    B->>B: User selects brand slug
+    B->>B: sessionStorage selected_tenant; navigate /t/{slug}
+  end
+```
+
+## 126. Customer enters desk via path or legacy query (Sprint 54)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant G as Go :8091
+  participant S as store
+  participant PG as Postgres
+
+  alt path deep link
+    B->>B: GET /t/{slug}
+  else legacy query preselect
+    B->>B: GET /?tenant_id={id|slug}
+    B->>B: Normalize → /t/{slug}
+  end
+
+  B->>G: GET /api/public/brands/{slug}
+  G->>S: GetPublicBrand(slug)
+  S->>PG: active + listed + platform_listed
+  alt not listable
+    PG-->>S: no rows
+    G-->>B: 404 brand not found
+    B->>B: Fallback to picker + error
+  else listable
+    S-->>G: PublicBrand
+    G-->>B: 200 { item }
+    B->>G: GET /api/public/theme/{tenant_id}
+    G-->>B: published theme
+    B->>G: GET /api/customer/workforce (X-Tenant-Id)
+    G-->>B: active agents for tenant only
+    B->>B: Desk ready (chat/voice)
+  end
+```
+
+### State table — customer portal tenant context (Sprint 54)
+
+| UI state | URL | Session | Desk |
+| --- | --- | --- | --- |
+| Picker | `/` | none / cleared | no workforce |
+| Desk | `/t/{slug}` | `{ id, slug, name }` | theme + workforce for slug |
+| Legacy preselect | `/?tenant_id=` → redirect | set after resolve | same as desk |
+
+See DES-0049, ER Sprint 54, API Sprint 54, UX C54.
