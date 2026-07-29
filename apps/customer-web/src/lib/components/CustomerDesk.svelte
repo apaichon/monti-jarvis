@@ -118,10 +118,13 @@
   let audioOpen = $state(true);
   let audioTesting = $state(false);
   let micLevel = $state(0);
-  let openPanel = $state<'notifications' | 'language' | 'security' | 'about' | ''>('');
+  let speakerLevel = $state(0);
   let appVersion = $state('');
+  let signedInAt = $state<number | null>(null);
+  let lastActiveAt = $state<number | null>(null);
   let audioTestStream: MediaStream | null = null;
   let audioTestRaf = 0;
+  let audioTestCtx: AudioContext | null = null;
   let customer = $state<CustomerProfile | null>(null);
   let customerEmail = $state('');
   let customerName = $state('');
@@ -173,6 +176,10 @@
       // Always apply result so a stale sessionStorage profile without a valid
       // cookie/token cannot unlock Start call.
       customer = profile;
+      if (profile) {
+        signedInAt = Date.now();
+        lastActiveAt = Date.now();
+      }
       void refreshPortalState();
     });
     try {
@@ -244,10 +251,6 @@
     await refreshAudioDevices(requestPermission);
   }
 
-  function togglePanel(id: typeof openPanel) {
-    openPanel = openPanel === id ? '' : id;
-  }
-
   function stopAudioTest() {
     if (audioTestRaf) cancelAnimationFrame(audioTestRaf);
     audioTestRaf = 0;
@@ -255,8 +258,13 @@
       for (const t of audioTestStream.getTracks()) t.stop();
       audioTestStream = null;
     }
+    if (audioTestCtx) {
+      void audioTestCtx.close().catch(() => {});
+      audioTestCtx = null;
+    }
     audioTesting = false;
     micLevel = 0;
+    speakerLevel = 0;
   }
 
   async function startAudioTest() {
@@ -276,25 +284,52 @@
       };
       audioTestStream = await navigator.mediaDevices.getUserMedia(constraints);
       const ctx = new AudioContext();
+      audioTestCtx = ctx;
       const source = ctx.createMediaStreamSource(audioTestStream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       source.connect(analyser);
+
+      // Soft tone on selected speaker path when setSinkId is available.
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.04;
+      osc.frequency.value = 660;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const sink = ctx as AudioContext & { setSinkId?: (id: string) => Promise<void> };
+      if (selectedSpeakerId && typeof sink.setSinkId === 'function') {
+        try {
+          await sink.setSinkId(selectedSpeakerId);
+        } catch {
+          /* default output */
+        }
+      }
+      osc.start();
+      window.setTimeout(() => {
+        try {
+          osc.stop();
+        } catch {
+          /* already stopped */
+        }
+      }, 450);
+
       const data = new Uint8Array(analyser.frequencyBinCount);
       audioTesting = true;
-      audioNote = 'Testing microphone… speak now.';
-      const tick = () => {
+      audioNote = 'Testing… speak into the mic. A short tone played on the speaker.';
+      const loop = () => {
         analyser.getByteFrequencyData(data);
         let sum = 0;
         for (const v of data) sum += v;
-        micLevel = Math.min(100, Math.round((sum / data.length / 255) * 140));
-        audioTestRaf = requestAnimationFrame(tick);
+        const level = Math.min(100, Math.round((sum / data.length / 255) * 140));
+        micLevel = level;
+        speakerLevel = Math.max(level * 0.65, audioTesting ? 25 : 0);
+        audioTestRaf = requestAnimationFrame(loop);
       };
-      tick();
+      loop();
       window.setTimeout(() => {
         if (audioTesting) {
           stopAudioTest();
-          void ctx.close().catch(() => {});
           audioNote = 'Audio test finished. Mic and speaker look ready.';
         }
       }, 6000);
@@ -315,9 +350,25 @@
     return audioOutputs.find((d) => d.deviceId === selectedSpeakerId)?.label || 'Default speaker';
   }
 
+  function touchActivity() {
+    lastActiveAt = Date.now();
+  }
+
+  function formatLastActive(ts: number | null): string {
+    if (!ts) return 'just now';
+    const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (sec < 45) return 'just now';
+    if (sec < 90) return '1 min ago';
+    if (sec < 3600) return `${Math.floor(sec / 60)} mins ago`;
+    if (sec < 7200) return '1 hour ago';
+    return `${Math.floor(sec / 3600)} hours ago`;
+  }
+
   const onlineLabel = $derived(
     systemLiveKind === 'ok' ? 'Online' : systemLiveKind === 'issues' ? 'Limited' : systemLiveKind === 'offline' ? 'Offline' : 'Checking…'
   );
+  const roleLabel = $derived(customer?.role === 'customer' ? 'Customer' : customer?.role || 'Guest');
+  const lastActiveLabel = $derived(formatLastActive(lastActiveAt));
 
   function agentInitial(name?: string) {
     return (name || 'A').slice(0, 1).toUpperCase();
@@ -807,6 +858,8 @@
         otp: otp.trim()
       }, tenantId ? { tenantId } : undefined);
       customer = res.customer;
+      signedInAt = Date.now();
+      lastActiveAt = Date.now();
       customerEmail = '';
       customerName = '';
       otp = '';
@@ -823,6 +876,8 @@
   async function signOutCustomer() {
     await logoutCustomer();
     customer = null;
+    signedInAt = null;
+    lastActiveAt = null;
     authStatus = 'Signed out';
     await refreshPortalState();
   }
@@ -983,38 +1038,47 @@
     {#if showCallDetails}
       <!-- 3. Quick actions -->
       <nav class="quick-actions" aria-label="Quick actions">
-        <button type="button" class="qa-btn" disabled={!onChangeTenant || live} onclick={() => onChangeTenant?.()}>
-          <span class="qa-ico" aria-hidden="true">🏢</span>
+        <button type="button" class="qa-btn" disabled={!onChangeTenant || live} onclick={() => { touchActivity(); onChangeTenant?.(); }}>
+          <span class="qa-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M4 20V9l8-5 8 5v11h-5v-6H9v6H4z"/></svg>
+          </span>
           <span>My tenants</span>
         </button>
         <button
           type="button"
           class="qa-btn"
           onclick={() => {
+            touchActivity();
             void openAudioSettings(true).then(() => void startAudioTest());
           }}
         >
-          <span class="qa-ico" aria-hidden="true">🎧</span>
+          <span class="qa-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zm-7 9a1 1 0 0 1 2 0 5 5 0 0 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.9V21h3a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h3v-2.1A7 7 0 0 1 5 12z"/></svg>
+          </span>
           <span>Audio test</span>
         </button>
         <button
           type="button"
           class="qa-btn"
           onclick={() => {
-            const el = document.getElementById('desk-account');
-            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            touchActivity();
+            document.getElementById('desk-account')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           }}
         >
-          <span class="qa-ico" aria-hidden="true">👤</span>
+          <span class="qa-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-8 2-8 5v1h16v-1c0-3-4-5-8-5z"/></svg>
+          </span>
           <span>Profile</span>
         </button>
-        <button type="button" class="qa-btn" onclick={() => void openAudioSettings(true)}>
-          <span class="qa-ico" aria-hidden="true">⚙️</span>
+        <button type="button" class="qa-btn" onclick={() => { touchActivity(); void openAudioSettings(true); }}>
+          <span class="qa-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.1 12.9a7.5 7.5 0 0 0 .1-1.8l2-1.5-2-3.5-2.4 1a7.5 7.5 0 0 0-1.6-.9L14.8 3h-4l-.4 2.7a7.5 7.5 0 0 0-1.6.9l-2.4-1-2 3.5 2 1.5a7.5 7.5 0 0 0-.1 1.8l-2 1.5 2 3.5 2.4-1a7.5 7.5 0 0 0 1.6.9l.4 2.7h4l.4-2.7a7.5 7.5 0 0 0 1.6-.9l2.4 1 2-3.5-2-1.5zM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5z"/></svg>
+          </span>
           <span>Settings</span>
         </button>
       </nav>
 
-      <!-- 4. Audio settings (collapsible) — mic/speaker selectable -->
+      <!-- 4. Audio settings (collapsible) -->
       <section id="desk-audio-settings" class="voice-card audio-card" aria-label="Audio settings">
         <button
           type="button"
@@ -1025,9 +1089,14 @@
           }}
           aria-expanded={audioOpen}
         >
-          <div>
-            <strong>🔊 Audio settings</strong>
-            <p>Configure your microphone and speaker</p>
+          <div class="collapse-title">
+            <span class="collapse-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2A3.5 3.5 0 0 0 16.5 12zM14 4.2v2.1a6 6 0 0 1 0 11.4v2.1a8 8 0 0 0 0-15.6z"/></svg>
+            </span>
+            <div>
+              <strong>AUDIO SETTINGS</strong>
+              <p>Configure your microphone and speaker</p>
+            </div>
           </div>
           <span class="chev">{audioOpen ? '⌃' : '⌄'}</span>
         </button>
@@ -1035,12 +1104,14 @@
           <div class="audio-body">
             <div class="audio-field audio-device-row">
               <div class="audio-device-label">
-                <span class="dev-ico" aria-hidden="true">🎤</span>
-                <span>
+                <span class="dev-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg>
+                </span>
+                <span class="dev-copy">
                   <b>Microphone</b>
                   <small>{selectedMicLabel()}</small>
                 </span>
-                <span class="level-bars" aria-hidden="true">
+                <span class="level-bars" aria-hidden="true" title="Live mic level">
                   {#each [0, 1, 2, 3, 4] as i}
                     <i class:on={micLevel > i * 18}></i>
                   {/each}
@@ -1049,7 +1120,11 @@
               <select
                 bind:value={selectedMicId}
                 disabled={live}
-                onchange={(e) => onMicChange((e.currentTarget as HTMLSelectElement).value)}
+                aria-label="Microphone device"
+                onchange={(e) => {
+                  touchActivity();
+                  onMicChange((e.currentTarget as HTMLSelectElement).value);
+                }}
               >
                 {#if audioInputs.length === 0}
                   <option value="">Default microphone</option>
@@ -1063,21 +1138,27 @@
 
             <div class="audio-field audio-device-row">
               <div class="audio-device-label">
-                <span class="dev-ico" aria-hidden="true">🔈</span>
-                <span>
+                <span class="dev-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2A3.5 3.5 0 0 0 16.5 12z"/></svg>
+                </span>
+                <span class="dev-copy">
                   <b>Speaker</b>
                   <small>{selectedSpeakerLabel()}</small>
                 </span>
-                <span class="level-bars idle" aria-hidden="true">
+                <span class="level-bars" class:idle={!audioTesting} aria-hidden="true" title="Speaker activity">
                   {#each [0, 1, 2, 3, 4] as i}
-                    <i class:on={i < 3}></i>
+                    <i class:on={speakerLevel > i * 18 || (!audioTesting && i < 3)}></i>
                   {/each}
                 </span>
               </div>
               <select
                 bind:value={selectedSpeakerId}
                 disabled={live || !speakerSelectable}
-                onchange={(e) => onSpeakerChange((e.currentTarget as HTMLSelectElement).value)}
+                aria-label="Speaker device"
+                onchange={(e) => {
+                  touchActivity();
+                  onSpeakerChange((e.currentTarget as HTMLSelectElement).value);
+                }}
               >
                 {#if !speakerSelectable}
                   <option value="">System default speaker</option>
@@ -1090,27 +1171,46 @@
                 {/if}
               </select>
               {#if !speakerSelectable}
-                <p class="voice-state">Speaker pick needs a browser that supports output devices (e.g. Chrome).</p>
+                <p class="voice-state">Speaker selection needs Chrome/Edge (setSinkId). Mic selection still works.</p>
               {/if}
             </div>
 
+            <div class="audio-actions">
+              <button
+                class="ghost-btn"
+                type="button"
+                disabled={audioBusy}
+                onclick={() => {
+                  touchActivity();
+                  void refreshAudioDevices(true);
+                }}
+              >
+                {audioBusy ? 'Refreshing…' : '↻ Refresh devices'}
+              </button>
+            </div>
+
             <div class="audio-test-row">
-              <div>
-                <strong>Test your audio</strong>
-                <p>Make sure your mic and speaker work properly.</p>
+              <div class="audio-test-copy">
+                <span class="dev-ico wave" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 12h2v4H4v-4zm4-4h2v12H8V8zm4-3h2v18h-2V5zm4 5h2v8h-2v-8zm4-2h2v12h-2V8z"/></svg>
+                </span>
+                <div>
+                  <strong>Test your audio</strong>
+                  <p>Make sure your mic and speaker work properly.</p>
+                </div>
               </div>
-              <button class="voice-button test-btn" type="button" disabled={live} onclick={() => void startAudioTest()}>
+              <button
+                class="voice-button test-btn"
+                type="button"
+                disabled={live}
+                onclick={() => {
+                  touchActivity();
+                  void startAudioTest();
+                }}
+              >
                 {audioTesting ? 'Stop test' : 'Start test'}
               </button>
             </div>
-            <button
-              class="plain-button"
-              type="button"
-              disabled={audioBusy}
-              onclick={() => void refreshAudioDevices(true)}
-            >
-              {audioBusy ? 'Loading devices…' : 'Refresh device list'}
-            </button>
             {#if audioNote}
               <div class="voice-state">{audioNote}</div>
             {/if}
@@ -1118,7 +1218,7 @@
         {/if}
       </section>
 
-      <!-- Avatar + start call (above notifications) -->
+      <!-- Avatar + start call -->
       {#if !hideAgentSurfaceBeforeLogin}
         <section class="voice-card call-card">
           <div class="agent-select-row">
@@ -1134,7 +1234,10 @@
                 class="picker-trigger picker-trigger-compact"
                 type="button"
                 disabled={!canOpenPicker}
-                onclick={() => (pickerOpen = true)}
+                onclick={() => {
+                  touchActivity();
+                  pickerOpen = true;
+                }}
               >
                 Change avatar
               </button>
@@ -1143,7 +1246,10 @@
                 class="picker-trigger picker-trigger-wide"
                 type="button"
                 disabled={!canOpenPicker}
-                onclick={() => (pickerOpen = true)}
+                onclick={() => {
+                  touchActivity();
+                  pickerOpen = true;
+                }}
               >
                 Choose avatar
               </button>
@@ -1158,7 +1264,10 @@
               class:live={live}
               type="button"
               disabled={busy || authRequired || quotaExhausted}
-              onclick={toggleCall}
+              onclick={() => {
+                touchActivity();
+                toggleCall();
+              }}
             >
               {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
             </button>
@@ -1185,55 +1294,26 @@
         </section>
       {/if}
 
-      <!-- 5. Collapsible utility sections (after avatar) -->
-      <div class="util-stack">
-        <button type="button" class="util-row" onclick={() => togglePanel('notifications')} aria-expanded={openPanel === 'notifications'}>
-          <span>🔔 Notifications</span>
-          <span class="chev">{openPanel === 'notifications' ? '⌃' : '⌄'}</span>
-        </button>
-        {#if openPanel === 'notifications'}
-          <div class="util-body">Alert preferences stay on your device for this session. Email alerts follow tenant policy after sign-in.</div>
-        {/if}
-
-        <button type="button" class="util-row" onclick={() => togglePanel('language')} aria-expanded={openPanel === 'language'}>
-          <span>🌐 Language</span>
-          <span class="chev">{openPanel === 'language' ? '⌃' : '⌄'}</span>
-        </button>
-        {#if openPanel === 'language'}
-          <div class="util-body">Conversation language follows the agent and topic. UI labels support EN · TH.</div>
-        {/if}
-
-        <button type="button" class="util-row" onclick={() => togglePanel('security')} aria-expanded={openPanel === 'security'}>
-          <span>🛡️ Security</span>
-          <span class="chev">{openPanel === 'security' ? '⌃' : '⌄'}</span>
-        </button>
-        {#if openPanel === 'security'}
-          <div class="util-body">Your call data is tenant-scoped and encrypted in transit. Sign out clears this browser session.</div>
-        {/if}
-
-        <button type="button" class="util-row" onclick={() => togglePanel('about')} aria-expanded={openPanel === 'about'}>
-          <span>ℹ️ About</span>
-          <span class="chev">{openPanel === 'about' ? '⌃' : '⌄'}</span>
-        </button>
-        {#if openPanel === 'about'}
-          <div class="util-body">Monti AI Call Center{appVersion ? ` · ${appVersion}` : ''}. Multi-tenant inbound chat and voice.</div>
-        {/if}
-      </div>
-
-      <!-- 6. Account / sign-in -->
+      <!-- 5. User account -->
       <section id="desk-account" class={`voice-card auth-card ${callStarted ? 'auth-card-compact' : ''}`} aria-label="Customer account">
         {#if customer}
           <div class="account-card">
-            <div class="account-avatar">{customerLabel.slice(0, 1).toUpperCase()}</div>
+            <div class="account-avatar" aria-hidden="true" title={customer.display_name || customer.email}>
+              {(customer.display_name || customer.email || 'U').slice(0, 1).toUpperCase()}
+            </div>
             <div class="account-meta">
               <div class="account-name-row">
-                <strong>{customerLabel}</strong>
-                <span class="agent-badge">Customer</span>
+                <strong>{customer.display_name || customerLabel}</strong>
+                <span class="agent-badge">{roleLabel}</span>
               </div>
               <div class="voice-state customer-meta">{customer.email}</div>
-              <div class="voice-state customer-meta">Signed in</div>
+              <div class="voice-state customer-meta">
+                Signed in · Last active <em>{lastActiveLabel}</em>
+              </div>
             </div>
-            <button class="voice-button signout-button" type="button" onclick={signOutCustomer}>Sign out</button>
+            <button class="voice-button signout-button" type="button" onclick={() => void signOutCustomer()}>
+              Sign out
+            </button>
           </div>
         {:else}
           <form onsubmit={challengeId ? verifyOTP : sendOTP} style="display:grid;gap:10px">
@@ -1282,10 +1362,13 @@
         {/if}
       </section>
 
-      <!-- 7. Footer -->
+      <!-- 6. Footer -->
       <footer class="desk-footer">
-        <span>🛡️ Your data is encrypted and secure.</span>
-        <span>{appVersion || 'Monti'}</span>
+        <span class="footer-secure">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm0 10.9 4-2.3V7.1L12 9.4 8 7.1v3.5l4 2.3z"/></svg>
+          Your data is encrypted and secure.
+        </span>
+        <span class="footer-version">{appVersion || 'Monti'}</span>
       </footer>
     {/if}
 

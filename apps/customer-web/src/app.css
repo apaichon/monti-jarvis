@@ -374,11 +374,6 @@ button {
   cursor: not-allowed;
 }
 
-.qa-ico {
-  font-size: 1rem;
-  line-height: 1;
-}
-
 .audio-card {
   display: grid;
   gap: 0;
@@ -401,10 +396,99 @@ button {
   cursor: pointer;
 }
 
+.collapse-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.collapse-ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--cyan);
+  background: rgb(0 110 255 / 14%);
+  border: 1px solid rgb(0 183 255 / 22%);
+  flex-shrink: 0;
+}
+
+.collapse-head strong {
+  letter-spacing: 0.06em;
+  font-size: 0.82rem;
+}
+
 .collapse-head p {
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.qa-ico {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--cyan);
+  background: rgb(0 110 255 / 12%);
+  border: 1px solid rgb(0 183 255 / 20%);
+}
+
+.qa-ico svg {
+  display: block;
+}
+
+.ghost-btn {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--cyan);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.ghost-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.audio-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.audio-test-copy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dev-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.footer-secure {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-version {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.account-meta em {
+  color: var(--cyan);
+  font-style: normal;
+  font-weight: 600;
 }
 
 .chev {
