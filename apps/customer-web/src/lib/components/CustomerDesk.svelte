@@ -235,6 +235,15 @@
     storeOutputDeviceId(id);
   }
 
+  /** Open audio panel and load devices so mic/speaker can actually be chosen. */
+  async function openAudioSettings(requestPermission = true) {
+    audioOpen = true;
+    await tick();
+    const el = document.getElementById('desk-audio-settings');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    await refreshAudioDevices(requestPermission);
+  }
+
   function togglePanel(id: typeof openPanel) {
     openPanel = openPanel === id ? '' : id;
   }
@@ -982,8 +991,7 @@
           type="button"
           class="qa-btn"
           onclick={() => {
-            audioOpen = true;
-            void startAudioTest();
+            void openAudioSettings(true).then(() => void startAudioTest());
           }}
         >
           <span class="qa-ico" aria-hidden="true">🎧</span>
@@ -1000,15 +1008,23 @@
           <span class="qa-ico" aria-hidden="true">👤</span>
           <span>Profile</span>
         </button>
-        <button type="button" class="qa-btn" onclick={() => (audioOpen = !audioOpen)}>
+        <button type="button" class="qa-btn" onclick={() => void openAudioSettings(true)}>
           <span class="qa-ico" aria-hidden="true">⚙️</span>
           <span>Settings</span>
         </button>
       </nav>
 
-      <!-- 4. Audio settings (collapsible) -->
-      <section class="voice-card audio-card" aria-label="Audio settings">
-        <button type="button" class="collapse-head" onclick={() => (audioOpen = !audioOpen)} aria-expanded={audioOpen}>
+      <!-- 4. Audio settings (collapsible) — mic/speaker selectable -->
+      <section id="desk-audio-settings" class="voice-card audio-card" aria-label="Audio settings">
+        <button
+          type="button"
+          class="collapse-head"
+          onclick={() => {
+            if (audioOpen) audioOpen = false;
+            else void openAudioSettings(true);
+          }}
+          aria-expanded={audioOpen}
+        >
           <div>
             <strong>🔊 Audio settings</strong>
             <p>Configure your microphone and speaker</p>
@@ -1017,8 +1033,8 @@
         </button>
         {#if audioOpen}
           <div class="audio-body">
-            <label class="audio-field audio-device-row">
-              <span class="audio-device-label">
+            <div class="audio-field audio-device-row">
+              <div class="audio-device-label">
                 <span class="dev-ico" aria-hidden="true">🎤</span>
                 <span>
                   <b>Microphone</b>
@@ -1029,10 +1045,10 @@
                     <i class:on={micLevel > i * 18}></i>
                   {/each}
                 </span>
-              </span>
+              </div>
               <select
-                value={selectedMicId}
-                disabled={audioBusy || live}
+                bind:value={selectedMicId}
+                disabled={live}
                 onchange={(e) => onMicChange((e.currentTarget as HTMLSelectElement).value)}
               >
                 {#if audioInputs.length === 0}
@@ -1043,10 +1059,10 @@
                   {/each}
                 {/if}
               </select>
-            </label>
+            </div>
 
-            <label class="audio-field audio-device-row">
-              <span class="audio-device-label">
+            <div class="audio-field audio-device-row">
+              <div class="audio-device-label">
                 <span class="dev-ico" aria-hidden="true">🔈</span>
                 <span>
                   <b>Speaker</b>
@@ -1057,10 +1073,10 @@
                     <i class:on={i < 3}></i>
                   {/each}
                 </span>
-              </span>
+              </div>
               <select
-                value={selectedSpeakerId}
-                disabled={audioBusy || !speakerSelectable || live}
+                bind:value={selectedSpeakerId}
+                disabled={live || !speakerSelectable}
                 onchange={(e) => onSpeakerChange((e.currentTarget as HTMLSelectElement).value)}
               >
                 {#if !speakerSelectable}
@@ -1073,17 +1089,28 @@
                   {/each}
                 {/if}
               </select>
-            </label>
+              {#if !speakerSelectable}
+                <p class="voice-state">Speaker pick needs a browser that supports output devices (e.g. Chrome).</p>
+              {/if}
+            </div>
 
             <div class="audio-test-row">
               <div>
                 <strong>Test your audio</strong>
                 <p>Make sure your mic and speaker work properly.</p>
               </div>
-              <button class="voice-button test-btn" type="button" disabled={audioBusy || live} onclick={() => void startAudioTest()}>
+              <button class="voice-button test-btn" type="button" disabled={live} onclick={() => void startAudioTest()}>
                 {audioTesting ? 'Stop test' : 'Start test'}
               </button>
             </div>
+            <button
+              class="plain-button"
+              type="button"
+              disabled={audioBusy}
+              onclick={() => void refreshAudioDevices(true)}
+            >
+              {audioBusy ? 'Loading devices…' : 'Refresh device list'}
+            </button>
             {#if audioNote}
               <div class="voice-state">{audioNote}</div>
             {/if}
@@ -1091,7 +1118,74 @@
         {/if}
       </section>
 
-      <!-- 5. Collapsible utility sections -->
+      <!-- Avatar + start call (above notifications) -->
+      {#if !hideAgentSurfaceBeforeLogin}
+        <section class="voice-card call-card">
+          <div class="agent-select-row">
+            {#if selectedAgent}
+              <div class="selected-agent" style="--assistant-color:{selectedAgent.color}">
+                <div class="agent-dot">{agentInitial(selectedAgent.name)}</div>
+                <div class="selected-agent-copy">
+                  <strong>{selectedAgent.name}</strong>
+                  <span>{selectedAgent.role}</span>
+                </div>
+              </div>
+              <button
+                class="picker-trigger picker-trigger-compact"
+                type="button"
+                disabled={!canOpenPicker}
+                onclick={() => (pickerOpen = true)}
+              >
+                Change avatar
+              </button>
+            {:else}
+              <button
+                class="picker-trigger picker-trigger-wide"
+                type="button"
+                disabled={!canOpenPicker}
+                onclick={() => (pickerOpen = true)}
+              >
+                Choose avatar
+              </button>
+            {/if}
+          </div>
+          <div class="voice-row">
+            <div class="status-pill" class:warning={callTimerWarning}>
+              {callTimerLabel}
+            </div>
+            <button
+              class="voice-button"
+              class:live={live}
+              type="button"
+              disabled={busy || authRequired || quotaExhausted}
+              onclick={toggleCall}
+            >
+              {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
+            </button>
+          </div>
+          {#if busy && !live}
+            <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
+          {:else}
+            <div class="voice-state">{voiceState}</div>
+          {/if}
+          <div class="voice-state">Quota · {quotaLabel}</div>
+        </section>
+      {/if}
+
+      {#if selectedAgent && !hideAgentSurfaceBeforeLogin}
+        <section class="assistant-orb">
+          <div class="halo" style="--assistant-color:{selectedAgent.color}">
+            <Portrait agent={selectedAgent} speaking={live} {tone} />
+          </div>
+          <div class="assistant-name">
+            <h2>{selectedAgent.name}</h2>
+            <p>{selectedAgent.role} · {selectedAgent.trait}</p>
+          </div>
+          <Waveform color={selectedAgent.color} />
+        </section>
+      {/if}
+
+      <!-- 5. Collapsible utility sections (after avatar) -->
       <div class="util-stack">
         <button type="button" class="util-row" onclick={() => togglePanel('notifications')} aria-expanded={openPanel === 'notifications'}>
           <span>🔔 Notifications</span>
@@ -1199,72 +1293,6 @@
       <section class="voice-card auth-required-card">
         <strong>Sign in required</strong>
         <div class="voice-state">Verify your email OTP to unlock AI agents and Start call.</div>
-      </section>
-    {/if}
-
-    {#if showCallDetails && !hideAgentSurfaceBeforeLogin}
-      <section class="voice-card call-card">
-        <div class="agent-select-row">
-          {#if selectedAgent}
-            <div class="selected-agent" style="--assistant-color:{selectedAgent.color}">
-              <div class="agent-dot">{agentInitial(selectedAgent.name)}</div>
-              <div class="selected-agent-copy">
-                <strong>{selectedAgent.name}</strong>
-                <span>{selectedAgent.role}</span>
-              </div>
-            </div>
-            <button
-              class="picker-trigger picker-trigger-compact"
-              type="button"
-              disabled={!canOpenPicker}
-              onclick={() => (pickerOpen = true)}
-            >
-              Change avatar
-            </button>
-          {:else}
-            <button
-              class="picker-trigger picker-trigger-wide"
-              type="button"
-              disabled={!canOpenPicker}
-              onclick={() => (pickerOpen = true)}
-            >
-              Choose avatar
-            </button>
-          {/if}
-        </div>
-        <div class="voice-row">
-          <div class="status-pill" class:warning={callTimerWarning}>
-            {callTimerLabel}
-          </div>
-          <button
-            class="voice-button"
-            class:live={live}
-            type="button"
-            disabled={busy || authRequired || quotaExhausted}
-            onclick={toggleCall}
-          >
-            {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
-          </button>
-        </div>
-        {#if busy && !live}
-          <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
-        {:else}
-          <div class="voice-state">{voiceState}</div>
-        {/if}
-        <div class="voice-state">Quota · {quotaLabel}</div>
-      </section>
-    {/if}
-
-    {#if selectedAgent && !hideAgentSurfaceBeforeLogin}
-      <section class="assistant-orb">
-        <div class="halo" style="--assistant-color:{selectedAgent.color}">
-          <Portrait agent={selectedAgent} speaking={live} {tone} />
-        </div>
-        <div class="assistant-name">
-          <h2>{selectedAgent.name}</h2>
-          <p>{selectedAgent.role} · {selectedAgent.trait}</p>
-        </div>
-        <Waveform color={selectedAgent.color} />
       </section>
     {/if}
   </aside>
