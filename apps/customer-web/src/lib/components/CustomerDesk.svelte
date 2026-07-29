@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { listPublicBrands, type PublicBrand } from '$lib/api/brands';
   import Portrait from '$lib/components/Portrait.svelte';
   import Waveform from '$lib/components/Waveform.svelte';
   import {
@@ -119,6 +120,7 @@
   let audioTesting = $state(false);
   let micLevel = $state(0);
   let speakerLevel = $state(0);
+  let tenantItems = $state<PublicBrand[]>([]);
   let appVersion = $state('');
   let signedInAt = $state<number | null>(null);
   let lastActiveAt = $state<number | null>(null);
@@ -193,6 +195,7 @@
     selectedMicId = getStoredInputDeviceId();
     selectedSpeakerId = getStoredOutputDeviceId();
     speakerSelectable = supportsSpeakerSelection();
+    void loadTenantSwitcher();
     void refreshAudioDevices(false);
     void fetch('/api/version')
       .then((r) => (r.ok ? r.json() : null))
@@ -229,6 +232,27 @@
       audioNote = friendlyMediaError(err);
     } finally {
       audioBusy = false;
+    }
+  }
+
+  async function loadTenantSwitcher() {
+    try {
+      const res = await listPublicBrands({ limit: 8 });
+      tenantItems = res.items;
+      const selected = res.items.find((item) => item.id === tenantId || item.slug === tenantSlug);
+      if (
+        selected?.logo_url &&
+        (!brand.logo_url || brand.logo_url.includes('monti-logo'))
+      ) {
+        brand = {
+          ...brand,
+          brand_name: selected.name || brand.brand_name,
+          logo_url: selected.logo_url,
+          logo_alt: selected.name || brand.logo_alt
+        };
+      }
+    } catch {
+      tenantItems = [];
     }
   }
 
@@ -516,6 +540,38 @@
       addMessage('assistant', agent.greeting, agentInitial(agent.name));
       showTone(agent.greeting);
     }
+  }
+
+  async function callAgentNow(agent: Agent) {
+    touchActivity();
+    if (busy) return;
+    if (selectedAgent?.id !== agent.id) {
+      await selectAgent(agent);
+      await tick();
+    }
+    if (live && selectedAgent?.id === agent.id) {
+      await endActiveCall();
+      return;
+    }
+    if (!live) await startCall();
+  }
+
+  function switchTenant(item: PublicBrand) {
+    touchActivity();
+    if (live) return;
+    const slug = item.slug || item.id;
+    if (!slug || slug === tenantSlug || item.id === tenantId) return;
+    window.location.href = `/t/${encodeURIComponent(slug)}`;
+  }
+
+  function openTenantDirectory() {
+    touchActivity();
+    if (live) return;
+    if (onChangeTenant) {
+      onChangeTenant();
+      return;
+    }
+    window.location.href = '/';
   }
 
   async function persistTurn(callId: string, role: string, content: string) {
@@ -820,11 +876,6 @@
       : 'Select an agent, then start an inbound voice call.';
   }
 
-  async function toggleCall() {
-    if (live) await endActiveCall();
-    else await startCall();
-  }
-
   async function sendOTP(event: Event) {
     event.preventDefault();
     authBusy = true;
@@ -951,7 +1002,6 @@
   );
   const callStarted = $derived(live || !!session);
   const customerLabel = $derived(customer?.display_name || customer?.email || 'Customer');
-  const canOpenPicker = $derived(!live && !authRequired && !quotaExhausted && agents.length > 0);
   const showCallDetails = $derived(!callStarted || callControlsExpanded);
   // Hide agent picker, Start call, and orb until the customer is signed in.
   const hideAgentSurfaceBeforeLogin = $derived(authRequired && !callStarted);
@@ -1035,50 +1085,46 @@
       </section>
     {/if}
 
-    {#if showCallDetails}
-      <!-- 3. Quick actions -->
-      <nav class="quick-actions" aria-label="Quick actions">
-        <button type="button" class="qa-btn" disabled={!onChangeTenant || live} onclick={() => { touchActivity(); onChangeTenant?.(); }}>
-          <span class="qa-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M4 20V9l8-5 8 5v11h-5v-6H9v6H4z"/></svg>
-          </span>
-          <span>My tenants</span>
-        </button>
-        <button
-          type="button"
-          class="qa-btn"
-          onclick={() => {
-            touchActivity();
-            void openAudioSettings(true).then(() => void startAudioTest());
-          }}
-        >
-          <span class="qa-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zm-7 9a1 1 0 0 1 2 0 5 5 0 0 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.9V21h3a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h3v-2.1A7 7 0 0 1 5 12z"/></svg>
-          </span>
-          <span>Audio test</span>
-        </button>
-        <button
-          type="button"
-          class="qa-btn"
-          onclick={() => {
-            touchActivity();
-            document.getElementById('desk-account')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }}
-        >
-          <span class="qa-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-8 2-8 5v1h16v-1c0-3-4-5-8-5z"/></svg>
-          </span>
-          <span>Profile</span>
-        </button>
-        <button type="button" class="qa-btn" onclick={() => { touchActivity(); void openAudioSettings(true); }}>
-          <span class="qa-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.1 12.9a7.5 7.5 0 0 0 .1-1.8l2-1.5-2-3.5-2.4 1a7.5 7.5 0 0 0-1.6-.9L14.8 3h-4l-.4 2.7a7.5 7.5 0 0 0-1.6.9l-2.4-1-2 3.5 2 1.5a7.5 7.5 0 0 0-.1 1.8l-2 1.5 2 3.5 2.4-1a7.5 7.5 0 0 0 1.6.9l.4 2.7h4l.4-2.7a7.5 7.5 0 0 0 1.6-.9l2.4 1 2-3.5-2-1.5zM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5z"/></svg>
-          </span>
-          <span>Settings</span>
-        </button>
-      </nav>
+    {#if callStarted && !callControlsExpanded && selectedAgent}
+      <section class="voice-card avatar-call-section live-avatar-section" aria-label="Live avatar">
+        <div class="section-title-row">
+          <span class="section-ico sparkle" aria-hidden="true">✦</span>
+          <div>
+            <strong>AI AVATAR LIVE</strong>
+            <p>{voiceState}</p>
+          </div>
+          <div class="status-pill compact" class:warning={callTimerWarning}>{callTimerLabel}</div>
+        </div>
 
-      <!-- 4. Audio settings (collapsible) -->
+        <div
+          class="avatar-live-stage"
+          class:live={live}
+          class:connecting={busy && !live}
+          style="--assistant-color:{selectedAgent.color}"
+          aria-label={`Live avatar ${selectedAgent.name}`}
+        >
+          <div class="avatar-live-visual" aria-hidden="true">
+            <span class="avatar-pulse-ring ring-a"></span>
+            <span class="avatar-pulse-ring ring-b"></span>
+            <span class="avatar-pulse-ring ring-c"></span>
+            <div class="avatar-live-halo">
+              <Portrait agent={selectedAgent} speaking={live} {tone} />
+            </div>
+          </div>
+          <div class="avatar-live-copy">
+            <strong>{selectedAgent.name}</strong>
+            <span>{selectedAgent.role} · {selectedAgent.trait}</span>
+          </div>
+          <Waveform color={selectedAgent.color} count={34} />
+          <div class="avatar-live-state">
+            {live ? 'Speaking now' : busy ? 'Connecting...' : 'Ready to call'}
+          </div>
+        </div>
+      </section>
+    {/if}
+
+    {#if showCallDetails}
+      <!-- 3. Audio settings (collapsible) -->
       <section id="desk-audio-settings" class="voice-card audio-card" aria-label="Audio settings">
         <button
           type="button"
@@ -1218,60 +1264,97 @@
         {/if}
       </section>
 
-      <!-- Avatar + start call -->
+      <!-- 4. AI avatar call grid -->
       {#if !hideAgentSurfaceBeforeLogin}
-        <section class="voice-card call-card">
-          <div class="agent-select-row">
+        <section class="voice-card avatar-call-section" aria-label="AI avatar call">
+          <div class="section-title-row">
+            <span class="section-ico sparkle" aria-hidden="true">✦</span>
+            <div>
+              <strong>AI AVATAR CALL</strong>
+              <p>Choose an AI avatar to start a conversation</p>
+            </div>
+            <div class="status-pill compact" class:warning={callTimerWarning}>{callTimerLabel}</div>
+          </div>
+
+          {#if agents.length === 0}
+            <div class="voice-state">Sign in to show available AI avatars.</div>
+          {:else}
             {#if selectedAgent}
-              <div class="selected-agent" style="--assistant-color:{selectedAgent.color}">
-                <div class="agent-dot">{agentInitial(selectedAgent.name)}</div>
-                <div class="selected-agent-copy">
+              <div
+                class="avatar-live-stage"
+                class:live={live && selectedAgent}
+                class:connecting={busy && !live}
+                style="--assistant-color:{selectedAgent.color}"
+                aria-label={`Selected avatar ${selectedAgent.name}`}
+              >
+                <div class="avatar-live-visual" aria-hidden="true">
+                  <span class="avatar-pulse-ring ring-a"></span>
+                  <span class="avatar-pulse-ring ring-b"></span>
+                  <span class="avatar-pulse-ring ring-c"></span>
+                  <div class="avatar-live-halo">
+                    <Portrait agent={selectedAgent} speaking={live} {tone} />
+                  </div>
+                </div>
+                <div class="avatar-live-copy">
                   <strong>{selectedAgent.name}</strong>
-                  <span>{selectedAgent.role}</span>
+                  <span>{selectedAgent.role} · {selectedAgent.trait}</span>
+                </div>
+                <Waveform color={selectedAgent.color} count={30} />
+                <div class="avatar-live-state">
+                  {live ? 'Live now' : busy ? 'Connecting...' : 'Ready to call'}
                 </div>
               </div>
-              <button
-                class="picker-trigger picker-trigger-compact"
-                type="button"
-                disabled={!canOpenPicker}
-                onclick={() => {
-                  touchActivity();
-                  pickerOpen = true;
-                }}
-              >
-                Change avatar
-              </button>
-            {:else}
-              <button
-                class="picker-trigger picker-trigger-wide"
-                type="button"
-                disabled={!canOpenPicker}
-                onclick={() => {
-                  touchActivity();
-                  pickerOpen = true;
-                }}
-              >
-                Choose avatar
-              </button>
             {/if}
-          </div>
-          <div class="voice-row">
-            <div class="status-pill" class:warning={callTimerWarning}>
-              {callTimerLabel}
+
+            <div class="avatar-call-grid">
+              {#each agents.slice(0, 4) as agent (agent.id)}
+                <article
+                  class="avatar-call-card"
+                  class:active={selectedAgent?.id === agent.id}
+                  style="--assistant-color:{agent.color}"
+                >
+                  {#if selectedAgent?.id === agent.id}
+                    <span class="avatar-online-dot" aria-label="Selected avatar"></span>
+                  {/if}
+                  <button
+                    class="avatar-select-button"
+                    type="button"
+                    disabled={live}
+                    onclick={() => {
+                      touchActivity();
+                      void selectAgent(agent);
+                    }}
+                  >
+                    <Portrait {agent} />
+                    <strong>{agent.name}</strong>
+                  </button>
+                  <button
+                    class="avatar-call-button"
+                    class:active={selectedAgent?.id === agent.id}
+                    class:live={live && selectedAgent?.id === agent.id}
+                    type="button"
+                    disabled={busy || authRequired || quotaExhausted}
+                    onclick={() => void callAgentNow(agent)}
+                  >
+                    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"
+                      />
+                    </svg>
+                    {live && selectedAgent?.id === agent.id
+                      ? 'End call'
+                      : selectedAgent?.id === agent.id
+                        ? busy
+                          ? 'Connecting…'
+                          : 'Call now'
+                        : 'Call'}
+                  </button>
+                </article>
+              {/each}
             </div>
-            <button
-              class="voice-button"
-              class:live={live}
-              type="button"
-              disabled={busy || authRequired || quotaExhausted}
-              onclick={() => {
-                touchActivity();
-                toggleCall();
-              }}
-            >
-              {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
-            </button>
-          </div>
+          {/if}
+
           {#if busy && !live}
             <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
           {:else}
@@ -1281,20 +1364,59 @@
         </section>
       {/if}
 
-      {#if selectedAgent && !hideAgentSurfaceBeforeLogin}
-        <section class="assistant-orb">
-          <div class="halo" style="--assistant-color:{selectedAgent.color}">
-            <Portrait agent={selectedAgent} speaking={live} {tone} />
+      <!-- 5. My tenants -->
+      <section class="voice-card tenant-switcher-section" aria-label="My tenants">
+        <div class="section-title-row tenant-title-row">
+          <span class="section-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 21V5l8-3v19H3zm10 0V8l8 3v10h-8zM6 8h2v2H6V8zm0 4h2v2H6v-2zm0 4h2v2H6v-2zm10-3h2v2h-2v-2zm0 4h2v2h-2v-2z"/></svg>
+          </span>
+          <div>
+            <strong>MY TENANTS</strong>
+            <p>Manage and switch between your tenants</p>
           </div>
-          <div class="assistant-name">
-            <h2>{selectedAgent.name}</h2>
-            <p>{selectedAgent.role} · {selectedAgent.trait}</p>
-          </div>
-          <Waveform color={selectedAgent.color} />
-        </section>
-      {/if}
+          <button class="tenant-next" type="button" disabled={live} onclick={openTenantDirectory} aria-label="Open tenant directory">›</button>
+        </div>
 
-      <!-- 5. User account -->
+        <div class="tenant-switcher-grid">
+          {#if tenantItems.length > 0}
+            {#each tenantItems.slice(0, 4) as item (item.id)}
+              <button
+                type="button"
+                class="tenant-mini-card"
+                class:active={item.slug === tenantSlug || item.id === tenantId}
+                disabled={live}
+                onclick={() => switchTenant(item)}
+              >
+                <span class="tenant-mini-logo">
+                  {#if item.logo_url && !item.logo_url.includes('monti-logo')}
+                    <img src={item.logo_url} alt="" />
+                  {:else}
+                    <span>{brandMonogram(item.name, item.slug)}</span>
+                  {/if}
+                </span>
+                <strong>{item.name || item.slug}</strong>
+              </button>
+            {/each}
+          {:else}
+            <button type="button" class="tenant-mini-card active" disabled>
+              <span class="tenant-mini-logo">
+                {#if brand.logo_url && !brand.logo_url.includes('monti-logo')}
+                  <img src={brand.logo_url} alt="" />
+                {:else}
+                  <span>{companyMonogram}</span>
+                {/if}
+              </span>
+              <strong>{tenantName || brand.brand_name || tenantLabel}</strong>
+            </button>
+          {/if}
+          <button type="button" class="tenant-mini-card add" disabled={live} onclick={openTenantDirectory}>
+            <span class="tenant-add-plus">＋</span>
+            <strong>Add tenant</strong>
+          </button>
+        </div>
+      </section>
+
+      <!-- 6. User account -->
       <section id="desk-account" class={`voice-card auth-card ${callStarted ? 'auth-card-compact' : ''}`} aria-label="Customer account">
         {#if customer}
           <div class="account-card">
