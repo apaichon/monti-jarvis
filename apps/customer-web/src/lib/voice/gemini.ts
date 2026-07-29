@@ -97,6 +97,10 @@ export class GeminiVoice {
       parentOrigin?: string;
       preferredLang?: PreferredLang;
       lang?: PreferredLang | 'auto';
+      /** Preferred microphone deviceId (Sprint 56). */
+      audioInputId?: string;
+      /** Preferred speaker deviceId when setSinkId is available (Sprint 56). */
+      audioOutputId?: string;
     }
   ) {
     const blocked = micAvailabilityError();
@@ -119,14 +123,20 @@ export class GeminiVoice {
     this.playbackCtx = new AudioContext({ sampleRate: 24000 });
     await Promise.all([this.captureCtx.resume(), this.playbackCtx.resume()]);
 
+    const audioConstraints: MediaTrackConstraints = {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true
+    };
+    const inputId = opts?.audioInputId?.trim();
+    if (inputId) {
+      audioConstraints.deviceId = { ideal: inputId };
+    }
+
     try {
       this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
+        audio: audioConstraints
       });
     } catch (err) {
       const name = err instanceof DOMException ? err.name : '';
@@ -134,7 +144,7 @@ export class GeminiVoice {
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
         await this.cleanup();
         throw new Error(
-          'Microphone permission denied. Click the lock icon in the address bar and allow mic for this site, then try Start call again.'
+          'Microphone access is needed for voice calls. You can still chat. Allow the mic in the address bar and try Start call again.'
         );
       }
       if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
@@ -157,6 +167,19 @@ export class GeminiVoice {
     this.source.connect(this.recorder);
     this.player.connect(this.playbackRecorder);
     this.playbackRecorder.connect(this.playbackCtx.destination);
+
+    // Prefer selected speaker when AudioContext supports setSinkId (Chrome).
+    const outputId = opts?.audioOutputId?.trim();
+    if (outputId) {
+      const ctx = this.playbackCtx as AudioContext & { setSinkId?: (id: string) => Promise<void> };
+      if (typeof ctx.setSinkId === 'function') {
+        try {
+          await ctx.setSinkId(outputId);
+        } catch {
+          /* keep default output */
+        }
+      }
+    }
 
     callbacks.onStatus?.('Connecting to agent (may take a few seconds)…');
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';

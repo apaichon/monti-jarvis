@@ -4711,3 +4711,34 @@ query topic must either be "unknown" or match the normalized topic pattern
 ```
 
 See DES-0051, workflow §127–128, ER Sprint 55, UX T55.
+
+## Sprint 56 — Caller desk branding + audio devices
+
+**Auth:** none for public brand/theme · customer optional bearer unchanged.
+
+### No new endpoints
+
+S56 is client UX + browser media APIs. Reuse:
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/public/brands` | `logo_url`, `name`, `slug` for large cards |
+| GET | `/api/public/brands/{slug}` | Selected brand logo |
+| GET | `/api/public/theme/{tenant_id}` | Published branding for desk chrome |
+
+### Client-only contracts (not HTTP)
+
+| Capability | Browser API | Notes |
+| --- | --- | --- |
+| List devices | `mediaDevices.enumerateDevices` | After permission for labels |
+| Mic capture | `getUserMedia({ audio: { deviceId } })` | ideal/exact per browser |
+| Speaker output | `HTMLMediaElement.setSinkId` | Feature-detect |
+
+### Unchanged
+
+| Surface | Note |
+| --- | --- |
+| Live · OK | Customer-facing system status stays non-technical (S54 polish) |
+| `/t/{slug}` routing | S54 |
+
+See DES-0051, workflow §127–129, ER Sprint 56, UX C56.

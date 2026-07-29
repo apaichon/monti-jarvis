@@ -2780,3 +2780,32 @@ erDiagram
 | invalid / too long | `unknown` or bounded normalized code per DES-0051 |
 
 See DES-0051, workflow §127–128, API Sprint 55, UX T55.
+
+## Sprint 56 — caller desk branding + audio prefs (client-only)
+
+No new Postgres tables. Branding reuses public `brands` / theme fields.
+Audio device preference is browser-local only.
+
+### Client preference keys
+
+| Store | Key | Value |
+| --- | --- | --- |
+| localStorage | `monti_jarvis:audio_input_id` | media deviceId |
+| localStorage | `monti_jarvis:audio_output_id` | media deviceId |
+| sessionStorage | `monti_jarvis:selected_tenant` | S54 tenant context |
+
+### Entities reused (no migration)
+
+| Entity | Field | Use |
+| --- | --- | --- |
+| `brands` | `logo_url`, `name` | Directory + desk company mark |
+| theme publish | `branding.logo_url` | Optional override for desk chrome |
+
+### Future entities
+
+| Entity | Sprint | Status |
+| --- | --- | --- |
+| Server-side audio device registry | — | **out of scope** |
+| Caller desk branding | 56 | **implement S56** (client UX) |
+
+See DES-0051, workflow §127–129, API Sprint 56, UX C56.

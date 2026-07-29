@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S55 commercial/tenant tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
+# Monti AI Call Center — Roadmap (36 core + S37–S56 commercial/tenant/customer UX tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -79,6 +79,7 @@
 | **53** | **Tenant / Customer** | **Tenant settings: auto-register customer when email + OTP is entered in conversation; show app/tag version on UI** | **D+** | **16, 19, 20, 21, 52** · ✅ **v2.26.0** · [FEAT-0046](../01-features/FEAT-0046-conversation-auto-register-app-version.md) · [SPRINT-053](../03-sprints/SPRINT-053.md) · [DES-0050](../02-design/50-conversation-auto-register-app-version-spec.md) |
 | **54** | **Customer / Platform** | **Customer portal: pick tenant from list to call (no `tenant_id` query string required)** | **J** | **1, 5, 6, 20, 21, 38, 53** · ✅ **v2.27.0** · [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md) · [SPRINT-054](../03-sprints/SPRINT-054.md) · [DES-0049](../02-design/49-customer-portal-tenant-list-spec.md) |
 | **55** | **Tenant** | **Call Center Statistics grouped by topic** | **F+** | **22, 25, 30** · ✅ **v2.28.0** · [FEAT-0047](../01-features/FEAT-0047-tenant-call-center-topic-statistics.md) · [SPRINT-055](../03-sprints/SPRINT-055.md) · [DES-0051](../02-design/51-tenant-call-center-topic-statistics-spec.md) · extends [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
+| **56** | **Customer** | **Caller desk UX revamp: mic/speaker device settings; larger Monti + per-company brand logos on call page and tenant list** | **A+** | **1, 5, 39, 54** · ✅ **v2.29.0** · [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · [SPRINT-056](../03-sprints/SPRINT-056.md) · [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) |
 
 ---
 
@@ -1806,3 +1807,96 @@ per call, or platform topic benchmarking.
 
 **Design note:** Prefer extending existing S25 ClickHouse/Postgres stats
 contracts with a `topic` dimension rather than a second analytics product.
+
+---
+
+## Shipped: SPRINT-056 — Caller Desk Branding + Mic/Speaker Settings ✅ v2.29.0
+
+**Platform:** Customer · **Feature:** Revamp customer call desk and tenant/brand
+list for stronger Monti + company brand presence; add microphone and speaker
+device selection for voice · **Depends:** 1, 5, 39, 54 · **Status:** shipped · **Release:** v2.29.0 · **Closed:** 2026-07-29 · **Feature:** [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · **Design:** [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) · **Sprint:** [SPRINT-056](../03-sprints/SPRINT-056.md)
+**Mockups:** [call page](../02-design/mockups/s56-caller-desk-branding/call-page.png) ·
+[tenant list](../02-design/mockups/s56-caller-desk-branding/tenant-list.png) ·
+[composite](../02-design/mockups/s56-caller-desk-branding/new-call-design-composite.png)
+
+### Problem today
+
+After S54, callers pick a brand and enter the desk, but:
+
+1. **Brand identity is small** — company logo and Monti product mark compete with
+   dense controls; mockups show a large Monti hero mark plus a clear selected-
+   company card with logo.
+2. **Tenant list cards under-emphasize logos** — directory should lead with
+   large brand marks (and Monti hero) so multi-company discovery feels like a
+   branded hub, not a text list.
+3. **No mic/speaker settings** — voice calls use the browser default input/
+   output; callers cannot pick microphone or speaker when multiple devices
+   are available (common on desktops and headsets).
+
+### Goal
+
+1. **Call page revamp** — Larger Monti product logo/hero; prominent **selected
+   company logo** and name on the control rail (per mockup).
+2. **Tenant list revamp** — Larger Monti hero + **large per-company logos** on
+   brand cards (per mockup).
+3. **Mic and speaker settings** — Before/during voice, caller can select
+   input (mic) and output (speaker/headphones); persist choice for the session
+   (and optionally local preference).
+
+### Scope
+
+### In
+
+- Customer web visual revamp aligned to mockups (layout, logo scale, brand card).
+- Use published tenant theme branding (`logo_url`, brand name) and Monti product
+  mark assets; fallbacks when logo missing.
+- Device enumeration via browser media APIs (`enumerateDevices`, `getUserMedia`
+  permission prompt as needed).
+- UI: mic select + speaker select (labels EN/TH as needed); apply to Gemini voice
+  / LiveKit capture and playback paths already used by the desk.
+- Session or `localStorage` preference for last mic/speaker device ids.
+- Accessible labels; graceful fallback when device list empty or permission denied.
+- Keep S54 routing (`/`, `/t/{slug}`) and Live · OK system status (non-technical).
+
+### Out
+
+- Changing tenant theme publish pipeline beyond consuming existing public theme.
+- Native mobile OS-only audio routing (beyond browser APIs).
+- Full redesign of OTP/auth flows (layout polish only if needed for logo space).
+- S55 topic statistics.
+- Platform admin CMS for logos (reuse S39 theme / brand profile).
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Call page logo revamp | Large Monti hero + selected company logo card on desk |
+| Tenant list logo revamp | Large Monti hero + large brand logos on directory cards |
+| Mic settings | Select/list input devices; use for voice capture |
+| Speaker settings | Select/list output devices; use for voice playback |
+| Preference persist | Session and/or local last-used device ids |
+| Verification | Logos load per brand A/B; device switch works; denied permission UX |
+
+### Acceptance sketch
+
+1. Tenant list shows a large Monti mark and each company card shows a large
+   brand logo (or monogram fallback), matching mockup intent.
+2. Call desk shows a large Monti product logo and a clear selected-company logo
+   block (not a tiny header chip only).
+3. Caller can open audio settings and choose **microphone** and **speaker**
+   when multiple devices exist.
+4. Starting a voice call uses the selected mic/speaker (or safe default).
+5. Switching brand updates company logo to the newly selected tenant only.
+6. Permission denied / no devices shows clear non-technical messaging (not
+   raw API errors).
+
+**Out (unless pulled in):** Device testing tone generator, noise suppression
+UI, or multi-language voice device naming beyond browser labels.
+
+**Design note:** Prefer client-side device selection wired into existing
+`GeminiVoice` / LiveKit paths; do not invent a server audio device registry.
+Reuse `GET /api/public/theme/{tenant_id}` and public brand `logo_url` for marks.
+
+**Tasks:** TASK-0202 (branding), TASK-0203 (mic/speaker), TASK-0204 (UAT).  
+**Worktree:** `.worktrees/SPRINT-056` · branch `feature/sprint-056-caller-desk-branding-audio`
+

@@ -54,6 +54,7 @@ System design artifacts for Monti Jarvis.
 | 47 | [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md) | 52 | Tenant avatar library create; active cap = package max_ai_employees | **`shipped`** v2.24.0 |
 | 48 | [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md) | 51 | Shared Cloud checkout, Dedicated quotation, billing scheduler, current quota/next bill, and finance documents | **`shipped`** v2.25.0 |
 | 50 | [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md) | 53 | Conversation auto-register email OTP + app version on UI | **`shipped`** v2.26.0 |
+| 51 | [52-caller-desk-branding-audio-devices-spec.md](52-caller-desk-branding-audio-devices-spec.md) | 56 | Caller desk large logos + mic/speaker device settings | **`approved`** |
 | 49 | [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md) | 54 | Customer portal tenant/brand picker; no required `?tenant_id=` | **`shipped`** v2.27.0 |
 | 51 | [51-tenant-call-center-topic-statistics-spec.md](51-tenant-call-center-topic-statistics-spec.md) | 55 | Tenant call-center statistics grouped and filtered by topic | **`shipped`** v2.28.0 |
 
@@ -106,6 +107,8 @@ workflow §120–124; ER/API Sprint 51; UX T51/A51.
 **Sprint 53:** Design pack **approved** — [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md); workflow §120–122; ER/API/UX Sprint 53; UX T53/C53/A53. [SPRINT-053](../03-sprints/SPRINT-053.md) · [FEAT-0045](../01-features/FEAT-0046-conversation-auto-register-app-version.md). Worktree `.worktrees/SPRINT-053`.
 
 **Sprint 52:** ✅ **shipped v2.24.0** — [47-tenant-avatar-create-active-cap-spec.md](47-tenant-avatar-create-active-cap-spec.md); workflow §118–119; ER/API/UX Sprint 52; UX T52. [SPRINT-052](../03-sprints/SPRINT-052.md) · [FEAT-0043](../01-features/FEAT-0043-tenant-avatar-create-active-cap.md).
+
+**Sprint 56:** Design pack **approved** — [52-caller-desk-branding-audio-devices-spec.md](52-caller-desk-branding-audio-devices-spec.md); workflow §127–129; UX C56. [SPRINT-056](../03-sprints/SPRINT-056.md) · [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md).
 
 **Sprint 54:** Design pack **approved** — [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md); workflow §125–126; ER/API/UX Sprint 54; UX C54. [SPRINT-054](../03-sprints/SPRINT-054.md) · [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md).
 

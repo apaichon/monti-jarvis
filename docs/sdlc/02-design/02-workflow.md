@@ -3915,3 +3915,63 @@ sequenceDiagram
 | blank / missing / invalid | `unknown` | Unknown / unset |
 
 See DES-0051, ER Sprint 55, API Sprint 55, UX T55.
+
+## 127. Customer opens branded tenant directory (Sprint 56)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser customer-web
+  participant G as Go :8091
+  participant S as store
+
+  B->>B: Open /
+  B->>G: GET /api/public/brands
+  G->>S: ListPublicBrands
+  S-->>G: items (logo_url, name, slug)
+  G-->>B: 200 items
+  B->>B: Render large Monti hero + brand cards with large logos
+  B->>B: Monogram fallback if logo_url empty
+```
+
+## 128. Customer selects brand and sees desk branding (Sprint 56)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant G as Go :8091
+
+  B->>B: Select brand → /t/{slug}
+  B->>G: GET /api/public/brands/{slug}
+  G-->>B: PublicBrand
+  B->>G: GET /api/public/theme/{tenant_id}
+  G-->>B: published branding
+  B->>B: Large Monti hero + selected company logo card
+  B->>B: Live · OK system status (non-technical)
+```
+
+## 129. Customer sets mic/speaker and starts voice (Sprint 56)
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant MD as mediaDevices
+  participant V as GeminiVoice / LiveKit
+
+  B->>B: Open audio settings
+  B->>MD: getUserMedia (permission if needed)
+  B->>MD: enumerateDevices
+  MD-->>B: audioinput / audiooutput lists
+  B->>B: User picks mic + speaker
+  B->>B: localStorage monti_jarvis:audio_*_id
+  B->>V: start voice with deviceId prefs
+  alt setSinkId supported
+    V->>V: apply output device
+  else not supported
+    V->>V: default output; show gentle note
+  end
+  alt permission denied
+    B->>B: Non-technical error copy
+  end
+```
+
+See DES-0052, ER Sprint 56, API Sprint 56, UX C56.

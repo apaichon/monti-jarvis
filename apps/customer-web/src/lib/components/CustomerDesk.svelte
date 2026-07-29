@@ -40,6 +40,18 @@
     resolveBranding,
     type ThemeBranding
   } from '$lib/theme/applyTheme';
+  import { brandMonogram } from '$lib/brandMark';
+  import {
+    ensureAudioPermission,
+    friendlyMediaError,
+    getStoredInputDeviceId,
+    getStoredOutputDeviceId,
+    listAudioDevices,
+    storeInputDeviceId,
+    storeOutputDeviceId,
+    supportsSpeakerSelection,
+    type AudioDevice
+  } from '$lib/audio/devices';
 
   type Props = {
     tenantId: string;
@@ -93,8 +105,26 @@
   let systemLive = $state('Checking…');
   let systemLiveKind = $state<SystemLiveState>('checking');
   let chatEl: HTMLElement | undefined = $state();
-  let tenantLabel = $derived(tenantName || tenantSlug || tenantId);
   let brand = $state(resolveBranding(null));
+  let tenantLabel = $derived(tenantName || tenantSlug || tenantId);
+  let companyMonogram = $derived(brandMonogram(tenantName || brand.brand_name, tenantSlug));
+  let audioInputs = $state<AudioDevice[]>([]);
+  let audioOutputs = $state<AudioDevice[]>([]);
+  let selectedMicId = $state('');
+  let selectedSpeakerId = $state('');
+  let audioBusy = $state(false);
+  let audioNote = $state('');
+  let speakerSelectable = $state(false);
+  let audioOpen = $state(true);
+  let audioTesting = $state(false);
+  let micLevel = $state(0);
+  let speakerLevel = $state(0);
+  let appVersion = $state('');
+  let signedInAt = $state<number | null>(null);
+  let lastActiveAt = $state<number | null>(null);
+  let audioTestStream: MediaStream | null = null;
+  let audioTestRaf = 0;
+  let audioTestCtx: AudioContext | null = null;
   let customer = $state<CustomerProfile | null>(null);
   let customerEmail = $state('');
   let customerName = $state('');
@@ -146,6 +176,10 @@
       // Always apply result so a stale sessionStorage profile without a valid
       // cookie/token cannot unlock Start call.
       customer = profile;
+      if (profile) {
+        signedInAt = Date.now();
+        lastActiveAt = Date.now();
+      }
       void refreshPortalState();
     });
     try {
@@ -156,7 +190,185 @@
     const infra = await loadInfra();
     systemLiveKind = systemLiveState(infra);
     systemLive = formatSystemLive(infra);
+    selectedMicId = getStoredInputDeviceId();
+    selectedSpeakerId = getStoredOutputDeviceId();
+    speakerSelectable = supportsSpeakerSelection();
+    void refreshAudioDevices(false);
+    void fetch('/api/version')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.version) appVersion = String(data.version);
+      })
+      .catch(() => {});
   });
+
+  async function refreshAudioDevices(requestPermission: boolean) {
+    audioBusy = true;
+    audioNote = '';
+    try {
+      if (requestPermission) {
+        await ensureAudioPermission();
+      }
+      const { inputs, outputs } = await listAudioDevices();
+      audioInputs = inputs;
+      audioOutputs = outputs;
+      if (selectedMicId && !inputs.some((d) => d.deviceId === selectedMicId)) {
+        selectedMicId = inputs[0]?.deviceId || '';
+      } else if (!selectedMicId && inputs[0]) {
+        selectedMicId = inputs[0].deviceId;
+      }
+      if (selectedSpeakerId && !outputs.some((d) => d.deviceId === selectedSpeakerId)) {
+        selectedSpeakerId = outputs[0]?.deviceId || '';
+      } else if (!selectedSpeakerId && outputs[0]) {
+        selectedSpeakerId = outputs[0].deviceId;
+      }
+      if (!speakerSelectable && outputs.length === 0) {
+        audioNote = 'This browser uses the system default speaker.';
+      }
+    } catch (err) {
+      audioNote = friendlyMediaError(err);
+    } finally {
+      audioBusy = false;
+    }
+  }
+
+  function onMicChange(id: string) {
+    selectedMicId = id;
+    storeInputDeviceId(id);
+  }
+
+  function onSpeakerChange(id: string) {
+    selectedSpeakerId = id;
+    storeOutputDeviceId(id);
+  }
+
+  /** Open audio panel and load devices so mic/speaker can actually be chosen. */
+  async function openAudioSettings(requestPermission = true) {
+    audioOpen = true;
+    await tick();
+    const el = document.getElementById('desk-audio-settings');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    await refreshAudioDevices(requestPermission);
+  }
+
+  function stopAudioTest() {
+    if (audioTestRaf) cancelAnimationFrame(audioTestRaf);
+    audioTestRaf = 0;
+    if (audioTestStream) {
+      for (const t of audioTestStream.getTracks()) t.stop();
+      audioTestStream = null;
+    }
+    if (audioTestCtx) {
+      void audioTestCtx.close().catch(() => {});
+      audioTestCtx = null;
+    }
+    audioTesting = false;
+    micLevel = 0;
+    speakerLevel = 0;
+  }
+
+  async function startAudioTest() {
+    if (audioTesting) {
+      stopAudioTest();
+      audioNote = 'Audio test stopped.';
+      return;
+    }
+    audioNote = '';
+    audioBusy = true;
+    try {
+      await refreshAudioDevices(true);
+      const constraints: MediaStreamConstraints = {
+        audio: selectedMicId
+          ? { deviceId: { ideal: selectedMicId }, echoCancellation: true, noiseSuppression: true }
+          : { echoCancellation: true, noiseSuppression: true }
+      };
+      audioTestStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const ctx = new AudioContext();
+      audioTestCtx = ctx;
+      const source = ctx.createMediaStreamSource(audioTestStream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      // Soft tone on selected speaker path when setSinkId is available.
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.04;
+      osc.frequency.value = 660;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const sink = ctx as AudioContext & { setSinkId?: (id: string) => Promise<void> };
+      if (selectedSpeakerId && typeof sink.setSinkId === 'function') {
+        try {
+          await sink.setSinkId(selectedSpeakerId);
+        } catch {
+          /* default output */
+        }
+      }
+      osc.start();
+      window.setTimeout(() => {
+        try {
+          osc.stop();
+        } catch {
+          /* already stopped */
+        }
+      }, 450);
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      audioTesting = true;
+      audioNote = 'Testing… speak into the mic. A short tone played on the speaker.';
+      const loop = () => {
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (const v of data) sum += v;
+        const level = Math.min(100, Math.round((sum / data.length / 255) * 140));
+        micLevel = level;
+        speakerLevel = Math.max(level * 0.65, audioTesting ? 25 : 0);
+        audioTestRaf = requestAnimationFrame(loop);
+      };
+      loop();
+      window.setTimeout(() => {
+        if (audioTesting) {
+          stopAudioTest();
+          audioNote = 'Audio test finished. Mic and speaker look ready.';
+        }
+      }, 6000);
+    } catch (err) {
+      stopAudioTest();
+      audioNote = friendlyMediaError(err);
+    } finally {
+      audioBusy = false;
+    }
+  }
+
+  function selectedMicLabel() {
+    return audioInputs.find((d) => d.deviceId === selectedMicId)?.label || 'Default microphone';
+  }
+
+  function selectedSpeakerLabel() {
+    if (!speakerSelectable) return 'System default speaker';
+    return audioOutputs.find((d) => d.deviceId === selectedSpeakerId)?.label || 'Default speaker';
+  }
+
+  function touchActivity() {
+    lastActiveAt = Date.now();
+  }
+
+  function formatLastActive(ts: number | null): string {
+    if (!ts) return 'just now';
+    const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (sec < 45) return 'just now';
+    if (sec < 90) return '1 min ago';
+    if (sec < 3600) return `${Math.floor(sec / 60)} mins ago`;
+    if (sec < 7200) return '1 hour ago';
+    return `${Math.floor(sec / 3600)} hours ago`;
+  }
+
+  const onlineLabel = $derived(
+    systemLiveKind === 'ok' ? 'Online' : systemLiveKind === 'issues' ? 'Limited' : systemLiveKind === 'offline' ? 'Offline' : 'Checking…'
+  );
+  const roleLabel = $derived(customer?.role === 'customer' ? 'Customer' : customer?.role || 'Guest');
+  const lastActiveLabel = $derived(formatLastActive(lastActiveAt));
 
   function agentInitial(name?: string) {
     return (name || 'A').slice(0, 1).toUpperCase();
@@ -498,7 +710,12 @@
             error = message;
           }
         },
-        { lang: 'auto', tenantId: tenantId || undefined }
+        {
+          lang: 'auto',
+          tenantId: tenantId || undefined,
+          audioInputId: selectedMicId || undefined,
+          audioOutputId: selectedSpeakerId || undefined
+        }
       );
 
       voice = gemini;
@@ -641,6 +858,8 @@
         otp: otp.trim()
       }, tenantId ? { tenantId } : undefined);
       customer = res.customer;
+      signedInAt = Date.now();
+      lastActiveAt = Date.now();
       customerEmail = '';
       customerName = '';
       otp = '';
@@ -657,6 +876,8 @@
   async function signOutCustomer() {
     await logoutCustomer();
     customer = null;
+    signedInAt = null;
+    lastActiveAt = null;
     authStatus = 'Signed out';
     await refreshPortalState();
   }
@@ -744,20 +965,58 @@
     class:live-collapsed={callStarted && !callControlsExpanded}
     class:live-expanded={callStarted && callControlsExpanded}
   >
-    <header class="brand">
-      <img class="brand-mark" src={brand.logo_url} width="46" height="46" alt={brand.logo_alt} />
-      <div>
-        <h1>{brand.brand_name}</h1>
-        <p>{brand.subtitle}</p>
-        {#if tenantLabel}
-          <p>Brand · {tenantLabel}</p>
-        {/if}
-        {#if onChangeTenant && !live}
-          <button class="plain-button change-brand" type="button" onclick={() => onChangeTenant?.()}>
-            ← Brands · เปลี่ยนแบรนด์
-          </button>
-        {/if}
+    <!-- 1. Monti brand header -->
+    <header class="desk-branding">
+      <div class="monti-desk-hero">
+        <div class="monti-desk-ring">
+          <img class="monti-desk-logo" src="/images/monti-logo.png" width="96" height="96" alt="Monti" />
+        </div>
+        <div class="monti-desk-copy">
+          <div class="monti-title-row">
+            <span class="monti-desk-title">MONTI</span>
+            <span
+              class="online-pill"
+              class:ok={systemLiveKind === 'ok'}
+              class:issues={systemLiveKind === 'issues'}
+              class:offline={systemLiveKind === 'offline'}
+            >
+              <i></i>
+              {onlineLabel}
+            </span>
+          </div>
+          <span class="monti-desk-tag">AI CALL CENTER</span>
+          <p class="monti-desk-tagline">Your AI assistant. <em>Always here to help.</em></p>
+        </div>
       </div>
+
+      <!-- 2. Selected tenant -->
+      <section class="company-card" aria-label="Selected brand">
+        <div class="company-card-top">
+          <span class="company-card-label">Selected tenant</span>
+          {#if onChangeTenant && !live}
+            <button class="link-btn" type="button" onclick={() => onChangeTenant?.()}>
+              Change tenant ⌃
+            </button>
+          {/if}
+        </div>
+        <div class="company-card-row">
+          <div class="company-logo">
+            {#if brand.logo_url && !brand.logo_url.includes('monti-logo')}
+              <img src={brand.logo_url} alt={brand.logo_alt || tenantLabel} />
+            {:else}
+              <span class="company-monogram">{companyMonogram}</span>
+            {/if}
+          </div>
+          <div class="company-meta">
+            <strong>{tenantName || brand.brand_name || tenantLabel}</strong>
+            <span>AI · Text &amp; Voice</span>
+            {#if tenantSlug || tenantLabel}
+              <span class="company-brand-line">Brand · {tenantName || tenantLabel}</span>
+            {/if}
+            <span class="active-pill">Active</span>
+          </div>
+        </div>
+      </section>
     </header>
 
     {#if callStarted}
@@ -777,17 +1036,284 @@
     {/if}
 
     {#if showCallDetails}
-      <section class={`voice-card auth-card ${callStarted ? 'auth-card-compact' : ''}`} aria-label="Customer sign in">
-        {#if customer}
-          <div class="customer-session">
-            {#if callStarted}
-              <div class="customer-initial">{customerLabel.slice(0, 1).toUpperCase()}</div>
-            {/if}
-            <div class="customer-session-main">
-              <div class="customer-name">{customerLabel}</div>
-              <div class="voice-state customer-meta">{callStarted ? 'Signed in' : `Signed in · ${customer.email}`}</div>
+      <!-- 3. Quick actions -->
+      <nav class="quick-actions" aria-label="Quick actions">
+        <button type="button" class="qa-btn" disabled={!onChangeTenant || live} onclick={() => { touchActivity(); onChangeTenant?.(); }}>
+          <span class="qa-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M4 20V9l8-5 8 5v11h-5v-6H9v6H4z"/></svg>
+          </span>
+          <span>My tenants</span>
+        </button>
+        <button
+          type="button"
+          class="qa-btn"
+          onclick={() => {
+            touchActivity();
+            void openAudioSettings(true).then(() => void startAudioTest());
+          }}
+        >
+          <span class="qa-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zm-7 9a1 1 0 0 1 2 0 5 5 0 0 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.9V21h3a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h3v-2.1A7 7 0 0 1 5 12z"/></svg>
+          </span>
+          <span>Audio test</span>
+        </button>
+        <button
+          type="button"
+          class="qa-btn"
+          onclick={() => {
+            touchActivity();
+            document.getElementById('desk-account')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }}
+        >
+          <span class="qa-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-8 2-8 5v1h16v-1c0-3-4-5-8-5z"/></svg>
+          </span>
+          <span>Profile</span>
+        </button>
+        <button type="button" class="qa-btn" onclick={() => { touchActivity(); void openAudioSettings(true); }}>
+          <span class="qa-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.1 12.9a7.5 7.5 0 0 0 .1-1.8l2-1.5-2-3.5-2.4 1a7.5 7.5 0 0 0-1.6-.9L14.8 3h-4l-.4 2.7a7.5 7.5 0 0 0-1.6.9l-2.4-1-2 3.5 2 1.5a7.5 7.5 0 0 0-.1 1.8l-2 1.5 2 3.5 2.4-1a7.5 7.5 0 0 0 1.6.9l.4 2.7h4l.4-2.7a7.5 7.5 0 0 0 1.6-.9l2.4 1 2-3.5-2-1.5zM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5z"/></svg>
+          </span>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <!-- 4. Audio settings (collapsible) -->
+      <section id="desk-audio-settings" class="voice-card audio-card" aria-label="Audio settings">
+        <button
+          type="button"
+          class="collapse-head"
+          onclick={() => {
+            if (audioOpen) audioOpen = false;
+            else void openAudioSettings(true);
+          }}
+          aria-expanded={audioOpen}
+        >
+          <div class="collapse-title">
+            <span class="collapse-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2A3.5 3.5 0 0 0 16.5 12zM14 4.2v2.1a6 6 0 0 1 0 11.4v2.1a8 8 0 0 0 0-15.6z"/></svg>
+            </span>
+            <div>
+              <strong>AUDIO SETTINGS</strong>
+              <p>Configure your microphone and speaker</p>
             </div>
-            <button class="voice-button signout-button" type="button" onclick={signOutCustomer}>Sign out</button>
+          </div>
+          <span class="chev">{audioOpen ? '⌃' : '⌄'}</span>
+        </button>
+        {#if audioOpen}
+          <div class="audio-body">
+            <div class="audio-field audio-device-row">
+              <div class="audio-device-label">
+                <span class="dev-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg>
+                </span>
+                <span class="dev-copy">
+                  <b>Microphone</b>
+                  <small>{selectedMicLabel()}</small>
+                </span>
+                <span class="level-bars" aria-hidden="true" title="Live mic level">
+                  {#each [0, 1, 2, 3, 4] as i}
+                    <i class:on={micLevel > i * 18}></i>
+                  {/each}
+                </span>
+              </div>
+              <select
+                bind:value={selectedMicId}
+                disabled={live}
+                aria-label="Microphone device"
+                onchange={(e) => {
+                  touchActivity();
+                  onMicChange((e.currentTarget as HTMLSelectElement).value);
+                }}
+              >
+                {#if audioInputs.length === 0}
+                  <option value="">Default microphone</option>
+                {:else}
+                  {#each audioInputs as dev (dev.deviceId)}
+                    <option value={dev.deviceId}>{dev.label}</option>
+                  {/each}
+                {/if}
+              </select>
+            </div>
+
+            <div class="audio-field audio-device-row">
+              <div class="audio-device-label">
+                <span class="dev-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2A3.5 3.5 0 0 0 16.5 12z"/></svg>
+                </span>
+                <span class="dev-copy">
+                  <b>Speaker</b>
+                  <small>{selectedSpeakerLabel()}</small>
+                </span>
+                <span class="level-bars" class:idle={!audioTesting} aria-hidden="true" title="Speaker activity">
+                  {#each [0, 1, 2, 3, 4] as i}
+                    <i class:on={speakerLevel > i * 18 || (!audioTesting && i < 3)}></i>
+                  {/each}
+                </span>
+              </div>
+              <select
+                bind:value={selectedSpeakerId}
+                disabled={live || !speakerSelectable}
+                aria-label="Speaker device"
+                onchange={(e) => {
+                  touchActivity();
+                  onSpeakerChange((e.currentTarget as HTMLSelectElement).value);
+                }}
+              >
+                {#if !speakerSelectable}
+                  <option value="">System default speaker</option>
+                {:else if audioOutputs.length === 0}
+                  <option value="">Default speaker</option>
+                {:else}
+                  {#each audioOutputs as dev (dev.deviceId)}
+                    <option value={dev.deviceId}>{dev.label}</option>
+                  {/each}
+                {/if}
+              </select>
+              {#if !speakerSelectable}
+                <p class="voice-state">Speaker selection needs Chrome/Edge (setSinkId). Mic selection still works.</p>
+              {/if}
+            </div>
+
+            <div class="audio-actions">
+              <button
+                class="ghost-btn"
+                type="button"
+                disabled={audioBusy}
+                onclick={() => {
+                  touchActivity();
+                  void refreshAudioDevices(true);
+                }}
+              >
+                {audioBusy ? 'Refreshing…' : '↻ Refresh devices'}
+              </button>
+            </div>
+
+            <div class="audio-test-row">
+              <div class="audio-test-copy">
+                <span class="dev-ico wave" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 12h2v4H4v-4zm4-4h2v12H8V8zm4-3h2v18h-2V5zm4 5h2v8h-2v-8zm4-2h2v12h-2V8z"/></svg>
+                </span>
+                <div>
+                  <strong>Test your audio</strong>
+                  <p>Make sure your mic and speaker work properly.</p>
+                </div>
+              </div>
+              <button
+                class="voice-button test-btn"
+                type="button"
+                disabled={live}
+                onclick={() => {
+                  touchActivity();
+                  void startAudioTest();
+                }}
+              >
+                {audioTesting ? 'Stop test' : 'Start test'}
+              </button>
+            </div>
+            {#if audioNote}
+              <div class="voice-state">{audioNote}</div>
+            {/if}
+          </div>
+        {/if}
+      </section>
+
+      <!-- Avatar + start call -->
+      {#if !hideAgentSurfaceBeforeLogin}
+        <section class="voice-card call-card">
+          <div class="agent-select-row">
+            {#if selectedAgent}
+              <div class="selected-agent" style="--assistant-color:{selectedAgent.color}">
+                <div class="agent-dot">{agentInitial(selectedAgent.name)}</div>
+                <div class="selected-agent-copy">
+                  <strong>{selectedAgent.name}</strong>
+                  <span>{selectedAgent.role}</span>
+                </div>
+              </div>
+              <button
+                class="picker-trigger picker-trigger-compact"
+                type="button"
+                disabled={!canOpenPicker}
+                onclick={() => {
+                  touchActivity();
+                  pickerOpen = true;
+                }}
+              >
+                Change avatar
+              </button>
+            {:else}
+              <button
+                class="picker-trigger picker-trigger-wide"
+                type="button"
+                disabled={!canOpenPicker}
+                onclick={() => {
+                  touchActivity();
+                  pickerOpen = true;
+                }}
+              >
+                Choose avatar
+              </button>
+            {/if}
+          </div>
+          <div class="voice-row">
+            <div class="status-pill" class:warning={callTimerWarning}>
+              {callTimerLabel}
+            </div>
+            <button
+              class="voice-button"
+              class:live={live}
+              type="button"
+              disabled={busy || authRequired || quotaExhausted}
+              onclick={() => {
+                touchActivity();
+                toggleCall();
+              }}
+            >
+              {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
+            </button>
+          </div>
+          {#if busy && !live}
+            <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
+          {:else}
+            <div class="voice-state">{voiceState}</div>
+          {/if}
+          <div class="voice-state">Quota · {quotaLabel}</div>
+        </section>
+      {/if}
+
+      {#if selectedAgent && !hideAgentSurfaceBeforeLogin}
+        <section class="assistant-orb">
+          <div class="halo" style="--assistant-color:{selectedAgent.color}">
+            <Portrait agent={selectedAgent} speaking={live} {tone} />
+          </div>
+          <div class="assistant-name">
+            <h2>{selectedAgent.name}</h2>
+            <p>{selectedAgent.role} · {selectedAgent.trait}</p>
+          </div>
+          <Waveform color={selectedAgent.color} />
+        </section>
+      {/if}
+
+      <!-- 5. User account -->
+      <section id="desk-account" class={`voice-card auth-card ${callStarted ? 'auth-card-compact' : ''}`} aria-label="Customer account">
+        {#if customer}
+          <div class="account-card">
+            <div class="account-avatar" aria-hidden="true" title={customer.display_name || customer.email}>
+              {(customer.display_name || customer.email || 'U').slice(0, 1).toUpperCase()}
+            </div>
+            <div class="account-meta">
+              <div class="account-name-row">
+                <strong>{customer.display_name || customerLabel}</strong>
+                <span class="agent-badge">{roleLabel}</span>
+              </div>
+              <div class="voice-state customer-meta">{customer.email}</div>
+              <div class="voice-state customer-meta">
+                Signed in · Last active <em>{lastActiveLabel}</em>
+              </div>
+            </div>
+            <button class="voice-button signout-button" type="button" onclick={() => void signOutCustomer()}>
+              Sign out
+            </button>
           </div>
         {:else}
           <form onsubmit={challengeId ? verifyOTP : sendOTP} style="display:grid;gap:10px">
@@ -835,78 +1361,21 @@
           <div class="voice-state" style="margin-top:8px">{authStatus}</div>
         {/if}
       </section>
+
+      <!-- 6. Footer -->
+      <footer class="desk-footer">
+        <span class="footer-secure">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm0 10.9 4-2.3V7.1L12 9.4 8 7.1v3.5l4 2.3z"/></svg>
+          Your data is encrypted and secure.
+        </span>
+        <span class="footer-version">{appVersion || 'Monti'}</span>
+      </footer>
     {/if}
 
     {#if authRequired}
       <section class="voice-card auth-required-card">
         <strong>Sign in required</strong>
         <div class="voice-state">Verify your email OTP to unlock AI agents and Start call.</div>
-      </section>
-    {/if}
-
-    {#if showCallDetails && !hideAgentSurfaceBeforeLogin}
-      <section class="voice-card call-card">
-        <div class="agent-select-row">
-          {#if selectedAgent}
-            <div class="selected-agent" style="--assistant-color:{selectedAgent.color}">
-              <div class="agent-dot">{agentInitial(selectedAgent.name)}</div>
-              <div class="selected-agent-copy">
-                <strong>{selectedAgent.name}</strong>
-                <span>{selectedAgent.role}</span>
-              </div>
-            </div>
-            <button
-              class="picker-trigger picker-trigger-compact"
-              type="button"
-              disabled={!canOpenPicker}
-              onclick={() => (pickerOpen = true)}
-            >
-              Change avatar
-            </button>
-          {:else}
-            <button
-              class="picker-trigger picker-trigger-wide"
-              type="button"
-              disabled={!canOpenPicker}
-              onclick={() => (pickerOpen = true)}
-            >
-              Choose avatar
-            </button>
-          {/if}
-        </div>
-        <div class="voice-row">
-          <div class="status-pill" class:warning={callTimerWarning}>
-            {callTimerLabel}
-          </div>
-          <button
-            class="voice-button"
-            class:live={live}
-            type="button"
-            disabled={busy || authRequired || quotaExhausted}
-            onclick={toggleCall}
-          >
-            {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
-          </button>
-        </div>
-        {#if busy && !live}
-          <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
-        {:else}
-          <div class="voice-state">{voiceState}</div>
-        {/if}
-        <div class="voice-state">Quota · {quotaLabel}</div>
-      </section>
-    {/if}
-
-    {#if selectedAgent && !hideAgentSurfaceBeforeLogin}
-      <section class="assistant-orb">
-        <div class="halo" style="--assistant-color:{selectedAgent.color}">
-          <Portrait agent={selectedAgent} speaking={live} {tone} />
-        </div>
-        <div class="assistant-name">
-          <h2>{selectedAgent.name}</h2>
-          <p>{selectedAgent.role} · {selectedAgent.trait}</p>
-        </div>
-        <Waveform color={selectedAgent.color} />
       </section>
     {/if}
   </aside>
