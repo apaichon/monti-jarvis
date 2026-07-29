@@ -434,23 +434,33 @@ func (s *Store) ListPublicBrands(ctx context.Context, query string, limit, offse
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	query = strings.TrimSpace(query)
 	args := []any{query}
+	// Prefer brands.logo_url, then published theme company logo (tenant theme upload),
+	// then draft theme logo so registration/theme logos appear on the public directory.
 	where := fmt.Sprintf(`
 FROM %s.brands b
 JOIN %s.tenants t ON t.id = b.tenant_id
 LEFT JOIN %s.tenant_kyc_profiles k ON k.tenant_id = t.id
+LEFT JOIN %s.tenant_themes th ON th.tenant_id = t.id
 WHERE t.status = 'active'
   AND b.status = 'active'
   AND b.listed = true
   AND b.platform_listed = true
   AND COALESCE(k.status, 'approved') = 'approved'
-  AND ($1 = '' OR t.slug ILIKE '%%' || $1 || '%%' OR b.name ILIKE '%%' || $1 || '%%' OR b.category ILIKE '%%' || $1 || '%%')`, schema, schema, schema)
+  AND ($1 = '' OR t.slug ILIKE '%%' || $1 || '%%' OR b.name ILIKE '%%' || $1 || '%%' OR b.category ILIKE '%%' || $1 || '%%')`, schema, schema, schema, schema)
 	var total int
 	if err := s.pg.QueryRow(ctx, "SELECT COUNT(*) "+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	args = append(args, limit, offset)
 	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
-SELECT t.id, t.slug, b.name, b.blurb, b.logo_url, b.category, b.languages, b.listed, b.platform_listed, b.status
+SELECT t.id, t.slug, b.name, b.blurb,
+  COALESCE(
+    NULLIF(TRIM(b.logo_url), ''),
+    NULLIF(TRIM(th.published_branding->>'logo_url'), ''),
+    NULLIF(TRIM(th.draft_branding->>'logo_url'), ''),
+    ''
+  ) AS logo_url,
+  b.category, b.languages, b.listed, b.platform_listed, b.status
 %s ORDER BY b.name ASC, t.slug ASC LIMIT $2 OFFSET $3`, where), args...)
 	if err != nil {
 		return nil, 0, err
@@ -476,14 +486,22 @@ func (s *Store) GetPublicBrand(ctx context.Context, slug string) (PublicBrand, e
 FROM %s.brands b
 JOIN %s.tenants t ON t.id = b.tenant_id
 LEFT JOIN %s.tenant_kyc_profiles k ON k.tenant_id = t.id
+LEFT JOIN %s.tenant_themes th ON th.tenant_id = t.id
 WHERE (t.slug = $1 OR t.id = $1)
   AND t.status = 'active'
   AND b.status = 'active'
   AND b.listed = true
   AND b.platform_listed = true
-  AND COALESCE(k.status, 'approved') = 'approved'`, schema, schema, schema)
+  AND COALESCE(k.status, 'approved') = 'approved'`, schema, schema, schema, schema)
 	row := s.pg.QueryRow(ctx, fmt.Sprintf(`
-SELECT t.id, t.slug, b.name, b.blurb, b.logo_url, b.category, b.languages, b.listed, b.platform_listed, b.status
+SELECT t.id, t.slug, b.name, b.blurb,
+  COALESCE(
+    NULLIF(TRIM(b.logo_url), ''),
+    NULLIF(TRIM(th.published_branding->>'logo_url'), ''),
+    NULLIF(TRIM(th.draft_branding->>'logo_url'), ''),
+    ''
+  ) AS logo_url,
+  b.category, b.languages, b.listed, b.platform_listed, b.status
 %s`, where), strings.TrimSpace(slug))
 	brand, err := scanPublicBrand(row)
 	if errors.Is(err, pgx.ErrNoRows) {
