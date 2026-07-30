@@ -2838,3 +2838,55 @@ No new Postgres tables. Display language is browser-local and orthogonal to
 | Shared monorepo `@monti/i18n` package | later | optional consolidation |
 
 See DES-0054, workflow §130–131, API Sprint 58, UX C58/T58/A58.
+
+## Sprint 60 — tenant Gemini key validation metadata
+
+Extend `tenant_ai_configs` (S43):
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `gemini_key_status` | text | none/present/valid/invalid/degraded |
+| `gemini_key_last_validated_at` | timestamptz | |
+| `gemini_key_last_error_class` | text | auth/network/quota/unknown |
+| ciphertext fields | existing | unchanged |
+
+Audit columns remain on the row.
+
+## Sprint 61 — no new tables
+
+Gemini status is derived from S60 columns. Client top-bar only.
+
+## Sprint 62 — referral redemptions
+
+```mermaid
+erDiagram
+  TENANTS ||--o{ REFERRAL_REDEMPTIONS : redeems
+  TENANTS ||--o{ REFERRAL_REDEMPTIONS : referred_by
+  REFERRAL_REDEMPTIONS ||--o{ BONUS_LEDGER_ENTRIES : grants
+
+  REFERRAL_REDEMPTIONS {
+    uuid id PK
+    uuid redeemer_tenant_id FK
+    uuid referrer_tenant_id FK
+    text referral_code
+    text status
+    text idempotency_key
+    timestamptz applied_at
+    timestamptz reversed_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+Unique partial: one applied redemption per (redeemer_tenant_id, referral_code).
+
+### Future
+
+| Entity | Status |
+| --- | --- |
+| Campaign multi-code packs | later |
+| Cash affiliate payouts | out |
+
+See DES-0056–0058.

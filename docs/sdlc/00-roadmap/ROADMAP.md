@@ -82,15 +82,16 @@
 | **56** | **Customer** | **Caller desk UX revamp: v2 call rail, selected tenant card, mic/speaker device settings, avatar call grid, tenant switcher, account/footer, and larger Monti + company branding** | **A+** | **1, 5, 39, 54** · ✅ **v2.29.0** · [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · [SPRINT-056](../03-sprints/SPRINT-056.md) · [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) |
 | **57** | **Customer / Product Web / Branding** | **Monti root-domain logo and social preview metadata: use new Monti logo and Open Graph/Twitter tags for Facebook/link sharing** | **O+** | **39, 48, 54, 56** · ✅ **v2.30.0** · [FEAT-0049](../01-features/FEAT-0049-monti-logo-social-preview-metadata.md) · [SPRINT-057](../03-sprints/SPRINT-057.md) · [DES-0053](../02-design/53-monti-logo-social-preview-metadata-spec.md) |
 | **58** | **Customer / Tenant / Platform Admin** | **Portal UI language selector: EN, TH, and Japanese localized labels for call page, tenant portal, and admin pages** | **I18N** | **16, 20, 39, 54, 56, 57** · ✅ **v2.31.0** · [FEAT-0050](../01-features/FEAT-0050-portal-ui-language-selector.md) · [SPRINT-058](../03-sprints/SPRINT-058.md) · [DES-0054](../02-design/54-portal-ui-language-selector-spec.md) |
-| **59** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · backlog |
-| **60** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 59** · backlog |
-| **61** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · backlog |
-| **62** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
-| **63** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
-| **64** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog |
-| **65** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · backlog |
-| **66** | **Customer / Tenant / Tickets** | **AI summary before call close: generate call recap, confirm unresolved items, and submit summary to ticket** | **F+** | **1, 21, 22, 23, 24, 43, 53, 55, 56** · backlog |
-| **67** | **Tenant / Customer / Notifications** | **Call schedule email notifications: topic-based handover or sales links redirect customers into an auto-start prepared voice conversation** | **E+** | **1, 16, 20, 21, 23, 43, 53, 56, 64, 66** · backlog |
+| **59** | **Customer / Conversation UX** | **Call conversation UX revamp: friendly desktop/mobile call interface with clearer controls, chat transcript, customer context, and light/dark mode** | **A+** | **1, 21, 39, 54, 56, 58** · planned (local FEAT-0051 / DES-0055) |
+| **60** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) · [SPRINT-060](../03-sprints/SPRINT-060.md) · [DES-0056](../02-design/56-tenant-owned-gemini-key-enforcement-spec.md) · **planned** |
+| **61** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 60** · [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) · **planned** |
+| **62** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) · [SPRINT-062](../03-sprints/SPRINT-062.md) · [DES-0058](../02-design/58-referral-code-redemption-spec.md) · **planned** |
+| **63** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
+| **64** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
+| **65** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog |
+| **66** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · backlog |
+| **67** | **Customer / Tenant / Tickets** | **AI summary before call close: generate call recap, confirm unresolved items, and submit summary to ticket** | **F+** | **1, 21, 22, 23, 24, 43, 53, 55, 56** · backlog |
+| **68** | **Tenant / Customer / Notifications** | **Call schedule email notifications: topic-based handover or sales links redirect customers into an auto-start prepared voice conversation** | **E+** | **1, 16, 20, 21, 23, 43, 53, 56, 65, 67** · backlog |
 
 ---
 
@@ -2052,7 +2053,38 @@ call page, tenant portal, and platform admin · **Depends:** 16, 20, 39, 54, 56,
 
 **Worktree:** `.worktrees/SPRINT-058` · branch `feature/sprint-058-portal-ui-i18n`
 
-## Backlog: SPRINT-059 — Tenant-Owned Gemini Key Enforcement
+---
+
+## Planned: SPRINT-060 — Tenant-Owned Gemini Key Enforcement
+
+**Status:** planned · **Release target:** v2.33.0 · **Feature:** [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) ·
+**Design:** [DES-0056](../02-design/56-tenant-owned-gemini-key-enforcement-spec.md) · **Sprint:** [SPRINT-060](../03-sprints/SPRINT-060.md) ·
+**Worktree:** `.worktrees/SPRINT-060-062` · branch `docs/sprint-060-062-plan`
+
+**Commitment (12):** TASK-0216 validation API (4) · TASK-0217 fail-closed runtime (3) · TASK-0218 AI Settings UX (3) · TASK-0219 audit/UAT (2)
+
+---
+
+## Planned: SPRINT-061 — Tenant UX Simplification (Gemini Status Top Bar)
+
+**Status:** planned · **Release target:** v2.34.0 · **Feature:** [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) ·
+**Design:** [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) · **Sprint:** [SPRINT-061](../03-sprints/SPRINT-061.md) ·
+**Depends:** S60 · **Worktree:** `.worktrees/SPRINT-060-062`
+
+**Commitment (12):** TASK-0220 status API (3) · TASK-0221 remove performance nav (3) · TASK-0222 top-bar chip (3) · TASK-0223 platform UAT (3)
+
+---
+
+## Planned: SPRINT-062 — Referral Code Redemption Adds Bonus Quota
+
+**Status:** planned · **Release target:** v2.35.0 · **Feature:** [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) ·
+**Design:** [DES-0058](../02-design/58-referral-code-redemption-spec.md) · **Sprint:** [SPRINT-062](../03-sprints/SPRINT-062.md) ·
+**Worktree:** `.worktrees/SPRINT-060-062`
+
+**Commitment (12):** TASK-0224 validate/apply API (4) · TASK-0225 bonus ledger/usage (3) · TASK-0226 tenant UX (3) · TASK-0227 platform reverse/UAT (2)
+
+
+## Detail (planned as SPRINT-060): Tenant-Owned Gemini Key Enforcement
 
 **Platform:** Tenant / AI Operations / Security · **Feature:** Stop using a
 shared `GEMINI_API_KEY` environment fallback for tenant AI runtime in production.
@@ -2130,7 +2162,7 @@ secrets to the browser.
 
 ---
 
-## Backlog: SPRINT-060 — Tenant UX Simplification: Gemini Status in Top Bar
+## Detail (planned as SPRINT-061): Tenant UX Simplification: Gemini Status in Top Bar
 
 **Platform:** Tenant / Platform Admin / AI Operations · **Feature:** Tenant
 admins should not need a dedicated System Performance page for infrastructure
@@ -2205,7 +2237,7 @@ and reachable; deeper dependency health belongs to platform administration.
 
 ---
 
-## Backlog: SPRINT-061 — Referral Code Redemption Adds Bonus Quota
+## Detail (planned as SPRINT-062): Referral Code Redemption Adds Bonus Quota
 
 **Platform:** Tenant / Growth / Quota · **Feature:** Let a tenant enter and
 apply a referral code from another tenant or campaign to receive eligible bonus
@@ -2278,7 +2310,7 @@ editing entitlements.
 
 ---
 
-## Backlog: SPRINT-062 — Queued Concurrent-Call Admission
+## Backlog: SPRINT-063 — Queued Concurrent-Call Admission
 
 **Platform:** Customer / Tenant / Quota · **Feature:** Enforce each tenant
 package's total concurrent-call limit with a tenant-scoped waiting queue. When a
@@ -2358,7 +2390,7 @@ controlled wait queue instead of immediate rejection.
 
 ---
 
-## Backlog: SPRINT-063 — Full and Incremental Backup/Restore
+## Backlog: SPRINT-064 — Full and Incremental Backup/Restore
 
 **Platform:** Infra / Platform Admin / DevOps · **Feature:** Provide scheduled
 full and incremental backups plus verified restore workflows for Monti
@@ -2441,7 +2473,7 @@ tested against staging/local before any production recovery is attempted.
 
 ---
 
-## Backlog: SPRINT-064 — Tenant Customer Product Catalog
+## Backlog: SPRINT-065 — Tenant Customer Product Catalog
 
 **Platform:** Tenant / Customer / KM · **Feature:** Let tenants manage a
 customer-facing product/catalog library with downloadable files and structured
@@ -2529,7 +2561,7 @@ download when the customer asks about it.
 
 ---
 
-## Backlog: SPRINT-065 — Multi-User Tenant Permissions
+## Backlog: SPRINT-066 — Multi-User Tenant Permissions
 
 **Platform:** Tenant / Security / Back Office · **Feature:** Let tenant admins
 invite same-domain staff users into the tenant portal and assign menu-level
@@ -2612,7 +2644,7 @@ catalog content, customer records, or reports.
 
 ---
 
-## Backlog: SPRINT-066 — AI Summary Before Call Close
+## Backlog: SPRINT-067 — AI Summary Before Call Close
 
 **Platform:** Customer / Tenant / Tickets · **Feature:** Before a call is
 closed, generate an AI summary of the conversation, confirm unresolved items or
@@ -2699,7 +2731,7 @@ Without that, support teams must reread transcripts before acting on a ticket.
 
 ---
 
-## Backlog: SPRINT-067 — Call Schedule Email Notifications
+## Backlog: SPRINT-068 — Call Schedule Email Notifications
 
 **Platform:** Tenant / Customer / Notifications · **Feature:** Let tenants
 schedule customer call notifications by topic, send email links for handover or

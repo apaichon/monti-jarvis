@@ -4721,3 +4721,84 @@ See DES-0052, workflow §127–129, ER Sprint 56, API Sprint 56.
 | Admin shell | `apps/platform-admin-web/src/routes/+layout.svelte` |
 
 See DES-0054, workflow §130–131, ER Sprint 58, API Sprint 58.
+
+## T60 — Tenant AI Settings Gemini key (Sprint 60)
+
+### Screen map → API
+
+| UI zone | Action | API |
+| --- | --- | --- |
+| T60-A Key field | Enter/replace | PUT gemini-key |
+| T60-B Test | Test connection | POST gemini-key/test |
+| T60-C Delete | Remove key | DELETE gemini-key |
+| T60-D Status | View last4/status | GET gemini-key |
+
+### Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ AI Settings                                             │
+│ Gemini API key                                          │
+│ [ •••• ab12 ]  status: Valid · tested 2h ago            │
+│ [ Replace key… ]  [ Test connection ]  [ Delete ]       │
+│ ⚠ Production requires a validated key. Platform env     │
+│   key is not used for tenant traffic.                   │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## T61 — Tenant top bar Gemini status (Sprint 61)
+
+### Screen map → API
+
+| UI zone | Action | API |
+| --- | --- | --- |
+| T61-A Top-bar chip | View status | GET gemini-status |
+| T61-A Click | Fix config | navigate /tenant/ai |
+| T61-B Nav | No System Performance | — |
+
+### Layout
+
+```
+┌ tenant topbar ──────────────────────────────────────────┐
+│ ● All systems operational   [● Gemini ready]   ⌕  ♢  AD │
+└─────────────────────────────────────────────────────────┘
+Nav: Overview · Call center · … · AI config · Settings
+     (Monitoring / System Performance removed)
+```
+
+---
+
+## T62 — Tenant referral code redemption (Sprint 62)
+
+### Screen map → API
+
+| UI zone | Action | API |
+| --- | --- | --- |
+| T62-A Code input | Validate | POST referrals/validate |
+| T62-B Apply | Redeem | POST referrals/redeem |
+| T62-C History | List | GET referrals/redemptions |
+| T62-D Usage | Base+bonus | existing usage + bonus fields |
+
+### Layout
+
+```
+┌ Referrals ──────────────────────────────────────────────┐
+│ Your code: REFXYZ  [Copy]                               │
+│ ─────────────────────────────────────────────────────── │
+│ Redeem a code                                           │
+│ [ ______________ ] [Check] [Apply]                      │
+│ Preview: +100 call minutes · expires 90 days            │
+│ History: REFABC · applied · +100 min · expires …        │
+└─────────────────────────────────────────────────────────┘
+```
+
+## A62 — Platform reverse redemption (Sprint 62)
+
+| UI zone | Action | API |
+| --- | --- | --- |
+| A62-A List | Filter redemptions | GET platform redemptions |
+| A62-B Reverse | Reverse grant | POST …/reverse |
+
+See DES-0056–0058, workflow §132–139.

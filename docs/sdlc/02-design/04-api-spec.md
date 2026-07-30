@@ -4775,3 +4775,74 @@ No `/healthz` contract change required for i18n. Customer-visible app version
 string (S53) remains as shipped.
 
 See DES-0054, workflow §130–131, ER Sprint 58, UX C58/T58/A58.
+
+## Sprint 60 — Tenant Gemini key enforcement
+
+Extends S43 `/api/tenant/ai/gemini-key`.
+
+### `POST /api/tenant/ai/gemini-key/test`
+
+| Auth | tenant_admin |
+| --- | --- |
+| Body | `{ "api_key"?: string }` — if omitted, test stored key |
+
+Response 200: `{ ok, status, last4?, last_validated_at?, error_class?, message? }`
+
+### Runtime error
+
+Chat/voice when production fail-closed: **503** `{ "error": "tenant_gemini_key_required" }`
+
+### Env
+
+`ALLOW_PLATFORM_GEMINI_FALLBACK` only non-prod.
+
+## Sprint 61 — Tenant Gemini status
+
+### `GET /api/tenant/ai/gemini-status`
+
+```json
+{
+  "state": "ready",
+  "label": "Gemini ready",
+  "action_href": "/tenant/ai",
+  "last4": "ab12",
+  "last_validated_at": "2026-07-30T12:00:00Z"
+}
+```
+
+| state | meaning |
+| --- | --- |
+| ready | valid key |
+| key_missing | no key |
+| validation_failed | invalid |
+| degraded | optional soft fail |
+
+Tenant system-performance UI unlinked; API may remain support-only.
+
+## Sprint 62 — Referral code redemption
+
+### `POST /api/tenant/referrals/validate`
+
+Body: `{ "code": "REFABC" }`  
+200: `{ "eligible": true, "preview_bonus": [...] }`
+
+### `POST /api/tenant/referrals/redeem`
+
+Body: `{ "code", "idempotency_key"? }`  
+200: `{ "redemption_id", "status", "bonus": [...] }`
+
+Errors: `referral_not_found`, `self_referral`, `already_redeemed`, `referral_ineligible`, `rate_limited`
+
+### `GET /api/tenant/referrals/redemptions`
+
+List redeemer’s grants.
+
+### `GET /api/platform/referrals/redemptions`
+
+Query: tenant_id, code, status.
+
+### `POST /api/platform/referrals/redemptions/{id}/reverse`
+
+Reverses remaining bonus; status `reversed`.
+
+See DES-0056, DES-0057, DES-0058.

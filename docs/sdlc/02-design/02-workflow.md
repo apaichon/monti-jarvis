@@ -4020,3 +4020,149 @@ sequenceDiagram
 ```
 
 See DES-0054, ER Sprint 58, API Sprint 58, UX C58/T58/A58.
+
+## 132. Tenant saves and tests Gemini key (Sprint 60)
+
+```mermaid
+sequenceDiagram
+  participant A as Tenant admin
+  participant B as tenant-web
+  participant G as Go :8091
+  participant S as Postgres
+  participant Gem as Gemini API
+
+  A->>B: Enter API key + Test connection
+  B->>G: POST /api/tenant/ai/gemini-key/test {api_key}
+  G->>Gem: Bounded probe
+  alt ok
+    Gem-->>G: success
+    G->>S: encrypt + store ciphertext; status=valid
+    G-->>B: last4 + valid + last_validated_at
+  else fail
+    Gem-->>G: auth/network error
+    G->>S: optional status=invalid (if testing stored)
+    G-->>B: safe error_class + message
+  end
+```
+
+## 133. Tenant AI runtime resolves key (Sprint 60)
+
+```mermaid
+sequenceDiagram
+  participant C as Customer / Voice
+  participant G as Go :8091
+  participant S as Postgres
+  participant Env as process env
+
+  C->>G: chat or voice (tenant context)
+  G->>S: load tenant_ai_configs
+  alt status valid + ciphertext
+    G->>G: decrypt tenant key
+    G->>G: call Gemini with tenant key
+  else missing/invalid
+    alt ALLOW_PLATFORM_GEMINI_FALLBACK and non-prod
+      G->>Env: GEMINI_API_KEY
+      G->>G: call Gemini with platform key
+    else production fail-closed
+      G-->>C: 503 tenant_gemini_key_required
+    end
+  end
+```
+
+## 134. Tenant deletes Gemini key (Sprint 60)
+
+```mermaid
+sequenceDiagram
+  participant A as Tenant admin
+  participant G as Go :8091
+  participant S as Postgres
+  participant Audit as audit
+
+  A->>G: DELETE /api/tenant/ai/gemini-key
+  G->>S: clear ciphertext + status=none
+  G->>Audit: tenant.ai.gemini_key.deleted (no secret)
+  G-->>A: 204
+```
+
+## 135. Tenant shell loads Gemini status (Sprint 61)
+
+```mermaid
+sequenceDiagram
+  participant A as Tenant admin
+  participant B as tenant-web layout
+  participant G as Go :8091
+
+  A->>B: Open portal shell
+  B->>G: GET /api/tenant/ai/gemini-status
+  G-->>B: state + label + action_href
+  B->>B: Render top-bar chip
+  alt not ready
+    A->>B: Click chip
+    B->>B: Navigate /tenant/ai
+  end
+```
+
+## 136. Tenant opens retired System Performance route (Sprint 61)
+
+```mermaid
+sequenceDiagram
+  participant A as Tenant admin
+  participant B as tenant-web
+  B->>B: Nav has no System Performance
+  A->>B: Deep link old /tenant/monitoring (optional)
+  B->>B: Redirect or retired notice → AI Settings / Overview
+```
+
+## 137. Tenant validates referral code (Sprint 62)
+
+```mermaid
+sequenceDiagram
+  participant A as Tenant admin
+  participant G as Go :8091
+  participant S as Postgres
+
+  A->>G: POST /api/tenant/referrals/validate {code}
+  G->>S: lookup code + eligibility rules
+  alt eligible
+    G-->>A: preview bonus dimensions
+  else ineligible
+    G-->>A: 4xx safe code
+  end
+```
+
+## 138. Tenant redeems referral code (Sprint 62)
+
+```mermaid
+sequenceDiagram
+  participant A as Tenant admin
+  participant G as Go :8091
+  participant S as Postgres
+  participant L as bonus ledger
+
+  A->>G: POST /api/tenant/referrals/redeem {code,idempotency_key}
+  G->>S: begin tx; lock redeemer
+  alt already applied
+    G-->>A: same redemption (idempotent)
+  else new
+    G->>L: insert bonus grants
+    G->>S: insert referral_redemptions applied
+    G-->>A: redemption_id + bonus[]
+  end
+```
+
+## 139. Platform reverses redemption (Sprint 62)
+
+```mermaid
+sequenceDiagram
+  participant P as Platform admin
+  participant G as Go :8091
+  participant L as bonus ledger
+  participant S as Postgres
+
+  P->>G: POST /api/platform/referrals/redemptions/{id}/reverse
+  G->>L: reverse remaining bonus
+  G->>S: status=reversed
+  G-->>P: 200
+```
+
+See DES-0056, DES-0057, DES-0058.

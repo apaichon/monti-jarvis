@@ -56,6 +56,9 @@ System design artifacts for Monti Jarvis.
 | 50 | [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md) | 53 | Conversation auto-register email OTP + app version on UI | **`shipped`** v2.26.0 |
 | 51 | [52-caller-desk-branding-audio-devices-spec.md](52-caller-desk-branding-audio-devices-spec.md) | 56 | Caller desk large logos + mic/speaker device settings | **`approved`** |
 | 54 | [54-portal-ui-language-selector-spec.md](54-portal-ui-language-selector-spec.md) | 58 | Portal UI language selector EN/TH/JA for customer, tenant, admin | **`shipped`** v2.31.0 |
+| 56 | [56-tenant-owned-gemini-key-enforcement-spec.md](56-tenant-owned-gemini-key-enforcement-spec.md) | 60 | Tenant-owned Gemini key; no prod env fallback | **`approved`** |
+| 57 | [57-tenant-gemini-status-top-bar-spec.md](57-tenant-gemini-status-top-bar-spec.md) | 61 | Gemini status top bar; remove tenant performance nav | **`approved`** |
+| 58 | [58-referral-code-redemption-spec.md](58-referral-code-redemption-spec.md) | 62 | Referral code redemption → bonus quota | **`approved`** |
 | 49 | [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md) | 54 | Customer portal tenant/brand picker; no required `?tenant_id=` | **`shipped`** v2.27.0 |
 | 51 | [51-tenant-call-center-topic-statistics-spec.md](51-tenant-call-center-topic-statistics-spec.md) | 55 | Tenant call-center statistics grouped and filtered by topic | **`shipped`** v2.28.0 |
 
@@ -153,3 +156,4 @@ workflow §120–124; ER/API Sprint 51; UX T51/A51.
 
 **Excel exports:** [excel-output/](excel-output/) mirrors the same `NN-` prefix order.
 **Sprint 58:** Design pack approved — [54-portal-ui-language-selector-spec.md](54-portal-ui-language-selector-spec.md); workflow §130–131; API Sprint 58; UX C58/T58/A58. [SPRINT-058](../03-sprints/SPRINT-058.md).
+**Sprint 60–62:** Design packs approved (plan worktree `.worktrees/SPRINT-060-062`) — DES-0056 Gemini key enforcement; DES-0057 Gemini top-bar + performance nav remove; DES-0058 referral redemption. [SPRINT-060](../03-sprints/SPRINT-060.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [SPRINT-062](../03-sprints/SPRINT-062.md).
