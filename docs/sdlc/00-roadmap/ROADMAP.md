@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S56 commercial/tenant/customer UX tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
+# Monti AI Call Center — Roadmap (36 core + S37–S67 commercial/tenant/customer UX tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -79,7 +79,18 @@
 | **53** | **Tenant / Customer** | **Tenant settings: auto-register customer when email + OTP is entered in conversation; show app/tag version on UI** | **D+** | **16, 19, 20, 21, 52** · ✅ **v2.26.0** · [FEAT-0046](../01-features/FEAT-0046-conversation-auto-register-app-version.md) · [SPRINT-053](../03-sprints/SPRINT-053.md) · [DES-0050](../02-design/50-conversation-auto-register-app-version-spec.md) |
 | **54** | **Customer / Platform** | **Customer portal: pick tenant from list to call (no `tenant_id` query string required)** | **J** | **1, 5, 6, 20, 21, 38, 53** · ✅ **v2.27.0** · [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md) · [SPRINT-054](../03-sprints/SPRINT-054.md) · [DES-0049](../02-design/49-customer-portal-tenant-list-spec.md) |
 | **55** | **Tenant** | **Call Center Statistics grouped by topic** | **F+** | **22, 25, 30** · ✅ **v2.28.0** · [FEAT-0047](../01-features/FEAT-0047-tenant-call-center-topic-statistics.md) · [SPRINT-055](../03-sprints/SPRINT-055.md) · [DES-0051](../02-design/51-tenant-call-center-topic-statistics-spec.md) · extends [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
-| **56** | **Customer** | **Caller desk UX revamp: mic/speaker device settings; larger Monti + per-company brand logos on call page and tenant list** | **A+** | **1, 5, 39, 54** · ✅ **v2.29.0** · [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · [SPRINT-056](../03-sprints/SPRINT-056.md) · [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) |
+| **56** | **Customer** | **Caller desk UX revamp: v2 call rail, selected tenant card, mic/speaker device settings, avatar call grid, tenant switcher, account/footer, and larger Monti + company branding** | **A+** | **1, 5, 39, 54** · ✅ **v2.29.0** · [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · [SPRINT-056](../03-sprints/SPRINT-056.md) · [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) |
+| **57** | **Customer / Product Web / Branding** | **Monti root-domain logo and social preview metadata: use new Monti logo and Open Graph/Twitter tags for Facebook/link sharing** | **O+** | **39, 48, 54, 56** · ✅ **v2.30.0** · [FEAT-0049](../01-features/FEAT-0049-monti-logo-social-preview-metadata.md) · [SPRINT-057](../03-sprints/SPRINT-057.md) · [DES-0053](../02-design/53-monti-logo-social-preview-metadata-spec.md) |
+| **58** | **Customer / Tenant / Platform Admin** | **Portal UI language selector: EN, TH, and Japanese localized labels for call page, tenant portal, and admin pages** | **I18N** | **16, 20, 39, 54, 56, 57** · backlog |
+| **59** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · backlog |
+| **60** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 59** · backlog |
+| **61** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · backlog |
+| **62** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
+| **63** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
+| **64** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog |
+| **65** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · backlog |
+| **66** | **Customer / Tenant / Tickets** | **AI summary before call close: generate call recap, confirm unresolved items, and submit summary to ticket** | **F+** | **1, 21, 22, 23, 24, 43, 53, 55, 56** · backlog |
+| **67** | **Tenant / Customer / Notifications** | **Call schedule email notifications: topic-based handover or sales links redirect customers into an auto-start prepared voice conversation** | **E+** | **1, 16, 20, 21, 23, 43, 53, 56, 64, 66** · backlog |
 
 ---
 
@@ -1813,11 +1824,21 @@ contracts with a `topic` dimension rather than a second analytics product.
 ## Shipped: SPRINT-056 — Caller Desk Branding + Mic/Speaker Settings ✅ v2.29.0
 
 **Platform:** Customer · **Feature:** Revamp customer call desk and tenant/brand
-list for stronger Monti + company brand presence; add microphone and speaker
-device selection for voice · **Depends:** 1, 5, 39, 54 · **Status:** shipped · **Release:** v2.29.0 · **Closed:** 2026-07-29 · **Feature:** [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · **Design:** [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) · **Sprint:** [SPRINT-056](../03-sprints/SPRINT-056.md)
+list for the v2 call-page design: Monti hero/status, selected tenant card,
+collapsible audio settings, AI avatar call grid, tenant switcher, account card,
+secure footer, and microphone/speaker device selection for voice · **Depends:**
+1, 5, 39, 54 · **Status:** shipped · **Release:** v2.29.0 · **Closed:**
+2026-07-29 · **Feature:** [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · **Design:** [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) · **Sprint:** [SPRINT-056](../03-sprints/SPRINT-056.md)
 **Mockups:** [call page](../02-design/mockups/s56-caller-desk-branding/call-page.png) ·
 [tenant list](../02-design/mockups/s56-caller-desk-branding/tenant-list.png) ·
 [composite](../02-design/mockups/s56-caller-desk-branding/new-call-design-composite.png)
+
+**Call-page v2 design anchors:** (1) Monti AI Call Center hero with online
+status; (2) selected tenant card with large company logo and change-tenant
+action; (3) audio settings panel with microphone, speaker, refresh, device
+levels, and audio test; (4) AI avatar call cards with active avatar emphasis;
+(5) tenant switcher for owned tenants plus add-tenant entry; (6) signed-in
+account, sign-out, encrypted-data notice, and app version footer.
 
 ### Problem today
 
@@ -1836,7 +1857,8 @@ After S54, callers pick a brand and enter the desk, but:
 ### Goal
 
 1. **Call page revamp** — Larger Monti product logo/hero; prominent **selected
-   company logo** and name on the control rail (per mockup).
+   company logo** and name on the control rail; avatar call cards; tenant
+   switcher; signed-in account and secure footer (per v2 mockup).
 2. **Tenant list revamp** — Larger Monti hero + **large per-company logos** on
    brand cards (per mockup).
 3. **Mic and speaker settings** — Before/during voice, caller can select
@@ -1852,8 +1874,9 @@ After S54, callers pick a brand and enter the desk, but:
   mark assets; fallbacks when logo missing.
 - Device enumeration via browser media APIs (`enumerateDevices`, `getUserMedia`
   permission prompt as needed).
-- UI: mic select + speaker select (labels EN/TH as needed); apply to Gemini voice
-  / LiveKit capture and playback paths already used by the desk.
+- UI: mic select + speaker select + refresh + audio test (labels EN/TH as
+  needed); apply to Gemini voice / LiveKit capture and playback paths already
+  used by the desk.
 - Session or `localStorage` preference for last mic/speaker device ids.
 - Accessible labels; graceful fallback when device list empty or permission denied.
 - Keep S54 routing (`/`, `/t/{slug}`) and Live · OK system status (non-technical).
@@ -1872,8 +1895,12 @@ After S54, callers pick a brand and enter the desk, but:
 | --- | --- |
 | Call page logo revamp | Large Monti hero + selected company logo card on desk |
 | Tenant list logo revamp | Large Monti hero + large brand logos on directory cards |
+| Audio settings panel | Collapsible panel with mic, speaker, refresh, levels, and test action |
 | Mic settings | Select/list input devices; use for voice capture |
 | Speaker settings | Select/list output devices; use for voice playback |
+| Avatar call grid | Per-avatar cards with active/selected state and call CTA |
+| Tenant switcher | Owned tenant cards plus add-tenant entry |
+| Account/footer | Signed-in identity, sign-out, encrypted-data notice, and version |
 | Preference persist | Session and/or local last-used device ids |
 | Verification | Logos load per brand A/B; device switch works; denied permission UX |
 
@@ -1881,17 +1908,22 @@ After S54, callers pick a brand and enter the desk, but:
 
 1. Tenant list shows a large Monti mark and each company card shows a large
    brand logo (or monogram fallback), matching mockup intent.
-2. Call desk shows a large Monti product logo and a clear selected-company logo
-   block (not a tiny header chip only).
+2. Call desk shows a large Monti product logo, online status, and a clear
+   selected-company logo block (not a tiny header chip only).
 3. Caller can open audio settings and choose **microphone** and **speaker**
    when multiple devices exist.
-4. Starting a voice call uses the selected mic/speaker (or safe default).
-5. Switching brand updates company logo to the newly selected tenant only.
-6. Permission denied / no devices shows clear non-technical messaging (not
+4. Audio settings provide refresh and test actions without breaking the call
+   page when permissions are denied or labels are unavailable.
+5. Avatar cards show callable AI agents with a visible active/selected state.
+6. Tenant switcher shows owned tenants and an add-tenant path without requiring
+   `tenant_id` query-string use.
+7. Starting a voice call uses the selected mic/speaker (or safe default).
+8. Switching brand updates company logo to the newly selected tenant only.
+9. Permission denied / no devices shows clear non-technical messaging (not
    raw API errors).
 
-**Out (unless pulled in):** Device testing tone generator, noise suppression
-UI, or multi-language voice device naming beyond browser labels.
+**Out (unless pulled in):** Advanced calibrated tone generator, noise
+suppression UI, or multi-language voice device naming beyond browser labels.
 
 **Design note:** Prefer client-side device selection wired into existing
 `GeminiVoice` / LiveKit paths; do not invent a server audio device registry.
@@ -1900,3 +1932,899 @@ Reuse `GET /api/public/theme/{tenant_id}` and public brand `logo_url` for marks.
 **Tasks:** TASK-0202 (branding), TASK-0203 (mic/speaker), TASK-0204 (UAT).  
 **Worktree:** `.worktrees/SPRINT-056` · branch `feature/sprint-056-caller-desk-branding-audio`
 
+---
+
+## Shipped: SPRINT-057 — Monti Logo and Social Preview Metadata ✅ v2.30.0
+
+**Platform:** Customer / Product Web / Branding · **Feature:** Replace the
+root-domain/customer-facing Monti brand mark with the new logo asset and add
+social sharing metadata so pasted root-domain links render the Monti image,
+title, and description correctly on Facebook and other rich-preview surfaces ·
+**Depends:** 39, 48, 54, 56 · **Status:** shipped · **Release:** v2.30.0 ·
+**Closed:** 2026-07-30 ·
+**Feature:** [FEAT-0049](../01-features/FEAT-0049-monti-logo-social-preview-metadata.md) ·
+**Sprint:** [SPRINT-057](../03-sprints/SPRINT-057.md) ·
+**Design:** [DES-0053](../02-design/53-monti-logo-social-preview-metadata-spec.md)
+
+### Problem today
+
+The customer-facing root domain and shared links do not consistently expose the
+current Monti brand preview. When the URL is pasted into Facebook, chat apps, or
+other social surfaces, the preview can be missing, stale, or generic. The root
+experience needs to use the new Monti logo image and publish explicit Open
+Graph/Twitter metadata for a polished product preview.
+
+### Goal
+
+1. **Use the new Monti logo** — Root-domain and customer-facing brand surfaces
+   use the approved Monti AI Call Center logo image from
+   `/Users/apaichon/Projects/libra/monti/images/logo.png`.
+2. **Add rich preview metadata** — Root HTML includes Open Graph and Twitter
+   card metadata for image, title, description, URL, site name, and content
+   type.
+3. **Validate link sharing** — Local and production builds expose absolute,
+   crawlable social-preview image URLs that Facebook/debugger-style crawlers can
+   fetch.
+
+### Scope
+
+### In
+
+- Add the approved Monti logo asset to the appropriate public/static asset path
+  for the root-domain app, preserving image quality and cache-safe naming.
+- Update root-domain visible branding to use the new logo where product/customer
+  surfaces show the Monti mark.
+- Add Open Graph tags such as `og:title`, `og:description`, `og:image`,
+  `og:image:alt`, `og:url`, `og:type`, and `og:site_name`.
+- Add Twitter/X card tags such as `twitter:card`, `twitter:title`,
+  `twitter:description`, `twitter:image`, and `twitter:image:alt`.
+- Ensure metadata uses production absolute URLs for shared previews and a safe
+  local fallback during development.
+- Add or verify favicon/apple-touch/icon metadata where the root app already
+  supports it.
+- Manual validation notes for Facebook Sharing Debugger or equivalent rich-link
+  crawler after deployment.
+
+### Out
+
+- Redesigning the full product-web landing page.
+- Tenant-specific social previews or per-tenant Open Graph generation.
+- Dynamic image generation for every route.
+- Changing tenant company logos or uploaded brand assets.
+- Paid social campaign tracking pixels or marketing attribution.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Logo asset | New Monti logo copied into the root app public/static path with cache-safe filename |
+| Visible branding | Root/customer-facing Monti mark updated to use the approved logo |
+| Open Graph tags | Title, description, image, image alt, URL, type, and site name metadata |
+| Twitter card tags | Summary-large-image metadata aligned with the Open Graph preview |
+| Preview validation | Local HTML/source check and post-deploy rich-preview debugger checklist |
+| Verification | Root page renders logo; shared URL metadata resolves to accessible image and description |
+
+### Acceptance sketch
+
+1. Root-domain page uses the new Monti AI Call Center logo image from the
+   approved asset, not the older/placeholder mark.
+2. Page source includes `og:image` and related Open Graph metadata with an
+   absolute production image URL suitable for Facebook link previews.
+3. Page source includes description, title, site name, and Twitter card metadata
+   consistent with the Monti AI Call Center brand.
+4. The preview image URL returns the image with a crawler-readable content type
+   and does not require authentication.
+5. A local source check and a production rich-preview validation checklist are
+   captured before marking the sprint complete.
+
+---
+
+## Backlog: SPRINT-058 — Portal UI Language Selector
+
+**Platform:** Customer / Tenant / Platform Admin · **Feature:** Let users choose
+the UI label language on the customer call page, tenant portal, and platform
+admin pages, with localized labels for English (`en`), Thai (`th`), and
+Japanese (`ja`) · **Depends:** 16, 20, 39, 54, 56, 57 · **Status:** backlog
+
+### Problem today
+
+Sprint 16 stores tenant locale and AI reply-language hints, but the portal UI
+labels are still page-specific and English-first. Callers, tenant operators,
+and platform admins need a consistent language selector that changes local UI
+labels without changing tenant KM content, transcripts, or AI reply behavior.
+
+### Goal
+
+1. **Call page language selector** — Customer call page can switch visible UI
+   labels between EN, TH, and Japanese.
+2. **Tenant portal language selector** — Tenant portal navigation, primary
+   actions, form labels, statuses, and common empty/error states use the chosen
+   display language.
+3. **Admin page language selector** — Platform admin pages use the same language
+   selection pattern and localized label catalog.
+
+### Scope
+
+### In
+
+- Shared locale catalog keys for customer-web, tenant-web, and
+  platform-admin-web UI chrome.
+- Language selector component/pattern reused across the call page, tenant portal,
+  and platform admin pages.
+- Localized labels for primary navigation, buttons, forms, statuses, common
+  validation/help copy, and empty states on the selected pages.
+- Persist selected display language in browser storage; use authenticated user
+  preference later if the current surface already has one.
+- Fallback behavior: missing TH/JA labels fall back to EN rather than rendering
+  blank strings.
+- Preserve Sprint 16 AI reply locale behavior; this feature is for UI labels.
+
+### Out
+
+- Machine translation or auto-detection.
+- Translating tenant-authored KM, uploaded documents, chat transcripts, brand
+  marketing content, invoices/legal text, or third-party payment/provider pages.
+- Right-to-left languages.
+- Reworking voice model language selection beyond displaying localized labels.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Locale catalog | EN/TH/JA label keys for shared UI chrome and selected pages |
+| Language selector | Reusable selector component/pattern for customer, tenant, and admin surfaces |
+| Customer call page | Localized call controls, tenant selection labels, status text, auth/account labels |
+| Tenant portal | Localized nav, forms, actions, tables, and common states |
+| Platform admin pages | Localized nav, dashboard/admin controls, actions, tables, and common states |
+| Preference persist | Browser-level display-language persistence with safe default to EN |
+| Verification | EN/TH/JA smoke across all three surfaces; missing-key fallback check |
+
+### Acceptance sketch
+
+1. Customer call page, tenant portal, and platform admin pages each expose EN,
+   TH, and Japanese display-language selection.
+2. Selecting a language updates UI labels without logout or route reset.
+3. Reloading the page preserves the selected display language for the browser.
+4. Missing TH/JA translations fall back to EN and never render blank controls.
+5. Existing tenant locale / AI reply-language settings from S16 remain separate
+   unless a later sprint explicitly links them.
+
+---
+
+## Backlog: SPRINT-059 — Tenant-Owned Gemini Key Enforcement
+
+**Platform:** Tenant / AI Operations / Security · **Feature:** Stop using a
+shared `GEMINI_API_KEY` environment fallback for tenant AI runtime in production.
+Tenant admins must enter their own Gemini API key in AI Settings, test that the
+key can connect to Gemini, and only validated keys can power tenant AI calls ·
+**Depends:** 41, 43, 52 · **Status:** backlog
+
+### Problem today
+
+Sprint 43 added encrypted tenant Gemini keys, but the runtime can still fall
+back to a platform `GEMINI_API_KEY` from environment when a tenant has no key.
+That makes production cost attribution and tenant isolation weaker than the
+commercial model needs. Tenants need a clear AI Settings flow to provide,
+validate, rotate, and remove their own Gemini key without exposing plaintext
+secrets to the browser.
+
+### Goal
+
+1. **Tenant-owned key required** — Production chat/voice AI runtime uses the
+   tenant's validated Gemini key and does not use a shared env `GEMINI_API_KEY`
+   fallback for tenant calls.
+2. **AI Settings key management** — Tenant admins can save, replace, delete, and
+   see masked metadata for their Gemini key in AI Settings.
+3. **Test Gemini connection** — Tenant admins can click a test action that
+   verifies the saved or proposed key can connect to Gemini before it is marked
+   valid for runtime use.
+
+### Scope
+
+### In
+
+- Tenant AI Settings UI for Gemini key entry, replacement, deletion, masked
+  last-four display, validation status, and last-tested timestamp.
+- Backend validation endpoint/action that tests the key against Gemini with a
+  bounded, non-bill-heavy request and returns non-secret success/failure details.
+- Store encrypted key material only server-side; persist metadata such as
+  `last4`, `status`, `last_validated_at`, and validation error class.
+- Runtime resolution change: production tenant AI calls fail closed with a clear
+  configuration error when no validated tenant Gemini key exists.
+- Explicit dev/test behavior: any env-key fallback must be opt-in and reported
+  as non-production only.
+- Audit events for key create/replace/delete/test, without storing plaintext.
+- Readiness or posture signal that reports whether shared env Gemini fallback is
+  disabled for production tenant runtime.
+
+### Out
+
+- Exposing Gemini keys to browser JavaScript or platform-admin read paths.
+- Platform-funded shared Gemini pool for tenant production traffic.
+- Multi-provider key marketplace or non-Gemini provider support.
+- Tenant billing changes, AI usage pricing changes, or quota plan redesign.
+- Translating or rewriting tenant KM content.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| AI Settings UI | Key entry, replace/delete, masked metadata, test action, validation state |
+| Key validation | Server-side Gemini connectivity test with bounded request and safe errors |
+| Runtime enforcement | Production AI calls require validated tenant Gemini key; no env fallback |
+| Secret storage | Encrypted-at-rest key storage with no plaintext read API |
+| Ops posture | Readiness/security signal for env fallback disabled in production |
+| Verification | Valid key succeeds; invalid key fails; missing key blocks tenant AI call; no plaintext leaks |
+
+### Acceptance sketch
+
+1. Tenant admin can enter a Gemini key in AI Settings and run **Test connection**.
+2. A valid key is marked usable with masked metadata and `last_validated_at`.
+3. An invalid key shows a safe, non-secret failure reason and is not used for
+   tenant AI runtime.
+4. In production mode, tenant chat/voice AI calls never use `GEMINI_API_KEY`
+   from environment when the tenant key is missing or invalid.
+5. Key create/replace/delete/test actions are audited without plaintext secret
+   values.
+
+---
+
+## Backlog: SPRINT-060 — Tenant UX Simplification: Gemini Status in Top Bar
+
+**Platform:** Tenant / Platform Admin / AI Operations · **Feature:** Tenant
+admins should not need a dedicated System Performance page for infrastructure
+details. Remove the tenant-facing system performance route from normal tenant
+navigation and move the Gemini connectivity/status signal into the tenant top
+bar, while keeping deeper health diagnostics in platform-admin operations ·
+**Depends:** 26, 29, 43, 59 · **Status:** backlog
+
+### Problem today
+
+Sprint 26 exposed tenant-safe system performance monitoring, but that surface is
+too operational for most tenant admins. The tenant portal should stay focused on
+business workflows: avatars, KM, customers, billing, usage, and AI settings.
+For tenant operators, the important live signal is whether Gemini is configured
+and reachable; deeper dependency health belongs to platform administration.
+
+### Goal
+
+1. **Remove tenant performance page from tenant UX** — Hide or retire the tenant
+   System Performance navigation/page from normal tenant-admin workflows.
+2. **Gemini status in top bar** — Show a compact Gemini status indicator in the
+   tenant portal top bar so tenants can immediately see configured, valid,
+   degraded, or missing-key state.
+3. **Keep platform diagnostics** — Preserve platform-admin system performance
+   monitoring and operational probes for support teams.
+
+### Scope
+
+### In
+
+- Remove tenant System Performance from tenant nav and route discovery; preserve
+  backend compatibility only if needed for platform/support tooling.
+- Add tenant top-bar Gemini status indicator with concise states such as
+  `Gemini ready`, `Gemini key missing`, `Gemini validation failed`, and
+  `Gemini degraded`.
+- Link the top-bar Gemini status to Tenant AI Settings when action is needed.
+- Reuse S43/S59 key metadata and validation status rather than adding a second
+  status model.
+- Keep platform-admin performance dashboards and dependency probes available for
+  operators.
+- Non-technical tenant copy; no raw provider errors or internal hostnames.
+
+### Out
+
+- Removing platform-admin system performance monitoring.
+- Showing Redis, Postgres, MinIO, NATS, ClickHouse, or LiveKit internals to
+  tenant admins.
+- New Gemini key-management behavior beyond what S59 owns.
+- Changing customer call-page status beyond what tenant configuration requires.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Tenant nav cleanup | Remove System Performance from tenant portal navigation |
+| Top-bar status | Compact Gemini readiness/status indicator in tenant layout |
+| AI Settings link | Status action routes tenant admin to AI Settings when remediation is needed |
+| API reuse | Consume S43/S59 Gemini key/status metadata with safe tenant-scoped response |
+| Platform preservation | Platform-admin diagnostics remain available for support/ops |
+| Verification | Tenant no longer sees performance page in nav; Gemini status updates across ready/missing/failed states |
+
+### Acceptance sketch
+
+1. Tenant admin no longer sees a dedicated System Performance page in normal
+   tenant navigation.
+2. Tenant top bar shows Gemini status for the current tenant without exposing
+   infrastructure internals.
+3. Missing or invalid Gemini key status links directly to AI Settings.
+4. Platform admin can still access full system performance diagnostics.
+5. Existing S26/S29 operational APIs are either preserved for compatible support
+   use or deliberately deprecated in the sprint design.
+
+---
+
+## Backlog: SPRINT-061 — Referral Code Redemption Adds Bonus Quota
+
+**Platform:** Tenant / Growth / Quota · **Feature:** Let a tenant enter and
+apply a referral code from another tenant or campaign to receive eligible bonus
+quota, with validation, abuse controls, expiry rules, and quota-ledger tracking ·
+**Depends:** 13, 45, 46, 51 · **Status:** backlog
+
+### Problem today
+
+Sprint 46 established referral attribution and bonus-quota rewards, but the
+tenant experience is still referral-link-first. Operators also need a simple
+manual redemption flow: enter a referral code in the tenant portal, validate it,
+and apply eligible bonus quota to the current tenant without support manually
+editing entitlements.
+
+### Goal
+
+1. **Apply referral code** — Tenant admin can enter a referral code and see
+   whether it is valid, expired, already used, self-owned, or ineligible.
+2. **Grant bonus quota** — A valid code creates a bounded bonus-quota grant for
+   the tenant without mutating the base paid package entitlement.
+3. **Track redemption lifecycle** — Tenant and platform views show applied code,
+   bonus quota, expiry, usage, and reversal state.
+
+### Scope
+
+### In
+
+- Tenant portal referral-code input and validation flow.
+- Server-side validation for code existence, campaign status, expiry, tenant
+  eligibility, one-use/per-period limits, self-referral, duplicate redemption,
+  and fraud/abuse rules.
+- Bonus quota grant through the existing quota/bonus ledger layer, separate from
+  base package limits.
+- Supported quota dimensions aligned to S45/S46, such as call minutes, mobile
+  minutes, KM documents, storage, or active-avatar bonus where configured.
+- Tenant usage UI shows base quota plus applied referral bonus and expiry.
+- Platform admin can inspect, revoke, or reverse redemption grants.
+- Idempotent apply behavior so retries never grant quota twice.
+
+### Out
+
+- Cash payout, affiliate commission settlement, or accounting payouts.
+- Cross-tenant quota pooling beyond the specific redeemed bonus grant.
+- Manual SQL entitlement edits as the product path.
+- Unlimited concurrent-call increases without capacity approval.
+- Applying referral codes to invoices, tax documents, or historical usage.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Tenant redemption UI | Referral code input, validation state, apply action, bonus summary |
+| Validation API | Tenant-scoped code validation/apply endpoint with clear safe errors |
+| Bonus quota ledger | Idempotent grant records with dimension, amount, expiry, source code |
+| Usage display | Tenant usage shows base quota, referral bonus, consumed bonus, expiry |
+| Platform oversight | Admin view/action for redemption audit, revoke, and reversal |
+| Verification | Valid apply, duplicate retry, expired code, self-referral, cross-tenant isolation |
+
+### Acceptance sketch
+
+1. Tenant admin can apply a valid referral code and immediately see the granted
+   bonus quota in usage/quota views.
+2. The base paid package entitlement remains unchanged; bonus quota is tracked
+   as a separate grant source.
+3. Duplicate, expired, self-owned, unknown, or ineligible codes do not grant
+   quota and show non-technical messages.
+4. Applying the same code twice, including retry after timeout, cannot create
+   duplicate quota grants.
+5. Platform admin can audit and reverse a referral-code quota grant.
+
+---
+
+## Backlog: SPRINT-062 — Queued Concurrent-Call Admission
+
+**Platform:** Customer / Tenant / Quota · **Feature:** Enforce each tenant
+package's total concurrent-call limit with a tenant-scoped waiting queue. When a
+caller starts a voice call and the tenant is already at its concurrent-call
+quota, the caller waits until another customer finishes or the queue timeout
+expires · **Depends:** 13, 16, 21, 45, 51, 56 · **Status:** backlog
+
+### Problem today
+
+Sprint 13 enforces `max_concurrent_calls` by rejecting calls over the package
+limit. That protects capacity, but it creates a poor caller experience during
+brief traffic spikes: the caller must retry manually even if another customer
+finishes seconds later. Tenants need package-based concurrency protection with a
+controlled wait queue instead of immediate rejection.
+
+### Goal
+
+1. **Queue over-limit callers** — If a tenant has no available concurrent-call
+   slot, the start-call flow places the caller in a tenant-scoped queue.
+2. **Start when slot opens** — When another customer finishes, disconnects, or
+   times out, the next queued caller is admitted and the voice call starts.
+3. **Respect package limits** — The active-call count must never exceed the
+   tenant package's concurrent-call limit, including bonus quota where approved.
+
+### Scope
+
+### In
+
+- Tenant-scoped concurrent-call queue keyed by tenant and call channel.
+- Admission controller that checks package concurrency, reserves a slot, or
+  enqueues the caller with position and estimated wait metadata.
+- Server-side worker/goroutine path to promote queued callers when active calls
+  release slots; implementation must remain safe across server restarts and
+  multiple app instances.
+- Queue timeout, cancellation, browser disconnect cleanup, and idempotent retry
+  behavior.
+- Customer UI states for waiting, position, timeout, cancel, and automatic call
+  start when admitted.
+- Redis DB 4 keys under `monti_jarvis:` for active slots, queue entries, TTLs,
+  and promotion locks.
+- Tenant/admin visibility for active calls, queued callers, package limit, and
+  recent queue timeouts.
+- Metrics/audit events for queued, admitted, cancelled, timed out, and rejected
+  states.
+
+### Out
+
+- Exceeding the tenant package concurrent-call limit.
+- Infinite queues or unbounded goroutine creation per waiting caller.
+- Prioritized paid queue tiers, callback scheduling, or human-agent routing.
+- Cross-tenant queue sharing or borrowing unused capacity from another tenant.
+- Replacing monthly-minute, daily-limit, or rate-limit enforcement.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Queue data model | Redis-backed tenant queue, active-slot lease, TTL, and promotion lock |
+| Admission API/WS | Start-call response supports admitted vs queued with queue position |
+| Promotion worker | Bounded goroutine/worker promotes queued callers when slots release |
+| Customer UI | Waiting screen, position, cancel, timeout, and auto-start when admitted |
+| Tenant visibility | Active/queued count and package concurrent limit in usage/status UI |
+| Verification | Two tenants, over-limit queue, disconnect cleanup, timeout, restart, no over-admission |
+
+### Acceptance sketch
+
+1. When active calls are below the tenant package limit, a caller starts
+   immediately and consumes one concurrent slot.
+2. When active calls equal the tenant package limit, the next caller is queued
+   instead of receiving immediate `quota_exceeded`.
+3. When an active call ends, the first eligible queued caller is admitted and
+   active calls never exceed the package limit.
+4. If a queued caller cancels, closes the browser, or times out, the queue entry
+   is cleaned up and the next caller position is updated.
+5. Multiple tenants have independent queues and cannot consume each other's
+   concurrent-call capacity.
+
+---
+
+## Backlog: SPRINT-063 — Full and Incremental Backup/Restore
+
+**Platform:** Infra / Platform Admin / DevOps · **Feature:** Provide scheduled
+full and incremental backups plus verified restore workflows for Monti
+Postgres, ClickHouse, and MinIO data, including operator runbooks, manifests,
+retention, and audit evidence · **Depends:** 2, 22, 25, 28, 29, 36, 41, 49 ·
+**Status:** backlog
+
+### Problem today
+
+Monti stores tenant configuration, calls, transcripts, analytics, embeddings,
+and KM assets across Postgres, ClickHouse, and MinIO. Production readiness
+requires repeatable recovery, not only best-effort snapshots. Operators need
+full and incremental backup jobs, off-host retention, and a restore path that is
+tested against staging/local before any production recovery is attempted.
+
+### Goal
+
+1. **Back up all Monti data stores** — Capture Postgres, ClickHouse, and MinIO
+   data with full backups and incremental changes.
+2. **Restore with evidence** — Restore into staging/local and verify schema,
+   row counts, objects, checksums, and application-level consistency.
+3. **Operate safely** — Enforce encryption, retention, audit logs, explicit
+   production confirmation, and clear recovery runbooks.
+
+### Scope
+
+### In
+
+- Postgres backup for database `monti_jarvis`, schema `callcenter`, including
+  full logical/physical backup and incremental/PITR or WAL strategy where
+  selected.
+- ClickHouse backup for database `monti_jarvis`, including full snapshots and
+  incremental partition/object backups where supported.
+- MinIO backup for bucket `monti-jarvis`, including full bucket backup and
+  incremental object sync/versioned backup for prefixes `calls/` and `km/`.
+- Backup manifests with timestamp, environment, app version, schema/database
+  names, bucket/prefix list, object counts, sizes, checksums, and source backup
+  cursor/checkpoint.
+- Restore runner for staging/local dry runs and controlled production restore
+  with explicit operator confirmation and maintenance-window evidence.
+- Encrypted backups, off-host storage target, retention policy, pruning, and
+  failed-backup alerting.
+- Platform/admin operations visibility for last backup, status, size, retention
+  window, RPO/RTO estimate, and last restore verification.
+- Recovery runbooks and automated verification scripts that produce deployment
+  or readiness evidence.
+
+### Out
+
+- Backing up unrelated HarvestMax databases, schemas, buckets, or app storage.
+- Restoring production without explicit operator confirmation and rollback plan.
+- Per-customer or tenant self-service restore.
+- Data warehouse redesign, archive product UX, or cold-storage analytics.
+- Schema migrations unrelated to backup/restore correctness.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Backup runner | Scheduled full backups for Postgres, ClickHouse, and MinIO with encryption and off-host target |
+| Incremental strategy | WAL/PITR or selected Postgres incremental path, ClickHouse incremental snapshots, MinIO object delta sync/versioning |
+| Restore runner | Staging/local restore first, optional gated production restore, cleanup and rollback hooks |
+| Manifest/checksum | Per-backup metadata, checksums, cursor/checkpoint, retention, and verification output |
+| Ops dashboard/runbook | Platform/admin backup status, RPO/RTO, last restore test, operator recovery procedure |
+| Verification | Automated dry-run restore, consistency checks, corrupt backup handling, and DEP/readiness evidence |
+
+### Acceptance sketch
+
+1. A full backup captures Postgres `monti_jarvis.callcenter`, ClickHouse
+   database `monti_jarvis`, and MinIO bucket `monti-jarvis` prefixes `calls/`
+   and `km/`.
+2. Incremental backup captures only changes since the last valid checkpoint or
+   snapshot and records that checkpoint in the manifest.
+3. Restore to staging/local reconstructs databases and bucket objects, then
+   passes schema, count, checksum, and application consistency checks.
+4. Production restore requires explicit operator confirmation, records audit
+   evidence, and links the resulting DEP/readiness note.
+5. Corrupt, missing, partial, or checksum-mismatched backups fail safely without
+   silently leaving a partial restore marked successful.
+
+---
+
+## Backlog: SPRINT-064 — Tenant Customer Product Catalog
+
+**Platform:** Tenant / Customer / KM · **Feature:** Let tenants manage a
+customer-facing product/catalog library with downloadable files and structured
+metadata, then render the most relevant catalog items inside chat or voice
+conversation when the customer's request matches them · **Depends:** 2, 14, 15,
+20, 21, 22, 39, 43, 54, 56 · **Status:** backlog
+
+### Problem today
+
+Monti can answer from tenant KM, but tenants also need a product-style catalog
+surface that is designed for customer conversations. A restaurant may need to
+show a food menu, a travel agency may show package guides, an insurer may show
+coverage plans, a lender may show loan packages, and an HR/business tenant may
+show attendance or employee-service documents. The AI should not only answer in
+text; it should surface the relevant item, preview key details, and offer a
+download when the customer asks about it.
+
+### Goal
+
+1. **Manage catalog assets** — Tenant admins can upload and organize
+   customer-facing catalog files with metadata, categories, language, tags,
+   eligibility, and publish state.
+2. **Match customer intent** — Conversation retrieval finds relevant catalog
+   items based on the customer's request, tenant scope, avatar role, language,
+   and active publish rules.
+3. **Render and download** — Customer conversation can show product cards,
+   menus, packages, guides, or business records with safe file download links.
+
+### Scope
+
+### In
+
+- Tenant portal catalog management for upload, edit, publish/unpublish,
+  archive, versioning, and delete.
+- File support for common customer-facing assets such as PDF, image, CSV/XLSX,
+  DOCX, and structured JSON/CSV catalog rows where approved.
+- Catalog item types for food menus, travel guides/packages, insurance
+  packages, loan packages, employee attendance or HR service records, and
+  configurable business-specific catalog categories.
+- MinIO storage under tenant-scoped catalog prefixes with metadata in Postgres
+  and optional searchable embeddings in ClickHouse.
+- RAG/relevance pipeline that ranks catalog items and returns cited item IDs,
+  snippets, thumbnails/previews where available, and download eligibility.
+- Customer conversation rendering for related catalog cards, menu/package
+  summaries, file previews, and download actions.
+- Tenant controls for which avatars can use each catalog collection and whether
+  files are public, authenticated-customer-only, or restricted by customer tier.
+- Multilingual metadata and matching, aligned with EN/TH/Japanese localization
+  and tenant avatar language settings.
+- Audit events for upload, publish, download, and AI-rendered catalog
+  recommendations.
+
+### Out
+
+- Full ecommerce checkout, cart, payment, invoice, or inventory reservation.
+- Editing customer business systems of record from the conversation.
+- Public search engine indexing of private tenant catalog files.
+- Cross-tenant catalog sharing unless a later marketplace feature approves it.
+- Unlimited file retention or storage beyond tenant package limits.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Catalog data model | Tenant-scoped collections, items, file versions, metadata, publish state, access policy |
+| Upload/download API | Secure file upload, signed download links, thumbnail/preview metadata, storage quota checks |
+| Tenant catalog UI | Manage food menus, travel guides, insurance/loan packages, HR records, and custom categories |
+| Retrieval integration | Catalog indexing, relevance ranking, citations, language matching, avatar collection scope |
+| Customer rendering | Conversation cards, file previews, related-product panels, and download action states |
+| Verification | Tenant isolation, file ACLs, relevance quality, stale version handling, package quota enforcement |
+
+### Acceptance sketch
+
+1. Tenant admin can upload, tag, publish, and version customer-facing catalog
+   assets without exposing them to other tenants.
+2. When a customer asks a related question, the conversation surfaces relevant
+   catalog items such as a menu, travel package, insurance plan, loan package,
+   or business record with a concise summary and citation.
+3. Download links are tenant-scoped, permission-checked, time-limited where
+   needed, and record an audit event.
+4. Unpublished, archived, expired, or restricted catalog items are not rendered
+   to ineligible customers or avatars.
+5. Catalog storage, indexing, and retrieval respect tenant package limits,
+   language settings, and existing KM isolation rules.
+
+---
+
+## Backlog: SPRINT-065 — Multi-User Tenant Permissions
+
+**Platform:** Tenant / Security / Back Office · **Feature:** Let tenant admins
+invite same-domain staff users into the tenant portal and assign menu-level
+back-office permissions so multiple users can manage operations without sharing
+one owner account · **Depends:** 3, 6, 16, 19, 20, 28, 41, 42, 53 ·
+**Status:** backlog
+
+### Problem today
+
+Tenant administration is owner-centric. As tenants grow, support, billing,
+operations, content, and technical staff need controlled access to specific
+tenant back-office menus. Sharing a single tenant admin account weakens audit
+trails and makes it hard to limit who can change AI settings, quota, billing,
+catalog content, customer records, or reports.
+
+### Goal
+
+1. **Invite tenant users** — Tenant owner/admin can add staff by email when the
+   email domain matches the tenant's approved domain policy.
+2. **Assign permissions** — Tenant owner/admin can grant roles or direct
+   menu-level permissions for back-office pages and actions.
+3. **Audit access** — Every invite, acceptance, permission change, suspension,
+   and privileged action is tenant-scoped and auditable.
+
+### Scope
+
+### In
+
+- Tenant user invite flow with same-domain validation, invite expiry, resend,
+  revoke, accept, and first-login handoff.
+- Tenant staff identity records linked to one tenant, with status such as
+  invited, active, suspended, removed, and owner.
+- Menu-level permission model for tenant portal sections such as dashboard,
+  conversations, KM, catalog, avatars, AI settings, billing/quota, customers,
+  tickets, reports, integrations, and user management.
+- Built-in roles such as Owner, Admin, Operator, Billing, Content Manager,
+  Analyst, and Read Only, with optional custom permission overrides.
+- Server-side authorization checks for tenant APIs and UI navigation filtering
+  so hidden menus cannot be accessed directly by URL/API call.
+- Owner protection rules: at least one active owner remains, owners cannot be
+  removed by lower-privilege users, and privilege escalation is blocked.
+- Audit log events for invites, accepts, login, permission changes, suspension,
+  removal, and denied access attempts.
+- Platform admin visibility for tenant user count, owner list, suspicious
+  invites, and support-only troubleshooting without cross-tenant data mutation.
+
+### Out
+
+- Cross-tenant workforce membership from one login unless a later federation
+  feature approves it.
+- Public customer account permission management.
+- Enterprise SSO/SAML/SCIM provisioning.
+- Fine-grained field-level permissions inside every entity.
+- Sharing tenant admin credentials as an accepted workflow.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Tenant user model | Staff membership, role, status, invite token, domain policy, owner protection |
+| Invite API/UI | Add same-domain email, resend, revoke, accept, suspend, remove, and list users |
+| Permission matrix | Built-in roles, menu/action permissions, custom overrides, navigation filtering |
+| Authorization layer | Server-side tenant API permission checks with direct URL/API denial tests |
+| Audit trail | Cross-tenant audit events for membership, permission, login, and denied access |
+| Verification | Same-domain validation, owner safety, role coverage, API bypass prevention, tenant isolation |
+
+### Acceptance sketch
+
+1. Tenant owner/admin can invite a staff email that matches the tenant's allowed
+   domain, and invalid or external-domain emails are rejected with clear errors.
+2. Accepted staff users can sign in to the tenant portal and only see menus and
+   actions allowed by their role/permission matrix.
+3. Direct API or URL access to a restricted tenant menu/action is denied even if
+   the UI link is hidden.
+4. Permission changes take effect on the next request/session refresh and are
+   recorded in the audit log with actor, target user, tenant, and before/after
+   values.
+5. The system prevents removing or downgrading the last active tenant owner and
+   prevents lower-privilege users from granting themselves higher permissions.
+
+---
+
+## Backlog: SPRINT-066 — AI Summary Before Call Close
+
+**Platform:** Customer / Tenant / Tickets · **Feature:** Before a call is
+closed, generate an AI summary of the conversation, confirm unresolved items or
+next steps, and submit the approved summary into the tenant ticket workflow ·
+**Depends:** 1, 21, 22, 23, 24, 43, 53, 55, 56 · **Status:** backlog
+
+### Problem today
+
+Monti can hold a customer conversation and create tickets, but the close-call
+handoff is still thin. Tenant staff need a concise, structured summary that
+captures the customer's intent, issue, actions already taken, unresolved
+questions, sentiment, related products/KM citations, and follow-up ownership.
+Without that, support teams must reread transcripts before acting on a ticket.
+
+### Goal
+
+1. **Summarize before closing** — When the caller or AI ends a call, Monti
+   generates a structured summary from the transcript and call metadata.
+2. **Confirm next steps** — The close flow asks the customer or agent to confirm
+   unresolved items, contact details, priority, and whether a ticket should be
+   created.
+3. **Submit to ticket** — Approved summaries create or update a tenant ticket
+   with transcript references, attachments, and audit evidence.
+
+### Scope
+
+### In
+
+- AI-generated close-call summary for voice and text conversations with fields
+  such as customer request, issue category, key facts, actions taken,
+  unresolved questions, sentiment, priority, suggested next action, and owner.
+- Close-call customer UI that displays the summary, asks for confirmation or
+  correction where appropriate, and supports "submit ticket" or "close without
+  ticket" according to tenant settings.
+- Tenant settings to require ticket creation for unresolved calls, allow optional
+  ticket creation, or disable ticket submission for selected avatars/topics.
+- Ticket payload mapping into the existing ticket workflow with call ID,
+  transcript/recording references in MinIO, customer identity, tenant, avatar,
+  topic, priority, summary, and attachments.
+- Tenant back-office view that shows AI summary, original transcript link,
+  confidence/warning flags, and customer confirmation state.
+- Safety checks for hallucinated facts, missing transcript segments, sensitive
+  data, and low-confidence summaries before ticket submission.
+- Audit events for summary generation, customer confirmation, ticket submit,
+  summary edit, and close-without-ticket.
+- Analytics hooks for summary/ticket rate, unresolved-call rate, and summary
+  correction frequency.
+
+### Out
+
+- Replacing the full conversation transcript or recording archive.
+- Automatic legal/medical/financial advice classification beyond tenant-defined
+  escalation rules.
+- Human support SLA engine, assignment queues, or external CRM integrations
+  unless already covered by ticket scope.
+- Customer-visible ticket portal for tracking status.
+- Silent ticket creation without tenant-configured consent/confirmation rules.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Summary generator | Structured AI summary from transcript, metadata, KM/product citations, and call outcome |
+| Close-call UX | Summary preview, confirmation, correction, submit ticket, close without ticket |
+| Ticket mapping | Create/update ticket with call references, priority, customer info, attachments, and audit |
+| Tenant settings | Per-avatar/topic rules for required, optional, or disabled ticket submission |
+| Safety checks | Low-confidence flags, missing transcript warnings, sensitive data handling, edit history |
+| Verification | Voice/text close flow, ticket payload, rejected summary, tenant isolation, audit evidence |
+
+### Acceptance sketch
+
+1. Before a voice or text call closes, Monti generates a structured summary that
+   references the correct tenant, call ID, customer, avatar, topic, and key
+   transcript facts.
+2. The caller or configured tenant flow can confirm, correct, submit to ticket,
+   or close without ticket according to tenant settings.
+3. Submitted tickets include the AI summary, unresolved items, priority,
+   customer/contact details, transcript or recording references, and audit
+   events.
+4. Low-confidence, incomplete, or sensitive summaries are flagged and cannot be
+   silently submitted as verified facts.
+5. Tenant staff can open the ticket and trace the summary back to the original
+   conversation record without crossing tenant boundaries.
+
+---
+
+## Backlog: SPRINT-067 — Call Schedule Email Notifications
+
+**Platform:** Tenant / Customer / Notifications · **Feature:** Let tenants
+schedule customer call notifications by topic, send email links for handover or
+sales/product conversations, and redirect the customer into an automatically
+started voice call with prepared conversation context · **Depends:** 1, 16, 20,
+21, 23, 43, 53, 56, 64, 66 · **Status:** backlog
+
+### Problem today
+
+Monti supports customer-initiated calls, but tenants also need a proactive
+schedule flow for handover, follow-up, renewal, sales, onboarding, or product
+consultation. The customer should receive an email with a clear topic and a
+secure link. When clicked, Monti should open the correct tenant/avatar call page
+and prepare the AI to speak about the scheduled topic instead of starting from a
+generic greeting.
+
+### Goal
+
+1. **Schedule topic calls** — Tenant staff can create scheduled call invites
+   with customer email, topic, intent, avatar, product/catalog context, and time
+   window.
+2. **Send actionable email** — The customer receives a branded email with the
+   topic, appointment details, and a secure redirect link.
+3. **Auto-start prepared call** — Clicking the link opens the call page and
+   starts or primes a speech conversation with the scheduled topic, handover
+   notes, and relevant product context.
+
+### Scope
+
+### In
+
+- Tenant schedule UI for one-off call invites with customer email, subject,
+  topic, purpose such as handover, sales product, support follow-up, onboarding,
+  renewal, or ticket continuation.
+- Optional links to ticket, product/catalog item, KM document, previous call
+  summary, assigned avatar, language, and preferred call time window.
+- Email notification templates with tenant branding, topic, appointment window,
+  call purpose, cancel/reschedule policy, and secure call link.
+- Signed redirect tokens with expiry, single-use or limited-use policy, tenant
+  and customer binding, topic payload, and replay protection.
+- Customer redirect flow that lands on the correct call page, checks auth/OTP
+  requirements, selects the scheduled tenant/avatar, and prepares the call
+  context.
+- Auto-start voice call when allowed by browser and tenant policy, with fallback
+  "Start call" action when microphone permission or browser autoplay rules block
+  automatic start.
+- AI conversation primer that includes scheduled topic, handover notes, product
+  or ticket context, language, and suggested opening message.
+- Status tracking for scheduled, email sent, opened, call started, completed,
+  missed, cancelled, expired, and failed.
+- Audit and analytics events for schedule create, email send/open, redirect,
+  auto-start, fallback start, and call outcome.
+
+### Out
+
+- Bulk marketing campaign automation or newsletter tooling.
+- Calendar provider two-way sync unless a later integration feature approves it.
+- SMS/LINE/WhatsApp notification channels.
+- Cold outbound dialing without customer click/consent.
+- Guaranteed browser microphone auto-start when browser permission rules block
+  it.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Schedule model | Tenant-scoped scheduled call invite, customer, topic, avatar, time window, token state |
+| Tenant schedule UI | Create, send, resend, cancel, expire, and inspect scheduled call notifications |
+| Email notification | Branded template, topic details, secure redirect link, delivery/error status |
+| Redirect/start flow | Signed token validation, tenant/avatar selection, auth/OTP gate, auto-start or fallback |
+| AI topic primer | Prepared opening prompt with handover notes, product/catalog/ticket context, language |
+| Verification | Token expiry, replay protection, wrong tenant denial, browser fallback, audit and status events |
+
+### Acceptance sketch
+
+1. Tenant staff can schedule a topic-based call notification for a customer email
+   and send a branded email with the correct tenant, avatar, topic, and call
+   window.
+2. Clicking the email link validates a signed token, redirects to the correct
+   customer call page, and applies the prepared conversation topic without
+   exposing another tenant's data.
+3. When browser and tenant policy allow it, the call starts automatically in
+   speech mode; otherwise the page shows a clear start action with the same
+   prepared topic context.
+4. The AI opening and follow-up context reflect the scheduled purpose, such as
+   handover, sales product discussion, support follow-up, onboarding, renewal,
+   or ticket continuation.
+5. Expired, revoked, already-used, or tampered links cannot start a call and are
+   recorded with safe audit/status events.
