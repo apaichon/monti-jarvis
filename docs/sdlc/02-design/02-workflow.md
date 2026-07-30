@@ -3975,3 +3975,48 @@ sequenceDiagram
 ```
 
 See DES-0052, ER Sprint 56, API Sprint 56, UX C56.
+
+## 130. User selects portal display language (Sprint 58)
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant B as Browser
+  participant S as localStorage
+  participant UI as Svelte i18n store
+
+  U->>B: Open portal (customer / tenant / admin)
+  B->>S: read monti_jarvis:ui_lang
+  alt valid en|th|ja
+    S-->>B: stored lang
+  else missing
+    B->>B: navigator.language hint or en
+  end
+  B->>UI: setLang(initial)
+  UI->>B: document.documentElement.lang = L
+  U->>B: Choose LanguageSelector (EN / TH / JA)
+  B->>UI: setLang(next)
+  UI->>S: write monti_jarvis:ui_lang
+  UI->>B: re-render chrome via t/messages
+  Note over B: No REST call; brand/API content unchanged
+```
+
+## 131. UI language vs AI reply locale (Sprint 58)
+
+```mermaid
+sequenceDiagram
+  participant Op as Tenant admin
+  participant B as Browser
+  participant G as Go :8091
+  participant AI as Gemini
+
+  Op->>B: Set Display language = ja (UI only)
+  B->>B: localStorage ui_lang=ja; labels Japanese
+  Op->>B: Settings AI reply language still th
+  B->>G: PUT /api/tenant/settings { ai_reply_locale: "th" }
+  G-->>B: saved
+  Note over B,AI: Caller later chats; system prompt still prefers th replies
+  Note over B: UI chrome remains Japanese until operator changes selector
+```
+
+See DES-0054, ER Sprint 58, API Sprint 58, UX C58/T58/A58.

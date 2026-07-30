@@ -1,6 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import FeedbackDialog from '$lib/components/FeedbackDialog.svelte';
+  import LanguageSelector from '$lib/components/LanguageSelector.svelte';
+  import { initLangFromUrl, t } from '$lib/i18n';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
@@ -22,6 +24,7 @@
   let appVersion = $state('');
 
   onMount(() => {
+    initLangFromUrl(new URLSearchParams(window.location.search));
     void fetch('/api/version')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -58,100 +61,101 @@
     <aside class="admin-sidebar">
       <a class="brand" href="{base}/packages">
         <img src="{base}/images/monti-logo.png" alt="Monti" />
-        <span><strong>MONTI</strong><small>PLATFORM ADMIN</small></span>
+        <span><strong>MONTI</strong><small>{$t.brand_admin}</small></span>
       </a>
-      <nav class="nav-links" aria-label="Platform navigation">
-        <a class="nav-link" class:active={$page.url.pathname === `${base}/`} href="{base}/"><span>⌂</span>Overview</a>
+      <nav class="nav-links" aria-label={$t.nav_aria}>
+        <a class="nav-link" class:active={$page.url.pathname === `${base}/`} href="{base}/"><span>⌂</span>{$t.nav_overview}</a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/packages`)}
           href="{base}/packages"
         >
-          <span>▦</span>Packages
+          <span>▦</span>{$t.nav_packages}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/tenants`) && !$page.url.pathname.includes('/avatars') && !$page.url.pathname.includes('/entitlement')}
           href="{base}/tenants"
         >
-          <span>◇</span>Tenants
+          <span>◇</span>{$t.nav_tenants}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/avatars`)}
           href="{base}/avatars"
         >
-          <span>◉</span>Avatars
+          <span>◉</span>{$t.nav_avatars}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/billing`) && !$page.url.pathname.startsWith(`${base}/billing/quotes`)}
           href="{base}/billing"
         >
-          <span>▣</span>Billing
+          <span>▣</span>{$t.nav_billing}
         </a>
         <a
           class="nav-link sub-link"
           class:active={$page.url.pathname.startsWith(`${base}/billing/quotes`)}
           href="{base}/billing/quotes"
         >
-          <span>▥</span>Quote requests
+          <span>▥</span>{$t.nav_quotes}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/leads`)}
           href="{base}/leads"
         >
-          <span>✉</span>Leads
+          <span>✉</span>{$t.nav_leads}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/audit-logs`)}
           href="{base}/audit-logs"
         >
-          <span>▤</span>Audit log
+          <span>▤</span>{$t.nav_audit}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/monitoring`)}
           href="{base}/monitoring"
         >
-          <span>◌</span>Monitoring
+          <span>◌</span>{$t.nav_monitoring}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/call-center`)}
           href="{base}/call-center"
         >
-          <span>◍</span>Call center
+          <span>◍</span>{$t.nav_call_center}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/settings`)}
           href="{base}/settings/payment"
         >
-          <span>⚙</span>Payment
+          <span>⚙</span>{$t.nav_payment}
         </a>
         <a
           class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/profile`)}
           href="{base}/profile"
         >
-          <span>◎</span>Profile
+          <span>◎</span>{$t.nav_profile}
         </a>
       </nav>
       <div class="admin-sidebar-foot">
-        <div class="system-card"><span><i></i>System health</span><strong>All systems operational</strong></div>
+        <div class="system-card"><span><i></i>{$t.system_health}</span><strong>{$t.system_all_ok}</strong></div>
         {#if appVersion}
-          <div style="padding:2px 0 8px;font-size:11px;color:var(--muted)">Monti Admin · {appVersion}</div>
+          <div style="padding:2px 0 8px;font-size:11px;color:var(--muted)">{$t.admin_version} · {appVersion}</div>
         {/if}
-        <button class="admin-account" type="button" onclick={handleLogout}><b>AD</b><span><strong>Admin</strong><small>{user?.email ?? 'Sign out'}</small></span><em>↗</em></button>
+        <LanguageSelector compact />
+        <button class="admin-account" type="button" onclick={handleLogout}><b>AD</b><span><strong>{$t.account_admin}</strong><small>{user?.email ?? $t.account_sign_out}</small></span><em>↗</em></button>
       </div>
     </aside>
     <section class="admin-workspace">
       <header class="topnav">
-        <div class="admin-context"><span>Monti Platform</span><b>/</b><strong>Administration</strong></div>
-        <div class="nav-right"><button aria-label="Search">⌕</button><button aria-label="Notifications">♢</button><span class="role-badge">SUPER ADMIN</span></div>
+        <div class="admin-context"><span>{$t.topbar_platform}</span><b>/</b><strong>{$t.topbar_admin}</strong></div>
+        <div class="nav-right"><button aria-label={$t.topbar_search}>⌕</button><button aria-label={$t.topbar_notifications}>♢</button><span class="role-badge">{$t.role_super}</span></div>
       </header>
       <main class="main">{@render children()}</main>
     </section>

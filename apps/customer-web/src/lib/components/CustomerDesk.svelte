@@ -42,6 +42,8 @@
     type ThemeBranding
   } from '$lib/theme/applyTheme';
   import { brandMonogram } from '$lib/brandMark';
+  import LanguageSelector from '$lib/components/LanguageSelector.svelte';
+  import { initLangFromUrl, t } from '$lib/i18n';
   import {
     ensureAudioPermission,
     friendlyMediaError,
@@ -73,11 +75,8 @@
     missingKm?: boolean;
   };
 
-  const topics = [
-    { id: 'general', label: 'General' },
-    { id: 'billing', label: 'Billing' },
-    { id: 'technical', label: 'Technical' }
-  ] as const;
+  const topicIds = ['general', 'billing', 'technical'] as const;
+  type TopicId = (typeof topicIds)[number];
 
   let agents = $state<Agent[]>([]);
   let selectedAgent = $state<Agent | null>(null);
@@ -90,7 +89,7 @@
   let remainingTimer = $state('00:00:00');
   let remainingSeconds = $state(0);
   let voiceState = $state('Select an agent, then start an inbound voice call.');
-  let topic = $state<(typeof topics)[number]['id']>('general');
+  let topic = $state<TopicId>('general');
   let chatSessionId = $state('');
   let chatHistory = $state<ChatHistoryEntry[]>([]);
   let messages = $state<UiMessage[]>([
@@ -165,6 +164,7 @@
   const transcriptKeys = new Set<string>();
 
   onMount(async () => {
+    initLangFromUrl(new URLSearchParams(window.location.search));
     customer = getStoredCustomer();
     if (tenantId) {
       const theme = await fetchPublicTheme(window.location.origin, tenantId);
@@ -371,7 +371,7 @@
 
   function selectedSpeakerLabel() {
     if (!speakerSelectable) return 'System default speaker';
-    return audioOutputs.find((d) => d.deviceId === selectedSpeakerId)?.label || 'Default speaker';
+    return audioOutputs.find((d) => d.deviceId === selectedSpeakerId)?.label || $t.desk_default_speaker;
   }
 
   function touchActivity() {
@@ -389,7 +389,7 @@
   }
 
   const onlineLabel = $derived(
-    systemLiveKind === 'ok' ? 'Online' : systemLiveKind === 'issues' ? 'Limited' : systemLiveKind === 'offline' ? 'Offline' : 'Checking…'
+    systemLiveKind === 'ok' ? $t.status_online : systemLiveKind === 'issues' ? $t.status_limited : systemLiveKind === 'offline' ? $t.status_offline : $t.status_checking
   );
   const roleLabel = $derived(customer?.role === 'customer' ? 'Customer' : customer?.role || 'Guest');
   const lastActiveLabel = $derived(formatLastActive(lastActiveAt));
@@ -998,10 +998,10 @@
       ? `Call ${session.id.slice(0, 8)} · ${selectedAgent?.name ?? 'agent'}`
       : chatSessionId
         ? `Call ${chatSessionId.slice(0, 8)} · ${selectedAgent?.name ?? 'agent'}`
-        : 'New call session'
+        : $t.desk_new_session
   );
   const callStarted = $derived(live || !!session);
-  const customerLabel = $derived(customer?.display_name || customer?.email || 'Customer');
+  const customerLabel = $derived(customer?.display_name || customer?.email || $t.desk_customer);
   const showCallDetails = $derived(!callStarted || callControlsExpanded);
   // Hide agent picker, Start call, and orb until the customer is signed in.
   const hideAgentSurfaceBeforeLogin = $derived(authRequired && !callStarted);
@@ -1033,19 +1033,20 @@
               <i></i>
               {onlineLabel}
             </span>
+            <LanguageSelector compact />
           </div>
           <span class="monti-desk-tag">AI CALL CENTER</span>
-          <p class="monti-desk-tagline">Your AI assistant. <em>Always here to help.</em></p>
+          <p class="monti-desk-tagline">{$t.desk_tagline}</p>
         </div>
       </div>
 
       <!-- 2. Selected tenant -->
       <section class="company-card" aria-label="Selected brand">
         <div class="company-card-top">
-          <span class="company-card-label">Selected tenant</span>
+          <span class="company-card-label">{$t.desk_selected_tenant}</span>
           {#if onChangeTenant && !live}
             <button class="link-btn" type="button" onclick={() => onChangeTenant?.()}>
-              Change tenant ⌃
+              {$t.desk_change_tenant} ⌃
             </button>
           {/if}
         </div>
@@ -1059,11 +1060,11 @@
           </div>
           <div class="company-meta">
             <strong>{tenantName || brand.brand_name || tenantLabel}</strong>
-            <span>AI · Text &amp; Voice</span>
+            <span>{$t.picker_badge}</span>
             {#if tenantSlug || tenantLabel}
-              <span class="company-brand-line">Brand · {tenantName || tenantLabel}</span>
+              <span class="company-brand-line">{$t.desk_brand_line} · {tenantName || tenantLabel}</span>
             {/if}
-            <span class="active-pill">Active</span>
+            <span class="active-pill">{$t.desk_active}</span>
           </div>
         </div>
       </section>
@@ -1074,14 +1075,14 @@
         <div class="live-call-summary" style="--assistant-color:{selectedAgent?.color || 'var(--cyan)'}">
           <div class="agent-dot">{agentInitial(selectedAgent?.name)}</div>
           <div>
-            <strong>{selectedAgent?.name || 'Agent'}</strong>
+            <strong>{selectedAgent?.name || $t.desk_agent}</strong>
             <span>{callTimerLabel} · {customerLabel}</span>
           </div>
         </div>
         <button class="strip-button" type="button" onclick={() => (callControlsExpanded = !callControlsExpanded)}>
           {callControlsExpanded ? 'Collapse' : 'Expand'}
         </button>
-        <button class="strip-button end" type="button" disabled={busy} onclick={() => void endActiveCall()}>End</button>
+        <button class="strip-button end" type="button" disabled={busy} onclick={() => void endActiveCall()}>{$t.desk_end}</button>
       </section>
     {/if}
 
@@ -1090,7 +1091,7 @@
         <div class="section-title-row">
           <span class="section-ico sparkle" aria-hidden="true">✦</span>
           <div>
-            <strong>AI AVATAR LIVE</strong>
+            <strong>{$t.desk_ai_avatar_live}</strong>
             <p>{voiceState}</p>
           </div>
           <div class="status-pill compact" class:warning={callTimerWarning}>{callTimerLabel}</div>
@@ -1140,8 +1141,8 @@
               <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2A3.5 3.5 0 0 0 16.5 12zM14 4.2v2.1a6 6 0 0 1 0 11.4v2.1a8 8 0 0 0 0-15.6z"/></svg>
             </span>
             <div>
-              <strong>AUDIO SETTINGS</strong>
-              <p>Configure your microphone and speaker</p>
+              <strong>{$t.desk_audio_settings}</strong>
+              <p>{$t.desk_audio_help}</p>
             </div>
           </div>
           <span class="chev">{audioOpen ? '⌃' : '⌄'}</span>
@@ -1154,7 +1155,7 @@
                   <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg>
                 </span>
                 <span class="dev-copy">
-                  <b>Microphone</b>
+                  <b>{$t.desk_mic}</b>
                   <small>{selectedMicLabel()}</small>
                 </span>
                 <span class="level-bars" aria-hidden="true" title="Live mic level">
@@ -1188,7 +1189,7 @@
                   <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2A3.5 3.5 0 0 0 16.5 12z"/></svg>
                 </span>
                 <span class="dev-copy">
-                  <b>Speaker</b>
+                  <b>{$t.desk_speaker}</b>
                   <small>{selectedSpeakerLabel()}</small>
                 </span>
                 <span class="level-bars" class:idle={!audioTesting} aria-hidden="true" title="Speaker activity">
@@ -1217,7 +1218,7 @@
                 {/if}
               </select>
               {#if !speakerSelectable}
-                <p class="voice-state">Speaker selection needs Chrome/Edge (setSinkId). Mic selection still works.</p>
+                <p class="voice-state">{$t.desk_speaker_note}</p>
               {/if}
             </div>
 
@@ -1241,8 +1242,8 @@
                   <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M4 12h2v4H4v-4zm4-4h2v12H8V8zm4-3h2v18h-2V5zm4 5h2v8h-2v-8zm4-2h2v12h-2V8z"/></svg>
                 </span>
                 <div>
-                  <strong>Test your audio</strong>
-                  <p>Make sure your mic and speaker work properly.</p>
+                  <strong>{$t.desk_test_audio}</strong>
+                  <p>{$t.desk_test_help}</p>
                 </div>
               </div>
               <button
@@ -1254,7 +1255,7 @@
                   void startAudioTest();
                 }}
               >
-                {audioTesting ? 'Stop test' : 'Start test'}
+                {audioTesting ? $t.desk_stop_test : $t.desk_start_test}
               </button>
             </div>
             {#if audioNote}
@@ -1270,14 +1271,14 @@
           <div class="section-title-row">
             <span class="section-ico sparkle" aria-hidden="true">✦</span>
             <div>
-              <strong>AI AVATAR CALL</strong>
-              <p>Choose an AI avatar to start a conversation</p>
+              <strong>{$t.desk_ai_avatar_call}</strong>
+              <p>{$t.desk_choose_avatar}</p>
             </div>
             <div class="status-pill compact" class:warning={callTimerWarning}>{callTimerLabel}</div>
           </div>
 
           {#if agents.length === 0}
-            <div class="voice-state">Sign in to show available AI avatars.</div>
+            <div class="voice-state">{$t.desk_sign_in_avatars}</div>
           {:else}
             {#if selectedAgent}
               <div
@@ -1301,7 +1302,7 @@
                 </div>
                 <Waveform color={selectedAgent.color} count={30} />
                 <div class="avatar-live-state">
-                  {live ? 'Live now' : busy ? 'Connecting...' : 'Ready to call'}
+                  {live ? $t.desk_live_now : busy ? $t.desk_connecting : $t.desk_ready}
                 </div>
               </div>
             {/if}
@@ -1343,12 +1344,12 @@
                       />
                     </svg>
                     {live && selectedAgent?.id === agent.id
-                      ? 'End call'
+                      ? $t.desk_end_call
                       : selectedAgent?.id === agent.id
                         ? busy
-                          ? 'Connecting…'
-                          : 'Call now'
-                        : 'Call'}
+                          ? $t.desk_connecting
+                          : $t.picker_call
+                        : $t.picker_call}
                   </button>
                 </article>
               {/each}
@@ -1371,8 +1372,8 @@
             <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 21V5l8-3v19H3zm10 0V8l8 3v10h-8zM6 8h2v2H6V8zm0 4h2v2H6v-2zm0 4h2v2H6v-2zm10-3h2v2h-2v-2zm0 4h2v2h-2v-2z"/></svg>
           </span>
           <div>
-            <strong>MY TENANTS</strong>
-            <p>Manage and switch between your tenants</p>
+            <strong>{$t.desk_my_tenants}</strong>
+            <p>{$t.desk_manage_tenants}</p>
           </div>
           <button class="tenant-next" type="button" disabled={live} onclick={openTenantDirectory} aria-label="Open tenant directory">›</button>
         </div>
@@ -1411,7 +1412,7 @@
           {/if}
           <button type="button" class="tenant-mini-card add" disabled={live} onclick={openTenantDirectory}>
             <span class="tenant-add-plus">＋</span>
-            <strong>Add tenant</strong>
+            <strong>{$t.desk_add_tenant}</strong>
           </button>
         </div>
       </section>
@@ -1434,7 +1435,7 @@
               </div>
             </div>
             <button class="voice-button signout-button" type="button" onclick={() => void signOutCustomer()}>
-              Sign out
+              {$t.desk_sign_out}
             </button>
           </div>
         {:else}
@@ -1475,7 +1476,7 @@
               />
             {/if}
             <button class="voice-button" type="submit" disabled={authBusy || (!challengeId && !customerEmail.trim()) || (!!challengeId && !otp.trim())}>
-              {authBusy ? '…' : challengeId ? 'Verify OTP' : 'Send OTP'}
+              {authBusy ? '…' : challengeId ? $t.desk_verify : $t.desk_send_otp}
             </button>
           </form>
         {/if}
@@ -1553,16 +1554,20 @@
       <div>
         <h2>Caller Desk</h2>
         <div class="tabs" role="tablist" aria-label="Call topic">
-          {#each topics as tab (tab.id)}
+          {#each topicIds as topicId (topicId)}
             <button
               type="button"
               class="tab"
-              class:active={topic === tab.id}
+              class:active={topic === topicId}
               role="tab"
-              aria-selected={topic === tab.id}
-              onclick={() => (topic = tab.id)}
+              aria-selected={topic === topicId}
+              onclick={() => (topic = topicId)}
             >
-              {tab.label}
+              {topicId === 'general'
+                ? $t.desk_topic_general
+                : topicId === 'billing'
+                  ? $t.desk_topic_billing
+                  : $t.desk_topic_technical}
             </button>
           {/each}
         </div>
@@ -1618,12 +1623,12 @@
         <div class="composer">
           <textarea
             bind:value={input}
-            placeholder={authRequired ? 'Sign in with OTP first...' : quotaExhausted ? 'Customer quota exhausted' : 'Ask your question...'}
+            placeholder={authRequired ? $t.desk_sign_in : quotaExhausted ? $t.status_error : $t.desk_composer_ph}
             autocomplete="off"
             disabled={busy || authRequired || quotaExhausted}
             onkeydown={handleKeydown}
           ></textarea>
-          <button class="send" type="submit" disabled={busy || authRequired || quotaExhausted}>Send</button>
+          <button class="send" type="submit" disabled={busy || authRequired || quotaExhausted}>{$t.action_send}</button>
         </div>
         {#if chatSessionId && !live}
           <button class="plain-button finish-chat" type="button" onclick={finishChat}>Finish chat &amp; rate</button>

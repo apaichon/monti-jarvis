@@ -81,7 +81,7 @@
 | **55** | **Tenant** | **Call Center Statistics grouped by topic** | **F+** | **22, 25, 30** · ✅ **v2.28.0** · [FEAT-0047](../01-features/FEAT-0047-tenant-call-center-topic-statistics.md) · [SPRINT-055](../03-sprints/SPRINT-055.md) · [DES-0051](../02-design/51-tenant-call-center-topic-statistics-spec.md) · extends [FEAT-0027](../01-features/FEAT-0027-tenant-call-center-statistics.md) |
 | **56** | **Customer** | **Caller desk UX revamp: v2 call rail, selected tenant card, mic/speaker device settings, avatar call grid, tenant switcher, account/footer, and larger Monti + company branding** | **A+** | **1, 5, 39, 54** · ✅ **v2.29.0** · [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · [SPRINT-056](../03-sprints/SPRINT-056.md) · [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) |
 | **57** | **Customer / Product Web / Branding** | **Monti root-domain logo and social preview metadata: use new Monti logo and Open Graph/Twitter tags for Facebook/link sharing** | **O+** | **39, 48, 54, 56** · ✅ **v2.30.0** · [FEAT-0049](../01-features/FEAT-0049-monti-logo-social-preview-metadata.md) · [SPRINT-057](../03-sprints/SPRINT-057.md) · [DES-0053](../02-design/53-monti-logo-social-preview-metadata-spec.md) |
-| **58** | **Customer / Tenant / Platform Admin** | **Portal UI language selector: EN, TH, and Japanese localized labels for call page, tenant portal, and admin pages** | **I18N** | **16, 20, 39, 54, 56, 57** · backlog |
+| **58** | **Customer / Tenant / Platform Admin** | **Portal UI language selector: EN, TH, and Japanese localized labels for call page, tenant portal, and admin pages** | **I18N** | **16, 20, 39, 54, 56, 57** · ✅ **v2.31.0** · [FEAT-0050](../01-features/FEAT-0050-portal-ui-language-selector.md) · [SPRINT-058](../03-sprints/SPRINT-058.md) · [DES-0054](../02-design/54-portal-ui-language-selector-spec.md) |
 | **59** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · backlog |
 | **60** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 59** · backlog |
 | **61** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · backlog |
@@ -2019,77 +2019,38 @@ Graph/Twitter metadata for a polished product preview.
 
 ---
 
-## Backlog: SPRINT-058 — Portal UI Language Selector
+## Shipped: SPRINT-058 — Portal UI Language Selector (EN · TH · JA) ✅ v2.31.0
 
-**Platform:** Customer / Tenant / Platform Admin · **Feature:** Let users choose
-the UI label language on the customer call page, tenant portal, and platform
-admin pages, with localized labels for English (`en`), Thai (`th`), and
-Japanese (`ja`) · **Depends:** 16, 20, 39, 54, 56, 57 · **Status:** backlog
-
-### Problem today
-
-Sprint 16 stores tenant locale and AI reply-language hints, but the portal UI
-labels are still page-specific and English-first. Callers, tenant operators,
-and platform admins need a consistent language selector that changes local UI
-labels without changing tenant KM content, transcripts, or AI reply behavior.
+**Platform:** Customer / Tenant / Platform Admin · **Feature:** UI language
+selector with localized labels for English, Thai, and Japanese on the customer
+call page, tenant portal, and platform admin · **Depends:** 16, 20, 39, 54, 56, 57 ·
+**Status:** shipped · **Release:** v2.31.0 · **Closed:** 2026-07-30 ·
+**Feature:** [FEAT-0050](../01-features/FEAT-0050-portal-ui-language-selector.md) ·
+**Design:** [DES-0054](../02-design/54-portal-ui-language-selector-spec.md) ·
+**Sprint:** [SPRINT-058](../03-sprints/SPRINT-058.md)
 
 ### Goal
 
-1. **Call page language selector** — Customer call page can switch visible UI
-   labels between EN, TH, and Japanese.
-2. **Tenant portal language selector** — Tenant portal navigation, primary
-   actions, form labels, statuses, and common empty/error states use the chosen
-   display language.
-3. **Admin page language selector** — Platform admin pages use the same language
-   selection pattern and localized label catalog.
+1. Language selector on customer, tenant, and admin portals.
+2. EN / TH / JA catalogs for primary chrome (nav, actions, statuses, empty/error).
+3. Persist `monti_jarvis:ui_lang` in the browser; EN fallback for missing keys.
+4. Keep UI language separate from S16 AI reply / workspace locale.
 
-### Scope
+### Commitment (12/12)
 
-### In
+| Task | Points | Focus |
+| --- | ---: | --- |
+| TASK-0208 | 3 | Shared i18n runtime + LanguageSelector |
+| TASK-0209 | 3 | Customer directory + call desk labels |
+| TASK-0210 | 3 | Tenant portal shell + primary pages |
+| TASK-0211 | 3 | Platform admin + cross-surface UAT |
 
-- Shared locale catalog keys for customer-web, tenant-web, and
-  platform-admin-web UI chrome.
-- Language selector component/pattern reused across the call page, tenant portal,
-  and platform admin pages.
-- Localized labels for primary navigation, buttons, forms, statuses, common
-  validation/help copy, and empty states on the selected pages.
-- Persist selected display language in browser storage; use authenticated user
-  preference later if the current surface already has one.
-- Fallback behavior: missing TH/JA labels fall back to EN rather than rendering
-  blank strings.
-- Preserve Sprint 16 AI reply locale behavior; this feature is for UI labels.
+### Design pack
 
-### Out
+- Deep spec DES-0054 · workflow §130–131 · ER Sprint 58 · API Sprint 58 · UX C58/T58/A58
+- Manual UAT: [SPRINT-058-portal-ui-language-selector-manual.md](../06-manual-tests/SPRINT-058-portal-ui-language-selector-manual.md)
 
-- Machine translation or auto-detection.
-- Translating tenant-authored KM, uploaded documents, chat transcripts, brand
-  marketing content, invoices/legal text, or third-party payment/provider pages.
-- Right-to-left languages.
-- Reworking voice model language selection beyond displaying localized labels.
-
-### Deliverables
-
-| Deliverable | Scope |
-| --- | --- |
-| Locale catalog | EN/TH/JA label keys for shared UI chrome and selected pages |
-| Language selector | Reusable selector component/pattern for customer, tenant, and admin surfaces |
-| Customer call page | Localized call controls, tenant selection labels, status text, auth/account labels |
-| Tenant portal | Localized nav, forms, actions, tables, and common states |
-| Platform admin pages | Localized nav, dashboard/admin controls, actions, tables, and common states |
-| Preference persist | Browser-level display-language persistence with safe default to EN |
-| Verification | EN/TH/JA smoke across all three surfaces; missing-key fallback check |
-
-### Acceptance sketch
-
-1. Customer call page, tenant portal, and platform admin pages each expose EN,
-   TH, and Japanese display-language selection.
-2. Selecting a language updates UI labels without logout or route reset.
-3. Reloading the page preserves the selected display language for the browser.
-4. Missing TH/JA translations fall back to EN and never render blank controls.
-5. Existing tenant locale / AI reply-language settings from S16 remain separate
-   unless a later sprint explicitly links them.
-
----
+**Worktree:** `.worktrees/SPRINT-058` · branch `feature/sprint-058-portal-ui-i18n`
 
 ## Backlog: SPRINT-059 — Tenant-Owned Gemini Key Enforcement
 

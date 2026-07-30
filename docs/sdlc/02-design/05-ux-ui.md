@@ -4604,3 +4604,120 @@ User denies microphone
 | Microphone access is needed for voice calls. You can still chat. | ต้องการสิทธิ์ไมโครโฟนสำหรับสายเสียง คุณยังแชทได้ |
 
 See DES-0052, workflow §127–129, ER Sprint 56, API Sprint 56.
+
+## C58 — Customer portal language selector (Sprint 58)
+
+### Screen map → API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| C58-A Language selector | Choose EN / TH / JA | localStorage only |
+| C58-A Directory labels | View chrome | catalogs; `GET /api/public/brands` for brand fields |
+| C58-B Desk labels | View/call chrome | catalogs; existing chat/voice APIs |
+| C58-B Audio labels | Open settings | catalogs; mediaDevices (S56) |
+
+### Layout (directory + desk chrome)
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  [Monti logo]  Brand directory                    Language [EN|TH|JA]   │
+│  Search brands…                                                         │
+│  ┌────────┐ ┌────────┐ ┌────────┐                                      │
+│  │ Logo   │ │ Logo   │ │ Logo   │  brand name/blurb = API (untranslated)│
+│  │ Call → │ │ Call → │ │ Call → │  CTA label = catalog                  │
+│  └────────┘ └────────┘ └────────┘                                      │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────┬─────────────────────────────────────────────────────┐
+│ Monti · company    │ Caller desk                                         │
+│ Language [EN|TH|JA]│ Topics · transcript · composer (labels localized)   │
+│ Start / End call   │                                                     │
+│ Audio settings     │ Live · OK  (localized)                              │
+└────────────────────┴─────────────────────────────────────────────────────┘
+```
+
+### Flow C58
+
+1. Open `/` → language from storage/query/default  
+2. Switch to ไทย → directory chrome Thai; brand names unchanged  
+3. Open desk → same language  
+4. Reload → language persists  
+
+---
+
+## T58 — Tenant portal language selector (Sprint 58)
+
+### Screen map → API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| T58-A Language selector | Choose EN / TH / JA | localStorage |
+| T58-A Nav groups/links | Navigate | catalogs only |
+| T58-B Settings display language | Informational + selector | localStorage |
+| T58-B Settings AI reply locale | Save S16 locale | `PUT /api/tenant/settings` |
+
+### Layout (sidebar)
+
+```
+┌──────────────┬──────────────────────────────────────────┐
+│ MONTI TENANT │  Page title (localized)                  │
+│ Workspace    │                                          │
+│ Operations   │  ...                                     │
+│  Overview    │                                          │
+│  Call center │                                          │
+│  ...         │                                          │
+│ Settings     │                                          │
+│──────────────│                                          │
+│ Language     │                                          │
+│ [EN|TH|JA]   │                                          │
+│ Plan card    │                                          │
+│ Account      │                                          │
+└──────────────┴──────────────────────────────────────────┘
+```
+
+### Flow T58
+
+1. Login → shell loads stored UI lang  
+2. Switch 日本語 → nav groups Japanese  
+3. Settings: UI lang JA; AI reply still TH → save AI only → UI stays JA  
+
+---
+
+## A58 — Platform admin language selector (Sprint 58)
+
+### Screen map → API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| A58-A Language selector | Choose EN / TH / JA | localStorage |
+| A58-A Nav links | Navigate | catalogs |
+| A58-B System health card | View | catalogs |
+
+### Layout
+
+```
+┌──────────────┬──────────────────────────────────────────┐
+│ MONTI ADMIN  │  Overview / Packages / ...               │
+│ Overview     │                                          │
+│ Packages     │                                          │
+│ Tenants      │                                          │
+│ ...          │                                          │
+│──────────────│                                          │
+│ Language     │                                          │
+│ [EN|TH|JA]   │                                          │
+│ System health│                                          │
+│ Admin account│                                          │
+└──────────────┴──────────────────────────────────────────┘
+```
+
+### Component → file
+
+| UI | File |
+| --- | --- |
+| i18n runtime | `apps/*/src/lib/i18n/` |
+| Selector | `LanguageSelector.svelte` (each app) |
+| Customer | `TenantPicker.svelte`, `CustomerDesk.svelte` |
+| Tenant shell | `apps/tenant-web/src/routes/+layout.svelte` |
+| Admin shell | `apps/platform-admin-web/src/routes/+layout.svelte` |
+
+See DES-0054, workflow §130–131, ER Sprint 58, API Sprint 58.

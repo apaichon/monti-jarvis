@@ -55,6 +55,7 @@ System design artifacts for Monti Jarvis.
 | 48 | [48-commercial-plans-billing-operations-spec.md](48-commercial-plans-billing-operations-spec.md) | 51 | Shared Cloud checkout, Dedicated quotation, billing scheduler, current quota/next bill, and finance documents | **`shipped`** v2.25.0 |
 | 50 | [50-conversation-auto-register-app-version-spec.md](50-conversation-auto-register-app-version-spec.md) | 53 | Conversation auto-register email OTP + app version on UI | **`shipped`** v2.26.0 |
 | 51 | [52-caller-desk-branding-audio-devices-spec.md](52-caller-desk-branding-audio-devices-spec.md) | 56 | Caller desk large logos + mic/speaker device settings | **`approved`** |
+| 54 | [54-portal-ui-language-selector-spec.md](54-portal-ui-language-selector-spec.md) | 58 | Portal UI language selector EN/TH/JA for customer, tenant, admin | **`shipped`** v2.31.0 |
 | 49 | [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md) | 54 | Customer portal tenant/brand picker; no required `?tenant_id=` | **`shipped`** v2.27.0 |
 | 51 | [51-tenant-call-center-topic-statistics-spec.md](51-tenant-call-center-topic-statistics-spec.md) | 55 | Tenant call-center statistics grouped and filtered by topic | **`shipped`** v2.28.0 |
 
@@ -151,3 +152,4 @@ workflow §120–124; ER/API Sprint 51; UX T51/A51.
 **Verify:** [test matrix](../05-test-scenarios/TEST-MATRIX.md) · [manual tests](../06-manual-tests/) · [deploy](../07-deployment/LOCAL-DEV.md)
 
 **Excel exports:** [excel-output/](excel-output/) mirrors the same `NN-` prefix order.
+**Sprint 58:** Design pack approved — [54-portal-ui-language-selector-spec.md](54-portal-ui-language-selector-spec.md); workflow §130–131; API Sprint 58; UX C58/T58/A58. [SPRINT-058](../03-sprints/SPRINT-058.md).

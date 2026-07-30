@@ -18,6 +18,8 @@
     putCustomerAuthSettings,
     type CustomerAuthSettings
   } from '$lib/api/customerAuth';
+  import LanguageSelector from '$lib/components/LanguageSelector.svelte';
+  import { t as uiT } from '$lib/i18n';
 
   let settings = $state<TenantSettings | null>(null);
   let usage = $state<UsageSnapshot | null>(null);
@@ -56,7 +58,7 @@
           subtitle: 'ภาษา เขตเวลา การใช้งาน และขีดจำกัดการโทร',
           workspace: 'พื้นที่ทำงาน',
           displayName: 'ชื่อแสดง',
-          locale: 'ภาษาพอร์ทัล',
+          locale: 'ภาษาพื้นที่ทำงาน',
           timezone: 'เขตเวลา',
           aiLocale: 'ภาษาที่ AI ตอบ (ว่าง = ตามผู้โทร)',
           saveSettings: 'บันทึกการตั้งค่า',
@@ -72,14 +74,14 @@
           tier: 'ระดับลูกค้า (โน้ต)',
           group: 'กลุ่ม (โน้ต)',
           labelsHelp: 'โน้ตภายใน — จัดการระดับลูกค้าที่เมนู Tiers',
-          i18nNote: 'แปลทั้งพอร์ทัลยังไม่อยู่ในสโคป — หน้านี้เท่านั้น'
+          i18nNote: 'ภาษาที่แสดงบนหน้าจอแยกจากภาษาพื้นที่ทำงาน / ภาษาที่ AI ตอบ'
         }
       : {
           title: 'Settings',
           subtitle: 'Locale, timezone, package usage, and call-time caps',
           workspace: 'Workspace',
           displayName: 'Display name',
-          locale: 'Portal locale',
+          locale: 'Workspace locale',
           timezone: 'Timezone',
           aiLocale: 'AI reply language (empty = follow caller)',
           saveSettings: 'Save settings',
@@ -95,7 +97,7 @@
           tier: 'User tier label',
           group: 'User group label',
           labelsHelp: 'Ops notes — manage structured tiers under Tiers (menu)',
-          i18nNote: 'Full portal i18n is out of scope — settings page only'
+          i18nNote: 'Display language is separate from workspace locale / AI reply language'
         }
   );
 
@@ -231,10 +233,17 @@
     <p style="margin:6px 0 0;color:var(--muted);font-size:13px">{t.subtitle}</p>
     <p style="margin:4px 0 0;color:var(--muted);font-size:11px">{t.i18nNote}</p>
   </div>
+  <div style="display:grid;gap:6px;justify-items:end">
+    <span style="font-size:12px;color:var(--muted)">{$uiT.settings_display_language}</span>
+    <LanguageSelector />
+    <span style="font-size:11px;color:var(--muted);max-width:280px;text-align:right"
+      >{$uiT.settings_display_language_help}</span
+    >
+  </div>
 </div>
 
 {#if loading}
-  <p style="color:var(--muted)">Loading…</p>
+  <p style="color:var(--muted)">{$uiT.status_loading}</p>
 {:else}
   <div class="grid">
     <section class="card">
@@ -244,7 +253,7 @@
         <input type="text" bind:value={displayName} placeholder="Acme Support" />
       </label>
       <label>
-        <span>{t.locale}</span>
+        <span>{t.locale} · {$uiT.settings_workspace_locale}</span>
         <select bind:value={locale}>
           <option value="en">English (en)</option>
           <option value="th">ไทย (th)</option>
@@ -262,7 +271,7 @@
         </select>
       </label>
       <label>
-        <span>{t.aiLocale}</span>
+        <span>{t.aiLocale} · {$uiT.settings_ai_reply_language}</span>
         <select bind:value={aiReplyLocale}>
           <option value="">Auto / follow caller</option>
           <option value="en">English</option>

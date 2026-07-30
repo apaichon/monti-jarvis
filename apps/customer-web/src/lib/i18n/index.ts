@@ -1,0 +1,77 @@
+import { browser } from '$app/environment';
+import { derived, get, writable } from 'svelte/store';
+import { messages, type Lang, type Messages } from './messages';
+
+export const STORAGE_KEY = 'monti_jarvis:ui_lang';
+
+const SUPPORTED: Lang[] = ['en', 'th', 'ja'];
+
+function isLang(v: string | null | undefined): v is Lang {
+  return v === 'en' || v === 'th' || v === 'ja';
+}
+
+function detectInitial(): Lang {
+  if (!browser) return 'en';
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (isLang(stored)) return stored;
+  const nav = (navigator.language || '').toLowerCase();
+  if (nav.startsWith('th')) return 'th';
+  if (nav.startsWith('ja')) return 'ja';
+  return 'en';
+}
+
+export const lang = writable<Lang>(detectInitial());
+
+/** Messages for current lang with per-key EN fallback. */
+export const t = derived(lang, ($lang) => {
+  const cur = messages[$lang] ?? messages.en;
+  const base = messages.en;
+  return new Proxy(cur, {
+    get(target, prop: string | symbol) {
+      if (typeof prop !== 'string') return undefined;
+      const v = (target as Record<string, string>)[prop];
+      if (v != null && v !== '') return v;
+      const fb = (base as Record<string, string>)[prop];
+      return fb != null && fb !== '' ? fb : prop;
+    }
+  }) as Messages;
+});
+
+export function getLang(): Lang {
+  return get(lang);
+}
+
+export function setLang(next: Lang) {
+  if (!isLang(next)) return;
+  lang.set(next);
+  if (browser) {
+    localStorage.setItem(STORAGE_KEY, next);
+    document.documentElement.lang = next;
+    document.documentElement.dataset.lang = next;
+  }
+}
+
+export function initLangFromUrl(searchParams?: URLSearchParams) {
+  if (browser && searchParams) {
+    const q = searchParams.get('lang');
+    if (isLang(q)) {
+      setLang(q);
+      return;
+    }
+  }
+  if (browser) {
+    document.documentElement.lang = get(lang);
+    document.documentElement.dataset.lang = get(lang);
+  }
+}
+
+export function supportedLangs(): Lang[] {
+  return [...SUPPORTED];
+}
+
+export function msg(): Messages {
+  return get(t);
+}
+
+export type { Lang, Messages };
+export { messages };

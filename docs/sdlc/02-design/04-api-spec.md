@@ -4742,3 +4742,36 @@ S56 is client UX + browser media APIs. Reuse:
 | `/t/{slug}` routing | S54 |
 
 See DES-0051, workflow §127–129, ER Sprint 56, UX C56.
+
+## Sprint 58 — Portal UI language selector
+
+**No new REST endpoints.** Display language is entirely client-side.
+
+### Contract notes
+
+| Topic | Rule |
+| --- | --- |
+| UI language | Browser `localStorage` `monti_jarvis:ui_lang` ∈ {`en`,`th`,`ja`} |
+| Optional query | `?lang=en|th|ja` initializes client store (not a server filter) |
+| Content APIs | Brand names, package names, ticket subjects remain API payload language |
+| S16 settings | `PUT /api/tenant/settings` `locale` / `ai_reply_locale` unchanged |
+| Auth | No RBAC impact |
+
+### Explicit non-endpoints (do not invent this sprint)
+
+| Method | Path | Status |
+| --- | --- | --- |
+| `PATCH` | `/api/me/preferences` | Deferred — server-persisted UI lang |
+| `GET` | `/api/i18n/{lang}.json` | Deferred — catalogs ship in SPA bundles |
+
+### Compatibility
+
+- Existing Thai hard-coded labels may be migrated into catalogs without API bumps.
+- product-web continues to use its own i18n store/key until a later unify pass.
+
+### Health / version
+
+No `/healthz` contract change required for i18n. Customer-visible app version
+string (S53) remains as shipped.
+
+See DES-0054, workflow §130–131, ER Sprint 58, UX C58/T58/A58.

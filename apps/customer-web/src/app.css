@@ -278,6 +278,9 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .online-pill {

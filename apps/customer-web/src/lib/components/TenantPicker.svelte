@@ -1,6 +1,8 @@
 <script lang="ts">
   import { listPublicBrands, type PublicBrand } from '$lib/api/brands';
   import { brandMonogram } from '$lib/brandMark';
+  import LanguageSelector from '$lib/components/LanguageSelector.svelte';
+  import { initLangFromUrl, t } from '$lib/i18n';
   import { onMount } from 'svelte';
 
   type Props = {
@@ -25,7 +27,7 @@
       items = res.items;
       total = res.total;
     } catch (err) {
-      loadError = err instanceof Error ? err.message : 'Failed to load brands';
+      loadError = err instanceof Error ? err.message : $t.picker_load_error;
       items = [];
       total = 0;
     } finally {
@@ -34,6 +36,7 @@
   }
 
   onMount(() => {
+    initLangFromUrl(new URLSearchParams(window.location.search));
     void load();
   });
 
@@ -44,29 +47,32 @@
   }
 </script>
 
-<main class="tenant-picker" aria-label="Choose a brand to call">
+<main class="tenant-picker" aria-label={$t.picker_aria}>
   <header class="picker-hero">
-    <div class="monti-hero">
-      <div class="monti-hero-ring">
-        <img class="monti-hero-img" src="/images/monti-logo.png" width="120" height="120" alt="Monti" />
+    <div class="picker-hero-top">
+      <div class="monti-hero">
+        <div class="monti-hero-ring">
+          <img class="monti-hero-img" src="/images/monti-logo.png" width="120" height="120" alt="Monti" />
+        </div>
+        <div class="monti-wordmark">
+          <span class="monti-title">MONTI</span>
+          <span class="monti-tag">AI CALL CENTER</span>
+        </div>
       </div>
-      <div class="monti-wordmark">
-        <span class="monti-title">MONTI</span>
-        <span class="monti-tag">AI CALL CENTER</span>
-      </div>
+      <LanguageSelector />
     </div>
     <div class="picker-copy">
-      <h1>Choose who to call</h1>
-      <p class="picker-sub">เลือกแบรนด์ที่ต้องการติดต่อ · Select a brand to start chat or voice</p>
+      <h1>{$t.picker_title}</h1>
+      <p class="picker-sub">{$t.picker_sub}</p>
     </div>
   </header>
 
   <div class="picker-search">
-    <label class="sr-only" for="brand-search">Search brands</label>
+    <label class="sr-only" for="brand-search">{$t.picker_search}</label>
     <input
       id="brand-search"
       type="search"
-      placeholder="Search brands… · ค้นหาแบรนด์…"
+      placeholder={$t.picker_search_ph}
       value={q}
       oninput={(e) => onSearchInput((e.currentTarget as HTMLInputElement).value)}
       autocomplete="off"
@@ -78,11 +84,11 @@
   {/if}
 
   {#if loading}
-    <div class="picker-status">Loading brands…</div>
+    <div class="picker-status">{$t.picker_loading}</div>
   {:else if items.length === 0}
     <div class="picker-empty">
-      <strong>No brands available</strong>
-      <p>ยังไม่มีแบรนด์ที่เปิดให้บริการ · No public brands are listed yet.</p>
+      <strong>{$t.picker_empty_title}</strong>
+      <p>{$t.picker_empty_body}</p>
     </div>
   {:else}
     <ul class="picker-grid">
@@ -98,7 +104,7 @@
             </div>
             <strong class="brand-name">{brand.name || brand.slug}</strong>
             <span class="brand-meta">{brand.slug}</span>
-            <span class="brand-badge">AI · Text &amp; Voice</span>
+            <span class="brand-badge">{$t.picker_badge}</span>
             <span class="brand-cta">
               <svg class="call-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
                 <path
@@ -106,20 +112,20 @@
                   d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"
                 />
               </svg>
-              Call
+              {$t.picker_call}
             </span>
           </button>
         </li>
       {/each}
     </ul>
     {#if total > items.length}
-      <div class="picker-status">Showing {items.length} of {total}</div>
+      <div class="picker-status">{$t.picker_showing} {items.length} / {total}</div>
     {/if}
   {/if}
 
   <footer class="picker-foot">
-    <span>Secure · Private · Enterprise-grade</span>
-    <span>AI-powered conversations</span>
+    <span>{$t.picker_foot_secure}</span>
+    <span>{$t.picker_foot_ai}</span>
   </footer>
 </main>
 
@@ -137,6 +143,14 @@
     gap: 20px;
     margin-bottom: 28px;
     justify-items: start;
+  }
+  .picker-hero-top {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
   }
   .monti-hero {
     display: flex;

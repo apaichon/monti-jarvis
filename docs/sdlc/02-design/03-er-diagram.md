@@ -2809,3 +2809,32 @@ Audio device preference is browser-local only.
 | Caller desk branding | 56 | **implement S56** (client UX) |
 
 See DES-0051, workflow §127–129, API Sprint 56, UX C56.
+
+## Sprint 58 — portal UI display language (client-only)
+
+No new Postgres tables. Display language is browser-local and orthogonal to
+`tenant_settings.locale` / `ai_reply_locale` (Sprint 16).
+
+### Client preference keys
+
+| Store | Key | Value | Notes |
+| --- | --- | --- | --- |
+| localStorage | `monti_jarvis:ui_lang` | `en` \| `th` \| `ja` | Customer, tenant, admin portals |
+| localStorage | `monti_product_lang` | `en` \| `th` \| `ja` | product-web (existing; dual-key ok) |
+
+### Entities reused (no migration)
+
+| Entity | Field | Relation to UI lang |
+| --- | --- | --- |
+| `tenant_settings` | `locale` | Workspace preference — **not** UI chrome |
+| `tenant_settings` | `ai_reply_locale` | AI system-prompt hint — **not** UI chrome |
+| customer profile `locale` | optional | Future personalization; out of S58 |
+
+### Future entities
+
+| Entity | Sprint | Status |
+| --- | --- | --- |
+| Server-side `ui_lang` on user profile | later | **out of scope** |
+| Shared monorepo `@monti/i18n` package | later | optional consolidation |
+
+See DES-0054, workflow §130–131, API Sprint 58, UX C58/T58/A58.
