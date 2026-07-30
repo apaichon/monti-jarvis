@@ -17,6 +17,8 @@ type Agent struct {
 	VoiceProviderID string `json:"voice_provider_id,omitempty"`
 	VoiceID         string `json:"voice_id,omitempty"`
 	Image           string `json:"image"`
+	ImageDark       string `json:"image_dark_url,omitempty"`
+	ImageLight      string `json:"image_light_url,omitempty"`
 	SpeakingImage   string `json:"speaking_image,omitempty"`
 	// Expressions maps a response tone (hello, happy, sorry, cheer,
 	// goodbye) to a talking-loop GIF rendered with that feeling.
@@ -39,6 +41,8 @@ func FromWorkforceAgent(w store.WorkforceAgent) Agent {
 		VoiceProviderID: w.VoiceProviderID,
 		VoiceID:         w.VoiceID,
 		Image:           w.Image,
+		ImageDark:       w.ImageDark,
+		ImageLight:      w.ImageLight,
 		Greeting:        w.Greeting,
 		Popular:         w.Popular,
 		Robot:           w.Robot,

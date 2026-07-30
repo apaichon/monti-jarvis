@@ -428,24 +428,36 @@ func mergeAvatarUpdateBody(existing store.Avatar, body avatarUpdateBody) avatarB
 
 func avatarJSON(av store.Avatar) map[string]any {
 	out := map[string]any{
-		"id":         av.ID,
-		"slug":       av.Slug,
-		"name":       av.Name,
-		"role":       av.Role,
-		"trait":      av.Trait,
-		"color":      av.Color,
-		"image_url":  av.ImageURL,
-		"greeting":   av.Greeting,
-		"status":     av.Status,
-		"flags":      av.Flags,
-		"voices":     avatarVoiceListJSON(av.Voices),
-		"created_at": av.CreatedAt,
-		"updated_at": av.UpdatedAt,
+		"id":              av.ID,
+		"slug":            av.Slug,
+		"name":            av.Name,
+		"role":            av.Role,
+		"trait":           av.Trait,
+		"color":           av.Color,
+		"image_url":       av.ImageURL,
+		"image_dark_url":  avatarFlagString(av.Flags, "image_dark_url"),
+		"image_light_url": avatarFlagString(av.Flags, "image_light_url"),
+		"greeting":        av.Greeting,
+		"status":          av.Status,
+		"flags":           av.Flags,
+		"voices":          avatarVoiceListJSON(av.Voices),
+		"created_at":      av.CreatedAt,
+		"updated_at":      av.UpdatedAt,
 	}
 	if av.OwnerTenantID != "" {
 		out["owner_tenant_id"] = av.OwnerTenantID
 	}
 	return out
+}
+
+func avatarFlagString(flags map[string]any, key string) string {
+	if flags == nil {
+		return ""
+	}
+	if v, ok := flags[key].(string); ok {
+		return v
+	}
+	return ""
 }
 
 func avatarListJSON(avatars []store.Avatar) []map[string]any {

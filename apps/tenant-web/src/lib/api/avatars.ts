@@ -20,6 +20,8 @@ export type TenantAvatar = {
   trait: string;
   color: string;
   image_url: string;
+  image_dark_url?: string;
+  image_light_url?: string;
   greeting: string;
   status: string;
   owner_tenant_id?: string;
@@ -106,28 +108,36 @@ export function archiveTenantAvatar(id: string) {
 
 export type TenantAvatarImageUploadResponse = {
   image_url: string;
+  variant?: AvatarImageVariant;
   status: 'uploaded' | 'uploaded_and_saved';
   tenant_avatar?: TenantAvatar;
 };
 
+export type AvatarImageVariant = 'default' | 'dark' | 'light';
+
 export async function uploadTenantAvatarImage(
   avatarId: string,
-  file: File
+  file: File,
+  variant: AvatarImageVariant = 'default'
 ): Promise<TenantAvatarImageUploadResponse> {
   if (file.size > AVATAR_IMAGE_HINT.maxBytes) {
     throw new ApiError(400, `Image exceeds ${AVATAR_IMAGE_HINT.maxLabel} limit`);
   }
   const form = new FormData();
   form.append('file', file);
+  form.append('variant', variant);
   const headers = new Headers();
   const token = getAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  const res = await fetch(`/api/tenant/avatars/${encodeURIComponent(avatarId)}/image`, {
+  const res = await fetch(
+    `/api/tenant/avatars/${encodeURIComponent(avatarId)}/image?variant=${encodeURIComponent(variant)}`,
+    {
     method: 'POST',
     headers,
     credentials: 'include',
     body: form
-  });
+    }
+  );
   if (!res.ok) {
     let message = res.statusText;
     try {

@@ -7,6 +7,10 @@ export type Agent = {
   trait: string;
   color: string;
   image: string;
+  image_dark_url?: string;
+  image_light_url?: string;
+  image_dark?: string;
+  image_light?: string;
   speaking_image?: string;
   expressions?: Record<string, string>;
   popular?: boolean;

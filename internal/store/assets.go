@@ -14,24 +14,38 @@ import (
 const avatarAssetsPrefix = "avatars/"
 
 func AvatarPortraitKey(avatarID, ext string) string {
+	return AvatarPortraitVariantKey(avatarID, "", ext)
+}
+
+func AvatarPortraitVariantKey(avatarID, variant, ext string) string {
 	id := strings.TrimSpace(strings.ToLower(avatarID))
 	ext = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(ext)), ".")
 	if ext == "" {
 		ext = "jpg"
 	}
-	return avatarAssetsPrefix + id + "/portrait." + ext
+	name := avatarPortraitBaseName(variant)
+	return avatarAssetsPrefix + id + "/" + name + "." + ext
 }
 
 func AvatarPortraitURL(avatarID, ext string) string {
+	return AvatarPortraitVariantURL(avatarID, "", ext)
+}
+
+func AvatarPortraitVariantURL(avatarID, variant, ext string) string {
 	id := strings.TrimSpace(strings.ToLower(avatarID))
 	ext = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(ext)), ".")
 	if ext == "" {
 		ext = "jpg"
 	}
-	return "/api/assets/avatars/" + id + "/portrait." + ext
+	name := avatarPortraitBaseName(variant)
+	return "/api/assets/avatars/" + id + "/" + name + "." + ext
 }
 
 func (s *Store) PutAvatarImage(ctx context.Context, avatarID, contentType string, data []byte) (string, string, error) {
+	return s.PutAvatarImageVariant(ctx, avatarID, "", contentType, data)
+}
+
+func (s *Store) PutAvatarImageVariant(ctx context.Context, avatarID, variant, contentType string, data []byte) (string, string, error) {
 	if s.minio == nil {
 		return "", "", fmt.Errorf("minio is not available")
 	}
@@ -39,14 +53,14 @@ func (s *Store) PutAvatarImage(ctx context.Context, avatarID, contentType string
 	if ext == "" {
 		return "", "", fmt.Errorf("unsupported image type")
 	}
-	key := AvatarPortraitKey(avatarID, ext)
+	key := AvatarPortraitVariantKey(avatarID, variant, ext)
 	_, err := s.minio.PutObject(ctx, s.cfg.MinioBucket, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
 		return "", "", err
 	}
-	return key, AvatarPortraitURL(avatarID, ext), nil
+	return key, AvatarPortraitVariantURL(avatarID, variant, ext), nil
 }
 
 func (s *Store) GetAvatarAsset(ctx context.Context, avatarID, filename string) (io.ReadCloser, string, error) {
@@ -58,7 +72,7 @@ func (s *Store) GetAvatarAsset(ctx context.Context, avatarID, filename string) (
 	if id == "" || name == "" || name == "." || strings.Contains(name, "..") {
 		return nil, "", fmt.Errorf("invalid asset path")
 	}
-	if !strings.HasPrefix(name, "portrait.") {
+	if !validAvatarPortraitFilename(name) {
 		return nil, "", fmt.Errorf("invalid asset filename")
 	}
 	key := avatarAssetsPrefix + id + "/" + name
@@ -76,6 +90,23 @@ func (s *Store) GetAvatarAsset(ctx context.Context, avatarID, filename string) (
 		ct = extToContentType(path.Ext(name))
 	}
 	return obj, ct, nil
+}
+
+func avatarPortraitBaseName(variant string) string {
+	switch strings.ToLower(strings.TrimSpace(variant)) {
+	case "dark":
+		return "portrait-dark"
+	case "light":
+		return "portrait-light"
+	default:
+		return "portrait"
+	}
+}
+
+func validAvatarPortraitFilename(name string) bool {
+	return strings.HasPrefix(name, "portrait.") ||
+		strings.HasPrefix(name, "portrait-dark.") ||
+		strings.HasPrefix(name, "portrait-light.")
 }
 
 func contentTypeToExt(contentType string) string {

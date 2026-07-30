@@ -21,20 +21,20 @@ var (
 )
 
 type Avatar struct {
-	ID             string
-	Slug           string
-	Name           string
-	Role           string
-	Trait          string
-	Color          string
-	ImageURL       string
-	Greeting       string
-	Status         string
-	OwnerTenantID  string // empty = platform catalog; set = tenant-owned library
-	Flags          map[string]any
-	Voices         []AvatarVoice
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID            string
+	Slug          string
+	Name          string
+	Role          string
+	Trait         string
+	Color         string
+	ImageURL      string
+	Greeting      string
+	Status        string
+	OwnerTenantID string // empty = platform catalog; set = tenant-owned library
+	Flags         map[string]any
+	Voices        []AvatarVoice
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type AvatarVoice struct {
@@ -64,6 +64,8 @@ type WorkforceAgent struct {
 	VoiceProviderID string
 	VoiceID         string
 	Image           string
+	ImageDark       string
+	ImageLight      string
 	Greeting        string
 	Popular         bool
 	Robot           bool
@@ -854,5 +856,11 @@ func applyWorkforceFlags(agent *WorkforceAgent, flagsRaw []byte) {
 	}
 	if v, ok := flags["hair"].(string); ok {
 		agent.Hair = v
+	}
+	if v, ok := flags["image_dark_url"].(string); ok {
+		agent.ImageDark = v
+	}
+	if v, ok := flags["image_light_url"].(string); ok {
+		agent.ImageLight = v
 	}
 }

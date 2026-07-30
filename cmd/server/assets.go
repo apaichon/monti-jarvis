@@ -53,6 +53,11 @@ func (s *server) handleAvatarImageUpload(w http.ResponseWriter, r *http.Request,
 		writeError(w, http.StatusBadRequest, "invalid multipart form")
 		return
 	}
+	variant := avatarImageVariant(r)
+	if variant == "invalid" {
+		writeError(w, http.StatusBadRequest, "variant must be default, dark, or light")
+		return
+	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "file is required")
@@ -82,7 +87,7 @@ func (s *server) handleAvatarImageUpload(w http.ResponseWriter, r *http.Request,
 	ctx, cancel := contextWithTimeout(r, 30*time.Second)
 	defer cancel()
 
-	_, imageURL, err := s.store.PutAvatarImage(ctx, avatarID, contentType, data)
+	_, imageURL, err := s.store.PutAvatarImageVariant(ctx, avatarID, variant, contentType, data)
 	if err != nil {
 		if strings.Contains(err.Error(), "unsupported image") {
 			writeError(w, http.StatusBadRequest, "unsupported image type; use JPEG, PNG, WebP, or GIF")
@@ -92,11 +97,18 @@ func (s *server) handleAvatarImageUpload(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	out := map[string]any{"image_url": imageURL, "status": "uploaded"}
+	out := map[string]any{"image_url": imageURL, "status": "uploaded", "variant": avatarImageVariantLabel(variant)}
 	if av, err := s.store.GetAvatar(ctx, avatarID); err == nil {
 		// Tenant path: only update tenant-owned rows (already gated above).
 		if ownerTenantID == "" || av.OwnerTenantID == ownerTenantID {
-			av.ImageURL = imageURL
+			if variant == "dark" || variant == "light" {
+				if av.Flags == nil {
+					av.Flags = map[string]any{}
+				}
+				av.Flags["image_"+variant+"_url"] = imageURL
+			} else {
+				av.ImageURL = imageURL
+			}
 			if updated, err := s.store.UpdateAvatar(ctx, *av); err == nil {
 				out["avatar"] = avatarJSON(*updated)
 				out["status"] = "uploaded_and_saved"
@@ -110,6 +122,28 @@ func (s *server) handleAvatarImageUpload(w http.ResponseWriter, r *http.Request,
 	}
 
 	writeJSON(w, http.StatusOK, out)
+}
+
+func avatarImageVariant(r *http.Request) string {
+	variant := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("variant")))
+	if variant == "" {
+		variant = strings.ToLower(strings.TrimSpace(r.FormValue("variant")))
+	}
+	switch variant {
+	case "", "default":
+		return ""
+	case "dark", "light":
+		return variant
+	default:
+		return "invalid"
+	}
+}
+
+func avatarImageVariantLabel(variant string) string {
+	if variant == "" {
+		return "default"
+	}
+	return variant
 }
 
 func (s *server) serveAvatarAsset(w http.ResponseWriter, r *http.Request) {

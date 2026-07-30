@@ -74,6 +74,7 @@ export class GeminiVoice {
   private recorder: AudioWorkletNode | null = null;
   private player: AudioWorkletNode | null = null;
   private playbackRecorder: AudioWorkletNode | null = null;
+  private outputGain: GainNode | null = null;
 
   /** Accumulators for streamed partial transcripts (one active turn each). */
   private callerBuf = '';
@@ -164,9 +165,11 @@ export class GeminiVoice {
     this.recorder = new AudioWorkletNode(this.captureCtx, 'recorder-processor');
     this.player = new AudioWorkletNode(this.playbackCtx, 'player-processor');
     this.playbackRecorder = new AudioWorkletNode(this.playbackCtx, 'recorder-processor');
+    this.outputGain = this.playbackCtx.createGain();
     this.source.connect(this.recorder);
     this.player.connect(this.playbackRecorder);
-    this.playbackRecorder.connect(this.playbackCtx.destination);
+    this.playbackRecorder.connect(this.outputGain);
+    this.outputGain.connect(this.playbackCtx.destination);
 
     // Prefer selected speaker when AudioContext supports setSinkId (Chrome).
     const outputId = opts?.audioOutputId?.trim();
@@ -259,6 +262,18 @@ export class GeminiVoice {
     return true;
   }
 
+  setMicrophoneMuted(muted: boolean) {
+    const tracks = this.micStream?.getAudioTracks() || [];
+    for (const track of tracks) track.enabled = !muted;
+    return tracks.length > 0;
+  }
+
+  setSpeakerMuted(muted: boolean) {
+    if (!this.outputGain || !this.playbackCtx) return false;
+    this.outputGain.gain.setValueAtTime(muted ? 0 : 1, this.playbackCtx.currentTime);
+    return true;
+  }
+
   recordings(): VoiceRecording[] {
     if (this.recordingBytes === 0 || this.recordingChunks.length === 0) return [];
     return [
@@ -282,6 +297,7 @@ export class GeminiVoice {
     this.recorder = null;
     this.player = null;
     this.playbackRecorder = null;
+    this.outputGain = null;
     this.callerBuf = '';
     this.agentBuf = '';
     this.agentFromTranscript = false;

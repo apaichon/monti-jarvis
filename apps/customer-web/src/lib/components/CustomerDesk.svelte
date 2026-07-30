@@ -77,6 +77,20 @@
 
   const topicIds = ['general', 'billing', 'technical'] as const;
   type TopicId = (typeof topicIds)[number];
+  const keypadKeys = [
+    { value: '1', letters: '' },
+    { value: '2', letters: 'ABC' },
+    { value: '3', letters: 'DEF' },
+    { value: '4', letters: 'GHI' },
+    { value: '5', letters: 'JKL' },
+    { value: '6', letters: 'MNO' },
+    { value: '7', letters: 'PQRS' },
+    { value: '8', letters: 'TUV' },
+    { value: '9', letters: 'WXYZ' },
+    { value: '*', letters: '' },
+    { value: '0', letters: '+' },
+    { value: '#', letters: '' }
+  ];
 
   let agents = $state<Agent[]>([]);
   let selectedAgent = $state<Agent | null>(null);
@@ -147,6 +161,13 @@
   let ticketContactName = $state('');
   let ticketBusy = $state(false);
   let ticketError = $state('');
+  let callTheme = $state<'dark' | 'light'>('dark');
+  let tenantDetailsOpen = $state(false);
+  let customerDetailsOpen = $state(false);
+  let deviceDetailsOpen = $state(false);
+  let microphoneMuted = $state(false);
+  let speakerMuted = $state(false);
+  let keypadOpen = $state(false);
 
   let tone = $state('');
   let toneTimer: ReturnType<typeof setTimeout> | undefined;
@@ -165,6 +186,10 @@
 
   onMount(async () => {
     initLangFromUrl(new URLSearchParams(window.location.search));
+    const storedTheme = window.localStorage.getItem('monti_jarvis:call_theme');
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      callTheme = storedTheme;
+    }
     customer = getStoredCustomer();
     if (tenantId) {
       const theme = await fetchPublicTheme(window.location.origin, tenantId);
@@ -269,6 +294,7 @@
   /** Open audio panel and load devices so mic/speaker can actually be chosen. */
   async function openAudioSettings(requestPermission = true) {
     audioOpen = true;
+    deviceDetailsOpen = true;
     await tick();
     const el = document.getElementById('desk-audio-settings');
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -376,6 +402,50 @@
 
   function touchActivity() {
     lastActiveAt = Date.now();
+  }
+
+  function toggleCallTheme() {
+    callTheme = callTheme === 'dark' ? 'light' : 'dark';
+    window.localStorage.setItem('monti_jarvis:call_theme', callTheme);
+  }
+
+  function toggleSpeakerOutput() {
+    touchActivity();
+    if (!live || !voice) {
+      void openAudioSettings(false);
+      return;
+    }
+    const next = !speakerMuted;
+    if (!voice.setSpeakerMuted(next)) {
+      error = 'Speaker control is unavailable for this call.';
+      return;
+    }
+    speakerMuted = next;
+    error = '';
+  }
+
+  function toggleMicrophone() {
+    touchActivity();
+    if (!live || !voice) {
+      void openAudioSettings(true);
+      return;
+    }
+    const next = !microphoneMuted;
+    if (!voice.setMicrophoneMuted(next)) {
+      error = 'Microphone control is unavailable for this call.';
+      return;
+    }
+    microphoneMuted = next;
+    error = '';
+  }
+
+  function appendKeypadValue(value: string) {
+    touchActivity();
+    input += value;
+  }
+
+  function deleteKeypadValue() {
+    input = input.slice(0, -1);
   }
 
   function formatLastActive(ts: number | null): string {
@@ -714,6 +784,9 @@
     error = '';
     busy = true;
     callControlsExpanded = false;
+    microphoneMuted = false;
+    speakerMuted = false;
+    keypadOpen = false;
     transcriptKeys.clear();
     customerEndRequested = false;
     autoClosePending = false;
@@ -871,6 +944,9 @@
     customerEndRequested = false;
     if (resetSession) session = null;
     callControlsExpanded = false;
+    microphoneMuted = false;
+    speakerMuted = false;
+    keypadOpen = false;
     voiceState = selectedAgent
       ? `Ready to call ${selectedAgent.name}.`
       : 'Select an agent, then start an inbound voice call.';
@@ -1002,19 +1078,258 @@
   );
   const callStarted = $derived(live || !!session);
   const customerLabel = $derived(customer?.display_name || customer?.email || $t.desk_customer);
-  const showCallDetails = $derived(!callStarted || callControlsExpanded);
+  const callHeroTitle = $derived(selectedAgent ? `Hi, I'm ${selectedAgent.name}!` : 'Hi, I am Monti.');
+  const callHeroSubtitle = $derived(selectedAgent ? 'How can I help you today?' : $t.desk_voice_hint);
+  const showCallDetails = $derived(true);
   // Hide agent picker, Start call, and orb until the customer is signed in.
   const hideAgentSurfaceBeforeLogin = $derived(authRequired && !callStarted);
   const callTimerLabel = $derived(activeCallLimitSeconds > 0 ? remainingTimer : timer);
   const callTimerWarning = $derived(activeCallLimitSeconds > 0 && remainingSeconds <= 10);
 </script>
 
-<main class="app">
+<main class="app conversation-app theme-{callTheme}">
   <aside
     class="panel control-panel"
     class:live-collapsed={callStarted && !callControlsExpanded}
     class:live-expanded={callStarted && callControlsExpanded}
+    class:requires-auth={authRequired}
   >
+    <div class="compact-control-stack">
+      <header class="compact-brand">
+        <div class="compact-brand-mark">
+          <img src="/images/monti-logo.png" width="64" height="64" alt="Monti" />
+        </div>
+        <div class="compact-brand-copy">
+          <strong>MONTI</strong>
+          <span>AI CALL CENTER</span>
+        </div>
+        <span
+          class="compact-live"
+          class:ok={systemLiveKind === 'ok'}
+          class:issues={systemLiveKind === 'issues'}
+          class:offline={systemLiveKind === 'offline'}
+        >
+          <i></i>
+          {onlineLabel}
+        </span>
+      </header>
+
+      <section class="rail-section tenant-rail-section" class:open={tenantDetailsOpen}>
+        <button
+          class="rail-section-head"
+          type="button"
+          onclick={() => (tenantDetailsOpen = !tenantDetailsOpen)}
+          aria-expanded={tenantDetailsOpen}
+        >
+          <span class="rail-section-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 21V5l8-3v19H3zm10 0V8l8 3v10h-8zM6 8h2v2H6zm0 4h2v2H6zm0 4h2v2H6zm10-3h2v2h-2zm0 4h2v2h-2z"/></svg>
+          </span>
+          <span class="rail-section-title">
+            <small>{$t.desk_tenant_info}</small>
+            <strong>{tenantName || brand.brand_name || tenantLabel}</strong>
+          </span>
+          <svg class="rail-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18 6-6-6-6"/></svg>
+        </button>
+        {#if tenantDetailsOpen}
+          <div class="rail-section-body tenant-summary">
+            <div class="rail-logo">
+              {#if brand.logo_url && !brand.logo_url.includes('monti-logo')}
+                <img src={brand.logo_url} alt={brand.logo_alt || tenantLabel} />
+              {:else}
+                <span>{companyMonogram}</span>
+              {/if}
+            </div>
+            <div class="rail-detail-copy">
+              <strong>{tenantName || brand.brand_name || tenantLabel}</strong>
+              <span>{$t.picker_badge}</span>
+              <span class="rail-active"><i></i>{$t.desk_active}</span>
+            </div>
+            {#if !live}
+              <button class="rail-icon-action" type="button" onclick={openTenantDirectory} aria-label={$t.desk_change_tenant} title={$t.desk_change_tenant}>
+                <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18 6-6-6-6"/></svg>
+              </button>
+            {/if}
+          </div>
+        {/if}
+      </section>
+
+      <section class="rail-section customer-rail-section" class:open={customerDetailsOpen}>
+        <button
+          class="rail-section-head"
+          type="button"
+          onclick={() => (customerDetailsOpen = !customerDetailsOpen)}
+          aria-expanded={customerDetailsOpen}
+        >
+          <span class="rail-section-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-5 0-8 2.5-8 5.5V22h16v-2.5C20 16.5 17 14 12 14Z"/></svg>
+          </span>
+          <span class="rail-section-title">
+            <small>{$t.desk_customer_info}</small>
+            <strong>{customerLabel}</strong>
+          </span>
+          <svg class="rail-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18 6-6-6-6"/></svg>
+        </button>
+        {#if customerDetailsOpen}
+          <div class="rail-section-body">
+            {#if customer}
+              <div class="customer-summary">
+                <div class="rail-customer-avatar" aria-hidden="true">
+                  {(customer.display_name || customer.email || 'U').slice(0, 1).toUpperCase()}
+                </div>
+                <div class="rail-detail-copy">
+                  <strong>{customer.display_name || customerLabel}</strong>
+                  <span>{customer.email}</span>
+                  <span>{$t.desk_last_active} {lastActiveLabel}</span>
+                </div>
+                <button class="rail-icon-action" type="button" onclick={() => void signOutCustomer()} aria-label={$t.desk_sign_out} title={$t.desk_sign_out}>
+                  <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 17l5-5-5-5m5 5H3m10-9h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg>
+                </button>
+              </div>
+            {:else}
+              <form class="rail-auth-form" onsubmit={challengeId ? verifyOTP : sendOTP}>
+                <p>{autoRegister ? 'Sign in or create your customer account.' : 'Sign in to start a call or chat.'}</p>
+                <input
+                  type="email"
+                  bind:value={customerEmail}
+                  placeholder="customer@example.com"
+                  autocomplete="email"
+                  disabled={authBusy || !!challengeId}
+                />
+                {#if !challengeId}
+                  <input
+                    type="text"
+                    bind:value={customerName}
+                    placeholder="Name (optional)"
+                    autocomplete="name"
+                    disabled={authBusy}
+                  />
+                {:else}
+                  <input
+                    type="text"
+                    bind:value={otp}
+                    placeholder="6-digit OTP"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    disabled={authBusy}
+                  />
+                {/if}
+                <button class="rail-primary-action" type="submit" disabled={authBusy || (!challengeId && !customerEmail.trim()) || (!!challengeId && !otp.trim())}>
+                  {authBusy ? '…' : challengeId ? $t.desk_verify : $t.desk_send_otp}
+                </button>
+                {#if authStatus}<span class="rail-form-note">{authStatus}</span>{/if}
+              </form>
+            {/if}
+          </div>
+        {/if}
+      </section>
+
+      <section id="desk-audio-settings" class="rail-section device-rail-section" class:open={deviceDetailsOpen}>
+        <button
+          class="rail-section-head"
+          type="button"
+          onclick={() => {
+            if (deviceDetailsOpen) deviceDetailsOpen = false;
+            else void openAudioSettings(false);
+          }}
+          aria-expanded={deviceDetailsOpen}
+        >
+          <span class="rail-section-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2Z"/></svg>
+          </span>
+          <span class="rail-section-title">
+            <small>{$t.desk_device_settings}</small>
+            <strong>{selectedMicLabel()}</strong>
+          </span>
+          <svg class="rail-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18 6-6-6-6"/></svg>
+        </button>
+        {#if deviceDetailsOpen}
+          <div class="rail-section-body device-summary">
+            <label class="rail-device-row">
+              <span class="rail-device-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2Z"/></svg>
+              </span>
+              <span class="rail-device-copy">
+                <strong>{$t.desk_mic}</strong>
+                <span>{selectedMicLabel()}</span>
+              </span>
+              <span class="rail-level" aria-hidden="true">
+                {#each [0, 1, 2, 3] as i}<i class:on={micLevel > i * 22 || (!audioTesting && i < 3)}></i>{/each}
+              </span>
+              <select
+                bind:value={selectedMicId}
+                disabled={live}
+                aria-label="Microphone device"
+                onchange={(e) => onMicChange((e.currentTarget as HTMLSelectElement).value)}
+              >
+                {#if audioInputs.length === 0}
+                  <option value="">Default microphone</option>
+                {:else}
+                  {#each audioInputs as dev (dev.deviceId)}<option value={dev.deviceId}>{dev.label}</option>{/each}
+                {/if}
+              </select>
+            </label>
+
+            <label class="rail-device-row">
+              <span class="rail-device-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 10v4h4l5 5V5l-5 5H3Zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2a3.5 3.5 0 0 0 1.8-3.1Zm-2.5-7.8v2.1a6 6 0 0 1 0 11.4v2.1a8 8 0 0 0 0-15.6Z"/></svg>
+              </span>
+              <span class="rail-device-copy">
+                <strong>{$t.desk_speaker}</strong>
+                <span>{selectedSpeakerLabel()}</span>
+              </span>
+              <span class="rail-level" aria-hidden="true">
+                {#each [0, 1, 2, 3] as i}<i class:on={speakerLevel > i * 22 || (!audioTesting && i < 3)}></i>{/each}
+              </span>
+              <select
+                bind:value={selectedSpeakerId}
+                disabled={live || !speakerSelectable}
+                aria-label="Speaker device"
+                onchange={(e) => onSpeakerChange((e.currentTarget as HTMLSelectElement).value)}
+              >
+                {#if !speakerSelectable}
+                  <option value="">System default speaker</option>
+                {:else if audioOutputs.length === 0}
+                  <option value="">Default speaker</option>
+                {:else}
+                  {#each audioOutputs as dev (dev.deviceId)}<option value={dev.deviceId}>{dev.label}</option>{/each}
+                {/if}
+              </select>
+            </label>
+
+            <div class="rail-device-actions">
+              <button type="button" disabled={audioBusy} onclick={() => void refreshAudioDevices(true)}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M20 6v5h-5M4 18v-5h5m10-3a8 8 0 0 0-14-3m0 7a8 8 0 0 0 14 3"/></svg>
+                {audioBusy ? 'Refreshing…' : 'Refresh'}
+              </button>
+              <button type="button" disabled={live} onclick={() => void startAudioTest()}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 10h2v4H4zm4-4h2v12H8zm4-3h2v18h-2zm4 5h2v8h-2zm4 2h2v4h-2z"/></svg>
+                {audioTesting ? $t.desk_stop_test : $t.desk_start_test}
+              </button>
+            </div>
+            {#if audioNote}<span class="rail-form-note">{audioNote}</span>{/if}
+          </div>
+        {/if}
+      </section>
+
+      <button class="rail-utility-row" type="button" onclick={() => void openAudioSettings(false)}>
+        <span class="rail-section-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.8-1L14.8 3h-4l-.3 2.6a8 8 0 0 0-1.8 1l-2.4-1-2 3.4 2 1.5a7 7 0 0 0 0 2L4.3 14l2 3.4 2.4-1a8 8 0 0 0 1.8 1l.3 2.6h4l.3-2.6a8 8 0 0 0 1.8-1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1Z"/></svg>
+        </span>
+        <span><strong>{$t.desk_open_settings}</strong><small>{$t.desk_call_preferences}</small></span>
+        <svg class="rail-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18 6-6-6-6"/></svg>
+      </button>
+
+      <div class="rail-spacer"></div>
+
+      <div class="rail-help">
+        <span class="rail-section-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14v-2a8 8 0 0 1 16 0v2M4 14H3a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h3v-6H4Zm16 0h1a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-3v-6h2Z"/></svg>
+        </span>
+        <span><strong>{$t.desk_need_help}</strong><small>{$t.desk_contact_support}</small></span>
+      </div>
+    </div>
+
+    <div class="legacy-control-stack" aria-hidden="true">
     <!-- 1. Monti brand header -->
     <header class="desk-branding">
       <div class="monti-desk-hero">
@@ -1109,7 +1424,7 @@
             <span class="avatar-pulse-ring ring-b"></span>
             <span class="avatar-pulse-ring ring-c"></span>
             <div class="avatar-live-halo">
-              <Portrait agent={selectedAgent} speaking={live} {tone} />
+              <Portrait agent={selectedAgent} speaking={live} {tone} theme={callTheme} />
             </div>
           </div>
           <div class="avatar-live-copy">
@@ -1126,7 +1441,7 @@
 
     {#if showCallDetails}
       <!-- 3. Audio settings (collapsible) -->
-      <section id="desk-audio-settings" class="voice-card audio-card" aria-label="Audio settings">
+      <section id="legacy-desk-audio-settings" class="voice-card audio-card" aria-label="Audio settings">
         <button
           type="button"
           class="collapse-head"
@@ -1266,7 +1581,7 @@
       </section>
 
       <!-- 4. AI avatar call grid -->
-      {#if !hideAgentSurfaceBeforeLogin}
+      {#if !hideAgentSurfaceBeforeLogin && !callStarted}
         <section class="voice-card avatar-call-section" aria-label="AI avatar call">
           <div class="section-title-row">
             <span class="section-ico sparkle" aria-hidden="true">✦</span>
@@ -1293,7 +1608,7 @@
                   <span class="avatar-pulse-ring ring-b"></span>
                   <span class="avatar-pulse-ring ring-c"></span>
                   <div class="avatar-live-halo">
-                    <Portrait agent={selectedAgent} speaking={live} {tone} />
+                    <Portrait agent={selectedAgent} speaking={live} {tone} theme={callTheme} />
                   </div>
                 </div>
                 <div class="avatar-live-copy">
@@ -1326,7 +1641,7 @@
                       void selectAgent(agent);
                     }}
                   >
-                    <Portrait {agent} />
+                    <Portrait {agent} theme={callTheme} />
                     <strong>{agent.name}</strong>
                   </button>
                   <button
@@ -1501,6 +1816,7 @@
         <div class="voice-state">Verify your email OTP to unlock AI agents and Start call.</div>
       </section>
     {/if}
+    </div>
   </aside>
 
   {#if pickerOpen}
@@ -1530,7 +1846,7 @@
               style="--assistant-color:{agent.color}"
               onclick={() => selectAgent(agent)}
             >
-              <Portrait {agent} mini />
+              <Portrait {agent} mini theme={callTheme} />
               <div>
                 <div>
                   <strong>{agent.name}</strong>
@@ -1549,7 +1865,7 @@
     </div>
   {/if}
 
-  <section class="panel workspace">
+  <section class="panel workspace conversation-workspace">
     <header class="topbar">
       <div>
         <h2>Caller Desk</h2>
@@ -1576,7 +1892,134 @@
         <span class="system-live-dot" aria-hidden="true"></span>
         <span>{systemLive}</span>
       </div>
+      <button
+        class="theme-toggle"
+        type="button"
+        onclick={toggleCallTheme}
+        aria-label={callTheme === 'dark' ? $t.desk_switch_light : $t.desk_switch_dark}
+        title={callTheme === 'dark' ? $t.desk_switch_light : $t.desk_switch_dark}
+      >
+        {#if callTheme === 'dark'}
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3V1m0 22v-2m9-9h2M1 12h2m16.4-7.4 1.4-1.4M3.2 20.8l1.4-1.4m14.8 0 1.4 1.4M3.2 3.2l1.4 1.4M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z"/>
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M20.8 15.7A8.5 8.5 0 0 1 8.3 3.2 9 9 0 1 0 20.8 15.7Z"/>
+          </svg>
+        {/if}
+      </button>
     </header>
+
+    <section class="conversation-hero" aria-label="Active avatar conversation">
+      <div class="hero-wave hero-wave-left" aria-hidden="true">
+        <Waveform color={selectedAgent?.color || 'var(--cyan)'} count={26} />
+      </div>
+      <div
+        class="avatar-live-stage conversation-avatar-stage"
+        class:live={live}
+        class:connecting={busy && !live}
+        style="--assistant-color:{selectedAgent?.color || 'var(--cyan)'}"
+        aria-label={selectedAgent ? `Live avatar ${selectedAgent.name}` : 'Monti assistant avatar'}
+      >
+        <div class="avatar-live-visual" aria-hidden="true">
+          <span class="avatar-pulse-ring ring-a"></span>
+          <span class="avatar-pulse-ring ring-b"></span>
+          <span class="avatar-pulse-ring ring-c"></span>
+          <div class="avatar-live-halo">
+            {#if selectedAgent}
+              <Portrait agent={selectedAgent} speaking={live} {tone} theme={callTheme} />
+            {:else}
+              <img class="portrait photo" src="/images/monti-logo.png" alt="" />
+            {/if}
+          </div>
+        </div>
+        <div class="avatar-live-copy conversation-avatar-name">
+          <strong>{selectedAgent?.name || 'Monti'}</strong>
+          <span>{selectedAgent ? `${selectedAgent.role} · ${selectedAgent.trait}` : 'AI Call Center'}</span>
+        </div>
+        <div class="avatar-live-state">
+          {live ? 'Listening...' : busy ? $t.desk_connecting : $t.desk_ready}
+        </div>
+      </div>
+      <div class="hero-wave hero-wave-right" aria-hidden="true">
+        <Waveform color={selectedAgent?.color || 'var(--cyan)'} count={26} />
+      </div>
+
+      <div class="conversation-greeting">
+        <h1>{callHeroTitle}</h1>
+        <p>{callHeroSubtitle}</p>
+        <span class="listening-pill" class:live={live}>
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            <path fill="currentColor" d="M4 12h2v4H4v-4zm4-5h2v12H8V7zm4 3h2v8h-2v-8zm4-5h2v16h-2V5zm4 7h2v4h-2v-4z" />
+          </svg>
+          {live ? 'Listening...' : voiceState}
+        </span>
+      </div>
+
+      <div class="call-control-row" aria-label="Call controls">
+        <button
+          class="round-control"
+          class:active={speakerMuted}
+          type="button"
+          onclick={toggleSpeakerOutput}
+          aria-label={live ? (speakerMuted ? 'Unmute speaker' : 'Mute speaker') : 'Open speaker settings'}
+          aria-pressed={speakerMuted}
+          title={live ? (speakerMuted ? 'Unmute speaker' : 'Mute speaker') : 'Open speaker settings'}
+        >
+          {#if speakerMuted}
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M3 10v4h4l5 5V5l-5 5H3Zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v3.5l2.4 2.4A3.5 3.5 0 0 0 16.5 12Zm4.8 9.7L2.3 3.7l1.4-1.4 18 18-1.4 1.4Z"/></svg>
+          {:else}
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2A3.5 3.5 0 0 0 16.5 12z"/></svg>
+          {/if}
+          <span>{speakerMuted ? $t.desk_unmute : $t.desk_speaker}</span>
+        </button>
+        <button
+          class="round-control"
+          class:active={microphoneMuted}
+          type="button"
+          onclick={toggleMicrophone}
+          aria-label={live ? (microphoneMuted ? 'Unmute microphone' : 'Mute microphone') : 'Open microphone settings'}
+          aria-pressed={microphoneMuted}
+          title={live ? (microphoneMuted ? 'Unmute microphone' : 'Mute microphone') : 'Open microphone settings'}
+        >
+          {#if microphoneMuted}
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="m4.3 3 16.7 16.7-1.3 1.3-3.3-3.3A7 7 0 0 1 13 19v3h-2v-3.1A7 7 0 0 1 5 12h2a5 5 0 0 0 7.9 4.1L13 14.2A3 3 0 0 1 9 11V10L3 4.3 4.3 3ZM12 3a3 3 0 0 1 3 3v5c0 .3 0 .6-.1.8L9 5.9A3 3 0 0 1 12 3Zm5 8h2c0 1.3-.4 2.5-1 3.6l-1.5-1.5c.3-.6.5-1.3.5-2.1Z"/></svg>
+          {:else}
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg>
+          {/if}
+          <span>{microphoneMuted ? $t.desk_unmute : $t.desk_mute}</span>
+        </button>
+        <button
+          class="round-control end-call"
+          type="button"
+          disabled={busy || !selectedAgent || authRequired || quotaExhausted}
+          onclick={() => (live ? void endActiveCall() : void startCall())}
+          aria-label={live ? $t.desk_end_call : $t.desk_start_call}
+          title={live ? $t.desk_end_call : $t.desk_start_call}
+        >
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg>
+          <span>{live ? $t.desk_end : $t.desk_start_call}</span>
+        </button>
+        <button
+          class="round-control"
+          class:active={keypadOpen}
+          type="button"
+          disabled={authRequired || quotaExhausted}
+          onclick={() => (keypadOpen = true)}
+          aria-label={$t.desk_keypad}
+          aria-expanded={keypadOpen}
+          title={$t.desk_keypad}
+        >
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M7 5h3v3H7V5zm7 0h3v3h-3V5zM7 11h3v3H7v-3zm7 0h3v3h-3v-3zM7 17h3v3H7v-3zm7 0h3v3h-3v-3z"/></svg>
+          <span>{$t.desk_keypad}</span>
+        </button>
+        <button class="round-control" type="button" onclick={() => (pickerOpen = true)} disabled={live || agents.length === 0} aria-label="More call actions" title="More call actions">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M5 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>
+          <span>More</span>
+        </button>
+      </div>
+    </section>
 
     <section class="chat" aria-live="polite" bind:this={chatEl}>
       {#each messages as msg (msg.id)}
@@ -1619,8 +2062,19 @@
           </div>
         </section>
       {/if}
+      <div class="composer-meta-row">
+        {#if chatSessionId && !live}
+          <button class="plain-button finish-chat" type="button" onclick={finishChat}>Finish chat &amp; rate</button>
+        {/if}
+        <div class="infra">{sessionLabel}</div>
+      </div>
       <form onsubmit={submitChat}>
+        {#if error}<div class="error">{error}</div>{/if}
         <div class="composer">
+          <button class="talk-button" type="button" disabled={busy || authRequired || quotaExhausted} onclick={() => void startCall()}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg>
+            <span>Hold to Talk</span>
+          </button>
           <textarea
             bind:value={input}
             placeholder={authRequired ? $t.desk_sign_in : quotaExhausted ? $t.status_error : $t.desk_composer_ph}
@@ -1630,15 +2084,83 @@
           ></textarea>
           <button class="send" type="submit" disabled={busy || authRequired || quotaExhausted}>{$t.action_send}</button>
         </div>
-        {#if chatSessionId && !live}
-          <button class="plain-button finish-chat" type="button" onclick={finishChat}>Finish chat &amp; rate</button>
-        {/if}
-        <div class="error">{error}</div>
       </form>
-      <div class="infra">{sessionLabel}</div>
     </section>
   </section>
+
+  <aside class="panel insight-panel" aria-label="Customer context and quick actions">
+    <section class="insight-card">
+      <h3>About this customer</h3>
+      <dl>
+        <div><dt>Language</dt><dd>English</dd></div>
+        <div><dt>Sentiment</dt><dd><span class="sentiment positive">Positive</span></dd></div>
+        <div><dt>Last active</dt><dd>{lastActiveLabel}</dd></div>
+        <div><dt>Total calls</dt><dd>{chatSessionId || session ? '1' : '0'}</dd></div>
+      </dl>
+    </section>
+    <section class="insight-card">
+      <h3>Quick actions</h3>
+      <button type="button" class="insight-action" disabled>
+        <span>View previous calls</span><b>›</b>
+      </button>
+      <button type="button" class="insight-action" disabled>
+        <span>View documents</span><b>›</b>
+      </button>
+      <button type="button" class="insight-action" onclick={() => void openAudioSettings(true)}>
+        <span>{selectedMicLabel()}</span><b>›</b>
+      </button>
+    </section>
+    <section class="mobile-context-rows" aria-label="Mobile context rows">
+      <button type="button" onclick={openTenantDirectory} disabled={live}>
+        <span>Tenant</span><strong>{tenantName || brand.brand_name || tenantLabel}</strong><b>›</b>
+      </button>
+      <button type="button" disabled>
+        <span>Customer</span><strong>{customerLabel}</strong><b>›</b>
+      </button>
+      <button type="button" onclick={() => void openAudioSettings(true)}>
+        <span>Device</span><strong>{selectedMicLabel()}</strong><b>›</b>
+      </button>
+    </section>
+  </aside>
 </main>
+
+{#if keypadOpen}
+  <div class="keypad-backdrop">
+    <button class="keypad-scrim" type="button" aria-label="Close keypad" onclick={() => (keypadOpen = false)}></button>
+    <div class="keypad-dialog" role="dialog" aria-modal="true" aria-labelledby="keypad-title" tabindex="-1">
+      <header class="keypad-head">
+        <div>
+          <h2 id="keypad-title">{$t.desk_keypad}</h2>
+          <p>{$t.desk_keypad_help}</p>
+        </div>
+        <button class="keypad-close" type="button" aria-label="Close keypad" onclick={() => (keypadOpen = false)}>×</button>
+      </header>
+      <input
+        class="keypad-display"
+        bind:value={input}
+        inputmode="tel"
+        autocomplete="off"
+        aria-label={$t.desk_keypad_entry}
+        placeholder={$t.desk_keypad_placeholder}
+      />
+      <div class="dialpad-grid" aria-label="Dial pad">
+        {#each keypadKeys as key (key.value)}
+          <button type="button" onclick={() => appendKeypadValue(key.value)} aria-label={`Enter ${key.value}`}>
+            <strong>{key.value}</strong>
+            <small>{key.letters}</small>
+          </button>
+        {/each}
+      </div>
+      <div class="keypad-actions">
+        <button class="keypad-secondary" type="button" onclick={deleteKeypadValue} aria-label={$t.desk_delete_character} title={$t.desk_delete_character}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m10 7-5 5 5 5h9a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-9Zm3 3 4 4m0-4-4 4"/></svg>
+        </button>
+        <button class="keypad-secondary" type="button" onclick={() => (input = '')}>{$t.desk_clear}</button>
+        <button class="keypad-done" type="button" onclick={() => (keypadOpen = false)}>{$t.desk_done}</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if ratingOpen}
   <div class="rating-backdrop">
