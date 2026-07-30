@@ -72,6 +72,70 @@ func (c *Client) Enabled() bool {
 	return c.apiKey != ""
 }
 
+// TestConnection performs a lightweight generateContent call to verify the API key.
+func (c *Client) TestConnection(ctx context.Context) error {
+	if !c.Enabled() {
+		return errors.New("GEMINI_API_KEY is not configured")
+	}
+	model := c.model
+	if model == "" {
+		model = "gemini-flash-latest"
+	}
+	endpoint := fmt.Sprintf(
+		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
+		url.PathEscape(model),
+		url.QueryEscape(c.apiKey),
+	)
+	body := map[string]any{
+		"contents": []map[string]any{
+			{"role": "user", "parts": []map[string]string{{"text": "ping"}}},
+		},
+		"generationConfig": map[string]any{"maxOutputTokens": 8},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(raw))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("network: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	var errBody struct {
+		Error struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+			Code    int    `json:"code"`
+		} `json:"error"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&errBody)
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
+		strings.Contains(strings.ToLower(errBody.Error.Status), "permission") ||
+		strings.Contains(strings.ToLower(errBody.Error.Message), "api key") {
+		return fmt.Errorf("auth: gemini rejected the key")
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return fmt.Errorf("quota: gemini rate limited")
+	}
+	if errBody.Error.Message != "" {
+		return fmt.Errorf("provider: %s", errBody.Error.Message)
+	}
+	return fmt.Errorf("provider: status %d", resp.StatusCode)
+}
+
+// NewWithKey returns a client for an ad-hoc API key (test path).
+func NewWithKey(apiKey, model string) *Client {
+	return New(apiKey, model, "")
+}
+
 func (c *Client) Reply(ctx context.Context, systemPrompt string, history []Message) (string, error) {
 	result, err := c.ReplyWithUsage(ctx, systemPrompt, history)
 	if err != nil {

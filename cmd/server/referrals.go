@@ -61,7 +61,109 @@ func (s *server) listTenantReferrals(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tenant_id": tenantID, "referrals": items, "bonus": balances})
+	redemptions, _ := s.store.ListTenantRedemptions(r.Context(), tenantID)
+	writeJSON(w, http.StatusOK, map[string]any{"tenant_id": tenantID, "referrals": items, "bonus": balances, "redemptions": redemptions})
+}
+
+func (s *server) validateTenantReferralRedeem(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := s.tenantIDFromAuth(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON", "code": "validation_error"})
+		return
+	}
+	_, preview, err := s.store.ValidateReferralCodeForRedeem(r.Context(), tenantID, body.Code)
+	if err != nil {
+		writeReferralRedeemError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"eligible": true, "preview_bonus": preview})
+}
+
+func (s *server) redeemTenantReferralCode(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := s.tenantIDFromAuth(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var body struct {
+		Code           string `json:"code"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON", "code": "validation_error"})
+		return
+	}
+	item, err := s.store.RedeemReferralCode(r.Context(), tenantID, body.Code, body.IdempotencyKey)
+	if err != nil {
+		writeReferralRedeemError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"redemption_id": item.ID,
+		"status":        item.Status,
+		"bonus":         item.Bonus,
+		"referral_code": item.ReferralCode,
+	})
+}
+
+func (s *server) listTenantRedemptions(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := s.tenantIDFromAuth(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	items, err := s.store.ListTenantRedemptions(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"redemptions": items})
+}
+
+func (s *server) reversePlatformRedemption(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "redemption id is required")
+		return
+	}
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	item, err := s.store.ReverseReferralRedemption(r.Context(), id, strings.TrimSpace(body.Reason))
+	if err != nil {
+		if errors.Is(err, store.ErrReferralNotFound) {
+			writeError(w, http.StatusNotFound, "redemption not found")
+			return
+		}
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+func writeReferralRedeemError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, store.ErrReferralNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "unknown referral code", "code": "referral_not_found"})
+	case errors.Is(err, store.ErrReferralRedeemSelf):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "cannot redeem your own code", "code": "self_referral"})
+	case errors.Is(err, store.ErrReferralAlreadyRedeemed):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "code already redeemed", "code": "already_redeemed"})
+	case errors.Is(err, store.ErrReferralIneligible):
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": "code is not eligible", "code": "referral_ineligible"})
+	case errors.Is(err, store.ErrReferralInvalid):
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid code", "code": "validation_error"})
+	default:
+		writeError(w, http.StatusBadGateway, err.Error())
+	}
 }
 
 func (s *server) qualifyPlatformReferral(w http.ResponseWriter, r *http.Request) {

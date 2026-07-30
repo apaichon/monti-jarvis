@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os/signal"
@@ -226,17 +227,9 @@ func main() {
 		return st.AIReplyLocaleHint(ctx, tenantID)
 	}
 	voiceRelay.APIKeyResolver = func(ctx context.Context, tenantID string) (string, error) {
-		if st == nil || strings.TrimSpace(tenantID) == "" {
-			return cfg.GeminiAPIKey, nil
-		}
-		key, err := st.TenantGeminiKey(ctx, tenantID)
-		if err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(key) == "" {
-			return cfg.GeminiAPIKey, nil
-		}
-		return key, nil
+		// Use same fail-closed resolution as chat (S60).
+		tmp := &server{cfg: cfg, store: st}
+		return tmp.resolveTenantGeminiAPIKey(ctx, tenantID)
 	}
 	voiceRelay.PromptResolver = func(ctx context.Context, tenantID, agentID string) (string, error) {
 		if st == nil || strings.TrimSpace(tenantID) == "" {
@@ -371,6 +364,9 @@ func main() {
 	mux.HandleFunc("POST /api/public/tenant/referral/click", s.recordReferralClick)
 	mux.Handle("GET /api/tenant/referral", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantReferralCode)))
 	mux.Handle("GET /api/tenant/referrals", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantReferrals)))
+	mux.Handle("POST /api/tenant/referrals/validate", guard.RequireTenantAdminActive(http.HandlerFunc(s.validateTenantReferralRedeem)))
+	mux.Handle("POST /api/tenant/referrals/redeem", guard.RequireTenantAdminActive(http.HandlerFunc(s.redeemTenantReferralCode)))
+	mux.Handle("GET /api/tenant/referrals/redemptions", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantRedemptions)))
 	mux.HandleFunc("GET /api/public/tenant/verify-email", s.verifyTenantEmail)
 	mux.HandleFunc("POST /api/public/tenant/verify-email", s.verifyTenantEmail)
 	// Shared tenant OAuth (login + register): one start/callback per provider.
@@ -398,6 +394,7 @@ func main() {
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))
 	mux.Handle("POST /api/platform/referrals/{id}/qualify", guard.RequirePlatformAdmin(http.HandlerFunc(s.qualifyPlatformReferral)))
 	mux.Handle("POST /api/platform/referrals/{id}/reverse", guard.RequirePlatformAdmin(http.HandlerFunc(s.reversePlatformReferral)))
+	mux.Handle("POST /api/platform/referrals/redemptions/{id}/reverse", guard.RequirePlatformAdmin(http.HandlerFunc(s.reversePlatformRedemption)))
 	mux.HandleFunc("GET /api/tenant/kyc", s.getTenantKYC)
 	mux.HandleFunc("PUT /api/tenant/kyc", s.updateTenantKYC)
 	mux.HandleFunc("POST /api/tenant/kyc/photo", s.uploadTenantKYCPhoto)
@@ -476,6 +473,8 @@ func main() {
 	mux.Handle("GET /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantGeminiKey)))
 	mux.Handle("PUT /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantGeminiKey)))
 	mux.Handle("DELETE /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantGeminiKey)))
+	mux.Handle("POST /api/tenant/ai/gemini-key/test", guard.RequireTenantAdminActive(http.HandlerFunc(s.testTenantGeminiKey)))
+	mux.Handle("GET /api/tenant/ai/gemini-status", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantGeminiStatus)))
 	mux.Handle("GET /api/tenant/ai/prompts/{agent_id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantPrompt)))
 	mux.Handle("PUT /api/tenant/ai/prompts/{agent_id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantPrompt)))
 	mux.Handle("GET /api/tenant/ai/tools", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantTools)))
@@ -901,7 +900,15 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	aiClient, err := s.tenantAIClient(ctx, tenantID)
-	if err != nil || aiClient == nil || !aiClient.Enabled() {
+	if err != nil {
+		if errors.Is(err, store.ErrTenantGeminiKeyRequired) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "A validated tenant Gemini API key is required", "code": "tenant_gemini_key_required"})
+			return
+		}
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "tenant AI provider unavailable", "code": "ai_provider_unavailable"})
+		return
+	}
+	if aiClient == nil || !aiClient.Enabled() {
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "tenant AI provider unavailable", "code": "ai_provider_unavailable"})
 		return
 	}

@@ -1,6 +1,6 @@
 ---
 id: SPRINT-060
-status: planned
+status: completed
 start: 2026-08-12
 end: 2026-08-22
 updated: 2026-07-30
@@ -34,11 +34,11 @@ tenant production traffic.
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0216](../04-tasks/TASK-0216.md) Gemini key validation API + metadata | 4 | todo | dev | Test/connect status endpoints |
-| [TASK-0217](../04-tasks/TASK-0217.md) Production runtime fail-closed (no env fallback) | 3 | todo | dev | Resolver enforces tenant key |
-| [TASK-0218](../04-tasks/TASK-0218.md) Tenant AI Settings key UX | 3 | todo | dev | Enter/test/replace/delete UI |
-| [TASK-0219](../04-tasks/TASK-0219.md) Audit, readiness, verification | 2 | todo | tester/dev | Audit + UAT + posture signal |
-| **Total** | **12** | **0/12** | | |
+| [TASK-0216](../04-tasks/TASK-0216.md) Gemini key validation API + metadata | 4 | completed | dev | Test/connect status endpoints |
+| [TASK-0217](../04-tasks/TASK-0217.md) Production runtime fail-closed (no env fallback) | 3 | completed | dev | Resolver enforces tenant key |
+| [TASK-0218](../04-tasks/TASK-0218.md) Tenant AI Settings key UX | 3 | completed | dev | Enter/test/replace/delete UI |
+| [TASK-0219](../04-tasks/TASK-0219.md) Audit, readiness, verification | 2 | completed | tester/dev | Audit + UAT + posture signal |
+| **Total** | **12** | **12/12** | | |
 
 ## Design pack
 

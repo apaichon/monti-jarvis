@@ -16,8 +16,11 @@ type Config struct {
 	GeminiAPIKey    string
 	GeminiModel     string
 	GeminiLiveModel string
-	Voice           string
-	PostgresURL     string
+	// AllowPlatformGeminiFallback enables env GEMINI_API_KEY for tenants without
+	// a usable key. Ignored when AppEnv is production/prod (always fail-closed).
+	AllowPlatformGeminiFallback bool
+	Voice                       string
+	PostgresURL                 string
 	// PostgresKMReadURL is the least-privilege connection used by KM/RAG read
 	// paths. It must not be used for KM ingest or ticket mutation.
 	PostgresKMReadURL string
@@ -146,72 +149,74 @@ func Load() Config {
 	configError := loadConfigFiles(appEnv)
 
 	return Config{
-		Port:                     envOr("PORT", "8091"),
-		GeminiAPIKey:             os.Getenv("GEMINI_API_KEY"),
-		GeminiModel:              envOr("GEMINI_MODEL", "gemini-flash-latest"),
-		GeminiLiveModel:          envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
-		Voice:                    envOr("VOICE", "Aoede"),
-		PostgresURL:              os.Getenv("POSTGRES_URL"),
-		PostgresKMReadURL:        envOr("POSTGRES_KM_READONLY_URL", envOr("POSTGRES_READONLY_URL", "")),
-		PostgresTicketWriteURL:   os.Getenv("POSTGRES_TICKET_WRITE_URL"),
-		PostgresRLSEnforced:      envBool("POSTGRES_RLS_ENFORCED", false),
-		PostgresSchema:           envOr("POSTGRES_SCHEMA", "callcenter"),
-		RedisURL:                 os.Getenv("REDIS_URL"),
-		RedisPrefix:              envOr("REDIS_PREFIX", "monti_jarvis:"),
-		MinioEndpoint:            os.Getenv("MINIO_ENDPOINT"),
-		MinioAccessKey:           os.Getenv("MINIO_ACCESS_KEY"),
-		MinioSecretKey:           os.Getenv("MINIO_SECRET_KEY"),
-		MinioBucket:              envOr("MINIO_BUCKET", "monti-jarvis"),
-		MinioPrefix:              envOr("MINIO_PREFIX", "calls/"),
-		MinioUseSSL:              envBool("MINIO_USE_SSL", false),
-		DemoTenantID:             envOr("DEMO_TENANT_ID", "demo"),
-		LegacyUIEnabled:          envBool("LEGACY_UI_ENABLED", false),
-		NATSURL:                  envOr("NATS_URL", "nats://localhost:4222"),
-		LiveKitURL:               envOr("LIVEKIT_URL", "ws://localhost:7880"),
-		LiveKitAPIKey:            envOr("LIVEKIT_API_KEY", "devkey"),
-		LiveKitAPISecret:         envOr("LIVEKIT_API_SECRET", "secret"),
-		CustomerWebDir:           envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
-		PlatformAdminWebDir:      envOr("PLATFORM_ADMIN_WEB_DIR", "apps/platform-admin-web/build"),
-		ClickHouseURL:            envOr("CLICKHOUSE_URL", "http://localhost:8123"),
-		ClickHouseDB:             envOr("CLICKHOUSE_DB", "monti_jarvis"),
-		ClickHouseUser:           envOr("CLICKHOUSE_USER", "monti"),
-		ClickHousePassword:       envOr("CLICKHOUSE_PASSWORD", "monti"),
-		ClickHouseKMReadUser:     envOr("CLICKHOUSE_KM_READONLY_USER", envOr("CLICKHOUSE_USER", "monti")),
-		ClickHouseKMReadPassword: envOr("CLICKHOUSE_KM_READONLY_PASSWORD", envOr("CLICKHOUSE_PASSWORD", "monti")),
-		GeminiEmbedModel:         envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
-		AIUsageRateVersion:       envOr("AI_USAGE_RATE_VERSION", "unconfigured"),
-		AIUsagePricingAsOf:       envOr("AI_USAGE_PRICING_AS_OF", ""),
-		AIUsageCurrency:          envOr("AI_USAGE_CURRENCY", "USD"),
-		AIUsageInputPriceMicros:  envInt64("AI_USAGE_INPUT_PRICE_MICROS", 0),
-		AIUsageOutputPriceMicros: envInt64("AI_USAGE_OUTPUT_PRICE_MICROS", 0),
-		AIUsageAudioPriceMicros:  envInt64("AI_USAGE_AUDIO_PRICE_MICROS", 0),
-		AuthDisabled:             envBool("AUTH_DISABLED", true),
-		CookieSecure:             envBool("COOKIE_SECURE", false),
-		CookieSameSite:           strings.ToLower(envOr("COOKIE_SAMESITE", "lax")),
-		AllowedOrigins:           splitOrigins(os.Getenv("ALLOWED_ORIGINS")),
-		JWTSecret:                os.Getenv("JWT_SECRET"),
-		JWTAccessTTL:             envDuration("JWT_ACCESS_TTL", 15*time.Minute),
-		JWTRefreshTTL:            envDuration("JWT_REFRESH_TTL", 168*time.Hour),
-		AuthCacheEnabled:         envBool("AUTH_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
-		AuthWriteBehindEnabled:   envBool("AUTH_WRITE_BEHIND_ENABLED", os.Getenv("REDIS_URL") != ""),
-		AuthEventsEnabled:        envBool("AUTH_EVENTS_ENABLED", envOr("NATS_URL", "nats://localhost:4222") != ""),
-		AuthUserCacheTTL:         envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
-		EntitlementCacheEnabled:  envBool("ENTITLEMENT_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
-		EntitlementCacheTTL:      envDuration("ENTITLEMENT_CACHE_TTL", 15*time.Minute),
-		TenantRegisterEnabled:    envBool("TENANT_REGISTER_ENABLED", true),
-		TenantRegisterRateLimit:  envInt("TENANT_REGISTER_RATE_LIMIT", 5),
-		TenantWebDir:             envOr("TENANT_WEB_DIR", "apps/tenant-web/build"),
-		ProductWebDir:            envOr("PRODUCT_WEB_DIR", "apps/product-web/build"),
-		ProductWebEnabled:        envBool("PRODUCT_WEB_ENABLED", true),
-		LeadCaptureEnabled:       envBool("LEAD_CAPTURE_ENABLED", true),
-		LeadRateLimitPerIP:       envInt("LEAD_RATE_LIMIT_PER_IP", 10),
-		FunnelRateLimitPerIP:     envInt("FUNNEL_RATE_LIMIT_PER_IP", 120),
-		LeadDedupeWindowHours:    envInt("LEAD_DEDUPE_WINDOW_HOURS", 24),
-		PublicBaseURL:            envOr("APP_PUBLIC_URL", "http://localhost:8091"),
-		ResendAPIKey:             resolveResendAPIKey(),
-		ResendFromEmail:          resolveResendFrom(),
-		GoogleOAuthClientID:      os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
-		GoogleOAuthClientSecret:  os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+		Port:            envOr("PORT", "8091"),
+		GeminiAPIKey:    os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:     envOr("GEMINI_MODEL", "gemini-flash-latest"),
+		GeminiLiveModel: envOr("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"),
+		// Default true in non-prod for local DX; production never allows fallback.
+		AllowPlatformGeminiFallback: envBool("ALLOW_PLATFORM_GEMINI_FALLBACK", true),
+		Voice:                       envOr("VOICE", "Aoede"),
+		PostgresURL:                 os.Getenv("POSTGRES_URL"),
+		PostgresKMReadURL:           envOr("POSTGRES_KM_READONLY_URL", envOr("POSTGRES_READONLY_URL", "")),
+		PostgresTicketWriteURL:      os.Getenv("POSTGRES_TICKET_WRITE_URL"),
+		PostgresRLSEnforced:         envBool("POSTGRES_RLS_ENFORCED", false),
+		PostgresSchema:              envOr("POSTGRES_SCHEMA", "callcenter"),
+		RedisURL:                    os.Getenv("REDIS_URL"),
+		RedisPrefix:                 envOr("REDIS_PREFIX", "monti_jarvis:"),
+		MinioEndpoint:               os.Getenv("MINIO_ENDPOINT"),
+		MinioAccessKey:              os.Getenv("MINIO_ACCESS_KEY"),
+		MinioSecretKey:              os.Getenv("MINIO_SECRET_KEY"),
+		MinioBucket:                 envOr("MINIO_BUCKET", "monti-jarvis"),
+		MinioPrefix:                 envOr("MINIO_PREFIX", "calls/"),
+		MinioUseSSL:                 envBool("MINIO_USE_SSL", false),
+		DemoTenantID:                envOr("DEMO_TENANT_ID", "demo"),
+		LegacyUIEnabled:             envBool("LEGACY_UI_ENABLED", false),
+		NATSURL:                     envOr("NATS_URL", "nats://localhost:4222"),
+		LiveKitURL:                  envOr("LIVEKIT_URL", "ws://localhost:7880"),
+		LiveKitAPIKey:               envOr("LIVEKIT_API_KEY", "devkey"),
+		LiveKitAPISecret:            envOr("LIVEKIT_API_SECRET", "secret"),
+		CustomerWebDir:              envOr("CUSTOMER_WEB_DIR", "apps/customer-web/build"),
+		PlatformAdminWebDir:         envOr("PLATFORM_ADMIN_WEB_DIR", "apps/platform-admin-web/build"),
+		ClickHouseURL:               envOr("CLICKHOUSE_URL", "http://localhost:8123"),
+		ClickHouseDB:                envOr("CLICKHOUSE_DB", "monti_jarvis"),
+		ClickHouseUser:              envOr("CLICKHOUSE_USER", "monti"),
+		ClickHousePassword:          envOr("CLICKHOUSE_PASSWORD", "monti"),
+		ClickHouseKMReadUser:        envOr("CLICKHOUSE_KM_READONLY_USER", envOr("CLICKHOUSE_USER", "monti")),
+		ClickHouseKMReadPassword:    envOr("CLICKHOUSE_KM_READONLY_PASSWORD", envOr("CLICKHOUSE_PASSWORD", "monti")),
+		GeminiEmbedModel:            envOr("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
+		AIUsageRateVersion:          envOr("AI_USAGE_RATE_VERSION", "unconfigured"),
+		AIUsagePricingAsOf:          envOr("AI_USAGE_PRICING_AS_OF", ""),
+		AIUsageCurrency:             envOr("AI_USAGE_CURRENCY", "USD"),
+		AIUsageInputPriceMicros:     envInt64("AI_USAGE_INPUT_PRICE_MICROS", 0),
+		AIUsageOutputPriceMicros:    envInt64("AI_USAGE_OUTPUT_PRICE_MICROS", 0),
+		AIUsageAudioPriceMicros:     envInt64("AI_USAGE_AUDIO_PRICE_MICROS", 0),
+		AuthDisabled:                envBool("AUTH_DISABLED", true),
+		CookieSecure:                envBool("COOKIE_SECURE", false),
+		CookieSameSite:              strings.ToLower(envOr("COOKIE_SAMESITE", "lax")),
+		AllowedOrigins:              splitOrigins(os.Getenv("ALLOWED_ORIGINS")),
+		JWTSecret:                   os.Getenv("JWT_SECRET"),
+		JWTAccessTTL:                envDuration("JWT_ACCESS_TTL", 15*time.Minute),
+		JWTRefreshTTL:               envDuration("JWT_REFRESH_TTL", 168*time.Hour),
+		AuthCacheEnabled:            envBool("AUTH_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
+		AuthWriteBehindEnabled:      envBool("AUTH_WRITE_BEHIND_ENABLED", os.Getenv("REDIS_URL") != ""),
+		AuthEventsEnabled:           envBool("AUTH_EVENTS_ENABLED", envOr("NATS_URL", "nats://localhost:4222") != ""),
+		AuthUserCacheTTL:            envDuration("AUTH_USER_CACHE_TTL", 15*time.Minute),
+		EntitlementCacheEnabled:     envBool("ENTITLEMENT_CACHE_ENABLED", os.Getenv("REDIS_URL") != ""),
+		EntitlementCacheTTL:         envDuration("ENTITLEMENT_CACHE_TTL", 15*time.Minute),
+		TenantRegisterEnabled:       envBool("TENANT_REGISTER_ENABLED", true),
+		TenantRegisterRateLimit:     envInt("TENANT_REGISTER_RATE_LIMIT", 5),
+		TenantWebDir:                envOr("TENANT_WEB_DIR", "apps/tenant-web/build"),
+		ProductWebDir:               envOr("PRODUCT_WEB_DIR", "apps/product-web/build"),
+		ProductWebEnabled:           envBool("PRODUCT_WEB_ENABLED", true),
+		LeadCaptureEnabled:          envBool("LEAD_CAPTURE_ENABLED", true),
+		LeadRateLimitPerIP:          envInt("LEAD_RATE_LIMIT_PER_IP", 10),
+		FunnelRateLimitPerIP:        envInt("FUNNEL_RATE_LIMIT_PER_IP", 120),
+		LeadDedupeWindowHours:       envInt("LEAD_DEDUPE_WINDOW_HOURS", 24),
+		PublicBaseURL:               envOr("APP_PUBLIC_URL", "http://localhost:8091"),
+		ResendAPIKey:                resolveResendAPIKey(),
+		ResendFromEmail:             resolveResendFrom(),
+		GoogleOAuthClientID:         os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
+		GoogleOAuthClientSecret:     os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
 		GoogleOAuthRedirectURL: envOr(
 			"GOOGLE_OAUTH_REDIRECT_URL",
 			envOr("OAUTH_GOOGLE_REDIRECT_URL", ""),
@@ -287,6 +292,20 @@ func envDurationList(key string, fallback []time.Duration) []time.Duration {
 		return append([]time.Duration(nil), fallback...)
 	}
 	return out
+}
+
+// IsProduction reports whether the process is running as production.
+func (c Config) IsProduction() bool {
+	env := strings.ToLower(strings.TrimSpace(c.AppEnv))
+	return env == "production" || env == "prod"
+}
+
+// PlatformGeminiFallbackAllowed is true only for non-production when the flag is set.
+func (c Config) PlatformGeminiFallbackAllowed() bool {
+	if c.IsProduction() {
+		return false
+	}
+	return c.AllowPlatformGeminiFallback
 }
 
 // ValidateProductionSecurity enforces the Sprint 41 capability split before

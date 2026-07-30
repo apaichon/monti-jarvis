@@ -16,6 +16,7 @@
     listTenantTools,
     putTenantGeminiKey,
     putTenantPrompt,
+    testTenantGeminiKey,
     type TenantGeminiKey,
     type TenantPrompt,
     type TenantSkill,
@@ -95,7 +96,7 @@
     try {
       keyMeta = await putTenantGeminiKey(keyInput.trim());
       keyInput = '';
-      feedback.success('Tenant Gemini key encrypted and saved');
+      feedback.success('Tenant Gemini key encrypted and saved — run Test connection');
     } catch (err) {
       report(err, 'Failed to save Gemini key');
     } finally {
@@ -103,13 +104,52 @@
     }
   }
 
+  async function testKey() {
+    saving = true;
+    try {
+      const result = await testTenantGeminiKey(keyInput.trim() || undefined);
+      if (result.ok) {
+        keyMeta = {
+          configured: true,
+          last4: result.last4,
+          status: result.status,
+          last_validated_at: result.last_validated_at
+        };
+        keyInput = '';
+        feedback.success('Gemini connection OK');
+      } else {
+        if (keyMeta) keyMeta = { ...keyMeta, status: result.status || 'invalid' };
+        feedback.error(result.message || 'Gemini connection failed');
+      }
+    } catch (err) {
+      report(err, 'Failed to test Gemini key');
+    } finally {
+      saving = false;
+    }
+  }
+
   async function removeKey() {
-    if (!confirm('Remove the tenant Gemini key and use the platform fallback?')) return;
+    if (!confirm('Remove the tenant Gemini key? Production AI will fail until a valid key is configured.')) return;
     try {
       keyMeta = await deleteTenantGeminiKey();
       feedback.success('Tenant key removed');
     } catch (err) {
       report(err, 'Failed to remove Gemini key');
+    }
+  }
+
+  function keyStatusLabel(status?: string) {
+    switch (status) {
+      case 'valid':
+        return 'Valid';
+      case 'invalid':
+        return 'Invalid';
+      case 'present':
+        return 'Saved · untested';
+      case 'degraded':
+        return 'Degraded';
+      default:
+        return keyMeta?.configured ? 'Configured' : 'Missing';
     }
   }
 
@@ -207,20 +247,30 @@
 
       <section class="card" style="margin-bottom:16px">
         <h2 style="margin:0 0 6px;font-size:16px">Gemini provider / ผู้ให้บริการ Gemini</h2>
-        <p style="margin:0 0 14px;color:var(--muted);font-size:12px">The key is encrypted at rest and is not returned to the browser.</p>
+        <p style="margin:0 0 14px;color:var(--muted);font-size:12px">
+          Production requires a <strong>validated</strong> tenant key. The key is encrypted at rest and never returned in full.
+        </p>
         {#if keyMeta?.configured}
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-            <span>Configured · ••••{keyMeta.last4}</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <span
+              >••••{keyMeta.last4} · {keyStatusLabel(keyMeta.status)}{#if keyMeta.last_validated_at}
+                · tested {new Date(keyMeta.last_validated_at).toLocaleString()}{/if}</span
+            >
             <button class="secondary" onclick={() => void removeKey()}>Remove key</button>
           </div>
         {:else}
-          <span style="color:var(--muted);font-size:13px">Using platform Gemini fallback</span>
+          <span style="color:var(--muted);font-size:13px">No tenant key — production AI calls will be blocked without a valid key.</span>
         {/if}
         <div class="field" style="margin-top:14px">
-          <label for="gemini-key">Replace key</label>
+          <label for="gemini-key">API key</label>
           <input id="gemini-key" type="password" bind:value={keyInput} autocomplete="new-password" placeholder="Paste tenant Gemini API key" />
         </div>
-        <button class="primary" disabled={!keyInput.trim() || saving} onclick={() => void saveKey()}>Encrypt and save key</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="primary" disabled={!keyInput.trim() || saving} onclick={() => void saveKey()}>Encrypt and save</button>
+          <button class="secondary" disabled={saving || (!keyInput.trim() && !keyMeta?.configured)} onclick={() => void testKey()}
+            >Test connection</button
+          >
+        </div>
       </section>
 
       <section class="card">

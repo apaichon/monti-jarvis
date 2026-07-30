@@ -21,14 +21,28 @@ var (
 	ErrTenantToolInvalid         = errors.New("tenant tool is invalid")
 	ErrTenantToolInUse           = errors.New("tenant tool is in use")
 	ErrTenantSkillInvalid        = errors.New("tenant skill is invalid")
+	// ErrTenantGeminiKeyRequired is returned when production runtime has no
+	// validated tenant Gemini key and platform env fallback is disallowed.
+	ErrTenantGeminiKeyRequired = errors.New("tenant_gemini_key_required")
+)
+
+const (
+	GeminiKeyStatusNone     = "none"
+	GeminiKeyStatusPresent  = "present"
+	GeminiKeyStatusValid    = "valid"
+	GeminiKeyStatusInvalid  = "invalid"
+	GeminiKeyStatusDegraded = "degraded"
 )
 
 type TenantAIConfig struct {
-	TenantID     string     `json:"tenant_id"`
-	Configured   bool       `json:"configured"`
-	KeyLast4     string     `json:"last4,omitempty"`
-	KeyVersion   string     `json:"key_version,omitempty"`
-	KeyUpdatedAt *time.Time `json:"updated_at,omitempty"`
+	TenantID           string     `json:"tenant_id"`
+	Configured         bool       `json:"configured"`
+	KeyLast4           string     `json:"last4,omitempty"`
+	KeyVersion         string     `json:"key_version,omitempty"`
+	KeyUpdatedAt       *time.Time `json:"updated_at,omitempty"`
+	KeyStatus          string     `json:"status,omitempty"`
+	KeyLastValidatedAt *time.Time `json:"last_validated_at,omitempty"`
+	KeyLastErrorClass  string     `json:"last_error_class,omitempty"`
 }
 
 type TenantAgentConfig struct {
@@ -119,7 +133,15 @@ ALTER TABLE %s.tenant_ai_configs
   ADD COLUMN IF NOT EXISTS gemini_key_nonce bytea,
   ADD COLUMN IF NOT EXISTS gemini_key_version text,
   ADD COLUMN IF NOT EXISTS gemini_key_last4 text,
-  ADD COLUMN IF NOT EXISTS gemini_key_updated_at timestamptz;
+  ADD COLUMN IF NOT EXISTS gemini_key_updated_at timestamptz,
+  ADD COLUMN IF NOT EXISTS gemini_key_status text NOT NULL DEFAULT 'none',
+  ADD COLUMN IF NOT EXISTS gemini_key_last_validated_at timestamptz,
+  ADD COLUMN IF NOT EXISTS gemini_key_last_error_class text NOT NULL DEFAULT '';
+UPDATE %s.tenant_ai_configs
+  SET gemini_key_status = 'present'
+  WHERE gemini_key_ciphertext IS NOT NULL
+    AND length(gemini_key_ciphertext) > 0
+    AND (gemini_key_status IS NULL OR gemini_key_status = '' OR gemini_key_status = 'none');
 CREATE TABLE IF NOT EXISTS %s.tenant_agent_configs (
   tenant_id text NOT NULL REFERENCES %s.tenants(id) ON DELETE CASCADE,
   agent_id text NOT NULL,
@@ -182,9 +204,14 @@ CREATE TABLE IF NOT EXISTS %s.tenant_agent_skills (
 CREATE INDEX IF NOT EXISTS tenant_agent_configs_agent_idx ON %s.tenant_agent_configs (tenant_id, agent_id);
 CREATE INDEX IF NOT EXISTS tenant_call_tools_tenant_idx ON %s.tenant_call_tools (tenant_id, enabled);
 CREATE INDEX IF NOT EXISTS tenant_skills_tenant_idx ON %s.tenant_skills (tenant_id, enabled);`,
-		schema, schema, schema, auditColumnsDDL, schema, schema, schema, auditColumnsDDL, schema,
-		schema, schema, auditColumnsDDL, schema, schema, schema, auditColumnsDDL, schema, schema,
-		schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, schema, schema),
+		schema, schema, schema, auditColumnsDDL, schema, schema, // tenant_ai create + alter + status backfill
+		schema, schema, auditColumnsDDL, // tenant_agent_configs
+		schema,                                  // agent alter
+		schema, schema, auditColumnsDDL, schema, // tools create + alter
+		schema, schema, auditColumnsDDL, schema, // skills create + alter
+		schema, schema, auditColumnsDDL, // skill_tools
+		schema, schema, auditColumnsDDL, // agent_skills
+		schema, schema, schema), // indexes
 	)
 	return err
 }
@@ -196,16 +223,25 @@ func (s *Store) GetTenantAIConfig(ctx context.Context, tenantID string) (TenantA
 	var out TenantAIConfig
 	var ciphertext, nonce []byte
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT tenant_id, gemini_key_ciphertext, gemini_key_nonce, gemini_key_version, gemini_key_last4, gemini_key_updated_at FROM %s.tenant_ai_configs WHERE tenant_id=$1`, schema), tenantID).Scan(
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT tenant_id, gemini_key_ciphertext, gemini_key_nonce, gemini_key_version, gemini_key_last4, gemini_key_updated_at,
+		COALESCE(NULLIF(gemini_key_status,''),'none'), gemini_key_last_validated_at, COALESCE(gemini_key_last_error_class,'')
+		FROM %s.tenant_ai_configs WHERE tenant_id=$1`, schema), tenantID).Scan(
 		&out.TenantID, &ciphertext, &nonce, &out.KeyVersion, &out.KeyLast4, &out.KeyUpdatedAt,
+		&out.KeyStatus, &out.KeyLastValidatedAt, &out.KeyLastErrorClass,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return TenantAIConfig{TenantID: tenantID}, nil
+		return TenantAIConfig{TenantID: tenantID, KeyStatus: GeminiKeyStatusNone}, nil
 	}
 	if err != nil {
 		return TenantAIConfig{}, err
 	}
 	out.Configured = len(ciphertext) > 0 && len(nonce) > 0
+	if out.Configured && (out.KeyStatus == "" || out.KeyStatus == GeminiKeyStatusNone) {
+		out.KeyStatus = GeminiKeyStatusPresent
+	}
+	if !out.Configured {
+		out.KeyStatus = GeminiKeyStatusNone
+	}
 	return out, nil
 }
 
@@ -224,7 +260,21 @@ func (s *Store) PutTenantGeminiKey(ctx context.Context, tenantID, value string) 
 	}
 	actor := auditctx.ActorID(ctx)
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	_, err = s.pg.Exec(ctx, fmt.Sprintf(`INSERT INTO %s.tenant_ai_configs (tenant_id, gemini_key_ciphertext, gemini_key_nonce, gemini_key_version, gemini_key_last4, gemini_key_updated_at, created_by, updated_by) VALUES ($1,$2,$3,$4,$5,now(),$6,$6) ON CONFLICT (tenant_id) DO UPDATE SET gemini_key_ciphertext=EXCLUDED.gemini_key_ciphertext, gemini_key_nonce=EXCLUDED.gemini_key_nonce, gemini_key_version=EXCLUDED.gemini_key_version, gemini_key_last4=EXCLUDED.gemini_key_last4, gemini_key_updated_at=now(), updated_by=EXCLUDED.updated_by`, schema), tenantID, ciphertext, nonce, s.cfg.TenantSecretKeyVersion, secretbox.Last4(value), actor)
+	_, err = s.pg.Exec(ctx, fmt.Sprintf(`INSERT INTO %s.tenant_ai_configs (
+		tenant_id, gemini_key_ciphertext, gemini_key_nonce, gemini_key_version, gemini_key_last4, gemini_key_updated_at,
+		gemini_key_status, gemini_key_last_validated_at, gemini_key_last_error_class, created_by, updated_by
+	) VALUES ($1,$2,$3,$4,$5,now(),$6,NULL,'',$7,$7)
+	ON CONFLICT (tenant_id) DO UPDATE SET
+		gemini_key_ciphertext=EXCLUDED.gemini_key_ciphertext,
+		gemini_key_nonce=EXCLUDED.gemini_key_nonce,
+		gemini_key_version=EXCLUDED.gemini_key_version,
+		gemini_key_last4=EXCLUDED.gemini_key_last4,
+		gemini_key_updated_at=now(),
+		gemini_key_status=EXCLUDED.gemini_key_status,
+		gemini_key_last_validated_at=NULL,
+		gemini_key_last_error_class='',
+		updated_by=EXCLUDED.updated_by`, schema),
+		tenantID, ciphertext, nonce, s.cfg.TenantSecretKeyVersion, secretbox.Last4(value), GeminiKeyStatusPresent, actor)
 	if err != nil {
 		return TenantAIConfig{}, err
 	}
@@ -236,8 +286,41 @@ func (s *Store) DeleteTenantGeminiKey(ctx context.Context, tenantID string) erro
 		return fmt.Errorf("postgres is not available")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	_, err := s.pg.Exec(ctx, fmt.Sprintf(`DELETE FROM %s.tenant_ai_configs WHERE tenant_id=$1`, schema), tenantID)
-	return err
+	actor := auditctx.ActorID(ctx)
+	// Clear secrets but keep row so status metadata is consistent.
+	_, err := s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.tenant_ai_configs SET
+		gemini_key_ciphertext=NULL, gemini_key_nonce=NULL, gemini_key_version=NULL, gemini_key_last4=NULL,
+		gemini_key_updated_at=now(), gemini_key_status=$2, gemini_key_last_validated_at=NULL,
+		gemini_key_last_error_class='', updated_by=$3
+		WHERE tenant_id=$1`, schema), tenantID, GeminiKeyStatusNone, actor)
+	if err != nil {
+		return err
+	}
+	// If no row, insert none-status row is unnecessary; empty is fine.
+	return nil
+}
+
+func (s *Store) SetTenantGeminiKeyStatus(ctx context.Context, tenantID, status, errorClass string) (TenantAIConfig, error) {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		status = GeminiKeyStatusNone
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	actor := auditctx.ActorID(ctx)
+	var err error
+	if status == GeminiKeyStatusValid {
+		_, err = s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.tenant_ai_configs SET
+			gemini_key_status=$2, gemini_key_last_error_class='', gemini_key_last_validated_at=now(),
+			updated_by=$3, updated_at=now() WHERE tenant_id=$1`, schema), tenantID, status, actor)
+	} else {
+		_, err = s.pg.Exec(ctx, fmt.Sprintf(`UPDATE %s.tenant_ai_configs SET
+			gemini_key_status=$2, gemini_key_last_error_class=$3, updated_by=$4, updated_at=now()
+			WHERE tenant_id=$1`, schema), tenantID, status, strings.TrimSpace(errorClass), actor)
+	}
+	if err != nil {
+		return TenantAIConfig{}, err
+	}
+	return s.GetTenantAIConfig(ctx, tenantID)
 }
 
 func (s *Store) TenantGeminiKey(ctx context.Context, tenantID string) (string, error) {
@@ -245,9 +328,18 @@ func (s *Store) TenantGeminiKey(ctx context.Context, tenantID string) (string, e
 		return "", fmt.Errorf("postgres is not available")
 	}
 	var ciphertext, nonce []byte
+	var status string
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT gemini_key_ciphertext, gemini_key_nonce FROM %s.tenant_ai_configs WHERE tenant_id=$1`, schema), tenantID).Scan(&ciphertext, &nonce)
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT gemini_key_ciphertext, gemini_key_nonce, COALESCE(NULLIF(gemini_key_status,''),'none')
+		FROM %s.tenant_ai_configs WHERE tenant_id=$1`, schema), tenantID).Scan(&ciphertext, &nonce, &status)
 	if errors.Is(err, pgx.ErrNoRows) || len(ciphertext) == 0 {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	// Reject keys known invalid at runtime.
+	if status == GeminiKeyStatusInvalid {
 		return "", nil
 	}
 	key, err := secretbox.ParseKey(s.cfg.TenantSecretEncryptionKey)
@@ -259,6 +351,27 @@ func (s *Store) TenantGeminiKey(ctx context.Context, tenantID string) (string, e
 		return "", ErrTenantSecretInvalid
 	}
 	return string(plaintext), nil
+}
+
+// TenantGeminiStatus returns a safe readiness state for shell/top-bar use.
+func (s *Store) TenantGeminiStatus(ctx context.Context, tenantID string) (state, label, last4 string, lastValidated *time.Time, err error) {
+	cfg, err := s.GetTenantAIConfig(ctx, tenantID)
+	if err != nil {
+		return "", "", "", nil, err
+	}
+	switch {
+	case !cfg.Configured || cfg.KeyStatus == GeminiKeyStatusNone:
+		return "key_missing", "Gemini key missing", "", nil, nil
+	case cfg.KeyStatus == GeminiKeyStatusInvalid:
+		return "validation_failed", "Gemini key invalid", cfg.KeyLast4, cfg.KeyLastValidatedAt, nil
+	case cfg.KeyStatus == GeminiKeyStatusDegraded:
+		return "degraded", "Gemini degraded", cfg.KeyLast4, cfg.KeyLastValidatedAt, nil
+	case cfg.KeyStatus == GeminiKeyStatusValid:
+		return "ready", "Gemini ready", cfg.KeyLast4, cfg.KeyLastValidatedAt, nil
+	default:
+		// present or unknown with ciphertext — needs test
+		return "key_missing", "Gemini key untested", cfg.KeyLast4, cfg.KeyLastValidatedAt, nil
+	}
 }
 
 func (s *Store) GetTenantAgentConfig(ctx context.Context, tenantID, agentID string) (TenantAgentConfig, error) {
