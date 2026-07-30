@@ -55,7 +55,8 @@ func (s *server) customerWorkforce(w http.ResponseWriter, r *http.Request) {
 	for _, agent := range agents {
 		out = append(out, map[string]any{
 			"id": agent.ID, "name": agent.Name, "role": agent.Role, "trait": agent.Trait,
-			"color": agent.Color, "image": agent.Image, "greeting": agent.Greeting,
+			"color": agent.Color, "image": agent.Image, "image_dark_url": agent.ImageDark,
+			"image_light_url": agent.ImageLight, "greeting": agent.Greeting,
 			"voice": agent.Voice, "popular": agent.Popular, "robot": agent.Robot,
 			"skin": agent.Skin, "hair": agent.Hair, "quota_state": "available",
 		})

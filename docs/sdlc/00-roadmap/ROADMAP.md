@@ -82,7 +82,7 @@
 | **56** | **Customer** | **Caller desk UX revamp: v2 call rail, selected tenant card, mic/speaker device settings, avatar call grid, tenant switcher, account/footer, and larger Monti + company branding** | **A+** | **1, 5, 39, 54** · ✅ **v2.29.0** · [FEAT-0048](../01-features/FEAT-0048-caller-desk-branding-audio-devices.md) · [SPRINT-056](../03-sprints/SPRINT-056.md) · [DES-0052](../02-design/52-caller-desk-branding-audio-devices-spec.md) |
 | **57** | **Customer / Product Web / Branding** | **Monti root-domain logo and social preview metadata: use new Monti logo and Open Graph/Twitter tags for Facebook/link sharing** | **O+** | **39, 48, 54, 56** · ✅ **v2.30.0** · [FEAT-0049](../01-features/FEAT-0049-monti-logo-social-preview-metadata.md) · [SPRINT-057](../03-sprints/SPRINT-057.md) · [DES-0053](../02-design/53-monti-logo-social-preview-metadata-spec.md) |
 | **58** | **Customer / Tenant / Platform Admin** | **Portal UI language selector: EN, TH, and Japanese localized labels for call page, tenant portal, and admin pages** | **I18N** | **16, 20, 39, 54, 56, 57** · ✅ **v2.31.0** · [FEAT-0050](../01-features/FEAT-0050-portal-ui-language-selector.md) · [SPRINT-058](../03-sprints/SPRINT-058.md) · [DES-0054](../02-design/54-portal-ui-language-selector-spec.md) |
-| **59** | **Customer / Conversation UX** | **Call conversation UX revamp: friendly desktop/mobile call interface with clearer controls, chat transcript, customer context, and light/dark mode** | **A+** | **1, 21, 39, 54, 56, 58** · planned (local FEAT-0051 / DES-0055) |
+| **59** | **Customer / Conversation UX** | **Call conversation UX revamp: friendly desktop/mobile call interface with clearer controls, chat transcript, customer context, and light/dark mode** | **A+** | **1, 21, 39, 54, 56, 58** · ✅ **v2.32.0** · [FEAT-0051](../01-features/FEAT-0051-call-conversation-ux-revamp.md) · [SPRINT-059](../03-sprints/SPRINT-059.md) · [DES-0055](../02-design/55-call-conversation-ux-revamp-spec.md) |
 | **60** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) · [SPRINT-060](../03-sprints/SPRINT-060.md) · [DES-0056](../02-design/56-tenant-owned-gemini-key-enforcement-spec.md) · **planned** |
 | **61** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 60** · [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) · **planned** |
 | **62** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) · [SPRINT-062](../03-sprints/SPRINT-062.md) · [DES-0058](../02-design/58-referral-code-redemption-spec.md) · **planned** |
@@ -2052,6 +2052,29 @@ call page, tenant portal, and platform admin · **Depends:** 16, 20, 39, 54, 56,
 - Manual UAT: [SPRINT-058-portal-ui-language-selector-manual.md](../06-manual-tests/SPRINT-058-portal-ui-language-selector-manual.md)
 
 **Worktree:** `.worktrees/SPRINT-058` · branch `feature/sprint-058-portal-ui-i18n`
+
+---
+
+## Shipped: SPRINT-059 — Call Conversation UX Revamp ✅ v2.32.0
+
+**Platform:** Customer / Conversation UX · **Feature:** responsive call
+conversation workspace with a prominent live avatar, clear controls, transcript,
+context rails, and light/dark presentation · **Depends:** 1, 21, 39, 54, 56, 58 ·
+**Status:** shipped · **Release:** v2.32.0 · **Closed:** 2026-07-30 ·
+**Feature:** [FEAT-0051](../01-features/FEAT-0051-call-conversation-ux-revamp.md) ·
+**Design:** [DES-0055](../02-design/55-call-conversation-ux-revamp-spec.md) ·
+**Sprint:** [SPRINT-059](../03-sprints/SPRINT-059.md)
+
+### Delivered
+
+1. Desktop/mobile conversation shell with scroll-safe transcript and composer.
+2. Large live avatar that remains visible during active calls.
+3. Collapsed icon-led tenant, customer, and device context sections.
+4. Icon-only light/dark switch with persisted browser preference.
+5. Per-avatar default, dark, and light portrait uploads.
+6. Real speaker/microphone toggles and numeric keypad composer input.
+
+**Manual UAT:** [SPRINT-059-call-conversation-ux-manual.md](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md)
 
 ---
 

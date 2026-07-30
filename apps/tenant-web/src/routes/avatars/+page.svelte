@@ -10,6 +10,7 @@
     listTenantAvatars,
     updateTenantAvatar,
     uploadTenantAvatarImage,
+    type AvatarImageVariant,
     type AvatarCap,
     type GeminiSpeakerVoice,
     type TenantAvatar
@@ -36,6 +37,7 @@
   let voice = $state('Aoede');
   let pendingFile = $state<File | null>(null);
   let pendingPreview = $state('');
+  const portraitVariants: AvatarImageVariant[] = ['default', 'dark', 'light'];
 
   async function load() {
     loading = true;
@@ -134,7 +136,7 @@
     }
   }
 
-  async function onRowImageUpload(av: TenantAvatar, e: Event) {
+  async function onRowImageUpload(av: TenantAvatar, e: Event, variant: AvatarImageVariant = 'default') {
     if (!isOwned(av)) {
       feedback.error('Only tenant-owned avatars can upload images here');
       return;
@@ -149,8 +151,8 @@
     }
     uploadingId = av.id;
     try {
-      await uploadTenantAvatarImage(av.id, file);
-      feedback.success('Portrait uploaded');
+      await uploadTenantAvatarImage(av.id, file, variant);
+      feedback.success(`${variantLabel(variant)} portrait uploaded`);
       await load();
     } catch (err) {
       feedback.error(err instanceof ApiError ? err.message : 'Image upload failed');
@@ -244,6 +246,28 @@
     const url = (av.image_url || '').trim();
     if (!url || url.includes('default-avatar')) return '';
     return url;
+  }
+
+  function themedPortraitSrc(av: TenantAvatar, variant: AvatarImageVariant) {
+    const fromTopLevel =
+      variant === 'dark'
+        ? av.image_dark_url
+        : variant === 'light'
+          ? av.image_light_url
+          : av.image_url;
+    const fromFlags =
+      variant === 'dark'
+        ? av.flags?.image_dark_url
+        : variant === 'light'
+          ? av.flags?.image_light_url
+          : av.image_url;
+    const url = String(fromTopLevel || fromFlags || '').trim();
+    if (!url || url.includes('default-avatar')) return '';
+    return url;
+  }
+
+  function variantLabel(variant: AvatarImageVariant) {
+    return variant === 'default' ? 'Default' : variant[0].toUpperCase() + variant.slice(1);
   }
 </script>
 
@@ -344,17 +368,26 @@
                 </td>
                 <td>
                   {#if isOwned(av)}
-                    <label class="upload-inline">
-                      <input
-                        type="file"
-                        accept={AVATAR_IMAGE_HINT.accept}
-                        disabled={uploadingId === av.id}
-                        onchange={(e) => onRowImageUpload(av, e)}
-                      />
-                      <span class="btn ghost small">
-                        {uploadingId === av.id ? 'Uploading…' : portraitSrc(av) ? 'Replace' : 'Upload'}
-                      </span>
-                    </label>
+                    <div class="portrait-upload-set">
+                      {#each portraitVariants as variant (variant)}
+                        <label class="upload-inline">
+                          <input
+                            type="file"
+                            accept={AVATAR_IMAGE_HINT.accept}
+                            disabled={uploadingId === av.id}
+                            onchange={(e) => onRowImageUpload(av, e, variant)}
+                          />
+                          <span class="btn ghost small">
+                            {uploadingId === av.id ? 'Uploading…' : variantLabel(variant)}
+                          </span>
+                        </label>
+                      {/each}
+                      <div class="portrait-variant-status" aria-label="Portrait variants">
+                        <span class:ready={Boolean(portraitSrc(av))}>Default</span>
+                        <span class:ready={Boolean(themedPortraitSrc(av, 'dark'))}>Dark</span>
+                        <span class:ready={Boolean(themedPortraitSrc(av, 'light'))}>Light</span>
+                      </div>
+                    </div>
                   {:else}
                     <span style="font-size:12px;color:var(--muted)">—</span>
                   {/if}
@@ -408,8 +441,17 @@
 {/if}
 
 {#if showCreate}
-  <div class="modal-backdrop" role="presentation" onclick={() => { showCreate = false; resetCreateForm(); }}>
-    <div class="card modal" role="dialog" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-backdrop" role="presentation">
+    <button
+      class="modal-scrim"
+      type="button"
+      aria-label="Close create avatar"
+      onclick={() => {
+        showCreate = false;
+        resetCreateForm();
+      }}
+    ></button>
+    <div class="card modal" role="dialog" tabindex="-1">
       <h3 style="margin:0 0 8px">Create avatar</h3>
       <p style="margin:0 0 16px;font-size:13px;color:var(--muted)">
         Adds to your library as inactive. Activate later within your package limit.
@@ -569,7 +611,16 @@
     z-index: 50;
     padding: 16px;
   }
+  .modal-scrim {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: transparent;
+    cursor: default;
+  }
   .modal {
+    position: relative;
+    z-index: 1;
     width: min(480px, 100%);
     max-height: 90vh;
     overflow: auto;
@@ -633,6 +684,32 @@
   .btn.small {
     font-size: 12px;
     padding: 6px 10px;
+  }
+  .portrait-upload-set {
+    display: grid;
+    gap: 6px;
+    min-width: 160px;
+  }
+  .portrait-upload-set .upload-inline {
+    margin-right: 4px;
+  }
+  .portrait-variant-status {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .portrait-variant-status span {
+    border: 1px solid rgb(70 132 190 / 24%);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 6px;
+  }
+  .portrait-variant-status span.ready {
+    border-color: rgb(34 197 94 / 35%);
+    background: rgb(34 197 94 / 12%);
+    color: #4ade80;
   }
   .voice-select,
   select#av-voice {

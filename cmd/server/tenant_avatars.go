@@ -213,10 +213,10 @@ func (s *server) listGeminiSpeakerVoices(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"source":  "https://aistudio.google.com/generate-speech",
-		"docs":    "https://ai.google.dev/gemini-api/docs/speech-generation#voices",
+		"source":   "https://aistudio.google.com/generate-speech",
+		"docs":     "https://ai.google.dev/gemini-api/docs/speech-generation#voices",
 		"provider": store.GeminiLiveProviderID,
-		"voices":  store.GeminiSpeakerVoices(),
+		"voices":   store.GeminiSpeakerVoices(),
 	})
 }
 
@@ -321,6 +321,8 @@ func tenantLibraryAvatarJSON(item store.TenantLibraryAvatar) map[string]any {
 		"trait":             av.Trait,
 		"color":             av.Color,
 		"image_url":         av.ImageURL,
+		"image_dark_url":    avatarFlagString(av.Flags, "image_dark_url"),
+		"image_light_url":   avatarFlagString(av.Flags, "image_light_url"),
 		"greeting":          av.Greeting,
 		"status":            av.Status,
 		"owner_tenant_id":   av.OwnerTenantID,

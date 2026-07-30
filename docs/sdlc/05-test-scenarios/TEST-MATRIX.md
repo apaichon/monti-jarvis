@@ -2,8 +2,8 @@
 id: TEST-MATRIX
 status: active
 hold_reason: sprint_044_security_review
-updated: 2026-07-24
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044, SPRINT-045]
+updated: 2026-07-30
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044, SPRINT-045, SPRINT-055, SPRINT-059]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -235,6 +235,17 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | T55-01 | 1–2, 6 | Projection stores normalized topic and `unknown` fallback without changing fact idempotency | Auto + Manual | `go test ./cmd/server ./internal/clickhouse -count=1` · [UAT-055](../06-manual-tests/SPRINT-055-topic-statistics-manual.md) | Pass |
 | T55-02 | 3–4 | Tenant statistics API returns `by_topic` and filters totals/channel/avatar/topic by `topic=` | Auto + Manual | `go test ./internal/clickhouse ./cmd/server -count=1` · [UAT-055](../06-manual-tests/SPRINT-055-topic-statistics-manual.md) | Pass |
 | T55-03 | 5 | Tenant dashboard renders topic selector, topic KPI, topic breakdown, and keeps existing sections | Auto + Manual | `cd apps/tenant-web && npm run check && npm run build` · [UAT-055](../06-manual-tests/SPRINT-055-topic-statistics-manual.md) | Pass (auto) |
+
+---
+
+## SPRINT-059 — Call Conversation UX Revamp
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T59-01 | 1–3 | Desktop/mobile shell keeps avatar prominent, rails collapsed, transcript scrollable, and composer at the bottom | Auto + Manual | Customer-web check/build · user screenshot review · [UAT-059](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md) | Pass |
+| T59-02 | 4–5 | Icon-only theme control persists light/dark mode and selects matching avatar portrait with fallback | Auto + Manual | Customer/tenant check/build · [UAT-059](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md) | Pass |
+| T59-03 | 6 | Speaker and microphone controls update live media state; keypad writes numeric input to composer | Auto + Manual | Customer-web check/build · [UAT-059](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md) | Pass (code); target-device media smoke tracked |
+| T59-04 | 7 | EN/TH/JA labels and responsive controls avoid horizontal overflow | Auto + Manual | Customer-web check/build · [UAT-059](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md) | Pass |
 
 ---
 

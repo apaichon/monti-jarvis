@@ -86,6 +86,25 @@ export type Messages = {
   desk_new_session: string;
   desk_expand: string;
   desk_collapse: string;
+  desk_tenant_info: string;
+  desk_customer_info: string;
+  desk_device_settings: string;
+  desk_open_settings: string;
+  desk_call_preferences: string;
+  desk_need_help: string;
+  desk_contact_support: string;
+  desk_last_active: string;
+  desk_mute: string;
+  desk_unmute: string;
+  desk_keypad: string;
+  desk_keypad_help: string;
+  desk_keypad_entry: string;
+  desk_keypad_placeholder: string;
+  desk_delete_character: string;
+  desk_clear: string;
+  desk_done: string;
+  desk_switch_light: string;
+  desk_switch_dark: string;
 };
 
 const en: Messages = {
@@ -172,7 +191,26 @@ const en: Messages = {
   desk_voice_hint: 'Select an agent, then start an inbound voice call.',
   desk_new_session: 'New call session',
   desk_expand: 'Expand',
-  desk_collapse: 'Collapse'
+  desk_collapse: 'Collapse',
+  desk_tenant_info: 'Tenant info',
+  desk_customer_info: 'Customer info',
+  desk_device_settings: 'Device settings',
+  desk_open_settings: 'Open settings',
+  desk_call_preferences: 'Audio and call preferences',
+  desk_need_help: 'Need help?',
+  desk_contact_support: 'Contact your tenant support team',
+  desk_last_active: 'Last active',
+  desk_mute: 'Mute',
+  desk_unmute: 'Unmute',
+  desk_keypad: 'Keypad',
+  desk_keypad_help: 'Type with your keyboard or tap a number.',
+  desk_keypad_entry: 'Keypad entry',
+  desk_keypad_placeholder: 'Enter numbers',
+  desk_delete_character: 'Delete last character',
+  desk_clear: 'Clear',
+  desk_done: 'Done',
+  desk_switch_light: 'Switch to light mode',
+  desk_switch_dark: 'Switch to dark mode'
 };
 
 const th: Messages = {
@@ -257,7 +295,26 @@ const th: Messages = {
   desk_voice_hint: 'เลือกเอเจนต์ แล้วเริ่มสายเสียงขาเข้า',
   desk_new_session: 'เซสชันการโทรใหม่',
   desk_expand: 'ขยาย',
-  desk_collapse: 'ย่อ'
+  desk_collapse: 'ย่อ',
+  desk_tenant_info: 'ข้อมูลแบรนด์',
+  desk_customer_info: 'ข้อมูลลูกค้า',
+  desk_device_settings: 'ตั้งค่าอุปกรณ์',
+  desk_open_settings: 'เปิดการตั้งค่า',
+  desk_call_preferences: 'การตั้งค่าเสียงและการโทร',
+  desk_need_help: 'ต้องการความช่วยเหลือ?',
+  desk_contact_support: 'ติดต่อทีมสนับสนุนของแบรนด์',
+  desk_last_active: 'ใช้งานล่าสุด',
+  desk_mute: 'ปิดเสียง',
+  desk_unmute: 'เปิดเสียง',
+  desk_keypad: 'แป้นตัวเลข',
+  desk_keypad_help: 'พิมพ์ด้วยแป้นพิมพ์หรือแตะตัวเลข',
+  desk_keypad_entry: 'ข้อมูลจากแป้นตัวเลข',
+  desk_keypad_placeholder: 'ป้อนตัวเลข',
+  desk_delete_character: 'ลบอักขระล่าสุด',
+  desk_clear: 'ล้าง',
+  desk_done: 'เสร็จ',
+  desk_switch_light: 'เปลี่ยนเป็นโหมดสว่าง',
+  desk_switch_dark: 'เปลี่ยนเป็นโหมดมืด'
 };
 
 const ja: Messages = {
@@ -343,7 +400,26 @@ const ja: Messages = {
   desk_voice_hint: 'エージェントを選び、インバウンド音声通話を開始してください。',
   desk_new_session: '新しい通話セッション',
   desk_expand: '展開',
-  desk_collapse: '折りたたむ'
+  desk_collapse: '折りたたむ',
+  desk_tenant_info: 'テナント情報',
+  desk_customer_info: '顧客情報',
+  desk_device_settings: 'デバイス設定',
+  desk_open_settings: '設定を開く',
+  desk_call_preferences: '音声と通話の設定',
+  desk_need_help: 'お困りですか？',
+  desk_contact_support: 'テナントのサポートに連絡',
+  desk_last_active: '最終アクティブ',
+  desk_mute: 'ミュート',
+  desk_unmute: 'ミュート解除',
+  desk_keypad: 'キーパッド',
+  desk_keypad_help: 'キーボードで入力するか、番号をタップしてください。',
+  desk_keypad_entry: 'キーパッド入力',
+  desk_keypad_placeholder: '番号を入力',
+  desk_delete_character: '最後の文字を削除',
+  desk_clear: 'クリア',
+  desk_done: '完了',
+  desk_switch_light: 'ライトモードに切り替え',
+  desk_switch_dark: 'ダークモードに切り替え'
 };
 
 export const messages: Record<Lang, Messages> = { en, th, ja };

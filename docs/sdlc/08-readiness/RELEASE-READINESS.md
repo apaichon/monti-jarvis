@@ -1,11 +1,11 @@
 ---
 id: READINESS-RELEASE
 status: completed
-updated: 2026-07-29
-current_sprint: SPRINT-055
-release_target: v2.28.0
-release: v2.28.0
-git_tag: v2.28.0
+updated: 2026-07-30
+current_sprint: SPRINT-059
+release_target: v2.32.0
+release: v2.32.0
+git_tag: v2.32.0
 ---
 
 # Release Readiness Checklist
@@ -172,6 +172,20 @@ curl -fsS http://localhost:8091/api/workforce
 - [ ] Browser/staging UAT re-run; automated release gate accepted by user for
   v2.28.0 close.
 
+### SPRINT-059 (v2.32.0)
+
+- [x] TASK-0212–TASK-0215 completed with 12/12 points.
+- [x] Desktop/mobile conversation shell keeps the live avatar prominent.
+- [x] Tenant, customer, and device rail sections default collapsed.
+- [x] Transcript workspace scrolls without covering the bottom composer.
+- [x] Icon-only light/dark toggle exposes an accessible label and persists mode.
+- [x] Tenant avatars support default, dark, and light portrait variants.
+- [x] Speaker/microphone controls update live media state; keypad enters composer digits.
+- [x] Go tests, customer/tenant Svelte checks/builds, and diff validation pass.
+- [x] User screenshot review drove desktop layout and overlap fixes.
+- [ ] Target-device microphone/speaker smoke; tracked in
+  [SPRINT-059 manual UAT](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md).
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -203,6 +217,10 @@ curl -fsS http://localhost:8091/api/workforce
 | Tester | Codex release verification | 2026-07-29 | Automated Go/Svelte/build checks passed; browser/staging UAT deferred |
 | PM | User-authorized release close | 2026-07-29 | User requested close, merge to main, push, and tag |
 | DevOps | Codex release verification | 2026-07-29 | VERSION v2.28.0, merge/tag/push prepared |
+| Dev | Codex release verification | 2026-07-30 | S59 responsive call workspace, avatar themes, controls, and API/storage changes |
+| Tester | Codex release verification | 2026-07-30 | Automated checks plus user screenshot UAT; target-device media smoke tracked |
+| PM | User-authorized release close | 2026-07-30 | User requested icon theme control, Sprint 59 close, merge, ROADMAP update, and tag |
+| DevOps | Codex release verification | 2026-07-30 | VERSION v2.32.0 and local merge/tag prepared; no push requested |
 
 ## H. Release-cut (PM + DevOps)
 
@@ -224,6 +242,10 @@ git push origin v2.13.0
 - [x] `_velocity.json` updated for SPRINT-055
 - [x] ROADMAP Sprint 55 marked v2.28.0
 - [x] Tag `v2.28.0` pushed to `origin`
+- [x] Sprint 59 marked `completed` in `03-sprints/`
+- [x] `_velocity.json` updated for SPRINT-059
+- [x] ROADMAP Sprint 59 marked v2.32.0
+- [x] Local tag `v2.32.0` authorized; remote push not requested
 
 ## Quick demo script (stakeholder, ~10 min)
 
