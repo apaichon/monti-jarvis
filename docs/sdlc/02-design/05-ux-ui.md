@@ -4802,3 +4802,52 @@ Nav: Overview · Call center · … · AI config · Settings
 | A62-B Reverse | Reverse grant | POST …/reverse |
 
 See DES-0056–0058, workflow §132–139.
+
+## A63 - Platform Admin Leads Inbox Rendering Fix
+
+### Screen map -> API
+
+| UI zone | User action | API / route |
+| --- | --- | --- |
+| A63-A Filters | Change status, kind, or search | `GET /api/platform/leads` |
+| A63-B Counts | Inspect shown and total | `items.length` + response `total` |
+| A63-C Inbox | Open returned Book Demo lead | `GET /api/platform/leads/{id}` |
+| A63-D Detail | Save status/assignment or add note | Existing PATCH/POST lead APIs |
+
+### Desktop layout
+
+```text
++--------------------------------------------------------------------------+
+| Leads                                                        [Refresh]  |
+| Status [new v]  Kind [all v]  Search [email/company]  [Apply]            |
++--------------------------------------------------------------------------+
+| Inbox                                      1 shown / 1 total              |
+| ID       Email             Company       Kind       Status       [Open]  |
+| lead_123 demo@example.com  Example Co.   book_demo  new          [Open]  |
++--------------------------------------------------------------------------+
+```
+
+### Flow A - non-empty response
+
+```text
+GET leads -> {items:[lead], total:1} -> normalize -> render one row
+          -> "1 shown / 1 total"
+```
+
+### Flow B - filtered empty response
+
+```text
+GET leads -> {items:[], total:0} -> normalize -> empty message
+          -> "0 shown / 0 total"
+```
+
+### Component -> file
+
+| Component | File |
+| --- | --- |
+| Leads page | `apps/platform-admin-web/src/routes/leads/+page.svelte` |
+| API types | `apps/platform-admin-web/src/lib/api/leads.ts` |
+| Response normalizer | `apps/platform-admin-web/src/lib/api/lead-list-contract.js` |
+| Contract tests | `apps/platform-admin-web/tests/lead-list-contract.test.js` |
+
+See workflow section 140, ER Sprint 63, and API Sprint 63.

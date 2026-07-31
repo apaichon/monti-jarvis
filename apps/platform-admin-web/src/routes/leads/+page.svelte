@@ -10,6 +10,7 @@
     type LeadDetail,
     type LeadListItem
   } from '$lib/api/leads';
+  import { normalizeLeadListResponse } from '$lib/api/lead-list-contract.js';
   import { ApiError } from '$lib/api/http';
   import { feedback } from '$lib/feedback.svelte';
 
@@ -32,15 +33,17 @@
   async function load() {
     loading = true;
     try {
-      const res = await listLeads({
-        status: statusFilter,
-        kind: kindFilter,
-        q: search.trim(),
-        limit: 50,
-        offset: 0
-      });
-      leads = res.leads ?? [];
-      total = res.total ?? leads.length;
+      const res = normalizeLeadListResponse(
+        await listLeads({
+          status: statusFilter,
+          kind: kindFilter,
+          q: search.trim(),
+          limit: 50,
+          offset: 0
+        })
+      );
+      leads = res.items;
+      total = res.total;
     } catch (err) {
       leads = [];
       total = 0;

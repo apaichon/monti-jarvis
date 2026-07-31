@@ -157,3 +157,4 @@ workflow §120–124; ER/API Sprint 51; UX T51/A51.
 **Excel exports:** [excel-output/](excel-output/) mirrors the same `NN-` prefix order.
 **Sprint 58:** Design pack approved — [54-portal-ui-language-selector-spec.md](54-portal-ui-language-selector-spec.md); workflow §130–131; API Sprint 58; UX C58/T58/A58. [SPRINT-058](../03-sprints/SPRINT-058.md).
 **Sprint 60–62:** Design packs approved (plan worktree `.worktrees/SPRINT-060-062`) — DES-0056 Gemini key enforcement; DES-0057 Gemini top-bar + performance nav remove; DES-0058 referral redemption. [SPRINT-060](../03-sprints/SPRINT-060.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [SPRINT-062](../03-sprints/SPRINT-062.md).
+**Sprint 63:** Existing Sprint 48 Leads domain contract clarified; workflow section 140, no ER delta, API Sprint 63, and UX A63. [SPRINT-063](../03-sprints/SPRINT-063.md).
