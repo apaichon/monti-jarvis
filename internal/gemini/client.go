@@ -77,6 +77,8 @@ func (c *Client) TestConnection(ctx context.Context) error {
 	if !c.Enabled() {
 		return errors.New("GEMINI_API_KEY is not configured")
 	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	model := c.model
 	if model == "" {
 		model = "gemini-flash-latest"

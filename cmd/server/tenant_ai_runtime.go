@@ -27,13 +27,10 @@ func (s *server) tenantAIClient(ctx context.Context, tenantID string) (*gemini.C
 // resolveTenantGeminiAPIKey implements S60 fail-closed production policy.
 func (s *server) resolveTenantGeminiAPIKey(ctx context.Context, tenantID string) (string, error) {
 	if s.store == nil || strings.TrimSpace(tenantID) == "" {
-		if s.cfg.PlatformGeminiFallbackAllowed() {
+		if s.cfg.PlatformGeminiFallbackAllowed() && strings.TrimSpace(s.cfg.GeminiAPIKey) != "" {
 			return s.cfg.GeminiAPIKey, nil
 		}
-		if strings.TrimSpace(s.cfg.GeminiAPIKey) == "" {
-			return "", store.ErrTenantGeminiKeyRequired
-		}
-		return s.cfg.GeminiAPIKey, nil
+		return "", store.ErrTenantGeminiKeyRequired
 	}
 	key, err := s.store.TenantGeminiKey(ctx, tenantID)
 	if err != nil {

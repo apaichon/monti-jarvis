@@ -34,7 +34,9 @@ export function getReferralCode() {
 }
 
 export function getReferrals() {
-  return apiFetch<{ tenant_id: string; referrals: Referral[]; bonus: BonusBalance[] }>('/api/tenant/referrals');
+  return apiFetch<{ tenant_id: string; referrals: Referral[]; bonus: BonusBalance[]; redemptions: ReferralRedemption[] }>(
+    '/api/tenant/referrals'
+  );
 }
 
 export type ReferralRedemption = {
@@ -44,7 +46,7 @@ export type ReferralRedemption = {
   status: string;
   applied_at?: string;
   reversed_at?: string;
-  bonus?: Array<{ dimension: string; remaining?: number; granted?: number; unit?: string; expires_at?: string }>;
+  bonus?: Array<{ dimension: string; amount: number; expires_at?: string }>;
 };
 
 export function validateReferralCode(code: string) {

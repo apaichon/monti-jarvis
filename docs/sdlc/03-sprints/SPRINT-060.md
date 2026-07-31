@@ -80,3 +80,12 @@ branch: docs/sprint-060-062-plan
 go test ./internal/store ./internal/gemini ./cmd/server -count=1
 cd apps/tenant-web && npm run check
 ```
+
+Manual UAT: [SPRINT-060-062-manual.md](../06-manual-tests/SPRINT-060-062-manual.md)
+
+## Review - PASS
+
+Validated-key runtime enforcement, production fail-closed behavior, bounded
+connection testing, safe status metadata, audit middleware coverage, and
+readiness posture were reviewed on 2026-07-31. Automated gates passed; live
+Gemini credential UAT remains listed in the manual checklist.

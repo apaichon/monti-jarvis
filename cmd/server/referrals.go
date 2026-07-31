@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -71,6 +72,9 @@ func (s *server) validateTenantReferralRedeem(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
+	if !s.allowReferralRedeemAttempt(w, r, tenantID) {
+		return
+	}
 	var body struct {
 		Code string `json:"code"`
 	}
@@ -90,6 +94,9 @@ func (s *server) redeemTenantReferralCode(w http.ResponseWriter, r *http.Request
 	tenantID, ok := s.tenantIDFromAuth(r)
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if !s.allowReferralRedeemAttempt(w, r, tenantID) {
 		return
 	}
 	var body struct {
@@ -113,6 +120,22 @@ func (s *server) redeemTenantReferralCode(w http.ResponseWriter, r *http.Request
 	})
 }
 
+func (s *server) allowReferralRedeemAttempt(w http.ResponseWriter, r *http.Request, tenantID string) bool {
+	if s.referralRedeemLimiter == nil {
+		return true
+	}
+	allowed, err := s.referralRedeemLimiter.Allow(r.Context(), tenantID)
+	if err != nil {
+		log.Printf("referral redemption rate limit warning: %v", err)
+		return true
+	}
+	if !allowed {
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "too many referral redemption attempts", "code": "rate_limited"})
+		return false
+	}
+	return true
+}
+
 func (s *server) listTenantRedemptions(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := s.tenantIDFromAuth(r)
 	if !ok {
@@ -121,6 +144,23 @@ func (s *server) listTenantRedemptions(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := s.store.ListTenantRedemptions(r.Context(), tenantID)
 	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"redemptions": items})
+}
+
+func (s *server) listPlatformRedemptions(w http.ResponseWriter, r *http.Request) {
+	items, err := s.store.ListPlatformReferralRedemptions(r.Context(), store.PlatformReferralRedemptionFilter{
+		TenantID: r.URL.Query().Get("tenant_id"),
+		Code:     r.URL.Query().Get("code"),
+		Status:   r.URL.Query().Get("status"),
+	})
+	if err != nil {
+		if errors.Is(err, store.ErrReferralInvalid) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid filters", "code": "validation_error"})
+			return
+		}
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}

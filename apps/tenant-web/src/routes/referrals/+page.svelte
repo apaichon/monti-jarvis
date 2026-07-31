@@ -30,7 +30,7 @@
     loading = true;
     error = '';
     try {
-      [code, { referrals, bonus }] = await Promise.all([getReferralCode(), getReferrals()]);
+      [code, { referrals, bonus, redemptions }] = await Promise.all([getReferralCode(), getReferrals()]);
     } catch (err) {
       error = err instanceof ApiError ? err.message : 'Failed to load referral rewards';
       feedback.error(error);
@@ -68,7 +68,7 @@
   async function applyCode() {
     redeemBusy = true;
     try {
-      const res = await redeemReferralCode(redeemCode.trim());
+      await redeemReferralCode(redeemCode.trim());
       feedback.success('Referral code applied');
       redeemCode = '';
       redeemPreview = '';

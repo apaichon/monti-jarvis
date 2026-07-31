@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -128,6 +129,15 @@ func (s *server) testTenantGeminiKey(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
+	if s.geminiTestLimiter != nil {
+		allowed, limitErr := s.geminiTestLimiter.Allow(r.Context(), tenantID)
+		if limitErr != nil {
+			log.Printf("Gemini key test rate limit warning: %v", limitErr)
+		} else if !allowed {
+			writeJSON(w, http.StatusTooManyRequests, map[string]any{"ok": false, "status": "degraded", "message": "Too many connection tests. Try again later.", "code": "rate_limited"})
+			return
+		}
+	}
 	var body tenantGeminiKeyBody
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	proposed := strings.TrimSpace(body.APIKey)
@@ -140,7 +150,7 @@ func (s *server) testTenantGeminiKey(w http.ResponseWriter, r *http.Request) {
 		}
 		key = proposed
 	} else {
-		key, err = s.store.TenantGeminiKey(r.Context(), tenantID)
+		key, err = s.store.TenantGeminiKeyForValidation(r.Context(), tenantID)
 		if err != nil {
 			writeTenantAIError(w, err)
 			return
@@ -167,10 +177,11 @@ func (s *server) testTenantGeminiKey(w http.ResponseWriter, r *http.Request) {
 			class = "quota"
 			msg = "Gemini rate limited the test. Try again later."
 		}
+		failureStatus := geminiFailureStatus(class)
 		if proposed == "" {
-			_, _ = s.store.SetTenantGeminiKeyStatus(r.Context(), tenantID, store.GeminiKeyStatusInvalid, class)
+			_, _ = s.store.SetTenantGeminiKeyStatus(r.Context(), tenantID, failureStatus, class)
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "status": "invalid", "error_class": class, "message": msg})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "status": failureStatus, "error_class": class, "message": msg})
 		return
 	}
 	// On success with proposed key, persist it as valid.
@@ -194,6 +205,13 @@ func (s *server) testTenantGeminiKey(w http.ResponseWriter, r *http.Request) {
 		"last_validated_at": row.KeyLastValidatedAt,
 		"configured":        row.Configured,
 	})
+}
+
+func geminiFailureStatus(errorClass string) string {
+	if strings.TrimSpace(errorClass) == "auth" {
+		return store.GeminiKeyStatusInvalid
+	}
+	return store.GeminiKeyStatusDegraded
 }
 
 func (s *server) getTenantGeminiStatus(w http.ResponseWriter, r *http.Request) {

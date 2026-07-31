@@ -78,3 +78,12 @@ branch: docs/sprint-060-062-plan
 go test ./internal/quota ./internal/store ./cmd/server -count=1
 cd apps/tenant-web && npm run check
 ```
+
+Manual UAT: [SPRINT-060-062-manual.md](../06-manual-tests/SPRINT-060-062-manual.md)
+
+## Review - PASS
+
+Apply/retry/reverse atomicity, expiry and owner eligibility, tenant isolation,
+grant-specific response data, platform inspection, audit coverage, and portal
+refresh behavior were reviewed on 2026-07-31. The Postgres integration path and
+both web builds pass.

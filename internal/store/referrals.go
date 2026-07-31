@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS %s.tenant_referral_codes (
   status text NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'disabled')),%s
 );
+ALTER TABLE %s.tenant_referral_codes
+  ADD COLUMN IF NOT EXISTS expires_at timestamptz;
 CREATE TABLE IF NOT EXISTS %s.tenant_referrals (
   id text PRIMARY KEY,
   referrer_tenant_id text NOT NULL REFERENCES %s.tenants(id) ON DELETE CASCADE,
@@ -110,7 +112,7 @@ CREATE TABLE IF NOT EXISTS %s.tenant_referral_clicks (
   landing_path text NOT NULL DEFAULT '',
   clicked_at timestamptz NOT NULL DEFAULT now(),%s
 );`,
-		schema, schema, auditColumnsDDL, schema, schema, schema, schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, schema, schema, schema, auditColumnsDDL))
+		schema, schema, auditColumnsDDL, schema, schema, schema, schema, schema, auditColumnsDDL, schema, schema, auditColumnsDDL, schema, schema, schema, schema, auditColumnsDDL))
 	return err
 }
 

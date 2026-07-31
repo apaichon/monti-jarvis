@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/libra/monti-jarvis/internal/auditctx"
 )
 
@@ -19,15 +20,27 @@ var (
 
 // ReferralRedemption is a redeemer-side code apply record (S62).
 type ReferralRedemption struct {
-	ID               string         `json:"id"`
-	RedeemerTenantID string         `json:"redeemer_tenant_id"`
-	ReferrerTenantID string         `json:"referrer_tenant_id"`
-	ReferralCode     string         `json:"referral_code"`
-	Status           string         `json:"status"`
-	IdempotencyKey   string         `json:"idempotency_key,omitempty"`
-	AppliedAt        time.Time      `json:"applied_at"`
-	ReversedAt       *time.Time     `json:"reversed_at,omitempty"`
-	Bonus            []BonusBalance `json:"bonus,omitempty"`
+	ID               string                    `json:"id"`
+	RedeemerTenantID string                    `json:"redeemer_tenant_id"`
+	ReferrerTenantID string                    `json:"referrer_tenant_id"`
+	ReferralCode     string                    `json:"referral_code"`
+	Status           string                    `json:"status"`
+	IdempotencyKey   string                    `json:"idempotency_key,omitempty"`
+	AppliedAt        time.Time                 `json:"applied_at"`
+	ReversedAt       *time.Time                `json:"reversed_at,omitempty"`
+	Bonus            []ReferralRedemptionBonus `json:"bonus,omitempty"`
+}
+
+type ReferralRedemptionBonus struct {
+	Dimension string     `json:"dimension"`
+	Amount    int64      `json:"amount"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+type PlatformReferralRedemptionFilter struct {
+	TenantID string
+	Code     string
+	Status   string
 }
 
 func (s *Store) ensureReferralRedeemSchema(ctx context.Context) error {
@@ -66,15 +79,20 @@ func (s *Store) ValidateReferralCodeForRedeem(ctx context.Context, redeemerTenan
 		return "", nil, fmt.Errorf("postgres unavailable")
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
-	var status, ownerTenant string
-	err = s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT tenant_id, status FROM %s.tenant_referral_codes WHERE code=$1`, schema), code).Scan(&ownerTenant, &status)
+	var status, ownerTenant, ownerStatus string
+	var expired bool
+	err = s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT c.tenant_id, c.status, c.expires_at IS NOT NULL AND c.expires_at <= now(), t.status
+FROM %s.tenant_referral_codes c
+JOIN %s.tenants t ON t.id=c.tenant_id
+WHERE c.code=$1`, schema, schema), code).Scan(&ownerTenant, &status, &expired, &ownerStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil, ErrReferralNotFound
 	}
 	if err != nil {
 		return "", nil, err
 	}
-	if status != ReferralCodeActive {
+	if !referralCodeRedeemable(status, expired, ownerStatus) {
 		return "", nil, ErrReferralIneligible
 	}
 	if ownerTenant == redeemerTenantID {
@@ -135,23 +153,28 @@ FROM %s.referral_redemptions WHERE redeemer_tenant_id=$1 AND referral_code=$2 AN
 		if err := tx.Commit(ctx); err != nil {
 			return ReferralRedemption{}, err
 		}
-		balances, _ := s.ListTenantBonusBalances(ctx, redeemerTenantID)
-		existing.Bonus = balances
+		existing.Bonus, _ = s.listReferralRedemptionBonuses(ctx, redeemerTenantID, existing.ID)
 		return existing, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return ReferralRedemption{}, err
 	}
 
-	var ownerTenant, status string
-	err = tx.QueryRow(ctx, fmt.Sprintf(`SELECT tenant_id, status FROM %s.tenant_referral_codes WHERE code=$1 FOR UPDATE`, schema), code).Scan(&ownerTenant, &status)
+	var ownerTenant, status, ownerStatus string
+	var expired bool
+	err = tx.QueryRow(ctx, fmt.Sprintf(`
+SELECT c.tenant_id, c.status, c.expires_at IS NOT NULL AND c.expires_at <= now(), t.status
+FROM %s.tenant_referral_codes c
+JOIN %s.tenants t ON t.id=c.tenant_id
+WHERE c.code=$1
+FOR UPDATE OF c`, schema, schema), code).Scan(&ownerTenant, &status, &expired, &ownerStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ReferralRedemption{}, ErrReferralNotFound
 	}
 	if err != nil {
 		return ReferralRedemption{}, err
 	}
-	if status != ReferralCodeActive {
+	if !referralCodeRedeemable(status, expired, ownerStatus) {
 		return ReferralRedemption{}, ErrReferralIneligible
 	}
 	if ownerTenant == redeemerTenantID {
@@ -164,8 +187,10 @@ FROM %s.referral_redemptions WHERE redeemer_tenant_id=$1 AND referral_code=$2 AN
 INSERT INTO %s.referral_redemptions (id, redeemer_tenant_id, referrer_tenant_id, referral_code, status, idempotency_key, applied_at, created_by, updated_by)
 VALUES ($1,$2,$3,$4,'applied',$5,now(),$6,$6)`, schema), redemptionID, redeemerTenantID, ownerTenant, code, idempotencyKey, actor)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
-			return ReferralRedemption{}, ErrReferralAlreadyRedeemed
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			_ = tx.Rollback(ctx)
+			return s.getAppliedReferralRedemption(ctx, redeemerTenantID, code)
 		}
 		return ReferralRedemption{}, err
 	}
@@ -222,9 +247,54 @@ ON CONFLICT (tenant_id, idempotency_key) DO NOTHING`, schema),
 		IdempotencyKey:   idempotencyKey,
 		AppliedAt:        time.Now().UTC(),
 	}
-	balances, _ := s.ListTenantBonusBalances(ctx, redeemerTenantID)
-	out.Bonus = balances
+	out.Bonus, _ = s.listReferralRedemptionBonuses(ctx, redeemerTenantID, redemptionID)
 	return out, nil
+}
+
+func (s *Store) getAppliedReferralRedemption(ctx context.Context, tenantID, code string) (ReferralRedemption, error) {
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	var out ReferralRedemption
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT id, redeemer_tenant_id, referrer_tenant_id, referral_code, status, idempotency_key, applied_at, reversed_at
+FROM %s.referral_redemptions
+WHERE redeemer_tenant_id=$1 AND referral_code=$2 AND status='applied'`, schema), tenantID, code).Scan(
+		&out.ID, &out.RedeemerTenantID, &out.ReferrerTenantID, &out.ReferralCode,
+		&out.Status, &out.IdempotencyKey, &out.AppliedAt, &out.ReversedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ReferralRedemption{}, ErrReferralAlreadyRedeemed
+	}
+	if err != nil {
+		return ReferralRedemption{}, err
+	}
+	out.Bonus, _ = s.listReferralRedemptionBonuses(ctx, tenantID, out.ID)
+	return out, nil
+}
+
+func (s *Store) listReferralRedemptionBonuses(ctx context.Context, tenantID, redemptionID string) ([]ReferralRedemptionBonus, error) {
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
+SELECT dimension, COALESCE(SUM(amount),0), MIN(expires_at)
+FROM %s.tenant_bonus_ledger
+WHERE tenant_id=$1 AND source_type='referral_redeem' AND source_id=$2 AND operation='grant'
+GROUP BY dimension
+ORDER BY dimension`, schema), tenantID, redemptionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]ReferralRedemptionBonus, 0)
+	for rows.Next() {
+		var item ReferralRedemptionBonus
+		if err := rows.Scan(&item.Dimension, &item.Amount, &item.ExpiresAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func referralCodeRedeemable(codeStatus string, expired bool, ownerStatus string) bool {
+	return codeStatus == ReferralCodeActive && !expired && ownerStatus == "active"
 }
 
 // ListTenantRedemptions lists codes the tenant redeemed.
@@ -242,6 +312,43 @@ FROM %s.referral_redemptions WHERE redeemer_tenant_id=$1 ORDER BY applied_at DES
 	}
 	defer rows.Close()
 	var out []ReferralRedemption
+	for rows.Next() {
+		var item ReferralRedemption
+		if err := rows.Scan(&item.ID, &item.RedeemerTenantID, &item.ReferrerTenantID, &item.ReferralCode, &item.Status, &item.IdempotencyKey, &item.AppliedAt, &item.ReversedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) ListPlatformReferralRedemptions(ctx context.Context, filter PlatformReferralRedemptionFilter) ([]ReferralRedemption, error) {
+	if s.pg == nil {
+		return nil, fmt.Errorf("postgres unavailable")
+	}
+	if err := s.ensureReferralRedeemSchema(ctx); err != nil {
+		return nil, err
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	tenantID := strings.TrimSpace(filter.TenantID)
+	code := normalizeReferralCode(filter.Code)
+	status := strings.TrimSpace(filter.Status)
+	if status != "" && status != "applied" && status != "reversed" {
+		return nil, ErrReferralInvalid
+	}
+	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
+SELECT id, redeemer_tenant_id, referrer_tenant_id, referral_code, status, idempotency_key, applied_at, reversed_at
+FROM %s.referral_redemptions
+WHERE ($1='' OR redeemer_tenant_id=$1 OR referrer_tenant_id=$1)
+  AND ($2='' OR referral_code=$2)
+  AND ($3='' OR status=$3)
+ORDER BY applied_at DESC
+LIMIT 500`, schema), tenantID, code, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]ReferralRedemption, 0)
 	for rows.Next() {
 		var item ReferralRedemption
 		if err := rows.Scan(&item.ID, &item.RedeemerTenantID, &item.ReferrerTenantID, &item.ReferralCode, &item.Status, &item.IdempotencyKey, &item.AppliedAt, &item.ReversedAt); err != nil {
@@ -329,5 +436,6 @@ ON CONFLICT (tenant_id, idempotency_key) DO NOTHING`, schema),
 	if err := tx.Commit(ctx); err != nil {
 		return ReferralRedemption{}, err
 	}
+	item.Bonus, _ = s.listReferralRedemptionBonuses(ctx, item.RedeemerTenantID, item.ID)
 	return item, nil
 }

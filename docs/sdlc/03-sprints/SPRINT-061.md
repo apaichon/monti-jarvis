@@ -79,3 +79,11 @@ cd apps/tenant-web && npm run check
 cd apps/platform-admin-web && npm run check
 # Manual: nav has no performance; top bar states; platform monitoring OK
 ```
+
+Manual UAT: [SPRINT-060-062-manual.md](../06-manual-tests/SPRINT-060-062-manual.md)
+
+## Review - PASS
+
+Tenant navigation removal, localized top-bar states, immediate status refresh,
+safe degraded behavior, and platform monitoring preservation were reviewed on
+2026-07-31. Both tenant and platform web builds pass.

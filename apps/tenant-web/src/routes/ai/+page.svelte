@@ -42,6 +42,10 @@
   let skills = $state<TenantSkill[]>([]);
   let error = $state('');
 
+  function notifyGeminiStatusChanged() {
+    window.dispatchEvent(new CustomEvent('monti:gemini-status-changed'));
+  }
+
   function report(err: unknown, fallback: string) {
     feedback.error(err instanceof ApiError ? err.message : fallback);
   }
@@ -96,6 +100,7 @@
     try {
       keyMeta = await putTenantGeminiKey(keyInput.trim());
       keyInput = '';
+      notifyGeminiStatusChanged();
       feedback.success('Tenant Gemini key encrypted and saved — run Test connection');
     } catch (err) {
       report(err, 'Failed to save Gemini key');
@@ -116,9 +121,11 @@
           last_validated_at: result.last_validated_at
         };
         keyInput = '';
+        notifyGeminiStatusChanged();
         feedback.success('Gemini connection OK');
       } else {
         if (keyMeta) keyMeta = { ...keyMeta, status: result.status || 'invalid' };
+        notifyGeminiStatusChanged();
         feedback.error(result.message || 'Gemini connection failed');
       }
     } catch (err) {
@@ -132,6 +139,7 @@
     if (!confirm('Remove the tenant Gemini key? Production AI will fail until a valid key is configured.')) return;
     try {
       keyMeta = await deleteTenantGeminiKey();
+      notifyGeminiStatusChanged();
       feedback.success('Tenant key removed');
     } catch (err) {
       report(err, 'Failed to remove Gemini key');

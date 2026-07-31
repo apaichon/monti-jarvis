@@ -324,6 +324,16 @@ func (s *Store) SetTenantGeminiKeyStatus(ctx context.Context, tenantID, status, 
 }
 
 func (s *Store) TenantGeminiKey(ctx context.Context, tenantID string) (string, error) {
+	return s.tenantGeminiKey(ctx, tenantID, true)
+}
+
+// TenantGeminiKeyForValidation returns a configured key regardless of its
+// validation state. It is only for the tenant-admin connection-test path.
+func (s *Store) TenantGeminiKeyForValidation(ctx context.Context, tenantID string) (string, error) {
+	return s.tenantGeminiKey(ctx, tenantID, false)
+}
+
+func (s *Store) tenantGeminiKey(ctx context.Context, tenantID string, requireValid bool) (string, error) {
 	if s.pg == nil {
 		return "", fmt.Errorf("postgres is not available")
 	}
@@ -338,8 +348,7 @@ func (s *Store) TenantGeminiKey(ctx context.Context, tenantID string) (string, e
 	if err != nil {
 		return "", err
 	}
-	// Reject keys known invalid at runtime.
-	if status == GeminiKeyStatusInvalid {
+	if requireValid && !tenantGeminiKeyUsable(status) {
 		return "", nil
 	}
 	key, err := secretbox.ParseKey(s.cfg.TenantSecretEncryptionKey)
@@ -351,6 +360,10 @@ func (s *Store) TenantGeminiKey(ctx context.Context, tenantID string) (string, e
 		return "", ErrTenantSecretInvalid
 	}
 	return string(plaintext), nil
+}
+
+func tenantGeminiKeyUsable(status string) bool {
+	return strings.TrimSpace(status) == GeminiKeyStatusValid
 }
 
 // TenantGeminiStatus returns a safe readiness state for shell/top-bar use.

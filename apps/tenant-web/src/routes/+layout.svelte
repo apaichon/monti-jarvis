@@ -31,7 +31,24 @@
     try {
       geminiStatus = await getTenantGeminiStatus();
     } catch {
-      geminiStatus = null;
+      geminiStatus = { state: 'degraded', label: 'Gemini status unavailable', action_href: '/tenant/ai' };
+    }
+  }
+
+  function geminiStatusLabel(state: string) {
+    switch (state) {
+      case 'ready':
+        return $t.status_gemini_ready;
+      case 'key_missing':
+        return $t.status_gemini_missing;
+      case 'validation_failed':
+        return $t.status_gemini_invalid;
+      case 'degraded':
+        return geminiStatus?.label === 'Gemini status unavailable'
+          ? $t.status_gemini_unavailable
+          : $t.status_gemini_degraded;
+      default:
+        return geminiStatus?.label || $t.status_gemini_unavailable;
     }
   }
 
@@ -57,7 +74,11 @@
         if (data?.version) appVersion = String(data.version);
       })
       .catch(() => {});
-    return unsubscribe;
+    window.addEventListener('monti:gemini-status-changed', refreshGeminiStatus);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('monti:gemini-status-changed', refreshGeminiStatus);
+    };
   });
 
   const showShell = $derived(
@@ -230,7 +251,7 @@
               title="AI Settings"
             >
               <i></i>
-              {geminiStatus.label}
+              {geminiStatusLabel(geminiStatus.state)}
             </a>
           {/if}
         </div>
