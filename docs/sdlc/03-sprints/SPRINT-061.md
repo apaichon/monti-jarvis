@@ -1,6 +1,6 @@
 ---
 id: SPRINT-061
-status: planned
+status: completed
 start: 2026-08-22
 end: 2026-08-29
 updated: 2026-07-30
@@ -33,11 +33,11 @@ needed. Platform-admin diagnostics remain.
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0220](../04-tasks/TASK-0220.md) Gemini status API for tenant shell | 3 | todo | dev | Safe status payload for top bar |
-| [TASK-0221](../04-tasks/TASK-0221.md) Remove tenant performance nav + page | 3 | todo | dev | Nav/route cleanup |
-| [TASK-0222](../04-tasks/TASK-0222.md) Top-bar status UI + link to AI Settings | 3 | todo | dev | Ready/missing/failed/degraded chip |
-| [TASK-0223](../04-tasks/TASK-0223.md) Platform preservation + UAT | 3 | todo | tester/dev | Platform perf intact; smoke states |
-| **Total** | **12** | **0/12** | | |
+| [TASK-0220](../04-tasks/TASK-0220.md) Gemini status API for tenant shell | 3 | completed | dev | Safe status payload for top bar |
+| [TASK-0221](../04-tasks/TASK-0221.md) Remove tenant performance nav + page | 3 | completed | dev | Nav/route cleanup |
+| [TASK-0222](../04-tasks/TASK-0222.md) Top-bar status UI + link to AI Settings | 3 | completed | dev | Ready/missing/failed/degraded chip |
+| [TASK-0223](../04-tasks/TASK-0223.md) Platform preservation + UAT | 3 | completed | tester/dev | Platform perf intact; smoke states |
+| **Total** | **12** | **12/12** | | |
 
 ## Design pack
 
@@ -79,3 +79,11 @@ cd apps/tenant-web && npm run check
 cd apps/platform-admin-web && npm run check
 # Manual: nav has no performance; top bar states; platform monitoring OK
 ```
+
+Manual UAT: [SPRINT-060-062-manual.md](../06-manual-tests/SPRINT-060-062-manual.md)
+
+## Review - PASS
+
+Tenant navigation removal, localized top-bar states, immediate status refresh,
+safe degraded behavior, and platform monitoring preservation were reviewed on
+2026-07-31. Both tenant and platform web builds pass.

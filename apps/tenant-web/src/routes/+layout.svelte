@@ -13,6 +13,7 @@
     hasRegistrationSession,
     subscribeSession
   } from '$lib/auth/session';
+  import { getTenantGeminiStatus, type TenantGeminiStatus } from '$lib/api/ai';
 
   let { children } = $props();
 
@@ -20,16 +21,48 @@
   let sessionTick = $state(0);
   let sessionReady = $state(false);
   let appVersion = $state('');
+  let geminiStatus = $state<TenantGeminiStatus | null>(null);
+
+  async function refreshGeminiStatus() {
+    if (!hasRegistrationSession()) {
+      geminiStatus = null;
+      return;
+    }
+    try {
+      geminiStatus = await getTenantGeminiStatus();
+    } catch {
+      geminiStatus = { state: 'degraded', label: 'Gemini status unavailable', action_href: '/tenant/ai' };
+    }
+  }
+
+  function geminiStatusLabel(state: string) {
+    switch (state) {
+      case 'ready':
+        return $t.status_gemini_ready;
+      case 'key_missing':
+        return $t.status_gemini_missing;
+      case 'validation_failed':
+        return $t.status_gemini_invalid;
+      case 'degraded':
+        return geminiStatus?.label === 'Gemini status unavailable'
+          ? $t.status_gemini_unavailable
+          : $t.status_gemini_degraded;
+      default:
+        return geminiStatus?.label || $t.status_gemini_unavailable;
+    }
+  }
 
   onMount(() => {
     initLangFromUrl(new URLSearchParams(window.location.search));
     const unsubscribe = subscribeSession(() => {
       sessionTick += 1;
+      void refreshGeminiStatus();
     });
     void bootstrapSession()
       .then(() => {
         if (hasRegistrationSession()) {
           void currentPlan.load().catch(() => {});
+          void refreshGeminiStatus();
         }
       })
       .finally(() => {
@@ -41,7 +74,11 @@
         if (data?.version) appVersion = String(data.version);
       })
       .catch(() => {});
-    return unsubscribe;
+    window.addEventListener('monti:gemini-status-changed', refreshGeminiStatus);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('monti:gemini-status-changed', refreshGeminiStatus);
+    };
   });
 
   const showShell = $derived(
@@ -100,9 +137,6 @@
           >
           <a class="nav-link" href="{base}/dashboard" class:active={active('/dashboard')}
             ><span>▦</span>{$t.nav_call_center}</a
-          >
-          <a class="nav-link" href="{base}/monitoring" class:active={active('/monitoring')}
-            ><span>◌</span>{$t.nav_monitoring}</a
           >
           <a class="nav-link" href="{base}/tickets" class:active={active('/tickets')}
             ><span>▱</span>{$t.nav_tickets}</a
@@ -205,7 +239,22 @@
     </aside>
     <section class="tenant-workspace">
       <header class="tenant-topbar">
-        <div><span class="status-dot"></span> {$t.status_all_systems}</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <span><span class="status-dot"></span> {$t.status_all_systems}</span>
+          {#if geminiStatus}
+            <a
+              class="gemini-chip"
+              class:ready={geminiStatus.state === 'ready'}
+              class:warn={geminiStatus.state === 'key_missing' || geminiStatus.state === 'degraded'}
+              class:bad={geminiStatus.state === 'validation_failed'}
+              href="{base}/ai"
+              title="AI Settings"
+            >
+              <i></i>
+              {geminiStatusLabel(geminiStatus.state)}
+            </a>
+          {/if}
+        </div>
         <div class="topbar-actions">
           <button aria-label={$t.topbar_search}>⌕</button><button aria-label={$t.topbar_notifications}>♢</button><a
             href="{base}/login"
@@ -220,3 +269,33 @@
   {@render children()}
 {/if}
 <FeedbackDialog />
+
+<style>
+.gemini-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          border: 1px solid var(--line, #2a3550);
+          color: inherit;
+          text-decoration: none;
+          font-size: 12px;
+          font-weight: 650;
+        }
+        .gemini-chip i {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--muted, #8b9bb8);
+        }
+        .gemini-chip.ready i {
+          background: #3dcea8;
+        }
+        .gemini-chip.warn i {
+          background: #e6b84d;
+        }
+        .gemini-chip.bad i {
+          background: #ff6b6b;
+        }
+</style>

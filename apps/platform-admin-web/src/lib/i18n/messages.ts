@@ -15,6 +15,7 @@ export type Messages = {
   nav_billing: string;
   nav_quotes: string;
   nav_leads: string;
+  nav_referrals: string;
   nav_audit: string;
   nav_monitoring: string;
   nav_call_center: string;
@@ -47,6 +48,7 @@ const en: Messages = {
   nav_billing: 'Billing',
   nav_quotes: 'Quote requests',
   nav_leads: 'Leads',
+  nav_referrals: 'Referral rewards',
   nav_audit: 'Audit log',
   nav_monitoring: 'Monitoring',
   nav_call_center: 'Call center',
@@ -77,6 +79,7 @@ const th: Messages = {
   nav_billing: 'บิลลิ่ง',
   nav_quotes: 'คำขอใบเสนอราคา',
   nav_leads: 'ลีด',
+  nav_referrals: 'รางวัลการแนะนำ',
   nav_audit: 'บันทึกตรวจสอบ',
   nav_monitoring: 'มอนิเตอร์',
   nav_call_center: 'คอลเซ็นเตอร์',
@@ -107,6 +110,7 @@ const ja: Messages = {
   nav_billing: '請求',
   nav_quotes: '見積リクエスト',
   nav_leads: 'リード',
+  nav_referrals: '紹介特典',
   nav_audit: '監査ログ',
   nav_monitoring: 'モニタリング',
   nav_call_center: 'コールセンター',

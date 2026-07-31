@@ -10,17 +10,39 @@ import (
 )
 
 func (s *server) tenantAIClient(ctx context.Context, tenantID string) (*gemini.Client, error) {
-	if s.store == nil || strings.TrimSpace(tenantID) == "" {
-		return s.ai, nil
-	}
-	key, err := s.store.TenantGeminiKey(ctx, tenantID)
+	key, err := s.resolveTenantGeminiAPIKey(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(key) == "" {
+		// Platform client may still be empty; callers check Enabled().
+		return s.ai, nil
+	}
+	if s.ai != nil && key == s.cfg.GeminiAPIKey {
 		return s.ai, nil
 	}
 	return gemini.New(key, s.cfg.GeminiModel, s.cfg.GeminiEmbedModel), nil
+}
+
+// resolveTenantGeminiAPIKey implements S60 fail-closed production policy.
+func (s *server) resolveTenantGeminiAPIKey(ctx context.Context, tenantID string) (string, error) {
+	if s.store == nil || strings.TrimSpace(tenantID) == "" {
+		if s.cfg.PlatformGeminiFallbackAllowed() && strings.TrimSpace(s.cfg.GeminiAPIKey) != "" {
+			return s.cfg.GeminiAPIKey, nil
+		}
+		return "", store.ErrTenantGeminiKeyRequired
+	}
+	key, err := s.store.TenantGeminiKey(ctx, tenantID)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(key) != "" {
+		return key, nil
+	}
+	if s.cfg.PlatformGeminiFallbackAllowed() && strings.TrimSpace(s.cfg.GeminiAPIKey) != "" {
+		return s.cfg.GeminiAPIKey, nil
+	}
+	return "", store.ErrTenantGeminiKeyRequired
 }
 
 func (s *server) tenantPrompt(ctx context.Context, tenantID, agentID string) (string, error) {

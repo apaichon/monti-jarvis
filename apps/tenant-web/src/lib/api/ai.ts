@@ -6,6 +6,27 @@ export type TenantGeminiKey = {
   last4?: string;
   key_version?: string;
   updated_at?: string;
+  status?: string;
+  last_validated_at?: string;
+  last_error_class?: string;
+};
+
+export type TenantGeminiStatus = {
+  state: 'ready' | 'key_missing' | 'validation_failed' | 'degraded' | string;
+  label: string;
+  action_href?: string;
+  last4?: string;
+  last_validated_at?: string | null;
+};
+
+export type GeminiKeyTestResult = {
+  ok: boolean;
+  status: string;
+  last4?: string;
+  last_validated_at?: string;
+  error_class?: string;
+  message?: string;
+  configured?: boolean;
 };
 
 export type TenantPrompt = {
@@ -50,7 +71,18 @@ export function putTenantGeminiKey(api_key: string) {
 }
 
 export function deleteTenantGeminiKey() {
-  return apiFetch<{ configured: false }>('/api/tenant/ai/gemini-key', { method: 'DELETE' });
+  return apiFetch<{ configured: false; status?: string }>('/api/tenant/ai/gemini-key', { method: 'DELETE' });
+}
+
+export function testTenantGeminiKey(api_key?: string) {
+  return apiFetch<GeminiKeyTestResult>('/api/tenant/ai/gemini-key/test', {
+    method: 'POST',
+    body: JSON.stringify(api_key ? { api_key } : {})
+  });
+}
+
+export function getTenantGeminiStatus() {
+  return apiFetch<TenantGeminiStatus>('/api/tenant/ai/gemini-status');
 }
 
 export function getTenantPrompt(agentId: string) {

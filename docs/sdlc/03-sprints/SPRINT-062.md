@@ -1,6 +1,6 @@
 ---
 id: SPRINT-062
-status: planned
+status: completed
 start: 2026-08-29
 end: 2026-09-08
 updated: 2026-07-30
@@ -32,11 +32,11 @@ bonus-quota grant through the S46 ledger — without mutating base packages.
 
 | Task | Points | Status | Owner | Outcome |
 | --- | ---: | --- | --- | --- |
-| [TASK-0224](../04-tasks/TASK-0224.md) Validate + apply referral code API | 4 | todo | dev | Idempotent apply + errors |
-| [TASK-0225](../04-tasks/TASK-0225.md) Bonus ledger grant + usage display | 3 | todo | dev | Base+bonus in usage UI |
-| [TASK-0226](../04-tasks/TASK-0226.md) Tenant redemption UX | 3 | todo | dev | Input, validate, apply, summary |
-| [TASK-0227](../04-tasks/TASK-0227.md) Platform reverse + UAT | 2 | todo | tester/dev | Admin revoke/reverse; isolation tests |
-| **Total** | **12** | **0/12** | | |
+| [TASK-0224](../04-tasks/TASK-0224.md) Validate + apply referral code API | 4 | completed | dev | Idempotent apply + errors |
+| [TASK-0225](../04-tasks/TASK-0225.md) Bonus ledger grant + usage display | 3 | completed | dev | Base+bonus in usage UI |
+| [TASK-0226](../04-tasks/TASK-0226.md) Tenant redemption UX | 3 | completed | dev | Input, validate, apply, summary |
+| [TASK-0227](../04-tasks/TASK-0227.md) Platform reverse + UAT | 2 | completed | tester/dev | Admin revoke/reverse; isolation tests |
+| **Total** | **12** | **12/12** | | |
 
 ## Design pack
 
@@ -78,3 +78,12 @@ branch: docs/sprint-060-062-plan
 go test ./internal/quota ./internal/store ./cmd/server -count=1
 cd apps/tenant-web && npm run check
 ```
+
+Manual UAT: [SPRINT-060-062-manual.md](../06-manual-tests/SPRINT-060-062-manual.md)
+
+## Review - PASS
+
+Apply/retry/reverse atomicity, expiry and owner eligibility, tenant isolation,
+grant-specific response data, platform inspection, audit coverage, and portal
+refresh behavior were reviewed on 2026-07-31. The Postgres integration path and
+both web builds pass.

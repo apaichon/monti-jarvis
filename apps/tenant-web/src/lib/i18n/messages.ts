@@ -11,6 +11,11 @@ export type Messages = {
   status_loading: string;
   status_loading_session: string;
   status_all_systems: string;
+  status_gemini_ready: string;
+  status_gemini_missing: string;
+  status_gemini_invalid: string;
+  status_gemini_degraded: string;
+  status_gemini_unavailable: string;
   brand_console: string;
   workspace: string;
   nav_aria: string;
@@ -73,6 +78,11 @@ const en: Messages = {
   status_loading: 'Loading…',
   status_loading_session: 'Loading session…',
   status_all_systems: 'All systems operational',
+  status_gemini_ready: 'Gemini ready',
+  status_gemini_missing: 'Gemini key missing',
+  status_gemini_invalid: 'Gemini key invalid',
+  status_gemini_degraded: 'Gemini degraded',
+  status_gemini_unavailable: 'Gemini status unavailable',
   brand_console: 'TENANT CONSOLE',
   workspace: 'Workspace',
   nav_aria: 'Tenant navigation',
@@ -133,6 +143,11 @@ const th: Messages = {
   status_loading: 'กำลังโหลด…',
   status_loading_session: 'กำลังโหลดเซสชัน…',
   status_all_systems: 'ระบบทำงานปกติ',
+  status_gemini_ready: 'Gemini พร้อมใช้งาน',
+  status_gemini_missing: 'ยังไม่มีคีย์ Gemini',
+  status_gemini_invalid: 'คีย์ Gemini ไม่ถูกต้อง',
+  status_gemini_degraded: 'Gemini ทำงานผิดปกติ',
+  status_gemini_unavailable: 'ไม่พบสถานะ Gemini',
   brand_console: 'คอนโซลผู้เช่า',
   workspace: 'พื้นที่ทำงาน',
   nav_aria: 'เมนูผู้เช่า',
@@ -193,6 +208,11 @@ const ja: Messages = {
   status_loading: '読み込み中…',
   status_loading_session: 'セッションを読み込み中…',
   status_all_systems: 'すべてのシステムは正常です',
+  status_gemini_ready: 'Gemini は準備完了',
+  status_gemini_missing: 'Gemini キーが未設定',
+  status_gemini_invalid: 'Gemini キーが無効',
+  status_gemini_degraded: 'Gemini の状態が低下',
+  status_gemini_unavailable: 'Gemini の状態を取得できません',
   brand_console: 'テナントコンソール',
   workspace: 'ワークスペース',
   nav_aria: 'テナントナビゲーション',

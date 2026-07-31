@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os/signal"
@@ -44,32 +45,34 @@ import (
 )
 
 type server struct {
-	cfg             env.Config
-	ai              *gemini.Client
-	voice           *live.Relay
-	calls           *calls.Service
-	store           *store.Store
-	km              *km.Service
-	rag             *rag.Service
-	ch              *clickhouse.Client
-	bus             *natsbus.Bus
-	auth            *auth.Service
-	guard           *auth.HTTPGuard
-	entitlements    *entitlements.Service
-	quota           *quota.Service
-	static          http.Handler
-	platform        http.Handler
-	tenant          http.Handler
-	product         http.Handler
-	legacy          http.Handler
-	registerLimiter *tenantregister.RateLimiter
-	leadLimiter     *leads.RateLimiter
-	funnelLimiter   *leads.RateLimiter
-	mailer          *resend.Client
-	tenantOAuth     *tenantoauth.Service
-	monitoring      *observability.Service
-	audit           *audit.Writer
-	aiMeter         *metering.Recorder
+	cfg                   env.Config
+	ai                    *gemini.Client
+	voice                 *live.Relay
+	calls                 *calls.Service
+	store                 *store.Store
+	km                    *km.Service
+	rag                   *rag.Service
+	ch                    *clickhouse.Client
+	bus                   *natsbus.Bus
+	auth                  *auth.Service
+	guard                 *auth.HTTPGuard
+	entitlements          *entitlements.Service
+	quota                 *quota.Service
+	static                http.Handler
+	platform              http.Handler
+	tenant                http.Handler
+	product               http.Handler
+	legacy                http.Handler
+	registerLimiter       *tenantregister.RateLimiter
+	leadLimiter           *leads.RateLimiter
+	funnelLimiter         *leads.RateLimiter
+	geminiTestLimiter     *leads.RateLimiter
+	referralRedeemLimiter *leads.RateLimiter
+	mailer                *resend.Client
+	tenantOAuth           *tenantoauth.Service
+	monitoring            *observability.Service
+	audit                 *audit.Writer
+	aiMeter               *metering.Recorder
 }
 
 type chatRequest struct {
@@ -197,6 +200,8 @@ func main() {
 	registerLimiter := tenantregister.NewRateLimiter(st.Redis(), cfg.RedisPrefix, cfg.TenantRegisterRateLimit)
 	leadLimiter := leads.NewRateLimiter(st.Redis(), cfg.RedisPrefix+"lead:rl:", cfg.LeadRateLimitPerIP)
 	funnelLimiter := leads.NewRateLimiter(st.Redis(), cfg.RedisPrefix+"funnel:rl:", cfg.FunnelRateLimitPerIP)
+	geminiTestLimiter := leads.NewRateLimiter(st.Redis(), cfg.RedisPrefix+"gemini-test:tenant:", 20)
+	referralRedeemLimiter := leads.NewRateLimiter(st.Redis(), cfg.RedisPrefix+"referral-redeem:tenant:", 20)
 	mailer := resend.New(cfg.ResendAPIKey, cfg.ResendFromEmail)
 	if mailer.Enabled() {
 		log.Printf("mailer: resend enabled from=%s", cfg.ResendFromEmail)
@@ -226,17 +231,9 @@ func main() {
 		return st.AIReplyLocaleHint(ctx, tenantID)
 	}
 	voiceRelay.APIKeyResolver = func(ctx context.Context, tenantID string) (string, error) {
-		if st == nil || strings.TrimSpace(tenantID) == "" {
-			return cfg.GeminiAPIKey, nil
-		}
-		key, err := st.TenantGeminiKey(ctx, tenantID)
-		if err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(key) == "" {
-			return cfg.GeminiAPIKey, nil
-		}
-		return key, nil
+		// Use same fail-closed resolution as chat (S60).
+		tmp := &server{cfg: cfg, store: st}
+		return tmp.resolveTenantGeminiAPIKey(ctx, tenantID)
 	}
 	voiceRelay.PromptResolver = func(ctx context.Context, tenantID, agentID string) (string, error) {
 		if st == nil || strings.TrimSpace(tenantID) == "" {
@@ -257,32 +254,34 @@ func main() {
 	}
 
 	s := &server{
-		cfg:             cfg,
-		ai:              ai,
-		voice:           voiceRelay,
-		calls:           calls.New(st, bus, lk, cfg.DemoTenantID),
-		store:           st,
-		km:              kmSvc,
-		rag:             ragSvc,
-		ch:              ch,
-		bus:             bus,
-		auth:            authSvc,
-		guard:           guard,
-		entitlements:    entSvc,
-		quota:           quotaSvc,
-		static:          customerweb.Handler(cfg.CustomerWebDir),
-		platform:        platformweb.Handler(cfg.PlatformAdminWebDir),
-		tenant:          tenantweb.Handler(cfg.TenantWebDir),
-		product:         productweb.Handler(cfg.ProductWebDir, cfg.ProductWebEnabled),
-		legacy:          web.Handler(),
-		registerLimiter: registerLimiter,
-		leadLimiter:     leadLimiter,
-		funnelLimiter:   funnelLimiter,
-		mailer:          mailer,
-		tenantOAuth:     tenantOAuth,
-		monitoring:      newMonitoringService(st, ch, bus, ai, cfg),
-		audit:           auditWriter,
-		aiMeter:         aiMeter,
+		cfg:                   cfg,
+		ai:                    ai,
+		voice:                 voiceRelay,
+		calls:                 calls.New(st, bus, lk, cfg.DemoTenantID),
+		store:                 st,
+		km:                    kmSvc,
+		rag:                   ragSvc,
+		ch:                    ch,
+		bus:                   bus,
+		auth:                  authSvc,
+		guard:                 guard,
+		entitlements:          entSvc,
+		quota:                 quotaSvc,
+		static:                customerweb.Handler(cfg.CustomerWebDir),
+		platform:              platformweb.Handler(cfg.PlatformAdminWebDir),
+		tenant:                tenantweb.Handler(cfg.TenantWebDir),
+		product:               productweb.Handler(cfg.ProductWebDir, cfg.ProductWebEnabled),
+		legacy:                web.Handler(),
+		registerLimiter:       registerLimiter,
+		leadLimiter:           leadLimiter,
+		funnelLimiter:         funnelLimiter,
+		geminiTestLimiter:     geminiTestLimiter,
+		referralRedeemLimiter: referralRedeemLimiter,
+		mailer:                mailer,
+		tenantOAuth:           tenantOAuth,
+		monitoring:            newMonitoringService(st, ch, bus, ai, cfg),
+		audit:                 auditWriter,
+		aiMeter:               aiMeter,
 	}
 	s.backfillCallCenterAnalytics(rootCtx)
 	s.startBillingScheduler(rootCtx)
@@ -371,6 +370,9 @@ func main() {
 	mux.HandleFunc("POST /api/public/tenant/referral/click", s.recordReferralClick)
 	mux.Handle("GET /api/tenant/referral", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantReferralCode)))
 	mux.Handle("GET /api/tenant/referrals", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantReferrals)))
+	mux.Handle("POST /api/tenant/referrals/validate", guard.RequireTenantAdminActive(http.HandlerFunc(s.validateTenantReferralRedeem)))
+	mux.Handle("POST /api/tenant/referrals/redeem", guard.RequireTenantAdminActive(http.HandlerFunc(s.redeemTenantReferralCode)))
+	mux.Handle("GET /api/tenant/referrals/redemptions", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantRedemptions)))
 	mux.HandleFunc("GET /api/public/tenant/verify-email", s.verifyTenantEmail)
 	mux.HandleFunc("POST /api/public/tenant/verify-email", s.verifyTenantEmail)
 	// Shared tenant OAuth (login + register): one start/callback per provider.
@@ -398,6 +400,8 @@ func main() {
 	mux.Handle("POST /api/platform/tenants/{tenant_id}/kyc/reject", guard.RequirePlatformAdmin(http.HandlerFunc(s.rejectPlatformTenantKYC)))
 	mux.Handle("POST /api/platform/referrals/{id}/qualify", guard.RequirePlatformAdmin(http.HandlerFunc(s.qualifyPlatformReferral)))
 	mux.Handle("POST /api/platform/referrals/{id}/reverse", guard.RequirePlatformAdmin(http.HandlerFunc(s.reversePlatformReferral)))
+	mux.Handle("GET /api/platform/referrals/redemptions", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformRedemptions)))
+	mux.Handle("POST /api/platform/referrals/redemptions/{id}/reverse", guard.RequirePlatformAdmin(http.HandlerFunc(s.reversePlatformRedemption)))
 	mux.HandleFunc("GET /api/tenant/kyc", s.getTenantKYC)
 	mux.HandleFunc("PUT /api/tenant/kyc", s.updateTenantKYC)
 	mux.HandleFunc("POST /api/tenant/kyc/photo", s.uploadTenantKYCPhoto)
@@ -476,6 +480,8 @@ func main() {
 	mux.Handle("GET /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantGeminiKey)))
 	mux.Handle("PUT /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantGeminiKey)))
 	mux.Handle("DELETE /api/tenant/ai/gemini-key", guard.RequireTenantAdminActive(http.HandlerFunc(s.deleteTenantGeminiKey)))
+	mux.Handle("POST /api/tenant/ai/gemini-key/test", guard.RequireTenantAdminActive(http.HandlerFunc(s.testTenantGeminiKey)))
+	mux.Handle("GET /api/tenant/ai/gemini-status", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantGeminiStatus)))
 	mux.Handle("GET /api/tenant/ai/prompts/{agent_id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantPrompt)))
 	mux.Handle("PUT /api/tenant/ai/prompts/{agent_id}", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantPrompt)))
 	mux.Handle("GET /api/tenant/ai/tools", guard.RequireTenantAdminActive(http.HandlerFunc(s.listTenantTools)))
@@ -683,12 +689,13 @@ func (s *server) ready(w http.ResponseWriter, _ *http.Request) {
 		status = http.StatusServiceUnavailable
 	}
 	writeJSON(w, status, map[string]any{
-		"ready":                 ready,
-		"auth_disabled":         s.cfg.AuthDisabled,
-		"cookie_secure":         s.cfg.CookieSecure,
-		"allowed_origins_set":   len(s.cfg.AllowedOrigins) > 0,
-		"postgres_rls_enforced": s.cfg.PostgresRLSEnforced,
-		"capability_pools":      capabilityErr == nil,
+		"ready":                               ready,
+		"auth_disabled":                       s.cfg.AuthDisabled,
+		"cookie_secure":                       s.cfg.CookieSecure,
+		"allowed_origins_set":                 len(s.cfg.AllowedOrigins) > 0,
+		"postgres_rls_enforced":               s.cfg.PostgresRLSEnforced,
+		"capability_pools":                    capabilityErr == nil,
+		"tenant_gemini_env_fallback_disabled": !s.cfg.PlatformGeminiFallbackAllowed(),
 	})
 }
 
@@ -698,11 +705,12 @@ func (s *server) securityPosture(w http.ResponseWriter, _ *http.Request) {
 		capabilityPools = s.store.ValidateCapabilityPools() == nil
 	}
 	checks := map[string]bool{
-		"auth_enabled":          !s.cfg.AuthDisabled,
-		"cookie_secure":         s.cfg.CookieSecure,
-		"allowed_origins_set":   len(s.cfg.AllowedOrigins) > 0,
-		"postgres_rls_enforced": s.cfg.PostgresRLSEnforced,
-		"capability_pools":      capabilityPools,
+		"auth_enabled":                        !s.cfg.AuthDisabled,
+		"cookie_secure":                       s.cfg.CookieSecure,
+		"allowed_origins_set":                 len(s.cfg.AllowedOrigins) > 0,
+		"postgres_rls_enforced":               s.cfg.PostgresRLSEnforced,
+		"capability_pools":                    capabilityPools,
+		"tenant_gemini_env_fallback_disabled": !s.cfg.PlatformGeminiFallbackAllowed(),
 	}
 	status := "healthy"
 	if s.cfg.AuthDisabled || !s.cfg.CookieSecure || len(s.cfg.AllowedOrigins) == 0 || !s.cfg.PostgresRLSEnforced || !capabilityPools {
@@ -901,7 +909,15 @@ func (s *server) chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	aiClient, err := s.tenantAIClient(ctx, tenantID)
-	if err != nil || aiClient == nil || !aiClient.Enabled() {
+	if err != nil {
+		if errors.Is(err, store.ErrTenantGeminiKeyRequired) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "A validated tenant Gemini API key is required", "code": "tenant_gemini_key_required"})
+			return
+		}
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "tenant AI provider unavailable", "code": "ai_provider_unavailable"})
+		return
+	}
+	if aiClient == nil || !aiClient.Enabled() {
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "tenant AI provider unavailable", "code": "ai_provider_unavailable"})
 		return
 	}

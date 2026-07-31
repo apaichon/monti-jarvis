@@ -3,11 +3,13 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/libra/monti-jarvis/internal/auth"
+	"github.com/libra/monti-jarvis/internal/gemini"
 	"github.com/libra/monti-jarvis/internal/store"
 	"github.com/libra/monti-jarvis/internal/workforce"
 )
@@ -64,6 +66,8 @@ func writeTenantAIError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid tenant AI configuration", "code": "validation_error"})
 	case errors.Is(err, store.ErrTenantAIConfigNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "tenant AI resource not found", "code": "not_found"})
+	case errors.Is(err, store.ErrTenantGeminiKeyRequired):
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "A validated tenant Gemini API key is required", "code": "tenant_gemini_key_required"})
 	default:
 		if err != nil && strings.Contains(err.Error(), "duplicate") {
 			writeJSON(w, http.StatusConflict, map[string]any{"error": "resource already exists", "code": "duplicate_key"})
@@ -116,7 +120,118 @@ func (s *server) deleteTenantGeminiKey(w http.ResponseWriter, r *http.Request) {
 		writeTenantAIError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"configured": false})
+	writeJSON(w, http.StatusOK, map[string]any{"configured": false, "status": store.GeminiKeyStatusNone})
+}
+
+func (s *server) testTenantGeminiKey(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := s.tenantAIID(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if s.geminiTestLimiter != nil {
+		allowed, limitErr := s.geminiTestLimiter.Allow(r.Context(), tenantID)
+		if limitErr != nil {
+			log.Printf("Gemini key test rate limit warning: %v", limitErr)
+		} else if !allowed {
+			writeJSON(w, http.StatusTooManyRequests, map[string]any{"ok": false, "status": "degraded", "message": "Too many connection tests. Try again later.", "code": "rate_limited"})
+			return
+		}
+	}
+	var body tenantGeminiKeyBody
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	proposed := strings.TrimSpace(body.APIKey)
+	var key string
+	var err error
+	if proposed != "" {
+		if len(proposed) < 20 || len(proposed) > 512 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "status": "invalid", "error_class": "auth", "message": "Invalid key format", "code": "validation_error"})
+			return
+		}
+		key = proposed
+	} else {
+		key, err = s.store.TenantGeminiKeyForValidation(r.Context(), tenantID)
+		if err != nil {
+			writeTenantAIError(w, err)
+			return
+		}
+		if strings.TrimSpace(key) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "status": "none", "error_class": "auth", "message": "No Gemini key configured", "code": "key_missing"})
+			return
+		}
+	}
+	client := gemini.NewWithKey(key, s.cfg.GeminiModel)
+	testErr := client.TestConnection(r.Context())
+	if testErr != nil {
+		class := "unknown"
+		msg := "Gemini connection failed"
+		errText := strings.ToLower(testErr.Error())
+		switch {
+		case strings.HasPrefix(errText, "auth"):
+			class = "auth"
+			msg = "Gemini rejected the key. Check the key in Google AI Studio."
+		case strings.HasPrefix(errText, "network"):
+			class = "network"
+			msg = "Could not reach Gemini. Try again later."
+		case strings.HasPrefix(errText, "quota"):
+			class = "quota"
+			msg = "Gemini rate limited the test. Try again later."
+		}
+		failureStatus := geminiFailureStatus(class)
+		if proposed == "" {
+			_, _ = s.store.SetTenantGeminiKeyStatus(r.Context(), tenantID, failureStatus, class)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "status": failureStatus, "error_class": class, "message": msg})
+		return
+	}
+	// On success with proposed key, persist it as valid.
+	var row store.TenantAIConfig
+	if proposed != "" {
+		row, err = s.store.PutTenantGeminiKey(r.Context(), tenantID, proposed)
+		if err != nil {
+			writeTenantAIError(w, err)
+			return
+		}
+	}
+	row, err = s.store.SetTenantGeminiKeyStatus(r.Context(), tenantID, store.GeminiKeyStatusValid, "")
+	if err != nil {
+		writeTenantAIError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":                true,
+		"status":            row.KeyStatus,
+		"last4":             row.KeyLast4,
+		"last_validated_at": row.KeyLastValidatedAt,
+		"configured":        row.Configured,
+	})
+}
+
+func geminiFailureStatus(errorClass string) string {
+	if strings.TrimSpace(errorClass) == "auth" {
+		return store.GeminiKeyStatusInvalid
+	}
+	return store.GeminiKeyStatusDegraded
+}
+
+func (s *server) getTenantGeminiStatus(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := s.tenantAIID(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	state, label, last4, lastValidated, err := s.store.TenantGeminiStatus(r.Context(), tenantID)
+	if err != nil {
+		writeTenantAIError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"state":             state,
+		"label":             label,
+		"action_href":       "/tenant/ai",
+		"last4":             last4,
+		"last_validated_at": lastValidated,
+	})
 }
 
 func (s *server) getTenantPrompt(w http.ResponseWriter, r *http.Request) {

@@ -109,6 +109,13 @@
         </a>
         <a
           class="nav-link"
+          class:active={$page.url.pathname.startsWith(`${base}/referrals`)}
+          href="{base}/referrals"
+        >
+          <span>↗</span>{$t.nav_referrals}
+        </a>
+        <a
+          class="nav-link"
           class:active={$page.url.pathname.startsWith(`${base}/audit-logs`)}
           href="{base}/audit-logs"
         >
