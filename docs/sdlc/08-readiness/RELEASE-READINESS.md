@@ -2,10 +2,10 @@
 id: READINESS-RELEASE
 status: completed
 updated: 2026-07-31
-current_sprint: SPRINT-062
-release_target: v2.35.0
-release: v2.35.0
-git_tag: v2.35.0
+current_sprint: SPRINT-063
+release_target: v2.35.1
+release: v2.35.1
+git_tag: v2.35.1
 ---
 
 # Release Readiness Checklist
@@ -208,6 +208,18 @@ curl -fsS http://localhost:8091/api/workforce
 - [ ] Credentialed Gemini browser/UAT scenarios remain in
   [SPRINT-060–062 manual UAT](../06-manual-tests/SPRINT-060-062-manual.md).
 
+### SPRINT-063 (v2.35.1)
+
+- [x] Platform Admin Leads client consumes `items[]` from
+  `GET /api/platform/leads`.
+- [x] Book Demo lead rows render in the inbox with accurate shown/total counts.
+- [x] Null and missing-count responses normalize safely.
+- [x] Node contract tests pass.
+- [x] Platform Admin Svelte check/build passed during Sprint 63 verification
+  with existing unrelated accessibility warnings.
+- [ ] Credentialed target browser UAT remains in
+  [SPRINT-063 manual UAT](../06-manual-tests/SPRINT-063-leads-inbox-manual.md).
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -247,6 +259,8 @@ curl -fsS http://localhost:8091/api/workforce
 | Tester | Codex release verification | 2026-07-31 | 303 Go tests, vet, Postgres lifecycle integration, and all web checks/builds passed |
 | PM | User-authorized release close | 2026-07-31 | User requested review, merge to main, sprint close, ROADMAP update, push, and tag |
 | DevOps | Codex release verification | 2026-07-31 | Combined v2.35.0 release train; credentialed Gemini browser UAT remains explicitly tracked |
+| PM | User-authorized release close | 2026-07-31 | User requested Sprint 63 close, ROADMAP update, and tag |
+| DevOps | Codex release verification | 2026-07-31 | v2.35.1 patch release closes the Platform Admin Leads inbox rendering fix |
 
 ## H. Release-cut (PM + DevOps)
 
@@ -276,6 +290,10 @@ git push origin v2.13.0
 - [x] `_velocity.json` updated for SPRINT-060–062
 - [x] ROADMAP Sprints 60–62 marked v2.35.0
 - [x] Tag `v2.35.0` authorized for push to `origin`
+- [x] Sprint 63 marked `completed` in `03-sprints/`
+- [x] `_velocity.json` updated for SPRINT-063
+- [x] ROADMAP Sprint 63 marked v2.35.1
+- [x] Local tag `v2.35.1` authorized by user request
 
 ## Quick demo script (stakeholder, ~10 min)
 

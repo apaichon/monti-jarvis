@@ -11,8 +11,8 @@ platform: Platform Admin / Product Web / Sales
 depends_on: [SPRINT-048, SPRINT-051]
 goal: "Render Product Web Book Demo leads returned by the platform API in the Platform Admin Leads inbox with accurate counts."
 velocity_basis: "Focused P1 regression fix; commit 3 points below normal 12-point velocity."
-release_target: pending
-release: pending
+release_target: v2.35.1
+release: v2.35.1
 ---
 
 # SPRINT-063 - Platform Admin Leads Inbox Rendering Fix
@@ -73,6 +73,14 @@ The client response type now matches the server `items[]` contract. A tested
 normalizer preserves rows and count metadata, and the Leads page no longer
 reads the nonexistent `res.leads` field. Automated tests and web gates pass;
 credentialed target-environment confirmation remains in the manual checklist.
+
+## Release
+
+- Version: v2.35.1
+- Closed: 2026-07-31
+- Type: patch bug fix
+- Merge: `504aaad` on `main`
+- Tag: `v2.35.1`
 
 ## Worktree
 
