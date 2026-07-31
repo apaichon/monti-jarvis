@@ -86,7 +86,7 @@
 | **60** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · ✅ **v2.35.0** · [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) · [SPRINT-060](../03-sprints/SPRINT-060.md) · [DES-0056](../02-design/56-tenant-owned-gemini-key-enforcement-spec.md) |
 | **61** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 60** · ✅ **v2.35.0** · [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) |
 | **62** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · ✅ **v2.35.0** · [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) · [SPRINT-062](../03-sprints/SPRINT-062.md) · [DES-0058](../02-design/58-referral-code-redemption-spec.md) |
-| **63** | **Platform Admin / Product Web / Sales** | **Bug fix: product-web Book Demo lead is returned by the admin API but missing from the Leads inbox; render API lead rows and correct shown/total counts** | **BUG/P1** | **48, 51** · [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) · [SPRINT-063](../03-sprints/SPRINT-063.md) · implemented 3/3 · release pending |
+| **63** | **Platform Admin / Product Web / Sales** | **Bug fix: product-web Book Demo lead is returned by the admin API but missing from the Leads inbox; render API lead rows and correct shown/total counts** | **BUG/P1** | **48, 51** · ✅ **v2.35.1** · [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) · [SPRINT-063](../03-sprints/SPRINT-063.md) |
 | **64** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
 | **65** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
 | **66** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog |
@@ -2334,13 +2334,14 @@ editing entitlements.
 
 ---
 
-## Implemented: SPRINT-063 - Platform Admin Leads Inbox Rendering Fix
+## Shipped: SPRINT-063 - Platform Admin Leads Inbox Rendering Fix ✅ v2.35.1
 
 **Platform:** Platform Admin / Product Web / Sales · **Feature:** Fix the
 platform-admin Leads inbox so a Book Demo submission returned in the
 `GET /api/platform/leads` response is rendered as a visible lead row with
-matching shown and total counts · **Depends:** 48, 51 · **Status:** implemented,
-release pending · **Feature:** [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) ·
+matching shown and total counts · **Depends:** 48, 51 · **Status:** shipped ·
+**Release:** v2.35.1 · **Closed:** 2026-07-31 ·
+**Feature:** [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) ·
 **Sprint:** [SPRINT-063](../03-sprints/SPRINT-063.md)
 
 ### Problem today

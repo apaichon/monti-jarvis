@@ -2,7 +2,7 @@
 id: FEAT-0055
 title: "Platform Admin Leads inbox renders API items"
 status: completed
-release: pending
+release: v2.35.1
 roadmap_sprint: 63
 priority: BUG/P1
 depends_on: [SPRINT-048, SPRINT-051]
@@ -51,3 +51,7 @@ the rendered collection became empty, producing `0 shown / 1 total`.
 - Existing domain: Sprint 48 marketing leads.
 - API contract: [04-api-spec.md](../02-design/04-api-spec.md), Sprint 63.
 - UX mapping: [05-ux-ui.md](../02-design/05-ux-ui.md), A63.
+
+## Release
+
+Shipped in v2.35.1 as a patch release for the Platform Admin Leads inbox.
