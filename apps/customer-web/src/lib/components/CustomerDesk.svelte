@@ -1888,9 +1888,14 @@
           {/each}
         </div>
       </div>
-      <div class="system-live" class:ok={systemLiveKind === 'ok'} class:issues={systemLiveKind === 'issues'} class:offline={systemLiveKind === 'offline'} aria-live="polite">
-        <span class="system-live-dot" aria-hidden="true"></span>
-        <span>{systemLive}</span>
+      <div class="topbar-status">
+        <div class="system-live" class:ok={systemLiveKind === 'ok'} class:issues={systemLiveKind === 'issues'} class:offline={systemLiveKind === 'offline'} aria-live="polite">
+          <span class="system-live-dot" aria-hidden="true"></span>
+          <span>{systemLive}</span>
+        </div>
+        <span class="topbar-version" aria-label={appVersion ? `Monti version ${appVersion}` : 'Loading Monti version'}>
+          {appVersion || 'v…'}
+        </span>
       </div>
       <button
         class="theme-toggle"
