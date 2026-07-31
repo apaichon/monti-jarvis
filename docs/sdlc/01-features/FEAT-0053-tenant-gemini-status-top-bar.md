@@ -1,14 +1,14 @@
 ---
 id: FEAT-0053
 title: "Tenant UX: remove system performance page; Gemini status in top bar"
-status: design_approved
-release: pending
+status: completed
+release: v2.35.0
 roadmap_sprint: 61
 priority: Q
 depends_on: [SPRINT-026, SPRINT-029, SPRINT-043, SPRINT-060]
 design: DES-0057
 design_spec: ../02-design/57-tenant-gemini-status-top-bar-spec.md
-updated: 2026-07-30
+updated: 2026-07-31
 ---
 
 # FEAT-0053: Tenant Gemini Status in Top Bar

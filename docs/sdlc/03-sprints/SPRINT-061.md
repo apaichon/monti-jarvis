@@ -1,9 +1,10 @@
 ---
 id: SPRINT-061
 status: completed
-start: 2026-08-22
-end: 2026-08-29
-updated: 2026-07-30
+start: 2026-07-30
+end: 2026-07-31
+closed: 2026-07-31
+updated: 2026-07-31
 design_pack: approved
 roadmap_sprint: 61
 feature: FEAT-0053
@@ -12,7 +13,8 @@ depends_on: [SPRINT-026, SPRINT-029, SPRINT-043, SPRINT-060]
 goal: "Remove tenant System Performance from tenant nav; show Gemini status in top bar linked to AI Settings."
 velocity_basis: "avg 12; commit 12 (UX-focused)"
 release_target: v2.34.0
-release: pending
+release: v2.35.0
+git_tag: v2.35.0
 ---
 
 # SPRINT-061 — Tenant UX Simplification (Gemini Status Top Bar)
@@ -87,3 +89,10 @@ Manual UAT: [SPRINT-060-062-manual.md](../06-manual-tests/SPRINT-060-062-manual.
 Tenant navigation removal, localized top-bar states, immediate status refresh,
 safe degraded behavior, and platform monitoring preservation were reviewed on
 2026-07-31. Both tenant and platform web builds pass.
+
+## Shipped summary
+
+Released in the combined Sprint 60–62 train as **v2.35.0** on 2026-07-31
+with 12/12 points completed. Tenant navigation is business-focused, while the
+localized top-bar Gemini state links operators directly to AI Settings and
+platform diagnostics remain available to platform admins.

@@ -1,12 +1,15 @@
 # SPRINT-060-062 Manual UAT
 
-**Status:** ready for credentialed browser UAT  
+**Status:** release accepted; credentialed browser UAT follow-up  
 **Automated verification:** passed 2026-07-31
 
 ## Automated evidence
 
 - [x] `go test ./internal/store ./internal/gemini ./internal/env ./cmd/server -count=1`
+- [x] `go test ./... -count=1` (303 tests in 38 packages)
+- [x] `go vet ./...`
 - [x] Postgres integration: apply, idempotent retry, expired/self rejection, tenant isolation, platform list, reverse, reverse retry
+- [x] `apps/customer-web`: `npm run check` and `npm run build`
 - [x] `apps/tenant-web`: `npm run check` and `npm run build`
 - [x] `apps/platform-admin-web`: `npm run check` and `npm run build`
 - [x] `git diff --check`

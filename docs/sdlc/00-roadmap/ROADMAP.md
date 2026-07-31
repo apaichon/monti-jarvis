@@ -83,9 +83,9 @@
 | **57** | **Customer / Product Web / Branding** | **Monti root-domain logo and social preview metadata: use new Monti logo and Open Graph/Twitter tags for Facebook/link sharing** | **O+** | **39, 48, 54, 56** · ✅ **v2.30.0** · [FEAT-0049](../01-features/FEAT-0049-monti-logo-social-preview-metadata.md) · [SPRINT-057](../03-sprints/SPRINT-057.md) · [DES-0053](../02-design/53-monti-logo-social-preview-metadata-spec.md) |
 | **58** | **Customer / Tenant / Platform Admin** | **Portal UI language selector: EN, TH, and Japanese localized labels for call page, tenant portal, and admin pages** | **I18N** | **16, 20, 39, 54, 56, 57** · ✅ **v2.31.0** · [FEAT-0050](../01-features/FEAT-0050-portal-ui-language-selector.md) · [SPRINT-058](../03-sprints/SPRINT-058.md) · [DES-0054](../02-design/54-portal-ui-language-selector-spec.md) |
 | **59** | **Customer / Conversation UX** | **Call conversation UX revamp: friendly desktop/mobile call interface with clearer controls, chat transcript, customer context, and light/dark mode** | **A+** | **1, 21, 39, 54, 56, 58** · ✅ **v2.32.0** · [FEAT-0051](../01-features/FEAT-0051-call-conversation-ux-revamp.md) · [SPRINT-059](../03-sprints/SPRINT-059.md) · [DES-0055](../02-design/55-call-conversation-ux-revamp-spec.md) |
-| **60** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) · [SPRINT-060](../03-sprints/SPRINT-060.md) · [DES-0056](../02-design/56-tenant-owned-gemini-key-enforcement-spec.md) · **planned** |
-| **61** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 60** · [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) · **planned** |
-| **62** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) · [SPRINT-062](../03-sprints/SPRINT-062.md) · [DES-0058](../02-design/58-referral-code-redemption-spec.md) · **planned** |
+| **60** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · ✅ **v2.35.0** · [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) · [SPRINT-060](../03-sprints/SPRINT-060.md) · [DES-0056](../02-design/56-tenant-owned-gemini-key-enforcement-spec.md) |
+| **61** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 60** · ✅ **v2.35.0** · [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) |
+| **62** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · ✅ **v2.35.0** · [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) · [SPRINT-062](../03-sprints/SPRINT-062.md) · [DES-0058](../02-design/58-referral-code-redemption-spec.md) |
 | **63** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
 | **64** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
 | **65** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog |
@@ -2078,42 +2078,42 @@ context rails, and light/dark presentation · **Depends:** 1, 21, 39, 54, 56, 58
 
 ---
 
-## Planned: SPRINT-060 — Tenant-Owned Gemini Key Enforcement
+## Shipped: SPRINT-060 — Tenant-Owned Gemini Key Enforcement ✅ v2.35.0
 
-**Status:** planned · **Release target:** v2.33.0 · **Feature:** [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) ·
+**Status:** shipped · **Release:** v2.35.0 · **Closed:** 2026-07-31 · **Feature:** [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) ·
 **Design:** [DES-0056](../02-design/56-tenant-owned-gemini-key-enforcement-spec.md) · **Sprint:** [SPRINT-060](../03-sprints/SPRINT-060.md) ·
-**Worktree:** `.worktrees/SPRINT-060-062` · branch `docs/sprint-060-062-plan`
+**Build:** `.worktrees/SPRINT-060-062-build` · branch `feature/sprint-060-062-build`
 
 **Commitment (12):** TASK-0216 validation API (4) · TASK-0217 fail-closed runtime (3) · TASK-0218 AI Settings UX (3) · TASK-0219 audit/UAT (2)
 
 ---
 
-## Planned: SPRINT-061 — Tenant UX Simplification (Gemini Status Top Bar)
+## Shipped: SPRINT-061 — Tenant UX Simplification (Gemini Status Top Bar) ✅ v2.35.0
 
-**Status:** planned · **Release target:** v2.34.0 · **Feature:** [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) ·
+**Status:** shipped · **Release:** v2.35.0 · **Closed:** 2026-07-31 · **Feature:** [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) ·
 **Design:** [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) · **Sprint:** [SPRINT-061](../03-sprints/SPRINT-061.md) ·
-**Depends:** S60 · **Worktree:** `.worktrees/SPRINT-060-062`
+**Depends:** S60 · **Build:** `.worktrees/SPRINT-060-062-build`
 
 **Commitment (12):** TASK-0220 status API (3) · TASK-0221 remove performance nav (3) · TASK-0222 top-bar chip (3) · TASK-0223 platform UAT (3)
 
 ---
 
-## Planned: SPRINT-062 — Referral Code Redemption Adds Bonus Quota
+## Shipped: SPRINT-062 — Referral Code Redemption Adds Bonus Quota ✅ v2.35.0
 
-**Status:** planned · **Release target:** v2.35.0 · **Feature:** [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) ·
+**Status:** shipped · **Release:** v2.35.0 · **Closed:** 2026-07-31 · **Feature:** [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) ·
 **Design:** [DES-0058](../02-design/58-referral-code-redemption-spec.md) · **Sprint:** [SPRINT-062](../03-sprints/SPRINT-062.md) ·
-**Worktree:** `.worktrees/SPRINT-060-062`
+**Build:** `.worktrees/SPRINT-060-062-build`
 
 **Commitment (12):** TASK-0224 validate/apply API (4) · TASK-0225 bonus ledger/usage (3) · TASK-0226 tenant UX (3) · TASK-0227 platform reverse/UAT (2)
 
 
-## Detail (planned as SPRINT-060): Tenant-Owned Gemini Key Enforcement
+## Detail (shipped as SPRINT-060): Tenant-Owned Gemini Key Enforcement
 
 **Platform:** Tenant / AI Operations / Security · **Feature:** Stop using a
 shared `GEMINI_API_KEY` environment fallback for tenant AI runtime in production.
 Tenant admins must enter their own Gemini API key in AI Settings, test that the
 key can connect to Gemini, and only validated keys can power tenant AI calls ·
-**Depends:** 41, 43, 52 · **Status:** backlog
+**Depends:** 41, 43, 52 · **Status:** shipped in v2.35.0
 
 ### Problem today
 
@@ -2185,14 +2185,14 @@ secrets to the browser.
 
 ---
 
-## Detail (planned as SPRINT-061): Tenant UX Simplification: Gemini Status in Top Bar
+## Detail (shipped as SPRINT-061): Tenant UX Simplification: Gemini Status in Top Bar
 
 **Platform:** Tenant / Platform Admin / AI Operations · **Feature:** Tenant
 admins should not need a dedicated System Performance page for infrastructure
 details. Remove the tenant-facing system performance route from normal tenant
 navigation and move the Gemini connectivity/status signal into the tenant top
 bar, while keeping deeper health diagnostics in platform-admin operations ·
-**Depends:** 26, 29, 43, 59 · **Status:** backlog
+**Depends:** 26, 29, 43, 60 · **Status:** shipped in v2.35.0
 
 ### Problem today
 
@@ -2260,12 +2260,12 @@ and reachable; deeper dependency health belongs to platform administration.
 
 ---
 
-## Detail (planned as SPRINT-062): Referral Code Redemption Adds Bonus Quota
+## Detail (shipped as SPRINT-062): Referral Code Redemption Adds Bonus Quota
 
 **Platform:** Tenant / Growth / Quota · **Feature:** Let a tenant enter and
 apply a referral code from another tenant or campaign to receive eligible bonus
 quota, with validation, abuse controls, expiry rules, and quota-ledger tracking ·
-**Depends:** 13, 45, 46, 51 · **Status:** backlog
+**Depends:** 13, 45, 46, 51 · **Status:** shipped in v2.35.0
 
 ### Problem today
 

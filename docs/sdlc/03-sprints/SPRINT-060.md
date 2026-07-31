@@ -1,9 +1,10 @@
 ---
 id: SPRINT-060
 status: completed
-start: 2026-08-12
-end: 2026-08-22
-updated: 2026-07-30
+start: 2026-07-30
+end: 2026-07-31
+closed: 2026-07-31
+updated: 2026-07-31
 design_pack: approved
 roadmap_sprint: 60
 feature: FEAT-0052
@@ -12,7 +13,8 @@ depends_on: [SPRINT-041, SPRINT-043, SPRINT-052]
 goal: "Require validated tenant Gemini keys for production AI; no env GEMINI_API_KEY fallback; AI Settings test connection."
 velocity_basis: "Last 3 closed: S56=12, S57=12, S58=12 → avg 12; commit 12"
 release_target: v2.33.0
-release: pending
+release: v2.35.0
+git_tag: v2.35.0
 ---
 
 # SPRINT-060 — Tenant-Owned Gemini Key Enforcement
@@ -89,3 +91,10 @@ Validated-key runtime enforcement, production fail-closed behavior, bounded
 connection testing, safe status metadata, audit middleware coverage, and
 readiness posture were reviewed on 2026-07-31. Automated gates passed; live
 Gemini credential UAT remains listed in the manual checklist.
+
+## Shipped summary
+
+Released in the combined Sprint 60–62 train as **v2.35.0** on 2026-07-31
+with 12/12 points completed. Production tenant AI now requires a validated
+tenant-owned Gemini key, fails closed without one, and exposes bounded key
+testing, audit, rate-limit, and readiness behavior.

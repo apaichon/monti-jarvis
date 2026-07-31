@@ -1,9 +1,10 @@
 ---
 id: SPRINT-062
 status: completed
-start: 2026-08-29
-end: 2026-09-08
-updated: 2026-07-30
+start: 2026-07-30
+end: 2026-07-31
+closed: 2026-07-31
+updated: 2026-07-31
 design_pack: approved
 roadmap_sprint: 62
 feature: FEAT-0054
@@ -12,7 +13,8 @@ depends_on: [SPRINT-013, SPRINT-045, SPRINT-046, SPRINT-051]
 goal: "Tenant can redeem a referral code for bonus quota with validation, ledger tracking, and platform reverse."
 velocity_basis: "avg 12; commit 12"
 release_target: v2.35.0
-release: pending
+release: v2.35.0
+git_tag: v2.35.0
 ---
 
 # SPRINT-062 — Referral Code Redemption Adds Bonus Quota
@@ -87,3 +89,10 @@ Apply/retry/reverse atomicity, expiry and owner eligibility, tenant isolation,
 grant-specific response data, platform inspection, audit coverage, and portal
 refresh behavior were reviewed on 2026-07-31. The Postgres integration path and
 both web builds pass.
+
+## Shipped summary
+
+Released as **v2.35.0** on 2026-07-31 with 12/12 points completed. Tenant
+referral redemption now validates eligibility and expiry, grants isolated bonus
+quota idempotently, shows redemption history, and supports audited platform
+inspection and reversal.

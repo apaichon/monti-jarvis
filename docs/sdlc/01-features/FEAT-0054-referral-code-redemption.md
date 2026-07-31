@@ -1,14 +1,14 @@
 ---
 id: FEAT-0054
 title: "Referral code redemption adds bonus quota"
-status: design_approved
-release: pending
+status: completed
+release: v2.35.0
 roadmap_sprint: 62
 priority: M+
 depends_on: [SPRINT-013, SPRINT-045, SPRINT-046, SPRINT-051]
 design: DES-0058
 design_spec: ../02-design/58-referral-code-redemption-spec.md
-updated: 2026-07-30
+updated: 2026-07-31
 ---
 
 # FEAT-0054: Referral Code Redemption Adds Bonus Quota
