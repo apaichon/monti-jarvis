@@ -1,14 +1,14 @@
 ---
 id: FEAT-0052
 title: "Tenant-owned Gemini key enforcement (no production env fallback)"
-status: design_approved
-release: pending
+status: completed
+release: v2.35.0
 roadmap_sprint: 60
 priority: D+
 depends_on: [SPRINT-041, SPRINT-043, SPRINT-052]
 design: DES-0056
 design_spec: ../02-design/56-tenant-owned-gemini-key-enforcement-spec.md
-updated: 2026-07-30
+updated: 2026-07-31
 ---
 
 # FEAT-0052: Tenant-Owned Gemini Key Enforcement

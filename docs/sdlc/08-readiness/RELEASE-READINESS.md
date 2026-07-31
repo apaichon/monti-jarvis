@@ -1,11 +1,11 @@
 ---
 id: READINESS-RELEASE
 status: completed
-updated: 2026-07-30
-current_sprint: SPRINT-059
-release_target: v2.32.0
-release: v2.32.0
-git_tag: v2.32.0
+updated: 2026-07-31
+current_sprint: SPRINT-062
+release_target: v2.35.0
+release: v2.35.0
+git_tag: v2.35.0
 ---
 
 # Release Readiness Checklist
@@ -186,6 +186,28 @@ curl -fsS http://localhost:8091/api/workforce
 - [ ] Target-device microphone/speaker smoke; tracked in
   [SPRINT-059 manual UAT](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md).
 
+### SPRINT-060–062 (v2.35.0)
+
+- [x] Production tenant Gemini runtime accepts only a validated tenant-owned
+  key and does not fall back to `GEMINI_API_KEY`.
+- [x] Gemini key save/test/delete paths expose metadata only, classify provider
+  authentication separately from degraded failures, and enforce tenant-scoped
+  rate limits.
+- [x] Tenant top bar shows localized EN/TH/JA Gemini readiness states and
+  refreshes after AI Settings changes; tenant performance navigation is removed.
+- [x] Platform performance monitoring remains available.
+- [x] Referral validate/apply rejects unknown, expired, inactive-owner,
+  self-owned, and duplicate-ineligible codes.
+- [x] Referral retries are idempotent, bonus grants remain separate from base
+  entitlements, and platform operators can inspect and reverse redemptions.
+- [x] `go test ./... -count=1` passes: 303 tests in 38 packages.
+- [x] `go vet ./...` passes.
+- [x] Postgres referral lifecycle integration passes and leaves zero fixtures.
+- [x] Customer, tenant, and platform-admin Svelte checks/builds pass.
+- [x] `git diff --check` passes.
+- [ ] Credentialed Gemini browser/UAT scenarios remain in
+  [SPRINT-060–062 manual UAT](../06-manual-tests/SPRINT-060-062-manual.md).
+
 ## F. Documentation
 
 - [x] Sprint doc status accurate (`docs/sdlc/03-sprints/SPRINT-NNN.md`)
@@ -221,6 +243,10 @@ curl -fsS http://localhost:8091/api/workforce
 | Tester | Codex release verification | 2026-07-30 | Automated checks plus user screenshot UAT; target-device media smoke tracked |
 | PM | User-authorized release close | 2026-07-30 | User requested icon theme control, Sprint 59 close, merge, ROADMAP update, and tag |
 | DevOps | Codex release verification | 2026-07-30 | VERSION v2.32.0 and local merge/tag prepared; no push requested |
+| Dev | Codex release verification | 2026-07-31 | S60–S62 Gemini enforcement, tenant status UX, referral redemption, and release-blocker hardening |
+| Tester | Codex release verification | 2026-07-31 | 303 Go tests, vet, Postgres lifecycle integration, and all web checks/builds passed |
+| PM | User-authorized release close | 2026-07-31 | User requested review, merge to main, sprint close, ROADMAP update, push, and tag |
+| DevOps | Codex release verification | 2026-07-31 | Combined v2.35.0 release train; credentialed Gemini browser UAT remains explicitly tracked |
 
 ## H. Release-cut (PM + DevOps)
 
@@ -246,6 +272,10 @@ git push origin v2.13.0
 - [x] `_velocity.json` updated for SPRINT-059
 - [x] ROADMAP Sprint 59 marked v2.32.0
 - [x] Local tag `v2.32.0` authorized; remote push not requested
+- [x] Sprints 60–62 marked completed in `03-sprints/`
+- [x] `_velocity.json` updated for SPRINT-060–062
+- [x] ROADMAP Sprints 60–62 marked v2.35.0
+- [x] Tag `v2.35.0` authorized for push to `origin`
 
 ## Quick demo script (stakeholder, ~10 min)
 

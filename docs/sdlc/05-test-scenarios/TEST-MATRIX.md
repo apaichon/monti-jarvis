@@ -3,7 +3,7 @@ id: TEST-MATRIX
 status: active
 hold_reason: sprint_044_security_review
 updated: 2026-07-30
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044, SPRINT-045, SPRINT-055, SPRINT-059]
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044, SPRINT-045, SPRINT-055, SPRINT-059, SPRINT-060, SPRINT-061, SPRINT-062]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -246,6 +246,29 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | T59-02 | 4–5 | Icon-only theme control persists light/dark mode and selects matching avatar portrait with fallback | Auto + Manual | Customer/tenant check/build · [UAT-059](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md) | Pass |
 | T59-03 | 6 | Speaker and microphone controls update live media state; keypad writes numeric input to composer | Auto + Manual | Customer-web check/build · [UAT-059](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md) | Pass (code); target-device media smoke tracked |
 | T59-04 | 7 | EN/TH/JA labels and responsive controls avoid horizontal overflow | Auto + Manual | Customer-web check/build · [UAT-059](../06-manual-tests/SPRINT-059-call-conversation-ux-manual.md) | Pass |
+
+---
+
+## SPRINT-060 — Tenant-Owned Gemini Key Enforcement
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T60-01 | 1–3 | Key save/test/delete returns bounded metadata and only validated keys resolve at runtime | Auto + Manual | `go test ./internal/store ./cmd/server -count=1` · [UAT-060–062](../06-manual-tests/SPRINT-060-062-manual.md) | Pass (auto) |
+| T60-02 | 4–5 | Production fails closed without tenant key; audit/readiness paths expose no secret | Auto + Manual | `go test ./... -count=1` · `go vet ./...` · [UAT-060–062](../06-manual-tests/SPRINT-060-062-manual.md) | Pass (auto); credential UAT tracked |
+
+## SPRINT-061 — Tenant Gemini Status Top Bar
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T61-01 | 1–3 | Tenant nav omits performance and localized top-bar state links to AI Settings and refreshes after changes | Auto + Manual | Tenant Svelte check/build · [UAT-060–062](../06-manual-tests/SPRINT-060-062-manual.md) | Pass |
+| T61-02 | 4–5 | Platform performance diagnostics remain available and tenant payloads contain no infra details | Auto + Manual | Platform-admin Svelte check/build · server tests | Pass |
+
+## SPRINT-062 — Referral Code Redemption
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T62-01 | 1–4 | Apply is tenant-isolated and idempotent; invalid, expired, self-owned, and inactive-owner codes do not grant quota | Auto + Integration | Store/server tests · Postgres lifecycle integration · [UAT-060–062](../06-manual-tests/SPRINT-060-062-manual.md) | Pass |
+| T62-02 | 1, 5 | Tenant sees grant/history and platform can filter, inspect, reverse, and safely retry reversal | Auto + Integration | Tenant/platform builds · Postgres lifecycle integration | Pass |
 
 ---
 
