@@ -2,8 +2,8 @@
 id: TEST-MATRIX
 status: active
 hold_reason: sprint_044_security_review
-updated: 2026-07-30
-sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044, SPRINT-045, SPRINT-055, SPRINT-059, SPRINT-060, SPRINT-061, SPRINT-062]
+updated: 2026-07-31
+sprints: [SPRINT-001, SPRINT-002, SPRINT-013, SPRINT-014, SPRINT-019, SPRINT-020, SPRINT-026, SPRINT-027, SPRINT-044, SPRINT-045, SPRINT-055, SPRINT-059, SPRINT-060, SPRINT-061, SPRINT-062, SPRINT-063]
 ---
 
 # Test Scenario Matrix — Monti Jarvis
@@ -269,6 +269,16 @@ Maps feature acceptance criteria to executable scenarios. **Auto** = `go test` o
 | --- | ---: | --- | --- | --- | --- |
 | T62-01 | 1–4 | Apply is tenant-isolated and idempotent; invalid, expired, self-owned, and inactive-owner codes do not grant quota | Auto + Integration | Store/server tests · Postgres lifecycle integration · [UAT-060–062](../06-manual-tests/SPRINT-060-062-manual.md) | Pass |
 | T62-02 | 1, 5 | Tenant sees grant/history and platform can filter, inspect, reverse, and safely retry reversal | Auto + Integration | Tenant/platform builds · Postgres lifecycle integration | Pass |
+
+---
+
+## SPRINT-063 - Platform Admin Leads Inbox Rendering
+
+| ID | AC | Scenario | Type | Test / Command | Result |
+| --- | ---: | --- | --- | --- | --- |
+| T63-01 | 1-3 | A non-empty Book Demo API `items[]` response remains visible with matching shown/total counts | Auto + Manual | `npm test` · [UAT-063](../06-manual-tests/SPRINT-063-leads-inbox-manual.md) | Pass (auto) |
+| T63-02 | 3-4 | Omitted total uses rendered count and null items produce a true empty state | Auto | `npm test` | Pass |
+| T63-03 | 5 | Filters and lead-detail actions remain available after list rendering | Build + Manual | Platform Admin check/build · [UAT-063](../06-manual-tests/SPRINT-063-leads-inbox-manual.md) | Pass (build); browser follow-up tracked |
 
 ---
 

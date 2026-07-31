@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S67 commercial/tenant/customer UX tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
+# Monti AI Call Center — Roadmap (36 core + S37–S69 commercial/tenant/customer UX tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -86,12 +86,13 @@
 | **60** | **Tenant / AI Operations / Security** | **Tenant-owned Gemini key enforcement: no production `GEMINI_API_KEY` env fallback; AI Settings key entry with live validation test** | **D+** | **41, 43, 52** · ✅ **v2.35.0** · [FEAT-0052](../01-features/FEAT-0052-tenant-owned-gemini-key-enforcement.md) · [SPRINT-060](../03-sprints/SPRINT-060.md) · [DES-0056](../02-design/56-tenant-owned-gemini-key-enforcement-spec.md) |
 | **61** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 60** · ✅ **v2.35.0** · [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) |
 | **62** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · ✅ **v2.35.0** · [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) · [SPRINT-062](../03-sprints/SPRINT-062.md) · [DES-0058](../02-design/58-referral-code-redemption-spec.md) |
-| **63** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
-| **64** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
-| **65** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog |
-| **66** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · backlog |
-| **67** | **Customer / Tenant / Tickets** | **AI summary before call close: generate call recap, confirm unresolved items, and submit summary to ticket** | **F+** | **1, 21, 22, 23, 24, 43, 53, 55, 56** · backlog |
-| **68** | **Tenant / Customer / Notifications** | **Call schedule email notifications: topic-based handover or sales links redirect customers into an auto-start prepared voice conversation** | **E+** | **1, 16, 20, 21, 23, 43, 53, 56, 65, 67** · backlog |
+| **63** | **Platform Admin / Product Web / Sales** | **Bug fix: product-web Book Demo lead is returned by the admin API but missing from the Leads inbox; render API lead rows and correct shown/total counts** | **BUG/P1** | **48, 51** · [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) · [SPRINT-063](../03-sprints/SPRINT-063.md) · implemented 3/3 · release pending |
+| **64** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
+| **65** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
+| **66** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog |
+| **67** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · backlog |
+| **68** | **Customer / Tenant / Tickets** | **AI summary before call close: generate call recap, confirm unresolved items, and submit summary to ticket** | **F+** | **1, 21, 22, 23, 24, 43, 53, 55, 56** · backlog |
+| **69** | **Tenant / Customer / Notifications** | **Call schedule email notifications: topic-based handover or sales links redirect customers into an auto-start prepared voice conversation** | **E+** | **1, 16, 20, 21, 23, 43, 53, 56, 66, 68** · backlog |
 
 ---
 
@@ -2333,7 +2334,77 @@ editing entitlements.
 
 ---
 
-## Backlog: SPRINT-063 — Queued Concurrent-Call Admission
+## Implemented: SPRINT-063 - Platform Admin Leads Inbox Rendering Fix
+
+**Platform:** Platform Admin / Product Web / Sales · **Feature:** Fix the
+platform-admin Leads inbox so a Book Demo submission returned in the
+`GET /api/platform/leads` response is rendered as a visible lead row with
+matching shown and total counts · **Depends:** 48, 51 · **Status:** implemented,
+release pending · **Feature:** [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) ·
+**Sprint:** [SPRINT-063](../03-sprints/SPRINT-063.md)
+
+### Problem today
+
+Product web successfully records a Book Demo lead, and the platform Leads API
+returns that lead inside `items[]`. The Platform Admin Leads inbox nevertheless
+shows `0 shown` while reporting `1 total`, leaving the inbox blank and preventing
+sales operators from opening or managing the submitted lead.
+
+### Goal
+
+1. **Render returned leads** - Map the API `items[]` response into visible inbox
+   rows without losing `book_demo` or other supported lead kinds.
+2. **Keep counts accurate** - The shown count reflects rendered rows and the
+   total count reflects the server result for the active filters.
+3. **Preserve lead operations** - A rendered row opens lead detail and supports
+   status, assignment, notes, and history actions.
+
+### Scope
+
+### In
+
+- Reproduce the blank-inbox condition using a Product Web Book Demo submission.
+- Align the Platform Admin response contract and client state with the API
+  `items`, `total`, `limit`, and `offset` fields.
+- Render all supported lead kinds, including `book_demo`, under the correct
+  status/kind/search filters.
+- Correct empty, loading, error, shown-count, total-count, and refresh behavior.
+- Keep lead detail, status update, assignment, notes, and history interactions
+  working for rows loaded from the list.
+- Add regression coverage for a non-empty response and for filtered empty
+  results.
+
+### Out
+
+- Changing Product Web lead-capture fields or consent behavior.
+- Redesigning the lead lifecycle, CRM integration, or sales automation.
+- Exposing tenant-private customer, billing, or payment data.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Contract fix | Platform Admin consumes the server lead-list response without dropping `items[]` |
+| Inbox rendering | Book Demo and other supported leads render with core contact/company fields |
+| Count/filter fix | Shown, total, status, kind, search, and refresh remain consistent |
+| Detail regression | Opening a lead and updating status, assignment, notes, and history still works |
+| Verification | API fixture, Svelte check/build, and browser UAT with a real Book Demo submission |
+
+### Acceptance sketch
+
+1. Given an API response with one `status=new`, `kind=book_demo` lead in
+   `items[]`, the inbox shows one row and reports `1 shown / 1 total`.
+2. The lead displays its submitted email, name, company, phone, preferred
+   channel, language, and lifecycle status without exposing hidden fields.
+3. Status, kind, and search filters either render matching rows or show a true
+   zero-result empty state with accurate counts.
+4. Refresh does not clear valid rows or duplicate leads.
+5. Selecting the row opens the correct detail, and existing update, notes, and
+   history actions continue to work.
+
+---
+
+## Backlog: SPRINT-064 — Queued Concurrent-Call Admission
 
 **Platform:** Customer / Tenant / Quota · **Feature:** Enforce each tenant
 package's total concurrent-call limit with a tenant-scoped waiting queue. When a
@@ -2413,7 +2484,7 @@ controlled wait queue instead of immediate rejection.
 
 ---
 
-## Backlog: SPRINT-064 — Full and Incremental Backup/Restore
+## Backlog: SPRINT-065 — Full and Incremental Backup/Restore
 
 **Platform:** Infra / Platform Admin / DevOps · **Feature:** Provide scheduled
 full and incremental backups plus verified restore workflows for Monti
@@ -2496,7 +2567,7 @@ tested against staging/local before any production recovery is attempted.
 
 ---
 
-## Backlog: SPRINT-065 — Tenant Customer Product Catalog
+## Backlog: SPRINT-066 — Tenant Customer Product Catalog
 
 **Platform:** Tenant / Customer / KM · **Feature:** Let tenants manage a
 customer-facing product/catalog library with downloadable files and structured
@@ -2584,7 +2655,7 @@ download when the customer asks about it.
 
 ---
 
-## Backlog: SPRINT-066 — Multi-User Tenant Permissions
+## Backlog: SPRINT-067 — Multi-User Tenant Permissions
 
 **Platform:** Tenant / Security / Back Office · **Feature:** Let tenant admins
 invite same-domain staff users into the tenant portal and assign menu-level
@@ -2667,7 +2738,7 @@ catalog content, customer records, or reports.
 
 ---
 
-## Backlog: SPRINT-067 — AI Summary Before Call Close
+## Backlog: SPRINT-068 — AI Summary Before Call Close
 
 **Platform:** Customer / Tenant / Tickets · **Feature:** Before a call is
 closed, generate an AI summary of the conversation, confirm unresolved items or
@@ -2754,13 +2825,13 @@ Without that, support teams must reread transcripts before acting on a ticket.
 
 ---
 
-## Backlog: SPRINT-068 — Call Schedule Email Notifications
+## Backlog: SPRINT-069 — Call Schedule Email Notifications
 
 **Platform:** Tenant / Customer / Notifications · **Feature:** Let tenants
 schedule customer call notifications by topic, send email links for handover or
 sales/product conversations, and redirect the customer into an automatically
 started voice call with prepared conversation context · **Depends:** 1, 16, 20,
-21, 23, 43, 53, 56, 64, 66 · **Status:** backlog
+21, 23, 43, 53, 56, 66, 68 · **Status:** backlog
 
 ### Problem today
 

@@ -2890,3 +2890,12 @@ Unique partial: one applied redemption per (redeemer_tenant_id, referral_code).
 | Cash affiliate payouts | out |
 
 See DES-0056–0058.
+
+## Sprint 63 - Platform Admin Leads Inbox Rendering
+
+No schema change. Sprint 63 reuses the Sprint 48 `marketing_leads`,
+`marketing_lead_notes`, and `marketing_lead_events` entities. The defect was a
+browser response-field mismatch after `GET /api/platform/leads` returned valid
+rows.
+
+See workflow section 140, API Sprint 63, and UX A63.

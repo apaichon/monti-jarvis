@@ -4166,3 +4166,29 @@ sequenceDiagram
 ```
 
 See DES-0056, DES-0057, DES-0058.
+
+## 140. Platform Admin renders returned lead items (Sprint 63)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin / sales
+  participant B as Browser /admin/leads
+  participant G as Go :8091
+  participant P as Postgres
+
+  A->>B: Open Leads with status=new
+  B->>G: GET /api/platform/leads?status=new&limit=50&offset=0
+  G->>P: List marketing_leads
+  P-->>G: rows + total
+  G-->>B: {items:[...],total,limit,offset}
+  B->>B: Normalize items and count metadata
+  alt items has Book Demo lead
+    B-->>A: Render row; shown matches item count
+    A->>B: Open lead detail
+  else items empty
+    B-->>A: True zero-result empty state
+  end
+```
+
+No server, database, auth, or lead-lifecycle behavior changes in Sprint 63.
+See API Sprint 63, ER Sprint 63, and UX A63.

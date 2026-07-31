@@ -83,7 +83,7 @@ export type LeadDetail = LeadListItem & {
 };
 
 export type LeadsListResponse = {
-  leads: LeadListItem[];
+  items: LeadListItem[];
   total?: number;
   limit?: number;
   offset?: number;

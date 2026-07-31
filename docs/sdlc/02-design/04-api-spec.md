@@ -4846,3 +4846,40 @@ Query: tenant_id, code, status.
 Reverses remaining bonus; status `reversed`.
 
 See DES-0056, DES-0057, DES-0058.
+
+## Sprint 63 - Platform Leads List Contract Clarification
+
+No endpoint change. The existing Sprint 48 response is authoritative.
+
+### `GET /api/platform/leads`
+
+| Field | Type | Contract |
+| --- | --- | --- |
+| `items` | array | Lead rows for the active filters; never renamed to `leads` in the client |
+| `total` | integer | Total matching rows before limit/offset |
+| `limit` | integer | Applied page size |
+| `offset` | integer | Applied row offset |
+
+```json
+{
+  "items": [
+    {
+      "id": "lead_123",
+      "kind": "book_demo",
+      "status": "new",
+      "email": "demo@example.com",
+      "company_name": "Example Co.",
+      "created_at": "2026-07-31T05:40:00Z"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+The Platform Admin client renders `items[]`; it may use `items.length` only as
+a defensive fallback when `total` is absent. Auth, query filters, detail,
+mutation, and error contracts remain unchanged.
+
+See workflow section 140, ER Sprint 63, and UX A63.
