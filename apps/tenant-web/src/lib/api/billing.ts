@@ -43,6 +43,7 @@ export type CheckoutResponse = {
   payment_url: string;
   provider: string;
   payment_method?: string;
+  provider_session_id?: string;
   return_url?: string;
   subscription_id?: string;
   billing_interval?: 'monthly' | 'annual';
@@ -215,6 +216,11 @@ export type PaymentOrder = {
   payment_method?: string;
   provider?: string;
   transaction_id?: string;
+  provider_session_id?: string;
+  provider_payment_id?: string;
+  provider_status?: string;
+  checkout_expires_at?: string | null;
+  last_provider_sync_at?: string | null;
   paid_at?: string | null;
   created_at: string;
   documents?: PaymentDocument[];

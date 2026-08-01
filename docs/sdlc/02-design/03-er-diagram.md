@@ -2,8 +2,8 @@
 id: DES-0003
 title: Entity Relationship Diagram
 status: shipped
-updated: 2026-07-17
-sprint: SPRINT-030
+updated: 2026-08-01
+sprint: SPRINT-064
 ---
 
 # ER Diagram — Monti Jarvis
@@ -2899,3 +2899,107 @@ browser response-field mismatch after `GET /api/platform/leads` returned valid
 rows.
 
 See workflow section 140, API Sprint 63, and UX A63.
+
+## Sprint 64 - Payment Gateway Portability and Stripe
+
+Sprint 64 keeps the existing payment authority tables and extends them for
+provider-neutral references. The implementation should use migration
+`scripts/migrations/037_payment_gateway_stripe.sql` or an equivalent idempotent
+`ensureSchema` delta.
+
+```mermaid
+erDiagram
+  payment_gateway_configs ||--o{ payment_orders : active_provider_for_new_orders
+  tenants ||--o{ payment_orders : places
+  packages ||--o{ payment_orders : purchased_as
+  payment_orders ||--o{ payment_documents : issues
+  payment_orders ||--o{ payment_callback_events : reconciled_by
+
+  payment_gateway_configs {
+    text id PK
+    text provider
+    text mode
+    text status
+    text stripe_publishable_key
+    text stripe_secret_key
+    text stripe_webhook_secret
+    text stripe_api_base_url
+    text stripe_success_url
+    text stripe_cancel_url
+    text last_test_status
+    timestamptz last_tested_at
+    text last_test_error
+    text last_webhook_status
+    timestamptz last_webhook_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  payment_orders {
+    text id PK
+    text tenant_id FK
+    text package_id FK
+    text order_no UK
+    int amount_cents
+    text currency
+    text status
+    text provider
+    text payment_method
+    text transaction_id
+    text payment_url
+    text provider_session_id
+    text provider_payment_id
+    text provider_status
+    timestamptz checkout_expires_at
+    timestamptz last_provider_sync_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+
+  payment_callback_events {
+    text id PK
+    text provider
+    text transaction_id
+    text order_no
+    text provider_event_id
+    text event_type
+    boolean signature_verified
+    text processing_status
+    timestamptz processed_at
+    text error_code
+    text payment_status
+    text amount
+    text customer_id
+    text payload_hash
+    timestamptz received_at
+    timestamptz created_at
+    timestamptz updated_at
+    text created_by
+    text updated_by
+  }
+```
+
+### Storage rules
+
+| Entity | Rule |
+| --- | --- |
+| `payment_gateway_configs.provider` | Valid values become `mock`, `chillpay`, `stripe` |
+| `payment_gateway_configs.stripe_secret_key` | Write-only through Platform Admin APIs; masked on read |
+| `payment_gateway_configs.stripe_webhook_secret` | Write-only through Platform Admin APIs; masked on read |
+| `payment_orders.provider` | Immutable after order creation |
+| `payment_callback_events.provider_event_id` | Unique per provider when non-empty |
+
+### Indexes and constraints
+
+| Object | Constraint |
+| --- | --- |
+| `payment_callback_events` | keep existing unique `(provider, transaction_id)` |
+| `payment_callback_events` | add partial unique `(provider, provider_event_id)` where not blank |
+| `payment_orders` | index `(provider, provider_session_id)` |
+| `payment_orders` | index `(provider, provider_payment_id)` |
+
+See DES-0059, workflow §141-143, API Sprint 64, and UX A64/T64.

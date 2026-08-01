@@ -2,8 +2,8 @@
 id: DES-0002
 title: Workflows
 status: shipped
-updated: 2026-07-17
-sprint: SPRINT-030
+updated: 2026-08-01
+sprint: SPRINT-064
 ---
 
 # Workflows — Monti Jarvis
@@ -4192,3 +4192,96 @@ sequenceDiagram
 
 No server, database, auth, or lead-lifecycle behavior changes in Sprint 63.
 See API Sprint 63, ER Sprint 63, and UX A63.
+
+## 141. Platform switches active payment provider (Sprint 64)
+
+```mermaid
+sequenceDiagram
+  actor A as Platform admin
+  participant B as Browser /admin/settings/payment
+  participant G as Go :8091
+  participant S as Postgres
+  participant P as payment.Gateway
+
+  A->>B: Select provider mock/chillpay/stripe
+  B->>G: PUT /api/platform/payment-gateway
+  G->>G: validate provider-specific fields
+  G->>S: UPSERT payment_gateway_configs + masked metadata
+  G-->>B: safe config, callback URLs, test/webhook status
+  A->>B: Test connection
+  B->>G: POST /api/platform/payment-gateway/test
+  G->>P: Ping(active provider)
+  alt test ok
+    G->>S: last_test_status=ok
+    G-->>B: {ok:true, provider}
+  else provider error
+    G->>S: last_test_status=failed + safe error
+    G-->>B: 502 {ok:false, code}
+  end
+```
+
+## 142. Tenant checkout routes to Stripe (Sprint 64)
+
+```mermaid
+sequenceDiagram
+  actor T as Tenant admin
+  participant B as Browser /tenant/billing
+  participant G as Go :8091
+  participant S as Postgres
+  participant Stripe as Stripe Checkout
+
+  T->>B: Buy Shared Cloud package
+  B->>G: POST /api/tenant/checkout {package_id,billing_interval,payment_method}
+  G->>S: validate active tenant + package + server amount
+  G->>S: INSERT payment_orders provider=stripe pending
+  G->>Stripe: create Checkout Session(order metadata, amount, success/cancel URLs)
+  Stripe-->>G: session id + hosted URL
+  G->>S: store provider_session_id/payment_url/expires_at
+  G-->>B: existing checkout response + provider=stripe
+  B->>Stripe: redirect tenant to hosted checkout
+```
+
+## 143. Stripe webhook fulfills order idempotently (Sprint 64)
+
+```mermaid
+sequenceDiagram
+  participant Stripe as Stripe
+  participant G as Go :8091
+  participant S as Postgres
+  participant E as entitlement cache
+
+  Stripe->>G: POST /api/callbacks/stripe + Stripe-Signature
+  G->>G: verify raw body signature
+  G->>S: INSERT payment_callback_events(provider_event_id)
+  alt duplicate event
+    G-->>Stripe: 200 already processed
+  else checkout.session.completed
+    G->>S: lookup payment_orders by order_id/order_no metadata
+    alt amount/currency/provider match
+      G->>S: FulfillPaymentOrder paid once
+      S->>S: update order, entitlement, documents
+      G->>E: invalidate tenant entitlement cache
+      G-->>Stripe: 200 processed
+    else mismatch
+      G->>S: processing_status=failed
+      G-->>Stripe: 200 recorded, no fulfillment
+    end
+  else failed/expired event
+    G->>S: mark failed/ignored safely
+    G-->>Stripe: 200
+  end
+```
+
+### State: payment provider checkout (Sprint 64)
+
+| Object | State | Meaning |
+| --- | --- | --- |
+| `payment_gateway_configs` | `active` | New checkout attempts use this provider |
+| `payment_orders` | `pending` | Local order created; provider session may be open |
+| `payment_orders` | `paid` | Provider success fulfilled once |
+| `payment_orders` | `failed` | Provider failed/expired/cancelled; no entitlement grant |
+| `payment_callback_events` | `processed` | Signature/checksum verified and local state handled |
+| `payment_callback_events` | `ignored` | Valid event, no local mutation required |
+| `payment_callback_events` | `failed` | Valid provider event but local mismatch or processing error |
+
+See DES-0059, API Sprint 64, ER Sprint 64, and UX A64/T64.

@@ -27,20 +27,25 @@ const (
 )
 
 type PaymentOrder struct {
-	ID            string
-	TenantID      string
-	PackageID     string
-	OrderNo       string
-	AmountCents   int
-	Currency      string
-	Status        string
-	Provider      string
-	PaymentMethod string
-	TransactionID string
-	PaymentURL    string
-	PaidAt        *time.Time
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID                 string
+	TenantID           string
+	PackageID          string
+	OrderNo            string
+	AmountCents        int
+	Currency           string
+	Status             string
+	Provider           string
+	PaymentMethod      string
+	TransactionID      string
+	PaymentURL         string
+	ProviderSessionID  string
+	ProviderPaymentID  string
+	ProviderStatus     string
+	CheckoutExpiresAt  *time.Time
+	LastProviderSyncAt *time.Time
+	PaidAt             *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type CreatePaymentOrderInput struct {
@@ -139,47 +144,72 @@ type PaymentFulfillResult struct {
 }
 
 type PaymentGatewayConfig struct {
-	ID           string
-	Provider     string
-	Mode         string
-	Status       string
-	MerchantCode string
-	APIKey       string
-	MD5Key       string
-	BaseURL      string
-	RouteNo      int
-	Currency     string
-	CallbackURL  string
-	ReturnURL    string
-	UpdatedAt    time.Time
+	ID                   string
+	Provider             string
+	Mode                 string
+	Status               string
+	MerchantCode         string
+	APIKey               string
+	MD5Key               string
+	BaseURL              string
+	RouteNo              int
+	Currency             string
+	CallbackURL          string
+	ReturnURL            string
+	StripePublishableKey string
+	StripeSecretKey      string
+	StripeWebhookSecret  string
+	StripeAPIBaseURL     string
+	StripeSuccessURL     string
+	StripeCancelURL      string
+	LastTestStatus       string
+	LastTestedAt         *time.Time
+	LastTestError        string
+	LastWebhookStatus    string
+	LastWebhookAt        *time.Time
+	UpdatedAt            time.Time
 }
 
 type PaymentGatewayUpsert struct {
-	Provider     string
-	Mode         string
-	Status       string
-	MerchantCode string
-	APIKey       string
-	MD5Key       string
-	BaseURL      string
-	RouteNo      int
-	Currency     string
-	CallbackURL  string
-	ReturnURL    string
-	SetAPIKey    bool
-	SetMD5Key    bool
+	Provider               string
+	Mode                   string
+	Status                 string
+	MerchantCode           string
+	APIKey                 string
+	MD5Key                 string
+	BaseURL                string
+	RouteNo                int
+	Currency               string
+	CallbackURL            string
+	ReturnURL              string
+	SetAPIKey              bool
+	SetMD5Key              bool
+	StripePublishableKey   string
+	StripeSecretKey        string
+	StripeWebhookSecret    string
+	StripeAPIBaseURL       string
+	StripeSuccessURL       string
+	StripeCancelURL        string
+	SetStripeSecret        bool
+	SetStripeWebhookSecret bool
 }
 
 type PaymentCallbackEvent struct {
-	ID            string
-	Provider      string
-	TransactionID string
-	OrderNo       string
-	PaymentStatus string
-	Amount        string
-	CustomerID    string
-	PayloadHash   string
-	ReceivedAt    time.Time
+	ID                string
+	Provider          string
+	TransactionID     string
+	OrderNo           string
+	ProviderEventID   string
+	EventType         string
+	SignatureVerified bool
+	ProcessingStatus  string
+	ProcessedAt       *time.Time
+	ErrorCode         string
+	PaymentStatus     string
+	Amount            string
+	CustomerID        string
+	PayloadHash       string
+	ReceivedAt        time.Time
 }
 
 func (s *Store) ensurePaymentSchema(ctx context.Context) error {
@@ -200,13 +230,30 @@ CREATE TABLE IF NOT EXISTS %s.payment_gateway_configs (
   route_no integer NOT NULL DEFAULT 1,
   currency text NOT NULL DEFAULT '764',
   callback_url text NOT NULL DEFAULT '',
-  return_url text NOT NULL DEFAULT '',%s
+  return_url text NOT NULL DEFAULT '',
+  stripe_publishable_key text NOT NULL DEFAULT '',
+  stripe_secret_key text NOT NULL DEFAULT '',
+  stripe_webhook_secret text NOT NULL DEFAULT '',
+  stripe_api_base_url text NOT NULL DEFAULT '',
+  stripe_success_url text NOT NULL DEFAULT '',
+  stripe_cancel_url text NOT NULL DEFAULT '',
+  last_test_status text NOT NULL DEFAULT 'unknown',
+  last_tested_at timestamptz,
+  last_test_error text NOT NULL DEFAULT '',
+  last_webhook_status text NOT NULL DEFAULT 'unknown',
+  last_webhook_at timestamptz,%s
 );
 CREATE TABLE IF NOT EXISTS %s.payment_callback_events (
   id text PRIMARY KEY,
   provider text NOT NULL,
   transaction_id text NOT NULL,
   order_no text NOT NULL DEFAULT '',
+  provider_event_id text NOT NULL DEFAULT '',
+  event_type text NOT NULL DEFAULT '',
+  signature_verified boolean NOT NULL DEFAULT false,
+  processing_status text NOT NULL DEFAULT 'received',
+  processed_at timestamptz,
+  error_code text NOT NULL DEFAULT '',
   payment_status text NOT NULL DEFAULT '',
   amount text NOT NULL DEFAULT '',
   customer_id text NOT NULL DEFAULT '',
@@ -228,6 +275,11 @@ CREATE TABLE IF NOT EXISTS %s.payment_orders (
   payment_method text NOT NULL DEFAULT 'credit_card',
   transaction_id text NOT NULL DEFAULT '',
   payment_url text NOT NULL DEFAULT '',
+  provider_session_id text NOT NULL DEFAULT '',
+  provider_payment_id text NOT NULL DEFAULT '',
+  provider_status text NOT NULL DEFAULT '',
+  checkout_expires_at timestamptz,
+  last_provider_sync_at timestamptz,
   paid_at timestamptz,%s
 );
 CREATE INDEX IF NOT EXISTS payment_orders_tenant_status_idx
@@ -266,6 +318,32 @@ CREATE INDEX IF NOT EXISTS payment_documents_tenant_idx
 	// Migrations for existing payment_orders / payment_documents rows.
 	migrations := []string{
 		fmt.Sprintf(`ALTER TABLE %s.payment_orders ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT 'credit_card'`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_orders ADD COLUMN IF NOT EXISTS provider_session_id text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_orders ADD COLUMN IF NOT EXISTS provider_payment_id text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_orders ADD COLUMN IF NOT EXISTS provider_status text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_orders ADD COLUMN IF NOT EXISTS checkout_expires_at timestamptz`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_orders ADD COLUMN IF NOT EXISTS last_provider_sync_at timestamptz`, schema),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS payment_orders_provider_session_idx ON %s.payment_orders (provider, provider_session_id)`, schema),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS payment_orders_provider_payment_idx ON %s.payment_orders (provider, provider_payment_id)`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS stripe_publishable_key text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS stripe_secret_key text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS stripe_webhook_secret text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS stripe_api_base_url text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS stripe_success_url text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS stripe_cancel_url text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS last_test_status text NOT NULL DEFAULT 'unknown'`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS last_tested_at timestamptz`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS last_test_error text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS last_webhook_status text NOT NULL DEFAULT 'unknown'`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_gateway_configs ADD COLUMN IF NOT EXISTS last_webhook_at timestamptz`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_callback_events ADD COLUMN IF NOT EXISTS provider_event_id text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_callback_events ADD COLUMN IF NOT EXISTS event_type text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_callback_events ADD COLUMN IF NOT EXISTS signature_verified boolean NOT NULL DEFAULT false`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_callback_events ADD COLUMN IF NOT EXISTS processing_status text NOT NULL DEFAULT 'received'`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_callback_events ADD COLUMN IF NOT EXISTS processed_at timestamptz`, schema),
+		fmt.Sprintf(`ALTER TABLE %s.payment_callback_events ADD COLUMN IF NOT EXISTS error_code text NOT NULL DEFAULT ''`, schema),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS payment_callback_events_provider_event_uidx
+  ON %s.payment_callback_events (provider, provider_event_id) WHERE provider_event_id <> ''`, schema),
 		fmt.Sprintf(`ALTER TABLE %s.payment_documents ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'issued'`, schema),
 		fmt.Sprintf(`ALTER TABLE %s.payment_documents ADD COLUMN IF NOT EXISTS void_reason text NOT NULL DEFAULT ''`, schema),
 		fmt.Sprintf(`ALTER TABLE %s.payment_documents ADD COLUMN IF NOT EXISTS voided_at timestamptz`, schema),
@@ -307,14 +385,25 @@ func (s *Store) GetPaymentGatewayConfig(ctx context.Context) (PaymentGatewayConf
 	var row PaymentGatewayConfig
 	err := s.pg.QueryRow(ctx, fmt.Sprintf(`
 SELECT id, provider, mode, status, merchant_code, api_key, md5_key, base_url, route_no, currency,
-       callback_url, return_url, updated_at
+       callback_url, return_url,
+       COALESCE(stripe_publishable_key, ''), COALESCE(stripe_secret_key, ''), COALESCE(stripe_webhook_secret, ''),
+       COALESCE(stripe_api_base_url, ''), COALESCE(stripe_success_url, ''), COALESCE(stripe_cancel_url, ''),
+       COALESCE(last_test_status, 'unknown'), last_tested_at, COALESCE(last_test_error, ''),
+       COALESCE(last_webhook_status, 'unknown'), last_webhook_at, updated_at
 FROM %s.payment_gateway_configs
 WHERE id = $1`, schema), PaymentGatewayConfigID).Scan(
 		&row.ID, &row.Provider, &row.Mode, &row.Status, &row.MerchantCode, &row.APIKey, &row.MD5Key,
-		&row.BaseURL, &row.RouteNo, &row.Currency, &row.CallbackURL, &row.ReturnURL, &row.UpdatedAt,
+		&row.BaseURL, &row.RouteNo, &row.Currency, &row.CallbackURL, &row.ReturnURL,
+		&row.StripePublishableKey, &row.StripeSecretKey, &row.StripeWebhookSecret,
+		&row.StripeAPIBaseURL, &row.StripeSuccessURL, &row.StripeCancelURL,
+		&row.LastTestStatus, &row.LastTestedAt, &row.LastTestError,
+		&row.LastWebhookStatus, &row.LastWebhookAt, &row.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return PaymentGatewayConfig{ID: PaymentGatewayConfigID, Mode: "test", Status: "inactive", RouteNo: 1, Currency: "764"}, nil
+		return PaymentGatewayConfig{
+			ID: PaymentGatewayConfigID, Mode: "test", Status: "inactive", RouteNo: 1, Currency: "764",
+			LastTestStatus: "unknown", LastWebhookStatus: "unknown",
+		}, nil
 	}
 	if err != nil {
 		return PaymentGatewayConfig{}, err
@@ -339,6 +428,14 @@ func (s *Store) UpsertPaymentGatewayConfig(ctx context.Context, in PaymentGatewa
 	if in.SetMD5Key {
 		md5Key = in.MD5Key
 	}
+	stripeSecret := current.StripeSecretKey
+	if in.SetStripeSecret {
+		stripeSecret = in.StripeSecretKey
+	}
+	stripeWebhookSecret := current.StripeWebhookSecret
+	if in.SetStripeWebhookSecret {
+		stripeWebhookSecret = in.StripeWebhookSecret
+	}
 
 	provider := strings.TrimSpace(in.Provider)
 	if provider == "" {
@@ -359,14 +456,50 @@ func (s *Store) UpsertPaymentGatewayConfig(ctx context.Context, in PaymentGatewa
 			status = "inactive"
 		}
 	}
+	routeNo := in.RouteNo
+	if routeNo <= 0 {
+		routeNo = current.RouteNo
+	}
+	if routeNo <= 0 {
+		routeNo = 1
+	}
+	currency := strings.TrimSpace(in.Currency)
+	if currency == "" {
+		currency = current.Currency
+	}
+	if currency == "" {
+		currency = "764"
+	}
+	callbackURL := strings.TrimSpace(in.CallbackURL)
+	if callbackURL == "" {
+		callbackURL = current.CallbackURL
+	}
+	returnURL := strings.TrimSpace(in.ReturnURL)
+	if returnURL == "" {
+		returnURL = current.ReturnURL
+	}
+	stripeAPIBaseURL := strings.TrimSpace(in.StripeAPIBaseURL)
+	if stripeAPIBaseURL == "" {
+		stripeAPIBaseURL = current.StripeAPIBaseURL
+	}
+	stripeSuccessURL := strings.TrimSpace(in.StripeSuccessURL)
+	if stripeSuccessURL == "" {
+		stripeSuccessURL = current.StripeSuccessURL
+	}
+	stripeCancelURL := strings.TrimSpace(in.StripeCancelURL)
+	if stripeCancelURL == "" {
+		stripeCancelURL = current.StripeCancelURL
+	}
 
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	actor := auditctx.ActorID(ctx)
 	_, err = s.pg.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s.payment_gateway_configs (
   id, provider, mode, status, merchant_code, api_key, md5_key, base_url, route_no, currency,
-  callback_url, return_url, created_by, updated_by
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13)
+  callback_url, return_url,
+  stripe_publishable_key, stripe_secret_key, stripe_webhook_secret, stripe_api_base_url, stripe_success_url, stripe_cancel_url,
+  created_by, updated_by
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$19)
 ON CONFLICT (id) DO UPDATE SET
   provider = EXCLUDED.provider,
   mode = EXCLUDED.mode,
@@ -379,11 +512,20 @@ ON CONFLICT (id) DO UPDATE SET
   currency = EXCLUDED.currency,
   callback_url = EXCLUDED.callback_url,
   return_url = EXCLUDED.return_url,
-  updated_by = EXCLUDED.updated_by`,
+  stripe_publishable_key = EXCLUDED.stripe_publishable_key,
+  stripe_secret_key = EXCLUDED.stripe_secret_key,
+  stripe_webhook_secret = EXCLUDED.stripe_webhook_secret,
+  stripe_api_base_url = EXCLUDED.stripe_api_base_url,
+  stripe_success_url = EXCLUDED.stripe_success_url,
+  stripe_cancel_url = EXCLUDED.stripe_cancel_url,
+  updated_by = EXCLUDED.updated_by,
+  updated_at = now()`,
 		schema),
 		PaymentGatewayConfigID, provider, mode, status, strings.TrimSpace(in.MerchantCode),
-		apiKey, md5Key, strings.TrimSpace(in.BaseURL), in.RouteNo, strings.TrimSpace(in.Currency),
-		strings.TrimSpace(in.CallbackURL), strings.TrimSpace(in.ReturnURL), actor,
+		apiKey, md5Key, strings.TrimSpace(in.BaseURL), routeNo, currency,
+		callbackURL, returnURL,
+		strings.TrimSpace(in.StripePublishableKey), stripeSecret, stripeWebhookSecret,
+		stripeAPIBaseURL, stripeSuccessURL, stripeCancelURL, actor,
 	)
 	if err != nil {
 		return PaymentGatewayConfig{}, err
@@ -404,15 +546,26 @@ func (s *Store) InsertPaymentCallbackEvent(ctx context.Context, ev PaymentCallba
 	if ev.Provider == "" {
 		ev.Provider = "chillpay"
 	}
+	if ev.ProviderEventID == "" {
+		ev.ProviderEventID = ev.TransactionID
+	}
+	if ev.ProcessingStatus == "" {
+		ev.ProcessingStatus = "received"
+	}
+	if ev.ReceivedAt.IsZero() {
+		ev.ReceivedAt = time.Now().UTC()
+	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
 	actor := auditctx.ActorID(ctx)
 	tag, err := s.pg.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s.payment_callback_events (
-  id, provider, transaction_id, order_no, payment_status, amount, customer_id, payload_hash,
+  id, provider, transaction_id, order_no, provider_event_id, event_type, signature_verified,
+  processing_status, processed_at, error_code, payment_status, amount, customer_id, payload_hash,
   received_at, created_by, updated_by
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, now()),$10,$10)
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,COALESCE($15, now()),$16,$16)
 ON CONFLICT (provider, transaction_id) DO NOTHING`, schema),
-		ev.ID, ev.Provider, ev.TransactionID, ev.OrderNo, ev.PaymentStatus, ev.Amount, ev.CustomerID,
+		ev.ID, ev.Provider, ev.TransactionID, ev.OrderNo, ev.ProviderEventID, ev.EventType, ev.SignatureVerified,
+		ev.ProcessingStatus, ev.ProcessedAt, ev.ErrorCode, ev.PaymentStatus, ev.Amount, ev.CustomerID,
 		ev.PayloadHash, ev.ReceivedAt, actor,
 	)
 	if err != nil {
@@ -438,9 +591,36 @@ SELECT received_at FROM %s.payment_callback_events ORDER BY received_at DESC LIM
 	return &ts, nil
 }
 
-// SeedPaymentGatewayFromEnv upserts active ChillPay config when env credentials are set.
+func (s *Store) UpdatePaymentGatewayTestStatus(ctx context.Context, status, message string) error {
+	if s.pg == nil {
+		return errors.New("postgres unavailable")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	actor := auditctx.ActorID(ctx)
+	_, err := s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.payment_gateway_configs
+SET last_test_status = $1, last_tested_at = now(), last_test_error = $2, updated_by = $3, updated_at = now()
+WHERE id = $4`, schema), strings.TrimSpace(status), strings.TrimSpace(message), actor, PaymentGatewayConfigID)
+	return err
+}
+
+func (s *Store) UpdatePaymentGatewayWebhookStatus(ctx context.Context, status, message string) error {
+	if s.pg == nil {
+		return errors.New("postgres unavailable")
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	actor := auditctx.ActorID(ctx)
+	_, err := s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.payment_gateway_configs
+SET last_webhook_status = $1, last_webhook_at = now(), updated_by = $2, updated_at = now()
+WHERE id = $3`, schema), strings.TrimSpace(status), actor, PaymentGatewayConfigID)
+	_ = message
+	return err
+}
+
+// SeedPaymentGatewayFromEnv upserts active payment gateway config when env credentials are set.
 func (s *Store) SeedPaymentGatewayFromEnv(ctx context.Context) error {
-	if strings.TrimSpace(s.cfg.ChillPayMerchantCode) == "" {
+	if strings.TrimSpace(s.cfg.ChillPayMerchantCode) == "" && strings.TrimSpace(s.cfg.StripeSecretKey) == "" {
 		return nil
 	}
 	row, err := s.GetPaymentGatewayConfig(ctx)
@@ -449,6 +629,28 @@ func (s *Store) SeedPaymentGatewayFromEnv(ctx context.Context) error {
 	}
 	if row.Status == "active" && strings.TrimSpace(row.Provider) != "" {
 		return nil
+	}
+	if strings.TrimSpace(s.cfg.StripeSecretKey) != "" && strings.TrimSpace(s.cfg.ChillPayMerchantCode) == "" {
+		callbackURL := strings.TrimRight(strings.TrimSpace(s.cfg.PublicBaseURL), "/") + "/api/callbacks/stripe"
+		returnURL := strings.TrimRight(strings.TrimSpace(s.cfg.PublicBaseURL), "/") + "/tenant/billing/return"
+		cancelURL := strings.TrimRight(strings.TrimSpace(s.cfg.PublicBaseURL), "/") + "/tenant/billing"
+		_, err = s.UpsertPaymentGatewayConfig(ctx, PaymentGatewayUpsert{
+			Provider:               "stripe",
+			Mode:                   "test",
+			Status:                 "active",
+			Currency:               "THB",
+			CallbackURL:            callbackURL,
+			ReturnURL:              returnURL,
+			StripePublishableKey:   s.cfg.StripePublishableKey,
+			StripeSecretKey:        s.cfg.StripeSecretKey,
+			StripeWebhookSecret:    s.cfg.StripeWebhookSecret,
+			StripeAPIBaseURL:       s.cfg.StripeAPIBaseURL,
+			StripeSuccessURL:       firstStoreNonEmpty(s.cfg.StripeSuccessURL, returnURL),
+			StripeCancelURL:        firstStoreNonEmpty(s.cfg.StripeCancelURL, cancelURL),
+			SetStripeSecret:        true,
+			SetStripeWebhookSecret: true,
+		})
+		return err
 	}
 	callbackURL := strings.TrimSpace(s.cfg.ChillPayCallbackURL)
 	if callbackURL == "" {
@@ -551,11 +753,41 @@ WHERE id = $1`, schema), orderID, transactionID, paymentURL, actor)
 	return nil
 }
 
+func (s *Store) UpdatePaymentOrderProviderRefs(ctx context.Context, orderID, transactionID, paymentURL, sessionID, paymentID, providerStatus string, expiresAt *time.Time) error {
+	if s.pg == nil {
+		return errors.New("postgres unavailable")
+	}
+	actor := auditctx.ActorID(ctx)
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	tag, err := s.pg.Exec(ctx, fmt.Sprintf(`
+UPDATE %s.payment_orders
+SET transaction_id = CASE WHEN $2 <> '' THEN $2 ELSE transaction_id END,
+    payment_url = CASE WHEN $3 <> '' THEN $3 ELSE payment_url END,
+    provider_session_id = CASE WHEN $4 <> '' THEN $4 ELSE provider_session_id END,
+    provider_payment_id = CASE WHEN $5 <> '' THEN $5 ELSE provider_payment_id END,
+    provider_status = CASE WHEN $6 <> '' THEN $6 ELSE provider_status END,
+    checkout_expires_at = COALESCE($7, checkout_expires_at),
+    last_provider_sync_at = now(),
+    updated_by = $8,
+    updated_at = now()
+WHERE id = $1`, schema), orderID, strings.TrimSpace(transactionID), strings.TrimSpace(paymentURL),
+		strings.TrimSpace(sessionID), strings.TrimSpace(paymentID), strings.TrimSpace(providerStatus), expiresAt, actor)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrPaymentOrderNotFound
+	}
+	return nil
+}
+
 func scanPaymentOrder(row pgx.Row) (PaymentOrder, error) {
 	var o PaymentOrder
 	err := row.Scan(
 		&o.ID, &o.TenantID, &o.PackageID, &o.OrderNo, &o.AmountCents, &o.Currency, &o.Status,
-		&o.Provider, &o.PaymentMethod, &o.TransactionID, &o.PaymentURL, &o.PaidAt, &o.CreatedAt, &o.UpdatedAt,
+		&o.Provider, &o.PaymentMethod, &o.TransactionID, &o.PaymentURL,
+		&o.ProviderSessionID, &o.ProviderPaymentID, &o.ProviderStatus, &o.CheckoutExpiresAt, &o.LastProviderSyncAt,
+		&o.PaidAt, &o.CreatedAt, &o.UpdatedAt,
 	)
 	if o.PaymentMethod == "" {
 		o.PaymentMethod = "credit_card"
@@ -564,7 +796,9 @@ func scanPaymentOrder(row pgx.Row) (PaymentOrder, error) {
 }
 
 const paymentOrderSelectCols = `id, tenant_id, package_id, order_no, amount_cents, currency, status, provider,
-       COALESCE(payment_method, 'credit_card'), transaction_id, payment_url, paid_at, created_at, updated_at`
+       COALESCE(payment_method, 'credit_card'), transaction_id, payment_url,
+       COALESCE(provider_session_id, ''), COALESCE(provider_payment_id, ''), COALESCE(provider_status, ''),
+       checkout_expires_at, last_provider_sync_at, paid_at, created_at, updated_at`
 
 func (s *Store) GetPaymentOrderByID(ctx context.Context, id string) (*PaymentOrder, error) {
 	if s.pg == nil {
@@ -598,6 +832,63 @@ FROM %s.payment_orders WHERE order_no = $1`, paymentOrderSelectCols, schema), or
 		return nil, err
 	}
 	return &o, nil
+}
+
+func (s *Store) GetPaymentOrderByProviderSession(ctx context.Context, provider, sessionID string) (*PaymentOrder, error) {
+	if s.pg == nil {
+		return nil, errors.New("postgres unavailable")
+	}
+	provider = strings.TrimSpace(provider)
+	sessionID = strings.TrimSpace(sessionID)
+	if provider == "" || sessionID == "" {
+		return nil, ErrPaymentOrderNotFound
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	o, err := scanPaymentOrder(s.pg.QueryRow(ctx, fmt.Sprintf(`
+SELECT %s
+FROM %s.payment_orders WHERE provider = $1 AND provider_session_id = $2`, paymentOrderSelectCols, schema), provider, sessionID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrPaymentOrderNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &o, nil
+}
+
+func (s *Store) ListPaymentOrdersForProviderReconcile(ctx context.Context, provider string, since *time.Time, limit int) ([]PaymentOrder, error) {
+	if s.pg == nil {
+		return nil, errors.New("postgres unavailable")
+	}
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		return nil, nil
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	schema := quoteIdent(s.cfg.PostgresSchema)
+	rows, err := s.pg.Query(ctx, fmt.Sprintf(`
+SELECT %s
+FROM %s.payment_orders
+WHERE provider = $1
+  AND ($2::timestamptz IS NULL OR created_at >= $2)
+  AND provider_session_id <> ''
+ORDER BY created_at DESC
+LIMIT $3`, paymentOrderSelectCols, schema), provider, since, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PaymentOrder
+	for rows.Next() {
+		o, err := scanPaymentOrder(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) FulfillPaymentOrder(ctx context.Context, orderNo, transactionID, paymentStatus string) (PaymentFulfillResult, error) {
@@ -660,7 +951,13 @@ func (s *Store) markOrderPaidAndAssignEntitlement(ctx context.Context, order *Pa
 
 	tag, err := tx.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.payment_orders
-SET status = 'paid', paid_at = now(), transaction_id = CASE WHEN $3 <> '' THEN $3 ELSE transaction_id END, updated_by = $2
+SET status = 'paid', paid_at = now(),
+    transaction_id = CASE WHEN $3 <> '' THEN $3 ELSE transaction_id END,
+    provider_payment_id = CASE WHEN $3 <> '' THEN $3 ELSE provider_payment_id END,
+    provider_status = 'paid',
+    last_provider_sync_at = now(),
+    updated_by = $2,
+    updated_at = now()
 WHERE id = $1 AND status = 'pending'`, schema), order.ID, actor, txnID)
 	if err != nil {
 		return false, err
@@ -765,9 +1062,24 @@ func (s *Store) updatePaymentOrderFailed(ctx context.Context, orderID, transacti
 	txnID := strings.TrimSpace(transactionID)
 	_, err := s.pg.Exec(ctx, fmt.Sprintf(`
 UPDATE %s.payment_orders
-SET status = 'failed', transaction_id = CASE WHEN $3 <> '' THEN $3 ELSE transaction_id END, updated_by = $2
+SET status = 'failed',
+    transaction_id = CASE WHEN $3 <> '' THEN $3 ELSE transaction_id END,
+    provider_payment_id = CASE WHEN $3 <> '' THEN $3 ELSE provider_payment_id END,
+    provider_status = 'failed',
+    last_provider_sync_at = now(),
+    updated_by = $2,
+    updated_at = now()
 WHERE id = $1 AND status = 'pending'`, schema), orderID, actor, txnID)
 	return err
+}
+
+func firstStoreNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 // splitVATInclusive treats amount as VAT-inclusive and returns net + vat at rateBps (700 = 7%).

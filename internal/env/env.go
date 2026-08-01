@@ -98,6 +98,13 @@ type Config struct {
 	ChillPayCurrency         string
 	ChillPayCallbackURL      string
 	ChillPayReturnURL        string
+	PaymentGatewayProvider   string
+	StripePublishableKey     string
+	StripeSecretKey          string
+	StripeWebhookSecret      string
+	StripeAPIBaseURL         string
+	StripeSuccessURL         string
+	StripeCancelURL          string
 	PaymentCallbackDevBypass bool
 	PaymentMockAutoFulfill   bool
 	BillingSchedulerEnabled  bool
@@ -235,6 +242,13 @@ func Load() Config {
 		ChillPayCurrency:         envOr("CHILLPAY_CURRENCY", "764"),
 		ChillPayCallbackURL:      os.Getenv("CHILLPAY_CALLBACK_URL"),
 		ChillPayReturnURL:        os.Getenv("CHILLPAY_RETURN_URL"),
+		PaymentGatewayProvider:   os.Getenv("PAYMENT_GATEWAY_PROVIDER"),
+		StripePublishableKey:     os.Getenv("STRIPE_PUBLISHABLE_KEY"),
+		StripeSecretKey:          os.Getenv("STRIPE_SECRET_KEY"),
+		StripeWebhookSecret:      os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripeAPIBaseURL:         envOr("STRIPE_API_BASE_URL", "https://api.stripe.com"),
+		StripeSuccessURL:         os.Getenv("STRIPE_SUCCESS_URL"),
+		StripeCancelURL:          os.Getenv("STRIPE_CANCEL_URL"),
 		PaymentCallbackDevBypass: envBool("PAYMENT_CALLBACK_DEV_BYPASS", false),
 		PaymentMockAutoFulfill:   envBool("PAYMENT_MOCK_AUTO_FULFILL", false),
 		BillingSchedulerEnabled:  envBool("BILLING_SCHEDULER_ENABLED", false),

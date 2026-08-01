@@ -2,8 +2,8 @@
 id: DES-0004
 title: API Specification
 status: shipped
-updated: 2026-07-25
-sprint: SPRINT-030
+updated: 2026-08-01
+sprint: SPRINT-064
 ---
 
 # API Specification — Monti Jarvis
@@ -4883,3 +4883,189 @@ a defensive fallback when `total` is absent. Auth, query filters, detail,
 mutation, and error contracts remain unchanged.
 
 See workflow section 140, ER Sprint 63, and UX A63.
+
+## Sprint 64 - Payment Gateway Portability and Stripe
+
+Extends the existing Payment Gateway and Tenant Checkout contracts.
+
+### Provider values
+
+| Provider | Meaning |
+| --- | --- |
+| `mock` | local/dev provider; unchanged |
+| `chillpay` | existing ChillPay hosted payment path |
+| `stripe` | new Stripe Checkout Session path |
+
+### `GET /api/platform/payment-gateway`
+
+**Auth:** `platform_admin`
+
+Response extends the existing config shape:
+
+```json
+{
+  "configured": true,
+  "provider": "stripe",
+  "mode": "test",
+  "status": "active",
+  "callback_url": "http://localhost:8091/api/callbacks/stripe",
+  "return_url": "http://localhost:8091/tenant/billing/return",
+  "stripe": {
+    "publishable_key_masked": "pk_test_****abcd",
+    "secret_key_set": true,
+    "webhook_secret_set": true,
+    "success_url": "http://localhost:8091/tenant/billing/return",
+    "cancel_url": "http://localhost:8091/tenant/billing",
+    "last_webhook_at": null
+  },
+  "chillpay": {
+    "merchant_code": "M123",
+    "api_key_masked": "****7890",
+    "md5_key_set": true,
+    "base_url": "https://sandbox-appsrv2.chillpay.co/api/v2/Payment",
+    "route_no": 1,
+    "currency": "764"
+  },
+  "connection_status": "ok",
+  "last_tested_at": "2026-08-01T09:00:00Z",
+  "last_test_error": ""
+}
+```
+
+No plaintext secret, webhook secret, full card data, or raw provider payload is
+returned.
+
+### `PUT /api/platform/payment-gateway`
+
+**Auth:** `platform_admin`
+
+Request:
+
+```json
+{
+  "provider": "stripe",
+  "mode": "test",
+  "stripe": {
+    "publishable_key": "pk_test_...",
+    "secret_key": "sk_test_...",
+    "webhook_secret": "whsec_...",
+    "success_url": "http://localhost:8091/tenant/billing/return",
+    "cancel_url": "http://localhost:8091/tenant/billing"
+  }
+}
+```
+
+ChillPay requests keep the existing flat fields for backward compatibility.
+Empty secret fields mean "leave existing secret unchanged"; explicit delete must
+be implemented as a deliberate clear action or provider reset.
+
+Errors:
+
+| HTTP | code | Meaning |
+| --- | --- | --- |
+| 400 | `INVALID_PROVIDER` | provider is not `mock`, `chillpay`, or `stripe` |
+| 400 | `MISSING_PROVIDER_SECRET` | selected real provider has no required secret |
+| 403 | `FORBIDDEN` | not platform admin |
+| 502 | `PAYMENT_CONFIG_SAVE_FAILED` | storage/encryption error |
+
+### `POST /api/platform/payment-gateway/test`
+
+**Auth:** `platform_admin`
+
+Body optional: `{ "provider": "stripe" }`; omitted tests the active provider.
+
+Response:
+
+```json
+{ "ok": true, "provider": "stripe", "mode": "test", "message": "credentials valid" }
+```
+
+Stripe test must use a bounded credentials/account probe and must not create a
+payment.
+
+### `POST /api/platform/payment-gateway/reconcile`
+
+**Auth:** `platform_admin`
+
+Request:
+
+```json
+{
+  "provider": "stripe",
+  "since": "2026-08-01T00:00:00Z",
+  "limit": 50,
+  "dry_run": true
+}
+```
+
+Response:
+
+```json
+{
+  "provider": "stripe",
+  "checked": 12,
+  "mismatches": [
+    {
+      "order_id": "ord_123",
+      "order_no": "MJ...",
+      "local_status": "pending",
+      "provider_status": "paid",
+      "recommended_action": "review_or_replay_webhook"
+    }
+  ]
+}
+```
+
+### `POST /api/tenant/checkout`
+
+Existing route; when the active provider is Stripe, response remains compatible
+and adds Stripe-safe references:
+
+```json
+{
+  "order_id": "ord_123",
+  "order_no": "MJ...",
+  "package_id": "pkg-shared-pro",
+  "amount_cents": 107000,
+  "currency": "THB",
+  "status": "pending",
+  "provider": "stripe",
+  "payment_method": "credit_card",
+  "payment_url": "https://checkout.stripe.com/c/pay/cs_test_...",
+  "return_url": "http://localhost:8091/tenant/billing/return?order_id=ord_123",
+  "provider_session_id": "cs_test_123",
+  "subscription_id": "sub_123",
+  "billing_interval": "monthly"
+}
+```
+
+Server amount, currency, package, and tax snapshot remain authoritative.
+Dedicated packages continue to return `409 PACKAGE_REQUIRES_QUOTE`.
+
+### `POST /api/callbacks/stripe`
+
+**Auth:** public endpoint protected by Stripe signature.
+
+Headers:
+
+| Header | Required | Notes |
+| --- | --- | --- |
+| `Stripe-Signature` | yes | Verify against configured webhook secret |
+
+Events handled:
+
+| Event | Local action |
+| --- | --- |
+| `checkout.session.completed` | verify order metadata + amount; fulfill paid order once |
+| `checkout.session.expired` | mark order failed/cancelled when still pending |
+| `payment_intent.payment_failed` | mark provider failure when mapped to order |
+
+Responses:
+
+| HTTP | Meaning |
+| --- | --- |
+| 200 | valid event recorded or duplicate acknowledged |
+| 400 | invalid signature or malformed payload |
+| 503 | active Stripe config/webhook secret missing |
+
+See DES-0059, workflow §141-143, ER Sprint 64, and UX A64/T64.

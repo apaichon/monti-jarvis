@@ -2,8 +2,8 @@
 id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: shipped
-updated: 2026-07-17
-sprint: SPRINT-030
+updated: 2026-08-01
+sprint: SPRINT-064
 ---
 
 # UX/UI — ASCII Wireframes
@@ -4851,3 +4851,87 @@ GET leads -> {items:[], total:0} -> normalize -> empty message
 | Contract tests | `apps/platform-admin-web/tests/lead-list-contract.test.js` |
 
 See workflow section 140, ER Sprint 63, and API Sprint 63.
+
+## A64 - Platform Payment Gateway Switch (Sprint 64)
+
+### Screen map -> API
+
+| UI zone | User action | API / route |
+| --- | --- | --- |
+| A64-A Provider selector | Choose Mock / ChillPay / Stripe | `PUT /api/platform/payment-gateway` |
+| A64-B Provider fields | Enter provider config/secrets | `PUT /api/platform/payment-gateway` |
+| A64-C Test connection | Validate active/provider config | `POST /api/platform/payment-gateway/test` |
+| A64-D Webhook status | Inspect latest signed callback | `GET /api/platform/payment-gateway` |
+| A64-E Reconcile | Compare local/provider state | `POST /api/platform/payment-gateway/reconcile` |
+
+### Desktop layout
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Payment Gateway                                                Status: OK    │
+│ Provider  [ Mock | ChillPay | Stripe* ]   Mode [ test v ]      [Save]       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Stripe configuration                                                        │
+│ Publishable key     [ pk_test_****abcd                         ]            │
+│ Secret key          [ ******** unchanged if blank               ]            │
+│ Webhook secret      [ ******** unchanged if blank               ]            │
+│ Success URL         [ https://app/tenant/billing/return         ]            │
+│ Cancel URL          [ https://app/tenant/billing                ]            │
+│ Callback URL        https://app/api/callbacks/stripe             read-only   │
+│ [Test connection]   Test: OK · last 2026-08-01 09:00                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ ChillPay compatibility                                                       │
+│ Merchant M123 · API ****7890 · MD5 set · callback /api/callbacks/chillpay    │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Reconciliation                                                               │
+│ Since [ today ]  Provider [active]  [Dry run] [Run reconcile]                │
+│ Mismatches: 0                                                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Flow A - switch to Stripe
+
+```text
+Open settings -> select Stripe -> enter keys/URLs -> Save
+             -> Test connection -> OK -> new checkout uses Stripe
+```
+
+### Flow B - reconcile mismatch
+
+```text
+Run reconcile -> provider says paid but local pending
+             -> show mismatch row -> operator reviews/replays webhook
+```
+
+## T64 - Tenant Checkout Provider-Aware Return
+
+### Screen map -> API
+
+| UI zone | User action | API / route |
+| --- | --- | --- |
+| T64-A Buy package | Start checkout | `POST /api/tenant/checkout` |
+| T64-B Hosted checkout | Pay on provider page | Stripe/ChillPay hosted URL |
+| T64-C Return status | Poll order | `GET /api/tenant/orders/{id}` |
+| T64-D Documents | Open receipt/tax invoice | existing document endpoints |
+
+### Flow C - Stripe checkout
+
+```text
+Tenant Billing -> Buy -> POST checkout
+              -> provider=stripe + payment_url
+              -> Stripe Checkout
+              -> /tenant/billing/return?order_id=...
+              -> poll order -> paid -> show entitlement + documents
+```
+
+### Component -> file
+
+| Component | File |
+| --- | --- |
+| Admin payment API | `apps/platform-admin-web/src/lib/api/payment.ts` |
+| Admin payment page | `apps/platform-admin-web/src/routes/settings/payment/+page.svelte` |
+| Tenant billing API | `apps/tenant-web/src/lib/api/billing.ts` |
+| Tenant billing page | `apps/tenant-web/src/routes/billing/+page.svelte` |
+| Return page | `apps/tenant-web/src/routes/billing/return/+page.svelte` |
+
+See DES-0059, workflow §141-143, ER Sprint 64, and API Sprint 64.

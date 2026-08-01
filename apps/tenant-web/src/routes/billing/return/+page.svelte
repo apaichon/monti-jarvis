@@ -19,8 +19,8 @@
 
   function orderId(): string {
     const params = get(page).url.searchParams;
-    // After ChillPay: server bridge redirects with order_id + order_no (+ status/txn_id).
-    // API accepts either internal id or ChillPay order_no.
+    // Gateway returns redirect with order_id + order_no (+ status/txn_id).
+    // API accepts either internal id or provider order_no.
     const fromQuery =
       params.get('order_id') ||
       params.get('OrderNo') ||
@@ -146,7 +146,7 @@
 
       {#if order.status === 'pending'}
         <p style="font-size:12px;color:var(--muted);margin:0 0 16px">
-          Waiting for ChillPay confirmation. This page updates automatically.
+          Waiting for payment confirmation. This page updates automatically.
         </p>
       {/if}
 

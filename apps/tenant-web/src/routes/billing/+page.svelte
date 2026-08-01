@@ -413,7 +413,7 @@
             <span class="method-icon" aria-hidden="true">{method.id === 'qr_promptpay' ? 'QR' : '💳'}</span>
             <span>
               <strong>{method.label}</strong>
-              <small>{method.id === 'qr_promptpay' ? 'Scan with mobile banking' : 'Visa / Mastercard via ChillPay'}</small>
+              <small>{method.id === 'qr_promptpay' ? 'Scan with mobile banking' : 'Secure hosted checkout'}</small>
             </span>
           </label>
         {/each}

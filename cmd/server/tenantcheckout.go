@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/libra/monti-jarvis/internal/auth"
 	"github.com/libra/monti-jarvis/internal/payment"
 	"github.com/libra/monti-jarvis/internal/payment/chillpay"
+	stripepay "github.com/libra/monti-jarvis/internal/payment/stripe"
 	"github.com/libra/monti-jarvis/internal/store"
 )
 
@@ -50,13 +52,22 @@ func (s *server) listTenantPackages(w http.ResponseWriter, r *http.Request) {
 	for _, p := range pkgs {
 		out = append(out, tenantPackageJSON(p))
 	}
+	methods := []map[string]string{
+		{"id": payment.MethodCreditCard, "label": "Credit Card", "channel_code": payment.ChannelCreditCard},
+		{"id": payment.MethodQRPromptPay, "label": "QR PromptPay", "channel_code": payment.ChannelQRPromptPay},
+	}
+	if gwRow, gwErr := s.store.GetPaymentGatewayConfig(r.Context()); gwErr == nil {
+		resolved := payment.NewGateway(s.cfg, s.store).Resolve(gwRow)
+		if strings.EqualFold(resolved.Provider, payment.ProviderStripe) {
+			methods = []map[string]string{
+				{"id": payment.MethodCreditCard, "label": "Credit Card", "channel_code": "stripe_checkout"},
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"packages":            out,
 		"current_entitlement": current,
-		"payment_methods": []map[string]string{
-			{"id": payment.MethodCreditCard, "label": "Credit Card", "channel_code": payment.ChannelCreditCard},
-			{"id": payment.MethodQRPromptPay, "label": "QR PromptPay", "channel_code": payment.ChannelQRPromptPay},
-		},
+		"payment_methods":     methods,
 	})
 }
 
@@ -152,6 +163,7 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 
 	var paymentURL string
 	var transactionID string
+	var providerSessionID string
 
 	switch provider {
 	case payment.ProviderMock:
@@ -169,7 +181,49 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 			order = &result.Order
 			paymentURL = spaReturnURL
 		}
-	default:
+	case payment.ProviderStripe:
+		stripeSuccessURL := tenantSPAReturnURL(resolved.StripeSuccessURL, s.cfg.PublicBaseURL, order.ID, order.OrderNo, "success", "")
+		stripeCancelURL := tenantBillingCancelURL(resolved.StripeCancelURL, s.cfg.PublicBaseURL, order.ID, order.OrderNo)
+		client := stripepay.NewClient(stripepay.Config{
+			PublishableKey: resolved.StripePublishableKey,
+			SecretKey:      resolved.StripeSecretKey,
+			WebhookSecret:  resolved.StripeWebhookSecret,
+			APIBaseURL:     resolved.StripeAPIBaseURL,
+			SuccessURL:     stripeSuccessURL,
+			CancelURL:      stripeCancelURL,
+		})
+		session, err := client.CreateCheckoutSession(r.Context(), stripepay.CheckoutSessionInput{
+			OrderID:     order.ID,
+			OrderNo:     order.OrderNo,
+			TenantID:    tenantID,
+			PackageID:   packageID,
+			PackageName: pkg.Name,
+			AmountCents: order.AmountCents,
+			Currency:    order.Currency,
+			SuccessURL:  stripeSuccessURL,
+			CancelURL:   stripeCancelURL,
+		})
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		paymentURL = session.URL
+		providerSessionID = session.ID
+		transactionID = firstNonEmpty(session.PaymentIntent, session.ID)
+		if err := s.store.UpdatePaymentOrderProviderRefs(
+			r.Context(),
+			order.ID,
+			transactionID,
+			paymentURL,
+			session.ID,
+			session.PaymentIntent,
+			stripeCheckoutStatus(session),
+			session.ExpiresAtTime(),
+		); err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+	case payment.ProviderChillPay:
 		client := chillpay.NewClient(chillpay.Config{
 			MerchantCode: resolved.MerchantCode,
 			APIKey:       resolved.APIKey,
@@ -207,6 +261,9 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
+	default:
+		writeError(w, http.StatusServiceUnavailable, "unsupported payment gateway provider")
+		return
 	}
 
 	if provider == payment.ProviderMock && !s.cfg.PaymentMockAutoFulfill {
@@ -226,8 +283,9 @@ func (s *server) tenantCheckout(w http.ResponseWriter, r *http.Request) {
 		"payment_url":         paymentURL,
 		"provider":            provider,
 		"payment_method":      method,
+		"provider_session_id": providerSessionID,
 		"return_url":          spaReturnURL,
-		"chillpay_return_url": chillPayReturnURL,
+		"chillpay_return_url": providerString(provider, payment.ProviderChillPay, chillPayReturnURL),
 		"subscription_id":     subscription.ID,
 		"billing_interval":    subscription.BillingInterval,
 	})
@@ -282,6 +340,50 @@ func tenantSPAReturnURL(configuredReturn, publicBase, orderID, orderNo, status, 
 		return base + "?" + encoded
 	}
 	return base
+}
+
+func tenantBillingCancelURL(configured, publicBase, orderID, orderNo string) string {
+	configured = strings.TrimSpace(configured)
+	base := ""
+	if u, err := url.Parse(configured); err == nil && u.Scheme != "" && u.Host != "" {
+		base = configured
+	} else {
+		base = strings.TrimRight(fallbackPublicBase(publicBase), "/") + "/tenant/billing"
+	}
+	q := url.Values{}
+	if strings.TrimSpace(orderID) != "" {
+		q.Set("order_id", strings.TrimSpace(orderID))
+	}
+	if strings.TrimSpace(orderNo) != "" {
+		q.Set("order_no", strings.TrimSpace(orderNo))
+	}
+	q.Set("status", "cancelled")
+	if encoded := q.Encode(); encoded != "" {
+		sep := "?"
+		if strings.Contains(base, "?") {
+			sep = "&"
+		}
+		return base + sep + encoded
+	}
+	return base
+}
+
+func stripeCheckoutStatus(session stripepay.CheckoutSession) string {
+	status := strings.TrimSpace(session.Status)
+	if paymentStatus := strings.TrimSpace(session.PaymentStatus); paymentStatus != "" {
+		if status != "" {
+			return status + ":" + paymentStatus
+		}
+		return paymentStatus
+	}
+	return status
+}
+
+func providerString(provider, expected, value string) string {
+	if strings.EqualFold(provider, expected) {
+		return value
+	}
+	return ""
 }
 
 // checkoutReturnURL keeps SPA return helper for mock / tests.
@@ -460,6 +562,13 @@ func (s *server) getTenantOrder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
+	if synced, syncErr := s.syncStripeOrderFromProvider(r.Context(), order); syncErr != nil {
+		log.Printf("stripe return sync error order=%s: %v", order.ID, syncErr)
+	} else if synced {
+		if refreshed, refreshErr := s.store.GetPaymentOrderByID(r.Context(), order.ID); refreshErr == nil {
+			order = refreshed
+		}
+	}
 
 	// Ensure documents exist for paid orders (re-issue if callback path skipped).
 	docs := []store.PaymentDocument{}
@@ -469,6 +578,63 @@ func (s *server) getTenantOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, paymentOrderJSON(*order, docs))
+}
+
+func (s *server) syncStripeOrderFromProvider(ctx context.Context, order *store.PaymentOrder) (bool, error) {
+	if order == nil ||
+		order.Status != store.PaymentOrderStatusPending ||
+		!strings.EqualFold(order.Provider, payment.ProviderStripe) ||
+		strings.TrimSpace(order.ProviderSessionID) == "" {
+		return false, nil
+	}
+	row, err := s.store.GetPaymentGatewayConfig(ctx)
+	if err != nil {
+		return false, err
+	}
+	resolved := payment.NewGateway(s.cfg, s.store).Resolve(row)
+	if !strings.EqualFold(resolved.Provider, payment.ProviderStripe) {
+		return false, nil
+	}
+	client := stripepay.NewClient(stripepay.Config{
+		PublishableKey: resolved.StripePublishableKey,
+		SecretKey:      resolved.StripeSecretKey,
+		WebhookSecret:  resolved.StripeWebhookSecret,
+		APIBaseURL:     resolved.StripeAPIBaseURL,
+		SuccessURL:     resolved.StripeSuccessURL,
+		CancelURL:      resolved.StripeCancelURL,
+	})
+	session, err := client.RetrieveCheckoutSession(ctx, order.ProviderSessionID)
+	if err != nil {
+		return false, err
+	}
+	if err := s.store.UpdatePaymentOrderProviderRefs(
+		ctx,
+		order.ID,
+		firstNonEmpty(session.PaymentIntent, session.ID),
+		"",
+		session.ID,
+		session.PaymentIntent,
+		stripeCheckoutStatus(session),
+		session.ExpiresAtTime(),
+	); err != nil {
+		return false, err
+	}
+	switch {
+	case session.Paid():
+		result, err := s.store.FulfillPaymentOrder(ctx, order.OrderNo, firstNonEmpty(session.PaymentIntent, session.ID), "0")
+		if err != nil {
+			return false, err
+		}
+		if result.EntitlementChanged {
+			s.entitlements.Invalidate(ctx, result.Order.TenantID)
+		}
+		return true, nil
+	case session.FailedOrExpired():
+		_, err := s.store.FulfillPaymentOrder(ctx, order.OrderNo, firstNonEmpty(session.PaymentIntent, session.ID), "2")
+		return err == nil, err
+	default:
+		return true, nil
+	}
 }
 
 func (s *server) getTenantOrderDocument(w http.ResponseWriter, r *http.Request) {
@@ -612,17 +778,30 @@ func tenantPackageJSON(p store.Package) map[string]any {
 
 func paymentOrderJSON(o store.PaymentOrder, docs []store.PaymentDocument) map[string]any {
 	out := map[string]any{
-		"id":             o.ID,
-		"order_no":       o.OrderNo,
-		"package_id":     o.PackageID,
-		"status":         o.Status,
-		"amount_cents":   o.AmountCents,
-		"currency":       o.Currency,
-		"payment_method": o.PaymentMethod,
-		"provider":       o.Provider,
-		"transaction_id": o.TransactionID,
-		"created_at":     o.CreatedAt,
-		"documents":      paymentDocumentsJSON(docs),
+		"id":                  o.ID,
+		"order_no":            o.OrderNo,
+		"package_id":          o.PackageID,
+		"status":              o.Status,
+		"amount_cents":        o.AmountCents,
+		"currency":            o.Currency,
+		"payment_method":      o.PaymentMethod,
+		"provider":            o.Provider,
+		"transaction_id":      o.TransactionID,
+		"provider_session_id": o.ProviderSessionID,
+		"provider_payment_id": o.ProviderPaymentID,
+		"provider_status":     o.ProviderStatus,
+		"created_at":          o.CreatedAt,
+		"documents":           paymentDocumentsJSON(docs),
+	}
+	if o.CheckoutExpiresAt != nil {
+		out["checkout_expires_at"] = o.CheckoutExpiresAt.UTC()
+	} else {
+		out["checkout_expires_at"] = nil
+	}
+	if o.LastProviderSyncAt != nil {
+		out["last_provider_sync_at"] = o.LastProviderSyncAt.UTC()
+	} else {
+		out["last_provider_sync_at"] = nil
 	}
 	if o.PaidAt != nil {
 		out["paid_at"] = o.PaidAt.UTC()

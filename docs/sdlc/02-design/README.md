@@ -59,6 +59,7 @@ System design artifacts for Monti Jarvis.
 | 56 | [56-tenant-owned-gemini-key-enforcement-spec.md](56-tenant-owned-gemini-key-enforcement-spec.md) | 60 | Tenant-owned Gemini key; no prod env fallback | **`approved`** |
 | 57 | [57-tenant-gemini-status-top-bar-spec.md](57-tenant-gemini-status-top-bar-spec.md) | 61 | Gemini status top bar; remove tenant performance nav | **`approved`** |
 | 58 | [58-referral-code-redemption-spec.md](58-referral-code-redemption-spec.md) | 62 | Referral code redemption → bonus quota | **`approved`** |
+| 59 | [59-payment-gateway-portability-stripe-spec.md](59-payment-gateway-portability-stripe-spec.md) | 64 | Payment gateway portability: active provider switch from ChillPay to Stripe with signed webhooks and reconciliation | **`shipped`** v2.36.0 |
 | 49 | [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md) | 54 | Customer portal tenant/brand picker; no required `?tenant_id=` | **`shipped`** v2.27.0 |
 | 51 | [51-tenant-call-center-topic-statistics-spec.md](51-tenant-call-center-topic-statistics-spec.md) | 55 | Tenant call-center statistics grouped and filtered by topic | **`shipped`** v2.28.0 |
 
@@ -117,6 +118,8 @@ workflow §120–124; ER/API Sprint 51; UX T51/A51.
 **Sprint 54:** Design pack **approved** — [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md); workflow §125–126; ER/API/UX Sprint 54; UX C54. [SPRINT-054](../03-sprints/SPRINT-054.md) · [FEAT-0045](../01-features/FEAT-0045-customer-portal-tenant-list.md).
 
 **Sprint 55:** ✅ Shipped v2.28.0 — [51-tenant-call-center-topic-statistics-spec.md](51-tenant-call-center-topic-statistics-spec.md); workflow §127–128; ER/API/UX Sprint 55; UX T55. [SPRINT-055](../03-sprints/SPRINT-055.md) · [FEAT-0047](../01-features/FEAT-0047-tenant-call-center-topic-statistics.md).
+
+**Sprint 64:** ✅ Shipped v2.36.0 — [59-payment-gateway-portability-stripe-spec.md](59-payment-gateway-portability-stripe-spec.md); workflow §141–143; ER/API Sprint 64; UX A64/T64. [SPRINT-064](../03-sprints/SPRINT-064.md) · [FEAT-0056](../01-features/FEAT-0056-payment-gateway-portability-stripe.md).
 
 **Sprint 41:** Design pack drafted and review-pending — [44-ai-call-center-security-hardening-spec.md](44-ai-call-center-security-hardening-spec.md); workflow §109–112; API § Sprint 41; UX S41. [SPRINT-041](../03-sprints/SPRINT-041.md) · [FEAT-0041](../01-features/FEAT-0041-ai-call-center-security-hardening.md).
 

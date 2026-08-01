@@ -1,4 +1,4 @@
-# Monti AI Call Center — Roadmap (36 core + S37–S69 commercial/tenant/customer UX tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
+# Monti AI Call Center — Roadmap (36 core + S37–S70 commercial/tenant/customer UX tracks + S44 generative AI hold + S45 residual + S47 Langfuse backlog)
 
 **Blueprint:** `docs/monti_multi_tenant_ai_call_center_blueprint.md` (v2.0)  
 **Tech stack:** Svelte + shadcn-svelte · Go + Fiber · Postgres · NATS.io · LiveKit · Redis 8 · MinIO · ClickHouse (analytics + vector RAG)
@@ -87,12 +87,13 @@
 | **61** | **Tenant / Platform Admin / AI Operations** | **Tenant UX simplification: remove tenant system performance page from tenant portal; move Gemini status to tenant top bar** | **Q** | **26, 29, 43, 60** · ✅ **v2.35.0** · [FEAT-0053](../01-features/FEAT-0053-tenant-gemini-status-top-bar.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [DES-0057](../02-design/57-tenant-gemini-status-top-bar-spec.md) |
 | **62** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · ✅ **v2.35.0** · [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) · [SPRINT-062](../03-sprints/SPRINT-062.md) · [DES-0058](../02-design/58-referral-code-redemption-spec.md) |
 | **63** | **Platform Admin / Product Web / Sales** | **Bug fix: product-web Book Demo lead is returned by the admin API but missing from the Leads inbox; render API lead rows and correct shown/total counts** | **BUG/P1** | **48, 51** · ✅ **v2.35.1** · [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) · [SPRINT-063](../03-sprints/SPRINT-063.md) |
-| **64** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
-| **65** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
-| **66** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog |
+| **64** | **Platform Admin / Tenant / Finance** | **Payment gateway portability: switch checkout provider from ChillPay to Stripe with safe provider config, webhooks, receipts, tax invoices, and reconciliation** | **P+** | **8, 9, 10, 12, 13, 45, 48, 50, 51** · ✅ **v2.36.0** · [FEAT-0056](../01-features/FEAT-0056-payment-gateway-portability-stripe.md) · [SPRINT-064](../03-sprints/SPRINT-064.md) · [DES-0059](../02-design/59-payment-gateway-portability-stripe-spec.md) |
+| **65** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
+| **66** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
 | **67** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · backlog |
 | **68** | **Customer / Tenant / Tickets** | **AI summary before call close: generate call recap, confirm unresolved items, and submit summary to ticket** | **F+** | **1, 21, 22, 23, 24, 43, 53, 55, 56** · backlog |
-| **69** | **Tenant / Customer / Notifications** | **Call schedule email notifications: topic-based handover or sales links redirect customers into an auto-start prepared voice conversation** | **E+** | **1, 16, 20, 21, 23, 43, 53, 56, 66, 68** · backlog |
+| **69** | **Tenant / Customer / Notifications** | **Call schedule email notifications: topic-based handover or sales links redirect customers into an auto-start prepared voice conversation** | **E+** | **1, 16, 20, 21, 23, 43, 53, 56, 68** · backlog |
+| **70** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog · deferred after failed Sprint 64 attempt |
 
 ---
 
@@ -2405,7 +2406,101 @@ sales operators from opening or managing the submitted lead.
 
 ---
 
-## Backlog: SPRINT-064 — Queued Concurrent-Call Admission
+## Shipped: SPRINT-064 - Payment Gateway Portability: ChillPay to Stripe ✅ v2.36.0
+
+**Platform:** Platform Admin / Tenant / Finance · **Feature:** Let Monti switch
+checkout processing from ChillPay to Stripe through a provider abstraction,
+safe configuration, signed webhooks, receipt/tax-invoice mapping, and
+reconciliation without breaking existing ChillPay orders · **Depends:** 8, 9,
+10, 12, 13, 45, 48, 50, 51 · **Status:** shipped · **Closed:** 2026-08-01
+
+**Release:** v2.36.0 · **Sprint:** [SPRINT-064](../03-sprints/SPRINT-064.md) ·
+**Feature:** [FEAT-0056](../01-features/FEAT-0056-payment-gateway-portability-stripe.md) ·
+**Design:** [DES-0059](../02-design/59-payment-gateway-portability-stripe-spec.md)
+
+### Problem today
+
+Monti's package purchase and billing flows are tied to the existing ChillPay
+checkout path. That limits rollout flexibility, makes Stripe adoption risky,
+and creates duplicate-payment risk if provider callbacks, entitlements,
+receipts, and tax invoices are not reconciled through a single provider-neutral
+contract.
+
+### Goal
+
+1. **Abstract payment providers** — Keep ChillPay working while adding a
+   provider interface that can support Stripe checkout sessions and webhooks.
+2. **Switch safely** — Platform admin can choose the active payment gateway for
+   supported checkout flows with clear provider status and missing-secret
+   warnings.
+3. **Reconcile correctly** — Payments, entitlements, receipts, tax invoices,
+   retries, and provider references remain idempotent across ChillPay and
+   Stripe.
+
+### Scope
+
+### In
+
+- Payment provider interface for creating checkout sessions/orders, return and
+  cancel handling, webhook verification, payment status lookup, and
+  reconciliation.
+- Stripe checkout integration for package purchase flows used by Product Web
+  and tenant package conversion, including success/cancel redirects and signed
+  webhook handling.
+- Existing ChillPay path retained behind the same provider contract until the
+  platform chooses to disable it.
+- Platform admin payment settings to configure active provider, environment,
+  public status, key presence, webhook health, and safe test connection.
+- Provider-specific secret handling using encrypted configuration and no secret
+  exposure in browser bundles, logs, audit rows, or API responses.
+- Idempotent fulfillment so duplicate, delayed, failed, or retried webhooks
+  cannot double-grant quota, double-issue receipts, or corrupt entitlement
+  state.
+- Provider reference mapping on payments, invoices, receipts, tax invoices, and
+  audit events so support can trace each purchase to ChillPay or Stripe.
+- Reconciliation job or admin action that compares local payment state with
+  provider state and records discrepancies for operator follow-up.
+- Local/dev configuration and test fixtures for Stripe sandbox and ChillPay
+  compatibility.
+
+### Out
+
+- Rewriting commercial package pricing, tax rules, or invoice numbering.
+- Native Stripe subscription billing unless a later billing sprint approves it.
+- Refund/dispute automation beyond recording provider references and safe
+  operator notes.
+- Multiple simultaneous providers for one checkout attempt.
+- Tenant self-service custom payment gateways.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Provider abstraction | Shared payment provider contract for checkout, status, webhook, and reconciliation |
+| Stripe adapter | Checkout session, return/cancel, signed webhook, sandbox config, and status mapping |
+| ChillPay adapter hardening | Existing ChillPay flow moved behind the provider contract without regression |
+| Admin settings | Active provider switch, key/status checks, webhook health, and test connection |
+| Fulfillment safety | Idempotent entitlement, receipt, tax invoice, and audit updates across providers |
+| Verification | ChillPay regression, Stripe sandbox purchase, webhook retry, mismatch reconciliation, no secret leaks |
+
+### Acceptance sketch
+
+1. With ChillPay selected, existing package checkout, payment fulfillment,
+   entitlement grant, receipt, and tax-invoice behavior continue to pass.
+2. With Stripe selected, a customer can buy a supported package through Stripe
+   checkout and return to Monti with the correct tenant entitlement and billing
+   evidence.
+3. Stripe webhooks are signature-verified and idempotent; retries or duplicate
+   events do not double-grant quota or issue duplicate receipts.
+4. Switching active provider only affects new checkout attempts; existing
+   orders keep their original provider references and can still be reconciled.
+5. Platform admin can see active provider, missing configuration, webhook
+   health, reconciliation mismatches, and safe test results without exposing
+   payment secrets.
+
+---
+
+## Backlog: SPRINT-065 — Queued Concurrent-Call Admission
 
 **Platform:** Customer / Tenant / Quota · **Feature:** Enforce each tenant
 package's total concurrent-call limit with a tenant-scoped waiting queue. When a
@@ -2485,7 +2580,7 @@ controlled wait queue instead of immediate rejection.
 
 ---
 
-## Backlog: SPRINT-065 — Full and Incremental Backup/Restore
+## Backlog: SPRINT-066 — Full and Incremental Backup/Restore
 
 **Platform:** Infra / Platform Admin / DevOps · **Feature:** Provide scheduled
 full and incremental backups plus verified restore workflows for Monti
@@ -2565,94 +2660,6 @@ tested against staging/local before any production recovery is attempted.
    evidence, and links the resulting DEP/readiness note.
 5. Corrupt, missing, partial, or checksum-mismatched backups fail safely without
    silently leaving a partial restore marked successful.
-
----
-
-## Backlog: SPRINT-066 — Tenant Customer Product Catalog
-
-**Platform:** Tenant / Customer / KM · **Feature:** Let tenants manage a
-customer-facing product/catalog library with downloadable files and structured
-metadata, then render the most relevant catalog items inside chat or voice
-conversation when the customer's request matches them · **Depends:** 2, 14, 15,
-20, 21, 22, 39, 43, 54, 56 · **Status:** backlog
-
-### Problem today
-
-Monti can answer from tenant KM, but tenants also need a product-style catalog
-surface that is designed for customer conversations. A restaurant may need to
-show a food menu, a travel agency may show package guides, an insurer may show
-coverage plans, a lender may show loan packages, and an HR/business tenant may
-show attendance or employee-service documents. The AI should not only answer in
-text; it should surface the relevant item, preview key details, and offer a
-download when the customer asks about it.
-
-### Goal
-
-1. **Manage catalog assets** — Tenant admins can upload and organize
-   customer-facing catalog files with metadata, categories, language, tags,
-   eligibility, and publish state.
-2. **Match customer intent** — Conversation retrieval finds relevant catalog
-   items based on the customer's request, tenant scope, avatar role, language,
-   and active publish rules.
-3. **Render and download** — Customer conversation can show product cards,
-   menus, packages, guides, or business records with safe file download links.
-
-### Scope
-
-### In
-
-- Tenant portal catalog management for upload, edit, publish/unpublish,
-  archive, versioning, and delete.
-- File support for common customer-facing assets such as PDF, image, CSV/XLSX,
-  DOCX, and structured JSON/CSV catalog rows where approved.
-- Catalog item types for food menus, travel guides/packages, insurance
-  packages, loan packages, employee attendance or HR service records, and
-  configurable business-specific catalog categories.
-- MinIO storage under tenant-scoped catalog prefixes with metadata in Postgres
-  and optional searchable embeddings in ClickHouse.
-- RAG/relevance pipeline that ranks catalog items and returns cited item IDs,
-  snippets, thumbnails/previews where available, and download eligibility.
-- Customer conversation rendering for related catalog cards, menu/package
-  summaries, file previews, and download actions.
-- Tenant controls for which avatars can use each catalog collection and whether
-  files are public, authenticated-customer-only, or restricted by customer tier.
-- Multilingual metadata and matching, aligned with EN/TH/Japanese localization
-  and tenant avatar language settings.
-- Audit events for upload, publish, download, and AI-rendered catalog
-  recommendations.
-
-### Out
-
-- Full ecommerce checkout, cart, payment, invoice, or inventory reservation.
-- Editing customer business systems of record from the conversation.
-- Public search engine indexing of private tenant catalog files.
-- Cross-tenant catalog sharing unless a later marketplace feature approves it.
-- Unlimited file retention or storage beyond tenant package limits.
-
-### Deliverables
-
-| Deliverable | Scope |
-| --- | --- |
-| Catalog data model | Tenant-scoped collections, items, file versions, metadata, publish state, access policy |
-| Upload/download API | Secure file upload, signed download links, thumbnail/preview metadata, storage quota checks |
-| Tenant catalog UI | Manage food menus, travel guides, insurance/loan packages, HR records, and custom categories |
-| Retrieval integration | Catalog indexing, relevance ranking, citations, language matching, avatar collection scope |
-| Customer rendering | Conversation cards, file previews, related-product panels, and download action states |
-| Verification | Tenant isolation, file ACLs, relevance quality, stale version handling, package quota enforcement |
-
-### Acceptance sketch
-
-1. Tenant admin can upload, tag, publish, and version customer-facing catalog
-   assets without exposing them to other tenants.
-2. When a customer asks a related question, the conversation surfaces relevant
-   catalog items such as a menu, travel package, insurance plan, loan package,
-   or business record with a concise summary and citation.
-3. Download links are tenant-scoped, permission-checked, time-limited where
-   needed, and record an audit event.
-4. Unpublished, archived, expired, or restricted catalog items are not rendered
-   to ineligible customers or avatars.
-5. Catalog storage, indexing, and retrieval respect tenant package limits,
-   language settings, and existing KM isolation rules.
 
 ---
 
@@ -2832,7 +2839,7 @@ Without that, support teams must reread transcripts before acting on a ticket.
 schedule customer call notifications by topic, send email links for handover or
 sales/product conversations, and redirect the customer into an automatically
 started voice call with prepared conversation context · **Depends:** 1, 16, 20,
-21, 23, 43, 53, 56, 66, 68 · **Status:** backlog
+21, 23, 43, 53, 56, 68 · **Status:** backlog
 
 ### Problem today
 
@@ -2916,3 +2923,93 @@ generic greeting.
    or ticket continuation.
 5. Expired, revoked, already-used, or tampered links cannot start a call and are
    recorded with safe audit/status events.
+
+---
+
+## Backlog: SPRINT-070 — Tenant Customer Product Catalog
+
+**Platform:** Tenant / Customer / KM · **Feature:** Let tenants manage a
+customer-facing product/catalog library with downloadable files and structured
+metadata, then render the most relevant catalog items inside chat or voice
+conversation when the customer's request matches them · **Depends:** 2, 14, 15,
+20, 21, 22, 39, 43, 54, 56 · **Status:** backlog · deferred last after failed Sprint 64 attempt
+
+### Problem today
+
+Monti can answer from tenant KM, but tenants also need a product-style catalog
+surface that is designed for customer conversations. A restaurant may need to
+show a food menu, a travel agency may show package guides, an insurer may show
+coverage plans, a lender may show loan packages, and an HR/business tenant may
+show attendance or employee-service documents. The AI should not only answer in
+text; it should surface the relevant item, preview key details, and offer a
+download when the customer asks about it.
+
+### Goal
+
+1. **Manage catalog assets** — Tenant admins can upload and organize
+   customer-facing catalog files with metadata, categories, language, tags,
+   eligibility, and publish state.
+2. **Match customer intent** — Conversation retrieval finds relevant catalog
+   items based on the customer's request, tenant scope, avatar role, language,
+   and active publish rules.
+3. **Render and download** — Customer conversation can show product cards,
+   menus, packages, guides, or business records with safe file download links.
+
+### Scope
+
+### In
+
+- Tenant portal catalog management for upload, edit, publish/unpublish,
+  archive, versioning, and delete.
+- File support for common customer-facing assets such as PDF, image, CSV/XLSX,
+  DOCX, and structured JSON/CSV catalog rows where approved.
+- Catalog item types for food menus, travel guides/packages, insurance
+  packages, loan packages, employee attendance or HR service records, and
+  configurable business-specific catalog categories.
+- MinIO storage under tenant-scoped catalog prefixes with metadata in Postgres
+  and optional searchable embeddings in ClickHouse.
+- RAG/relevance pipeline that ranks catalog items and returns cited item IDs,
+  snippets, thumbnails/previews where available, and download eligibility.
+- Customer conversation rendering for related catalog cards, menu/package
+  summaries, file previews, and download actions.
+- Tenant controls for which avatars can use each catalog collection and whether
+  files are public, authenticated-customer-only, or restricted by customer tier.
+- Multilingual metadata and matching, aligned with EN/TH/Japanese localization
+  and tenant avatar language settings.
+- Audit events for upload, publish, download, and AI-rendered catalog
+  recommendations.
+
+### Out
+
+- Full ecommerce checkout, cart, payment, invoice, or inventory reservation.
+- Editing customer business systems of record from the conversation.
+- Public search engine indexing of private tenant catalog files.
+- Cross-tenant catalog sharing unless a later marketplace feature approves it.
+- Unlimited file retention or storage beyond tenant package limits.
+
+### Deliverables
+
+| Deliverable | Scope |
+| --- | --- |
+| Catalog data model | Tenant-scoped collections, items, file versions, metadata, publish state, access policy |
+| Upload/download API | Secure file upload, signed download links, thumbnail/preview metadata, storage quota checks |
+| Tenant catalog UI | Manage food menus, travel guides, insurance/loan packages, HR records, and custom categories |
+| Retrieval integration | Catalog indexing, relevance ranking, citations, language matching, avatar collection scope |
+| Customer rendering | Conversation cards, file previews, related-product panels, and download action states |
+| Verification | Tenant isolation, file ACLs, relevance quality, stale version handling, package quota enforcement |
+
+### Acceptance sketch
+
+1. Tenant admin can upload, tag, publish, and version customer-facing catalog
+   assets without exposing them to other tenants.
+2. When a customer asks a related question, the conversation surfaces relevant
+   catalog items such as a menu, travel package, insurance plan, loan package,
+   or business record with a concise summary and citation.
+3. Download links are tenant-scoped, permission-checked, time-limited where
+   needed, and record an audit event.
+4. Unpublished, archived, expired, or restricted catalog items are not rendered
+   to ineligible customers or avatars.
+5. Catalog storage, indexing, and retrieval respect tenant package limits,
+   language settings, and existing KM isolation rules.
+
+---

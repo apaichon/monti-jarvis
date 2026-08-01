@@ -446,6 +446,7 @@ func main() {
 	mux.Handle("GET /api/platform/payment-gateway", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPaymentGateway)))
 	mux.Handle("PUT /api/platform/payment-gateway", guard.RequirePlatformAdmin(http.HandlerFunc(s.putPaymentGateway)))
 	mux.Handle("POST /api/platform/payment-gateway/test", guard.RequirePlatformAdmin(http.HandlerFunc(s.testPaymentGateway)))
+	mux.Handle("POST /api/platform/payment-gateway/reconcile", guard.RequirePlatformAdmin(http.HandlerFunc(s.reconcilePaymentGateway)))
 	// Sprint 10–11: platform billing ledger + receipt ops
 	mux.Handle("GET /api/platform/billing/orders", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformBillingOrders)))
 	mux.Handle("GET /api/platform/billing/orders/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.getPlatformBillingOrder)))
@@ -459,6 +460,7 @@ func main() {
 	mux.Handle("GET /api/platform/commercial/quotes", guard.RequirePlatformAdmin(http.HandlerFunc(s.listPlatformDedicatedQuotes)))
 	mux.Handle("PATCH /api/platform/commercial/quotes/{id}", guard.RequirePlatformAdmin(http.HandlerFunc(s.transitionPlatformDedicatedQuote)))
 	mux.HandleFunc("POST /api/callbacks/chillpay", s.chillpayCallback)
+	mux.HandleFunc("POST /api/callbacks/stripe", s.stripeCallback)
 	// Browser return from ChillPay (GET or POST) → fulfill if paid → SPA status page.
 	// Path may include /{orderRef} because ChillPay often strips query strings.
 	mux.HandleFunc("GET /api/callbacks/chillpay/return", s.chillpayBrowserReturn)
