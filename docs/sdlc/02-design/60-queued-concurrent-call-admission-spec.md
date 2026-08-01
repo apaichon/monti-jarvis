@@ -1,12 +1,13 @@
 ---
 id: DES-0060
 title: Queued Concurrent-Call Admission Specification
-status: review_pending
+status: shipped
 updated: 2026-08-01
 sprint: SPRINT-065
 owner: SA
 feature: FEAT-0057
 release_target: v2.37.0
+release: v2.37.0
 ---
 
 # DES-0060 - Queued Concurrent-Call Admission

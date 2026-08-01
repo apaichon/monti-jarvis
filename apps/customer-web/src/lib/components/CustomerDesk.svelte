@@ -2088,22 +2088,15 @@
           <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8z"/></svg>
           <span>{live ? $t.desk_end : $t.desk_start_call}</span>
         </button>
-        <button
-          class="round-control"
-          class:active={keypadOpen}
-          type="button"
-          disabled={authRequired || quotaExhausted}
-          onclick={() => (keypadOpen = true)}
-          aria-label={$t.desk_keypad}
-          aria-expanded={keypadOpen}
-          title={$t.desk_keypad}
-        >
-          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M7 5h3v3H7V5zm7 0h3v3h-3V5zM7 11h3v3H7v-3zm7 0h3v3h-3v-3zM7 17h3v3H7v-3zm7 0h3v3h-3v-3z"/></svg>
-          <span>{$t.desk_keypad}</span>
-        </button>
-        <button class="round-control" type="button" onclick={() => (pickerOpen = true)} disabled={live || agents.length === 0} aria-label="More call actions" title="More call actions">
-          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M5 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm7 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>
-          <span>More</span>
+        <button class="round-control avatar-control" type="button" onclick={() => (pickerOpen = true)} disabled={live || agents.length === 0} aria-label="Select avatar" title="Select avatar">
+          <span class="avatar-control-icon" aria-hidden="true">
+            {#if selectedAgent}
+              <Portrait agent={selectedAgent} mini speaking={live} {tone} theme={callTheme} />
+            {:else}
+              <span class="avatar-control-fallback">A</span>
+            {/if}
+          </span>
+          <span>Avatar</span>
         </button>
       </div>
     </section>

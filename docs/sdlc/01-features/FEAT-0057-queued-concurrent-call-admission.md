@@ -1,7 +1,8 @@
 ---
 id: FEAT-0057
 title: "Queued concurrent-call admission"
-status: in_progress
+status: completed
+release: v2.37.0
 roadmap_sprint: 65
 priority: A+
 depends_on: [SPRINT-013, SPRINT-016, SPRINT-021, SPRINT-045, SPRINT-051, SPRINT-056]
@@ -65,6 +66,13 @@ manually even if another customer finishes seconds later.
 ## Design
 
 - Deep spec: [DES-0060](../02-design/60-queued-concurrent-call-admission-spec.md)
-- Workflow: [02-workflow.md](../02-design/02-workflow.md), section 141
+- Workflow: [02-workflow.md](../02-design/02-workflow.md), section 144
 - API contract: [04-api-spec.md](../02-design/04-api-spec.md), Sprint 65
 - UX mapping: [05-ux-ui.md](../02-design/05-ux-ui.md), C65/T65
+
+## Release
+
+Shipped in v2.37.0 as SPRINT-065. The release adds bounded Redis-backed
+waiting for over-limit voice calls, automatic promotion on slot release,
+customer queue status, tenant capacity visibility, and simplified conversation
+controls.

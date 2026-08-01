@@ -60,7 +60,7 @@ System design artifacts for Monti Jarvis.
 | 57 | [57-tenant-gemini-status-top-bar-spec.md](57-tenant-gemini-status-top-bar-spec.md) | 61 | Gemini status top bar; remove tenant performance nav | **`approved`** |
 | 58 | [58-referral-code-redemption-spec.md](58-referral-code-redemption-spec.md) | 62 | Referral code redemption → bonus quota | **`approved`** |
 | 59 | [59-payment-gateway-portability-stripe-spec.md](59-payment-gateway-portability-stripe-spec.md) | 64 | Payment gateway portability: active provider switch from ChillPay to Stripe with signed webhooks and reconciliation | **`shipped`** v2.36.0 |
-| 60 | [60-queued-concurrent-call-admission-spec.md](60-queued-concurrent-call-admission-spec.md) | 65 | Redis-backed waiting queue for tenant concurrent-call admission | **`review_pending`** |
+| 60 | [60-queued-concurrent-call-admission-spec.md](60-queued-concurrent-call-admission-spec.md) | 65 | Redis-backed waiting queue for tenant concurrent-call admission | **`shipped`** v2.37.0 |
 | 49 | [49-customer-portal-tenant-list-spec.md](49-customer-portal-tenant-list-spec.md) | 54 | Customer portal tenant/brand picker; no required `?tenant_id=` | **`shipped`** v2.27.0 |
 | 51 | [51-tenant-call-center-topic-statistics-spec.md](51-tenant-call-center-topic-statistics-spec.md) | 55 | Tenant call-center statistics grouped and filtered by topic | **`shipped`** v2.28.0 |
 
@@ -162,4 +162,4 @@ workflow §120–124; ER/API Sprint 51; UX T51/A51.
 **Sprint 58:** Design pack approved — [54-portal-ui-language-selector-spec.md](54-portal-ui-language-selector-spec.md); workflow §130–131; API Sprint 58; UX C58/T58/A58. [SPRINT-058](../03-sprints/SPRINT-058.md).
 **Sprint 60–62:** Design packs approved (plan worktree `.worktrees/SPRINT-060-062`) — DES-0056 Gemini key enforcement; DES-0057 Gemini top-bar + performance nav remove; DES-0058 referral redemption. [SPRINT-060](../03-sprints/SPRINT-060.md) · [SPRINT-061](../03-sprints/SPRINT-061.md) · [SPRINT-062](../03-sprints/SPRINT-062.md).
 **Sprint 63:** Existing Sprint 48 Leads domain contract clarified; workflow section 140, no ER delta, API Sprint 63, and UX A63. [SPRINT-063](../03-sprints/SPRINT-063.md).
-**Sprint 65:** Design pack review-pending — [DES-0060](60-queued-concurrent-call-admission-spec.md); workflow §141; Redis ER/API/UX Sprint 65; UX C65/T65. [SPRINT-065](../03-sprints/SPRINT-065.md) · [FEAT-0057](../01-features/FEAT-0057-queued-concurrent-call-admission.md).
+**Sprint 65:** ✅ Shipped v2.37.0 — [DES-0060](60-queued-concurrent-call-admission-spec.md); workflow §144; Redis ER/API/UX Sprint 65; UX C65/T65. [SPRINT-065](../03-sprints/SPRINT-065.md) · [FEAT-0057](../01-features/FEAT-0057-queued-concurrent-call-admission.md).
