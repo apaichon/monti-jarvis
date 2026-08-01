@@ -283,6 +283,31 @@
         </div>
       {/if}
 
+      {#if currentPlan.data?.concurrent_queue}
+        <div class="queue-row">
+          <span>
+            <small>Call status</small>
+            {currentPlan.data.concurrent_queue.busy_status.replaceAll('_', ' ')}
+          </span>
+          <span>
+            <small>Total calls</small>
+            {currentPlan.data.concurrent_queue.total_calls.toLocaleString()}
+          </span>
+          <span>
+            <small>Active</small>
+            {currentPlan.data.concurrent_queue.active_calls.toLocaleString()} / {currentPlan.data.concurrent_queue.max_concurrent_calls.toLocaleString()}
+          </span>
+          <span>
+            <small>Queued</small>
+            {currentPlan.data.concurrent_queue.queued_callers.toLocaleString()}
+          </span>
+          <span>
+            <small>Timeouts 24h</small>
+            {currentPlan.data.concurrent_queue.recent_timeouts_24h.toLocaleString()}
+          </span>
+        </div>
+      {/if}
+
       {#if currentPlan.data?.quota?.length}
         <div class="quota-grid">
           {#each currentPlan.data.quota as item (item.dimension)}
@@ -531,6 +556,9 @@
   .period-row { display: flex; gap: 32px; padding: 15px 0 2px; color: var(--ink); font-size: 12px; }
   .period-row span { display: grid; gap: 4px; }
   .period-row small { color: var(--muted); }
+  .queue-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 14px; padding: 12px; border: 1px solid rgb(22 199 255 / 24%); border-radius: 12px; background: rgb(22 199 255 / 7%); }
+  .queue-row span { display: grid; gap: 4px; min-width: 0; color: var(--ink); font-size: 13px; text-transform: capitalize; }
+  .queue-row small { color: var(--muted); font-size: 10px; text-transform: none; }
   .quota-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
   .quota-card { min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 13px; background: rgb(5 12 25 / 58%); }
   .quota-card > div { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
@@ -588,7 +616,7 @@
   .quote-invariant span { color: var(--muted); font-size: 10px; line-height: 1.45; }
 
   @media (max-width: 900px) {
-    .pkg-grid, .quota-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pkg-grid, .quota-grid, .queue-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   @media (max-width: 620px) {
@@ -598,7 +626,7 @@
     .header-actions a { flex: 1; text-align: center; }
     .next-bill { text-align: left; }
     .period-row { display: grid; gap: 12px; }
-    .pkg-grid, .quota-grid, .form-grid { grid-template-columns: 1fr; }
+    .pkg-grid, .quota-grid, .form-grid, .queue-row { grid-template-columns: 1fr; }
     .span-2 { grid-column: span 1; }
     .pkg-card { min-height: auto; }
     .modal-backdrop { align-items: flex-start; padding: 10px; }

@@ -510,6 +510,7 @@ func main() {
 	mux.Handle("GET /api/tenant/settings", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantSettings)))
 	mux.Handle("PUT /api/tenant/settings", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantSettings)))
 	mux.Handle("GET /api/tenant/usage", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantUsage)))
+	mux.Handle("GET /api/tenant/concurrent-call-queue/status", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantConcurrentCallQueueStatus)))
 	mux.Handle("GET /api/tenant/call-limits", guard.RequireTenantAdminActive(http.HandlerFunc(s.getTenantCallLimits)))
 	mux.Handle("PUT /api/tenant/call-limits", guard.RequireTenantAdminActive(http.HandlerFunc(s.putTenantCallLimits)))
 

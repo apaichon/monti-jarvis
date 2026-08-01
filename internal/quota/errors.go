@@ -12,6 +12,8 @@ var (
 	ErrNoEntitlement    = errors.New("no entitlement")
 	ErrQuotaDisabled    = errors.New("quota disabled")
 	ErrQuotaUnavailable = errors.New("quota unavailable")
+	ErrQueueFull        = errors.New("call queue full")
+	ErrQueueTimeout     = errors.New("call queue timeout")
 )
 
 // Error is a structured quota/rate/feature failure for HTTP mapping.
@@ -120,5 +122,29 @@ func PreviewConcurrent(limit, usage int) *Error {
 		Usage:     usage,
 		Message:   fmt.Sprintf("too many concurrent preview voice sessions (%d/%d)", usage, limit),
 		cause:     ErrLimitExceeded,
+	}
+}
+
+// QueueFull rejects a caller when the tenant queue is already bounded at cap.
+func QueueFull(limit, usage int) *Error {
+	return &Error{
+		Code:      "queue_full",
+		Dimension: "call_queue",
+		Limit:     limit,
+		Usage:     usage,
+		Message:   fmt.Sprintf("call queue is full (%d/%d)", usage, limit),
+		cause:     ErrQueueFull,
+	}
+}
+
+// QueueTimeout expires a waiting caller after CALL_QUEUE_MAX_WAIT.
+func QueueTimeout(limitSeconds, waitedSeconds int) *Error {
+	return &Error{
+		Code:      "queue_timeout",
+		Dimension: "call_queue",
+		Limit:     limitSeconds,
+		Usage:     waitedSeconds,
+		Message:   fmt.Sprintf("call queue wait timed out after %d seconds", waitedSeconds),
+		cause:     ErrQueueTimeout,
 	}
 }

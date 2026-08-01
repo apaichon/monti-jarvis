@@ -3,7 +3,7 @@ id: DES-0004
 title: API Specification
 status: shipped
 updated: 2026-08-01
-sprint: SPRINT-064
+sprint: SPRINT-065
 ---
 
 # API Specification — Monti Jarvis
@@ -4883,7 +4883,6 @@ a defensive fallback when `total` is absent. Auth, query filters, detail,
 mutation, and error contracts remain unchanged.
 
 See workflow section 140, ER Sprint 63, and UX A63.
-
 ## Sprint 64 - Payment Gateway Portability and Stripe
 
 Extends the existing Payment Gateway and Tenant Checkout contracts.
@@ -5069,3 +5068,137 @@ Responses:
 | 503 | active Stripe config/webhook secret missing |
 
 See DES-0059, workflow §141-143, ER Sprint 64, and UX A64/T64.
+
+## Sprint 65 - Queued concurrent-call admission
+
+### `GET /ws/voice`
+
+**Auth:** public/customer optional as shipped for customer voice; tenant is
+resolved from request context, `tenant_id`, or embed key.
+
+Existing non-concurrency rules still fail immediately: rate limit,
+`voice_enabled`, monthly minutes, mobile minutes, S16 daily limit, S16/S18
+per-call limit, invalid tenant, or invalid agent. Only
+`max_concurrent_calls` exhaustion can enter the queue.
+
+#### Query additions
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `admission_id` | string | no | Client retry id; server may return one in queue frames. |
+| `queue` | string | no | `0` disables waiting and preserves immediate 429 behavior for tests/integrators. |
+
+#### Server frames
+
+```json
+{
+  "type": "queue_status",
+  "admission_id": "adm_123",
+  "position": 1,
+  "busy_status": "busy",
+  "active_calls": 1,
+  "queued_callers": 2,
+  "total_calls": 3,
+  "max_concurrent_calls": 1,
+  "estimated_wait_seconds": 45,
+  "expires_at": "2026-08-01T03:12:00Z"
+}
+```
+
+```json
+{
+  "type": "queue_admitted",
+  "admission_id": "adm_123",
+  "busy_status": "admitted",
+  "active_calls": 1,
+  "queued_callers": 1,
+  "total_calls": 2,
+  "max_concurrent_calls": 1
+}
+```
+
+After `queue_admitted`, the existing voice relay emits `ready`, `status`,
+transcript, and error frames as today. The first `ready` or `status` frame after
+admission should include the same optional capacity fields so the call screen can
+show total calls and busy/live state while the voice call is active.
+
+#### Capacity fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `busy_status` | string | `available`, `busy`, `queued`, `admitted`, `live`, `timeout`, or `cancelled`. |
+| `active_calls` | integer | Current active tenant voice slots. |
+| `queued_callers` | integer | Current queued callers for the tenant voice queue. |
+| `total_calls` | integer | `active_calls + queued_callers`; shown on customer call screen. |
+| `max_concurrent_calls` | integer | Tenant package/bonus concurrent-call limit. |
+
+#### Client frames
+
+```json
+{ "type": "queue_cancel", "admission_id": "adm_123" }
+```
+
+Closing the WebSocket before admission is equivalent to `queue_cancel`.
+
+#### Errors
+
+| HTTP / WS code | Code | When |
+| --- | --- | --- |
+| 403 | `feature_disabled` | `voice_enabled=false` or no active entitlement. |
+| 429 | `rate_limited` | Rate bucket full; never queued. |
+| 429 | `quota_exceeded` | Non-concurrency quota is exhausted, or `queue=0`. |
+| WS error | `queue_timeout` | Queue wait exceeded `CALL_QUEUE_MAX_WAIT`. |
+| WS error | `queue_full` | Tenant queue length exceeded `CALL_QUEUE_MAX_PER_TENANT`. |
+| WS error | `queue_cancelled` | Caller cancelled before admission. |
+
+### `GET /api/tenant/concurrent-call-queue/status`
+
+**Auth:** `tenant_admin`
+
+```json
+{
+  "tenant_id": "tenant_demo",
+  "active_calls": 1,
+  "queued_callers": 2,
+  "total_calls": 3,
+  "max_concurrent_calls": 1,
+  "oldest_wait_seconds": 37,
+  "recent_timeouts_24h": 1,
+  "queue_enabled": true
+}
+```
+
+### `GET /api/tenant/commercial/current-plan`
+
+Response addition under `quota` or top-level support metadata:
+
+```json
+{
+  "concurrent_queue": {
+    "active_calls": 1,
+    "queued_callers": 2,
+    "total_calls": 3,
+    "max_concurrent_calls": 1,
+    "recent_timeouts_24h": 1
+  }
+}
+```
+
+### `GET /api/platform/tenants/{tenant_id}/usage`
+
+Response addition:
+
+```json
+{
+  "concurrent_queue": {
+    "active_calls": 1,
+    "queued_callers": 2,
+    "total_calls": 3,
+    "max_concurrent_calls": 1,
+    "oldest_wait_seconds": 37,
+    "recent_timeouts_24h": 1
+  }
+}
+```
+
+See DES-0060, workflow §144, ER Sprint 65, UX C65/T65.

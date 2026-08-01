@@ -135,6 +135,17 @@ export type CurrentPlanQuotaDimension = {
   freshness: 'current' | 'stale' | 'unavailable' | string;
 };
 
+export type ConcurrentQueueSnapshot = {
+  queue_enabled: boolean;
+  active_calls: number;
+  queued_callers: number;
+  total_calls: number;
+  max_concurrent_calls: number;
+  busy_status: string;
+  oldest_wait_seconds: number;
+  recent_timeouts_24h: number;
+};
+
 export type CurrentCommercialPlan = {
   tenant_id: string;
   billing_state:
@@ -174,6 +185,7 @@ export type CurrentCommercialPlan = {
   } | null;
   quota: CurrentPlanQuotaDimension[];
   compact_utilization: number | null;
+  concurrent_queue: ConcurrentQueueSnapshot | null;
   documents: Array<{
     id: string;
     type: string;

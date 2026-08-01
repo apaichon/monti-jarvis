@@ -112,13 +112,18 @@ type Config struct {
 	BillingGracePeriod       time.Duration
 	BillingRetryDelays       []time.Duration
 	// Quota / rate limit (SPRINT-013)
-	QuotaEnabled         bool
-	QuotaFailOpen        bool
-	RateLimitEnabled     bool
-	RateLimitChatPerMin  int
-	RateLimitKMPerMin    int
-	RateLimitVoicePerMin int
-	QuotaConcurrentTTL   time.Duration
+	QuotaEnabled              bool
+	QuotaFailOpen             bool
+	RateLimitEnabled          bool
+	RateLimitChatPerMin       int
+	RateLimitKMPerMin         int
+	RateLimitVoicePerMin      int
+	QuotaConcurrentTTL        time.Duration
+	CallQueueEnabled          bool
+	CallQueueMaxWait          time.Duration
+	CallQueueMaxPerTenant     int
+	CallQueuePromotionLockTTL time.Duration
+	CallQueuePositionRefresh  time.Duration
 	// Embed (SPRINT-014)
 	EmbedAllowEmptyOrigins    bool
 	TenantSecretEncryptionKey string
@@ -263,6 +268,11 @@ func Load() Config {
 		RateLimitKMPerMin:         envInt("RATE_LIMIT_KM_PER_MIN", 30),
 		RateLimitVoicePerMin:      envInt("RATE_LIMIT_VOICE_PER_MIN", 20),
 		QuotaConcurrentTTL:        envDuration("QUOTA_CONCURRENT_TTL", 2*time.Hour),
+		CallQueueEnabled:          envBool("CALL_QUEUE_ENABLED", true),
+		CallQueueMaxWait:          envDuration("CALL_QUEUE_MAX_WAIT", 120*time.Second),
+		CallQueueMaxPerTenant:     envInt("CALL_QUEUE_MAX_PER_TENANT", 50),
+		CallQueuePromotionLockTTL: envDuration("CALL_QUEUE_PROMOTION_LOCK_TTL", 10*time.Second),
+		CallQueuePositionRefresh:  envDuration("CALL_QUEUE_POSITION_REFRESH", 2*time.Second),
 		EmbedAllowEmptyOrigins:    envBool("EMBED_ALLOW_EMPTY_ORIGINS", true),
 		TenantSecretEncryptionKey: os.Getenv("TENANT_SECRET_ENCRYPTION_KEY"),
 		TenantSecretKeyVersion:    envOr("TENANT_SECRET_KEY_VERSION", "v1"),

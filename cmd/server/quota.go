@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libra/monti-jarvis/internal/auth"
+	"github.com/libra/monti-jarvis/internal/live"
 	"github.com/libra/monti-jarvis/internal/quota"
 	"github.com/libra/monti-jarvis/internal/store"
 )
@@ -27,7 +28,7 @@ func writeQuotaError(w http.ResponseWriter, err error) {
 			status = http.StatusForbidden
 		case "no_entitlement":
 			status = http.StatusForbidden
-		case "daily_call_limit", "per_call_limit", "preview_concurrent":
+		case "daily_call_limit", "per_call_limit", "preview_concurrent", "queue_full", "queue_timeout":
 			status = http.StatusTooManyRequests
 		case "rate_limited":
 			status = http.StatusTooManyRequests
@@ -139,43 +140,105 @@ func (s *server) voiceWithPackageQuota(w http.ResponseWriter, r *http.Request, t
 		}
 	}
 
-	release, err := s.quota.AcquireConcurrent(ctx, tenantID)
-	if err != nil {
-		writeQuotaError(w, err)
+	req := r
+	relay := s.voice
+	if relay != nil {
+		cp := *relay
+		cp.Admission = func(admissionCtx context.Context, admissionTenantID string, emit func(live.AdmissionUpdate) error) (live.AdmissionResult, error) {
+			admission, err := s.quota.WaitForQueuedConcurrent(admissionCtx, admissionTenantID, r.URL.Query().Get("admission_id"), func(update quota.QueueUpdate) error {
+				return emit(liveAdmissionUpdate(update))
+			})
+			if err != nil {
+				return live.AdmissionResult{}, liveQuotaError(err)
+			}
+			if admission == nil {
+				return live.AdmissionResult{}, nil
+			}
+			started := time.Now()
+			result := live.AdmissionResult{
+				Release: func() {
+					if admission.Release != nil {
+						admission.Release()
+					}
+					s.recordCallQuotaMinutes(admissionTenantID, r.URL.Query().Get("call_id"), mobileCall, tz, started)
+				},
+				Capacity: liveAdmissionCapacity(admission.AdmissionID, admission.Snapshot),
+			}
+			if maxPerCall > 0 {
+				deadline := time.Duration(maxPerCall) * time.Minute
+				cctx, cancel := context.WithTimeout(admissionCtx, deadline)
+				result.Context = cctx
+				result.Cancel = cancel
+			}
+			return result, nil
+		}
+		relay = &cp
+	}
+	relay.Handler().ServeHTTP(w, req)
+}
+
+func (s *server) recordCallQuotaMinutes(tenantID, callID string, mobile bool, timezone string, started time.Time) {
+	if s == nil || s.quota == nil || started.IsZero() {
 		return
 	}
-	started := time.Now()
-	defer func() {
-		if release != nil {
-			release()
-		}
-		// Best-effort: at least 1 minute if session lasted > 30s, else ceil minutes.
-		elapsed := time.Since(started)
-		mins := int(elapsed.Minutes())
-		if mins < 1 && elapsed >= 30*time.Second {
-			mins = 1
-		}
-		if mins > 0 {
-			bg := context.Background()
-			if mobileCall {
-				_ = s.quota.AddMobileCallMinutes(bg, tenantID, mins)
-			} else {
-				_ = s.quota.AddCallMinutes(bg, tenantID, mins)
-			}
-			_ = s.quota.AddDailyCallMinutes(bg, tenantID, tz, mins)
-			s.recordCallUsageEvent(tenantID, r.URL.Query().Get("call_id"), mobileCall, mins)
-		}
-	}()
-
-	// Per-call max: cancel context after N minutes so the relay ends.
-	req := r
-	if maxPerCall > 0 {
-		deadline := time.Duration(maxPerCall) * time.Minute
-		cctx, cancel := context.WithTimeout(ctx, deadline)
-		defer cancel()
-		req = r.WithContext(cctx)
+	elapsed := time.Since(started)
+	mins := int(elapsed.Minutes())
+	if mins < 1 && elapsed >= 30*time.Second {
+		mins = 1
 	}
-	s.voice.Handler().ServeHTTP(w, req)
+	if mins <= 0 {
+		return
+	}
+	bg := context.Background()
+	if mobile {
+		_ = s.quota.AddMobileCallMinutes(bg, tenantID, mins)
+	} else {
+		_ = s.quota.AddCallMinutes(bg, tenantID, mins)
+	}
+	_ = s.quota.AddDailyCallMinutes(bg, tenantID, timezone, mins)
+	s.recordCallUsageEvent(tenantID, callID, mobile, mins)
+}
+
+func liveAdmissionUpdate(update quota.QueueUpdate) live.AdmissionUpdate {
+	out := live.AdmissionUpdate{
+		Type:    update.Type,
+		Message: update.Message,
+		AdmissionCapacity: live.AdmissionCapacity{
+			AdmissionID:          update.AdmissionID,
+			Position:             update.Position,
+			EstimatedWaitSeconds: update.EstimatedWaitSeconds,
+			QueueEnabled:         update.Snapshot.QueueEnabled,
+			ActiveCalls:          update.Snapshot.ActiveCalls,
+			QueuedCallers:        update.Snapshot.QueuedCallers,
+			TotalCalls:           update.Snapshot.TotalCalls,
+			MaxConcurrentCalls:   update.Snapshot.MaxConcurrentCalls,
+			BusyStatus:           update.Snapshot.BusyStatus,
+		},
+	}
+	return out
+}
+
+func liveAdmissionCapacity(admissionID string, snapshot quota.ConcurrentQueueSnapshot) *live.AdmissionCapacity {
+	return &live.AdmissionCapacity{
+		AdmissionID:        admissionID,
+		QueueEnabled:       snapshot.QueueEnabled,
+		ActiveCalls:        snapshot.ActiveCalls,
+		QueuedCallers:      snapshot.QueuedCallers,
+		TotalCalls:         snapshot.TotalCalls,
+		MaxConcurrentCalls: snapshot.MaxConcurrentCalls,
+		BusyStatus:         snapshot.BusyStatus,
+	}
+}
+
+func liveQuotaError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var qe *quota.Error
+	if errors.As(err, &qe) {
+		return &live.AdmissionError{Code: qe.Code, Message: qe.Error(), Err: err}
+	}
+	return err
 }
 
 func (s *server) recordCallUsageEvent(tenantID, callID string, mobile bool, minutes int) {
@@ -248,4 +311,26 @@ func (s *server) getPlatformTenantUsage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, snap)
+}
+
+// getTenantConcurrentCallQueueStatus serves GET /api/tenant/concurrent-call-queue/status.
+func (s *server) getTenantConcurrentCallQueueStatus(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := s.commercialTenantID(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if s.quota == nil {
+		writeJSON(w, http.StatusOK, quota.ConcurrentQueueSnapshot{
+			QueueEnabled: false,
+			BusyStatus:   "available",
+		})
+		return
+	}
+	snapshot, err := s.quota.ConcurrentQueueSnapshot(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, snapshot)
 }

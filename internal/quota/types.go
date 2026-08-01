@@ -35,6 +35,35 @@ type Usage struct {
 	ConcurrentCalls    int `json:"concurrent_calls"`
 }
 
+// ConcurrentQueueSnapshot reports live package-call capacity for support and UI.
+type ConcurrentQueueSnapshot struct {
+	QueueEnabled       bool   `json:"queue_enabled"`
+	ActiveCalls        int    `json:"active_calls"`
+	QueuedCallers      int    `json:"queued_callers"`
+	TotalCalls         int    `json:"total_calls"`
+	MaxConcurrentCalls int    `json:"max_concurrent_calls"`
+	BusyStatus         string `json:"busy_status"`
+	OldestWaitSeconds  int    `json:"oldest_wait_seconds"`
+	RecentTimeouts24h  int    `json:"recent_timeouts_24h"`
+}
+
+// QueueUpdate is sent while a caller waits for a concurrent-call slot.
+type QueueUpdate struct {
+	Type                 string
+	AdmissionID          string
+	Position             int
+	EstimatedWaitSeconds int
+	Snapshot             ConcurrentQueueSnapshot
+	Message              string
+}
+
+// QueuedAdmission is returned after a caller owns a concurrent-call slot.
+type QueuedAdmission struct {
+	AdmissionID string
+	Release     func()
+	Snapshot    ConcurrentQueueSnapshot
+}
+
 // Dimension is the stable reporting shape shared by tenant, platform, and
 // mobile clients. Source/freshness are explicit so unavailable dependencies
 // are never rendered as an authoritative zero.
@@ -57,14 +86,15 @@ type Dimension struct {
 
 // Snapshot is returned by Service.Snapshot for platform admin UI.
 type Snapshot struct {
-	TenantID   string               `json:"tenant_id"`
-	Package    *PackageSummary      `json:"package"`
-	Status     string               `json:"status"` // active | none
-	Period     string               `json:"period"` // YYYY-MM UTC
-	Limits     *Limits              `json:"limits"`
-	Usage      Usage                `json:"usage"`
-	Bonus      []store.BonusBalance `json:"bonus"`
-	Dimensions []Dimension          `json:"current_dimensions"`
+	TenantID        string                   `json:"tenant_id"`
+	Package         *PackageSummary          `json:"package"`
+	Status          string                   `json:"status"` // active | none
+	Period          string                   `json:"period"` // YYYY-MM UTC
+	Limits          *Limits                  `json:"limits"`
+	Usage           Usage                    `json:"usage"`
+	Bonus           []store.BonusBalance     `json:"bonus"`
+	Dimensions      []Dimension              `json:"current_dimensions"`
+	ConcurrentQueue *ConcurrentQueueSnapshot `json:"concurrent_queue,omitempty"`
 }
 
 // Rule dimension keys (package rules-v1).

@@ -6,10 +6,20 @@ import {
 
 type VoiceMsg = {
   type: string;
+  code?: string;
   data?: string;
   text?: string;
   role?: string;
   message?: string;
+  admission_id?: string;
+  position?: number;
+  estimated_wait_seconds?: number;
+  queue_enabled?: boolean;
+  active_calls?: number;
+  queued_callers?: number;
+  total_calls?: number;
+  max_concurrent_calls?: number;
+  busy_status?: string;
 };
 
 export type TranscriptMeta = {
@@ -21,11 +31,24 @@ export type VoiceCallbacks = {
   onLive?: (live: boolean) => void;
   /** Progress while connecting (mic, Gemini setup) — show loading UI. */
   onStatus?: (message: string) => void;
+  onCapacity?: (capacity: VoiceCapacity) => void;
   /** Live caption updates — `text` is the full turn so far (not a short fragment). */
   onTranscript?: (role: 'caller' | 'agent', text: string, meta?: TranscriptMeta) => void;
   /** Relay detected a caller confirmation that the conversation is finished. */
   onCustomerEndRequested?: () => void;
   onError?: (message: string) => void;
+};
+
+export type VoiceCapacity = {
+  admission_id?: string;
+  position?: number;
+  estimated_wait_seconds?: number;
+  queue_enabled: boolean;
+  active_calls: number;
+  queued_callers: number;
+  total_calls: number;
+  max_concurrent_calls: number;
+  busy_status: string;
 };
 
 export type VoiceRecording = {
@@ -212,6 +235,17 @@ export class GeminiVoice {
       });
       this.ws.addEventListener('message', (event) => {
         const msg: VoiceMsg = JSON.parse(event.data as string);
+        if (isCapacityMessage(msg)) {
+          callbacks.onCapacity?.(voiceCapacityFromMsg(msg));
+        }
+        if (msg.type === 'queue_status') {
+          callbacks.onStatus?.(msg.message || queueStatusMessage(msg));
+          return;
+        }
+        if (msg.type === 'queue_admitted') {
+          callbacks.onStatus?.(msg.message || 'A call slot is available. Connecting now…');
+          return;
+        }
         if (msg.type === 'status' && msg.message) {
           callbacks.onStatus?.(msg.message);
           return;
@@ -345,6 +379,17 @@ export class GeminiVoice {
 
   private handleMessage(raw: string, callbacks: VoiceCallbacks) {
     const msg: VoiceMsg = JSON.parse(raw);
+    if (isCapacityMessage(msg)) {
+      callbacks.onCapacity?.(voiceCapacityFromMsg(msg));
+    }
+    if (msg.type === 'queue_status') {
+      callbacks.onStatus?.(msg.message || queueStatusMessage(msg));
+      return;
+    }
+    if (msg.type === 'queue_admitted') {
+      callbacks.onStatus?.(msg.message || 'A call slot is available. Connecting now…');
+      return;
+    }
     if (msg.type === 'status' && msg.message) {
       callbacks.onStatus?.(msg.message);
       return;
@@ -430,6 +475,40 @@ export class GeminiVoice {
       callbacks.onError?.(msg.message || 'Voice error');
     }
   }
+}
+
+function isCapacityMessage(msg: VoiceMsg) {
+  return (
+    msg.type === 'queue_status' ||
+    msg.type === 'queue_admitted' ||
+    msg.type === 'queue_timeout' ||
+    msg.type === 'ready' ||
+    typeof msg.total_calls === 'number' ||
+    typeof msg.active_calls === 'number' ||
+    typeof msg.queued_callers === 'number'
+  );
+}
+
+function voiceCapacityFromMsg(msg: VoiceMsg): VoiceCapacity {
+  return {
+    admission_id: msg.admission_id,
+    position: msg.position,
+    estimated_wait_seconds: msg.estimated_wait_seconds,
+    queue_enabled: !!msg.queue_enabled,
+    active_calls: msg.active_calls ?? 0,
+    queued_callers: msg.queued_callers ?? 0,
+    total_calls: msg.total_calls ?? 0,
+    max_concurrent_calls: msg.max_concurrent_calls ?? 0,
+    busy_status: msg.busy_status || (msg.type === 'queue_status' ? 'queued' : 'available')
+  };
+}
+
+function queueStatusMessage(msg: VoiceMsg) {
+  const position = msg.position && msg.position > 0 ? `#${msg.position}` : 'in line';
+  if (msg.estimated_wait_seconds && msg.estimated_wait_seconds > 0) {
+    return `All agents are busy. You are ${position}. Estimated wait ${msg.estimated_wait_seconds}s.`;
+  }
+  return `All agents are busy. You are ${position}.`;
 }
 
 function floatToPCM16Bytes(float32: Float32Array) {

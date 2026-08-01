@@ -18,6 +18,7 @@ import (
 type CustomerUsageSummary struct {
 	TenantID              string    `json:"tenant_id"`
 	CustomerID            string    `json:"customer_id,omitempty"`
+	TotalCalls            int       `json:"total_calls"`
 	DailyRemainingSeconds *int      `json:"daily_remaining_seconds,omitempty"`
 	DailyLimitSeconds     int       `json:"daily_limit_seconds"`
 	MaxCallSeconds        int       `json:"max_call_seconds"`
@@ -289,12 +290,22 @@ func (s *Store) CustomerUsageSummary(ctx context.Context, tenantID, customerID s
 	}
 	resetAt := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
 	out := CustomerUsageSummary{TenantID: tenantID, CustomerID: customerID, DailyLimitSeconds: dailyLimitSeconds, MaxCallSeconds: maxCallSeconds, ResetAt: resetAt, State: "quota_available"}
-	if strings.TrimSpace(customerID) == "" || dailyLimitSeconds <= 0 || s.pg == nil {
+	if strings.TrimSpace(customerID) == "" || s.pg == nil {
 		return out, nil
 	}
 	schema := quoteIdent(s.cfg.PostgresSchema)
+	err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(DISTINCT session_id)
+FROM %s.customer_usage_events
+WHERE tenant_id=$1 AND customer_id=$2 AND session_id<>'' AND status IN ('reserved','committed')`, schema),
+		tenantID, customerID).Scan(&out.TotalCalls)
+	if err != nil {
+		return out, err
+	}
+	if dailyLimitSeconds <= 0 {
+		return out, nil
+	}
 	usageDate := now.Format("2006-01-02")
-	err := s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT COALESCE(SUM(consumed_seconds),0)
+	err = s.pg.QueryRow(ctx, fmt.Sprintf(`SELECT COALESCE(SUM(consumed_seconds),0)
 FROM %s.customer_usage_events WHERE tenant_id=$1 AND customer_id=$2 AND usage_date=$3 AND status='committed'`, schema),
 		tenantID, customerID, usageDate).Scan(&out.UsedSeconds)
 	if err != nil {

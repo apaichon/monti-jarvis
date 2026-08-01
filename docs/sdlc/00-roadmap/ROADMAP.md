@@ -88,7 +88,7 @@
 | **62** | **Tenant / Growth / Quota** | **Referral code redemption: tenant can apply a referral code to add bonus quota with validation, limits, and ledger tracking** | **M+** | **13, 45, 46, 51** · ✅ **v2.35.0** · [FEAT-0054](../01-features/FEAT-0054-referral-code-redemption.md) · [SPRINT-062](../03-sprints/SPRINT-062.md) · [DES-0058](../02-design/58-referral-code-redemption-spec.md) |
 | **63** | **Platform Admin / Product Web / Sales** | **Bug fix: product-web Book Demo lead is returned by the admin API but missing from the Leads inbox; render API lead rows and correct shown/total counts** | **BUG/P1** | **48, 51** · ✅ **v2.35.1** · [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) · [SPRINT-063](../03-sprints/SPRINT-063.md) |
 | **64** | **Platform Admin / Tenant / Finance** | **Payment gateway portability: switch checkout provider from ChillPay to Stripe with safe provider config, webhooks, receipts, tax invoices, and reconciliation** | **P+** | **8, 9, 10, 12, 13, 45, 48, 50, 51** · ✅ **v2.36.0** · [FEAT-0056](../01-features/FEAT-0056-payment-gateway-portability-stripe.md) · [SPRINT-064](../03-sprints/SPRINT-064.md) · [DES-0059](../02-design/59-payment-gateway-portability-stripe-spec.md) |
-| **65** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · backlog |
+| **65** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · [FEAT-0057](../01-features/FEAT-0057-queued-concurrent-call-admission.md) · [SPRINT-065](../03-sprints/SPRINT-065.md) · [DES-0060](../02-design/60-queued-concurrent-call-admission-spec.md) · in_progress |
 | **66** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
 | **67** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · backlog |
 | **68** | **Customer / Tenant / Tickets** | **AI summary before call close: generate call recap, confirm unresolved items, and submit summary to ticket** | **F+** | **1, 21, 22, 23, 24, 43, 53, 55, 56** · backlog |
@@ -2500,13 +2500,16 @@ contract.
 
 ---
 
-## Backlog: SPRINT-065 — Queued Concurrent-Call Admission
+## Active: SPRINT-065 — Queued Concurrent-Call Admission
 
 **Platform:** Customer / Tenant / Quota · **Feature:** Enforce each tenant
 package's total concurrent-call limit with a tenant-scoped waiting queue. When a
 caller starts a voice call and the tenant is already at its concurrent-call
 quota, the caller waits until another customer finishes or the queue timeout
-expires · **Depends:** 13, 16, 21, 45, 51, 56 · **Status:** backlog
+expires · **Depends:** 13, 16, 21, 45, 51, 56 · **Status:** in_progress ·
+[FEAT-0057](../01-features/FEAT-0057-queued-concurrent-call-admission.md) ·
+[SPRINT-065](../03-sprints/SPRINT-065.md) ·
+[DES-0060](../02-design/60-queued-concurrent-call-admission-spec.md)
 
 ### Problem today
 

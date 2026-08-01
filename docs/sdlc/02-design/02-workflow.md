@@ -3,7 +3,7 @@ id: DES-0002
 title: Workflows
 status: shipped
 updated: 2026-08-01
-sprint: SPRINT-064
+sprint: SPRINT-065
 ---
 
 # Workflows — Monti Jarvis
@@ -4192,7 +4192,6 @@ sequenceDiagram
 
 No server, database, auth, or lead-lifecycle behavior changes in Sprint 63.
 See API Sprint 63, ER Sprint 63, and UX A63.
-
 ## 141. Platform switches active payment provider (Sprint 64)
 
 ```mermaid
@@ -4285,3 +4284,59 @@ sequenceDiagram
 | `payment_callback_events` | `failed` | Valid provider event but local mismatch or processing error |
 
 See DES-0059, API Sprint 64, ER Sprint 64, and UX A64/T64.
+
+## 144. Queued voice admission promotes caller when slot opens (Sprint 65)
+
+```mermaid
+sequenceDiagram
+  actor C as Customer browser
+  participant G as Go :8091
+  participant Q as internal/quota
+  participant R as Redis DB4
+  participant V as Gemini voice relay
+  participant A as Audit/Metrics
+
+  C->>G: GET /ws/voice?tenant_id=T&agent=A
+  G->>Q: rate, voice_enabled, monthly, daily, per-call checks
+  alt non-concurrency rule fails
+    G-->>C: WS close / 4xx safe quota error
+  else concurrent slot available
+    Q->>R: INCR quota:{tenant}:concurrent
+    G->>V: start relay after slot reserved
+    G-->>C: ready
+  else concurrent limit full
+    Q->>R: ZADD callq:{tenant}:voice + HSET entry
+    G-->>C: queue_status(position, limit, estimated_wait)
+    loop until admitted, cancelled, or timed out
+      G-->>C: queue_status(position, expires_at)
+      C-->>G: cancel OR browser close
+      G->>Q: cancel entry when client leaves
+    end
+  end
+
+  V-->>G: call ended / disconnect / timeout
+  G->>Q: release concurrent slot
+  Q->>R: DECR quota:{tenant}:concurrent
+  Q->>R: SET NX callq:{tenant}:promote_lock
+  Q->>R: remove expired/cancelled entries; pick first queued
+  alt queued caller eligible
+    Q->>R: INCR concurrent + HSET entry admitted
+    Q->>A: call_queue.promoted
+    G-->>C: queue_admitted
+    G->>V: start relay for admitted caller
+  else no eligible caller
+    Q->>A: call_queue.empty_after_release
+  end
+```
+
+### State: `callq` entry
+
+| Status | Meaning |
+| --- | --- |
+| `queued` | Caller has a bounded waiting entry and receives position frames. |
+| `admitted` | Concurrent slot is reserved; voice relay may start. |
+| `cancelled` | Caller closed browser or pressed cancel before admission. |
+| `timed_out` | `CALL_QUEUE_MAX_WAIT` elapsed before capacity opened. |
+| `expired` | Cleanup removed stale metadata after handler/server loss. |
+
+See DES-0060, ER Sprint 65, API Sprint 65, UX C65/T65.

@@ -13,7 +13,7 @@
   import { sendChat, type ChatMessage as ChatHistoryEntry } from '$lib/api/chat';
   import { classifyTone } from '$lib/tone';
   import { loadWorkforce, type Agent } from '$lib/api/workforce';
-  import { GeminiVoice, micAvailabilityError } from '$lib/voice/gemini';
+  import { GeminiVoice, micAvailabilityError, type VoiceCapacity } from '$lib/voice/gemini';
   import {
     assistantConfirmedFarewell,
     customerConfirmedEnd,
@@ -80,6 +80,7 @@
   let live = $state(false);
   let timer = $state('00:00:00');
   let voiceState = $state('Select an agent, then start a voice call or type a message.');
+  let capacity = $state<VoiceCapacity | null>(null);
   let micBlocked = $state<string | null>(null);
   let tone = $state('');
   let chatEl: HTMLElement | undefined = $state();
@@ -91,6 +92,7 @@
   let autoCloseTimerId: ReturnType<typeof setInterval> | undefined;
   let customerEndRequested = $state(false);
   let autoClosePending = $state(false);
+  let pendingCancel = $state(false);
   let unsubscribe: (() => void) | undefined;
   const transcriptKeys = new Set<string>();
 
@@ -200,6 +202,28 @@
     return topicByAgent[agentId] || 'general';
   }
 
+  function capacitySummary() {
+    if (!capacity) return '';
+    const parts = [
+      `Total ${capacity.total_calls}`,
+      `Active ${capacity.active_calls}`,
+      `Queue ${capacity.queued_callers}`
+    ];
+    if (capacity.max_concurrent_calls > 0) parts.push(`Limit ${capacity.max_concurrent_calls}`);
+    if (capacity.busy_status === 'queued' && capacity.position && capacity.position > 0) {
+      parts.unshift(`Waiting #${capacity.position}`);
+    } else if (capacity.busy_status === 'admitted' || live) {
+      parts.unshift('Live');
+    } else if (capacity.busy_status === 'busy') {
+      parts.unshift('Busy');
+    }
+    return parts.join(' · ');
+  }
+
+  function capacityBusy() {
+    return capacity?.busy_status === 'busy' || capacity?.busy_status === 'queued';
+  }
+
   async function startCall() {
     if (authRequired && !customerAuthenticated) {
       error = 'Sign in before starting a call.';
@@ -211,6 +235,8 @@
     }
     error = '';
     busy = true;
+    pendingCancel = false;
+    capacity = null;
     transcriptKeys.clear();
     customerEndRequested = false;
     autoClosePending = false;
@@ -241,6 +267,9 @@
           },
           onStatus: (message) => {
             voiceState = message;
+          },
+          onCapacity: (next) => {
+            capacity = next;
           },
           onTranscript: (role, text, meta) => {
             upsertVoiceTurn(role, text);
@@ -275,12 +304,15 @@
         voiceState = `On call with ${selected.name} — agent greets first.`;
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Call failed';
+      if (!pendingCancel) {
+        error = err instanceof Error ? err.message : 'Call failed';
+      }
       await gemini?.stop().catch(() => {});
       if (session) await endCall(session.id, { tenantId }).catch(() => {});
       await cleanup(true);
     } finally {
       busy = false;
+      pendingCancel = false;
     }
   }
 
@@ -340,6 +372,7 @@
     autoCloseTimerId = undefined;
     customerEndRequested = false;
     autoClosePending = false;
+    capacity = null;
     unsubscribe?.();
     unsubscribe = undefined;
     voice = null;
@@ -351,7 +384,21 @@
 
   async function toggleCall() {
     if (live) await endActiveCall();
+    else if (busy) await cancelPendingCall();
     else await startCall();
+  }
+
+  async function cancelPendingCall() {
+    if (!busy || live) return;
+    pendingCancel = true;
+    voiceState = 'Cancelling call…';
+    try {
+      await voice?.stop().catch(() => {});
+      if (session) await endCall(session.id, { tenantId }).catch(() => {});
+    } finally {
+      await cleanup(true);
+      busy = false;
+    }
   }
 
   async function selectAgent(agent: Agent) {
@@ -650,13 +697,19 @@
           class="voice-button"
           class:live
           type="button"
-          disabled={busy || !selected || (!!micBlocked && !live)}
+          disabled={!selected || (!!micBlocked && !live) || (busy && !voice)}
           onclick={toggleCall}
           title={micBlocked || undefined}
         >
-          {live ? 'End call' : busy ? 'Connecting…' : 'Start call'}
+          {live ? 'End call' : busy ? 'Cancel' : 'Start call'}
         </button>
       </div>
+      {#if capacity}
+        <div class="capacity-strip" class:busy={capacityBusy()} aria-live="polite">
+          <span>{capacity.busy_status.replaceAll('_', ' ')}</span>
+          <strong>{capacitySummary()}</strong>
+        </div>
+      {/if}
       {#if busy && !live}
         <div class="voice-state loading" aria-live="polite">⏳ {voiceState}</div>
       {:else}
@@ -857,6 +910,36 @@
   .voice-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  .capacity-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 7px 9px;
+    border: 1px solid rgb(61 214 140 / 28%);
+    border-radius: 8px;
+    color: #b9ffd8;
+    background: rgb(61 214 140 / 8%);
+    font-size: 10px;
+    line-height: 1.25;
+  }
+  .capacity-strip.busy {
+    border-color: rgb(255 190 92 / 35%);
+    color: #ffdba0;
+    background: rgb(255 190 92 / 10%);
+  }
+  .capacity-strip span {
+    flex: 0 0 auto;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .capacity-strip strong {
+    min-width: 0;
+    color: inherit;
+    font-weight: 600;
+    text-align: right;
   }
   .voice-state {
     margin-top: 8px;

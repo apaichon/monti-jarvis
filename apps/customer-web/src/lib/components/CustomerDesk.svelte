@@ -17,7 +17,7 @@
   import { formatSystemLive, loadInfra, systemLiveState, type SystemLiveState } from '$lib/api/infra';
   import { classifyTone } from '$lib/tone';
   import { loadWorkforce, type Agent } from '$lib/api/workforce';
-  import { GeminiVoice } from '$lib/voice/gemini';
+  import { GeminiVoice, type VoiceCapacity } from '$lib/voice/gemini';
   import {
     assistantConfirmedFarewell,
     customerConfirmedEnd,
@@ -105,6 +105,8 @@
   let voiceState = $state('Select an agent, then start an inbound voice call.');
   let topic = $state<TopicId>('general');
   let chatSessionId = $state('');
+  let customerSessionCount = $state(0);
+  let voiceCapacity = $state<VoiceCapacity | null>(null);
   let chatHistory = $state<ChatHistoryEntry[]>([]);
   let messages = $state<UiMessage[]>([
     {
@@ -183,6 +185,7 @@
   let autoClosePending = $state(false);
   let unsubscribe: (() => void) | undefined;
   const transcriptKeys = new Set<string>();
+  const countedSessionIds = new Set<string>();
 
   onMount(async () => {
     initLangFromUrl(new URLSearchParams(window.location.search));
@@ -206,6 +209,8 @@
       if (profile) {
         signedInAt = Date.now();
         lastActiveAt = Date.now();
+      } else {
+        resetCustomerSessionCount();
       }
       void refreshPortalState();
     });
@@ -404,6 +409,39 @@
     lastActiveAt = Date.now();
   }
 
+  function rememberCustomerSession(id: string) {
+    const trimmed = id.trim();
+    if (!trimmed || countedSessionIds.has(trimmed)) return;
+    countedSessionIds.add(trimmed);
+    customerSessionCount += 1;
+  }
+
+  function resetCustomerSessionCount() {
+    countedSessionIds.clear();
+    customerSessionCount = 0;
+  }
+
+  function applyCustomerQuotaSummary(next: CustomerQuotaSummary) {
+    quota = next;
+    const persisted = Number(next.total_calls ?? 0);
+    if (Number.isFinite(persisted) && persisted > customerSessionCount) {
+      customerSessionCount = Math.floor(persisted);
+    }
+  }
+
+  function applyVoiceCapacity(next: VoiceCapacity) {
+    voiceCapacity = next;
+    if (next.total_calls > customerSessionCount) {
+      customerSessionCount = next.total_calls;
+    }
+  }
+
+  function titleCaseStatus(value: string) {
+    const normalized = value.trim().replace(/[_-]+/g, ' ');
+    if (!normalized) return 'Available';
+    return normalized.slice(0, 1).toUpperCase() + normalized.slice(1);
+  }
+
   function toggleCallTheme() {
     callTheme = callTheme === 'dark' ? 'light' : 'dark';
     window.localStorage.setItem('monti_jarvis:call_theme', callTheme);
@@ -490,9 +528,9 @@
       selectedAgent = null;
     }
     try {
-      quota = await loadCustomerQuota(tenantId ? { tenantId } : undefined);
+      applyCustomerQuotaSummary(await loadCustomerQuota(tenantId ? { tenantId } : undefined));
     } catch {
-      quota = portalPolicy.quota;
+      applyCustomerQuotaSummary(portalPolicy.quota);
     }
   }
 
@@ -800,6 +838,7 @@
       );
       session = created;
       chatSessionId = created.id;
+      rememberCustomerSession(created.id);
 
       gemini = new GeminiVoice();
       // Make the live client available to callbacks while start() is still
@@ -825,6 +864,7 @@
           onStatus: (message) => {
             voiceState = message;
           },
+          onCapacity: applyVoiceCapacity,
           onTranscript: (role, text, meta) => {
             // Live caption grows as partial ASR chunks merge into full sentences.
             upsertVoiceTurn(role, text);
@@ -888,7 +928,7 @@
         });
       }
       await endCall(session.id, tenantId ? { tenantId } : undefined);
-      void loadCustomerQuota(tenantId ? { tenantId } : undefined).then((q) => (quota = q)).catch(() => {});
+      void loadCustomerQuota(tenantId ? { tenantId } : undefined).then(applyCustomerQuotaSummary).catch(() => {});
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to end call';
     } finally {
@@ -939,6 +979,7 @@
     unsubscribe?.();
     unsubscribe = undefined;
     voice = null;
+    if (resetSession) voiceCapacity = null;
     clearTimeout(customerCloseFallbackTimerId);
     customerCloseFallbackTimerId = undefined;
     customerEndRequested = false;
@@ -984,6 +1025,7 @@
         challenge_id: challengeId,
         otp: otp.trim()
       }, tenantId ? { tenantId } : undefined);
+      if (customer?.id !== res.customer.id) resetCustomerSessionCount();
       customer = res.customer;
       signedInAt = Date.now();
       lastActiveAt = Date.now();
@@ -1005,6 +1047,8 @@
     customer = null;
     signedInAt = null;
     lastActiveAt = null;
+    resetCustomerSessionCount();
+    voiceCapacity = null;
     authStatus = 'Signed out';
     await refreshPortalState();
   }
@@ -1043,6 +1087,7 @@
         tenantId ? { tenantId } : undefined
       );
       chatSessionId = data.session_id;
+      rememberCustomerSession(data.session_id);
       if (data.ticket_offer) openTicketOffer(data.ticket_offer);
       messages = messages.map((m) =>
         m.id === thinking.id
@@ -1051,7 +1096,7 @@
       );
       chatHistory = [...chatHistory, { role: 'assistant', content: data.reply }];
       showTone(data.reply);
-      void loadCustomerQuota(tenantId ? { tenantId } : undefined).then((q) => (quota = q)).catch(() => {});
+      void loadCustomerQuota(tenantId ? { tenantId } : undefined).then(applyCustomerQuotaSummary).catch(() => {});
     } catch (err) {
       messages = messages.filter((m) => m.id !== thinking.id);
       chatHistory = chatHistory.slice(0, -1);
@@ -1085,6 +1130,30 @@
   const hideAgentSurfaceBeforeLogin = $derived(authRequired && !callStarted);
   const callTimerLabel = $derived(activeCallLimitSeconds > 0 ? remainingTimer : timer);
   const callTimerWarning = $derived(activeCallLimitSeconds > 0 && remainingSeconds <= 10);
+  const capacityStatus = $derived(voiceCapacity?.busy_status || (live ? 'live' : busy ? 'busy' : 'available'));
+  const capacityStatusLabel = $derived(titleCaseStatus(capacityStatus));
+  const displayedTotalCalls = $derived(voiceCapacity?.total_calls ?? customerSessionCount);
+  const displayedActiveCalls = $derived(voiceCapacity?.active_calls ?? (live ? 1 : 0));
+  const displayedMaxConcurrent = $derived(voiceCapacity?.max_concurrent_calls ?? 0);
+  const displayedQueuedCallers = $derived(voiceCapacity?.queued_callers ?? 0);
+  const displayedAvailableSlots = $derived(
+    displayedMaxConcurrent > 0 ? Math.max(0, displayedMaxConcurrent - displayedActiveCalls) : null
+  );
+  const activeCallsLabel = $derived(
+    displayedMaxConcurrent > 0 ? `${displayedActiveCalls}/${displayedMaxConcurrent}` : String(displayedActiveCalls)
+  );
+  const availableSlotsLabel = $derived(displayedAvailableSlots == null ? '—' : String(displayedAvailableSlots));
+  const capacitySummary = $derived(
+    `${capacityStatusLabel} · Total calls ${displayedTotalCalls} · Active ${activeCallsLabel} · Queue ${displayedQueuedCallers}`
+  );
+  const queuePositionLabel = $derived(
+    voiceCapacity?.position && voiceCapacity.position > 0 ? `Position ${voiceCapacity.position}` : ''
+  );
+  const queueWaitLabel = $derived(
+    voiceCapacity?.estimated_wait_seconds && voiceCapacity.estimated_wait_seconds > 0
+      ? `est. wait ${voiceCapacity.estimated_wait_seconds}s`
+      : ''
+  );
 </script>
 
 <main class="app conversation-app theme-{callTheme}">
@@ -1960,6 +2029,19 @@
           </svg>
           {live ? 'Listening...' : voiceState}
         </span>
+        <div class="capacity-strip" aria-live="polite">
+          <span class="capacity-pill status">{capacityStatusLabel}</span>
+          <span>Total calls {displayedTotalCalls}</span>
+          <span>Active {activeCallsLabel}</span>
+          <span>Queue {displayedQueuedCallers}</span>
+          <span>Available {availableSlotsLabel}</span>
+          {#if queuePositionLabel}
+            <span>{queuePositionLabel}</span>
+          {/if}
+          {#if queueWaitLabel}
+            <span>{queueWaitLabel}</span>
+          {/if}
+        </div>
       </div>
 
       <div class="call-control-row" aria-label="Call controls">
@@ -2100,7 +2182,11 @@
         <div><dt>Language</dt><dd>English</dd></div>
         <div><dt>Sentiment</dt><dd><span class="sentiment positive">Positive</span></dd></div>
         <div><dt>Last active</dt><dd>{lastActiveLabel}</dd></div>
-        <div><dt>Total calls</dt><dd>{chatSessionId || session ? '1' : '0'}</dd></div>
+        <div><dt>Call status</dt><dd>{capacityStatusLabel}</dd></div>
+        <div><dt>Total calls</dt><dd>{displayedTotalCalls}</dd></div>
+        <div><dt>Active calls</dt><dd>{activeCallsLabel}</dd></div>
+        <div><dt>Queue</dt><dd>{displayedQueuedCallers}</dd></div>
+        <div><dt>Available queue</dt><dd>{availableSlotsLabel}</dd></div>
       </dl>
     </section>
     <section class="insight-card">
@@ -2120,7 +2206,7 @@
         <span>Tenant</span><strong>{tenantName || brand.brand_name || tenantLabel}</strong><b>›</b>
       </button>
       <button type="button" disabled>
-        <span>Customer</span><strong>{customerLabel}</strong><b>›</b>
+        <span>Customer</span><strong>{customerLabel} · {capacitySummary}</strong><b>›</b>
       </button>
       <button type="button" onclick={() => void openAudioSettings(true)}>
         <span>Device</span><strong>{selectedMicLabel()}</strong><b>›</b>

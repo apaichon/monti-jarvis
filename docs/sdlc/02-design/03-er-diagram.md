@@ -3,7 +3,7 @@ id: DES-0003
 title: Entity Relationship Diagram
 status: shipped
 updated: 2026-08-01
-sprint: SPRINT-064
+sprint: SPRINT-065
 ---
 
 # ER Diagram — Monti Jarvis
@@ -2899,7 +2899,6 @@ browser response-field mismatch after `GET /api/platform/leads` returned valid
 rows.
 
 See workflow section 140, API Sprint 63, and UX A63.
-
 ## Sprint 64 - Payment Gateway Portability and Stripe
 
 Sprint 64 keeps the existing payment authority tables and extends them for
@@ -3003,3 +3002,32 @@ erDiagram
 | `payment_orders` | index `(provider, provider_payment_id)` |
 
 See DES-0059, workflow §141-143, API Sprint 64, and UX A64/T64.
+
+## Sprint 65 - queued concurrent-call admission
+
+S65 does not add a Postgres table. The queue is operational state in Redis DB 4
+and the active-call count remains the existing concurrent-call lease. Audit and
+metrics use the existing application audit/metrics paths.
+
+### Redis DB 4 keys
+
+| Key | Type | TTL | Purpose |
+| --- | --- | --- | --- |
+| `monti_jarvis:quota:{tenant}:concurrent` | int | `QUOTA_CONCURRENT_TTL` | Existing active-call slot lease. |
+| `monti_jarvis:callq:{tenant}:voice` | sorted set | none | FIFO queue ordered by enqueue timestamp. |
+| `monti_jarvis:callq:{tenant}:entry:{admission_id}` | hash | wait timeout + grace | Per-caller queue metadata and state. |
+| `monti_jarvis:callq:{tenant}:client:{client_key}` | string | entry TTL | Idempotent retry mapping. |
+| `monti_jarvis:callq:{tenant}:promote_lock` | string | lock TTL | Multi-instance promotion guard. |
+| `monti_jarvis:callq:{tenant}:recent_timeouts` | counter/list | 24h | Tenant/admin visibility. |
+
+### No new Postgres entities
+
+| Entity | Sprint | Status |
+| --- | --- | --- |
+| Durable call queue history | later | Deferred unless operations need long-term queue analytics. |
+| Queue audit event table | later | Reuse existing audit/metrics in S65. |
+
+Any future Postgres queue table must include `created_at`, `updated_at`,
+`created_by`, and `updated_by` audit columns.
+
+See DES-0060, workflow §144, API Sprint 65, UX C65/T65.

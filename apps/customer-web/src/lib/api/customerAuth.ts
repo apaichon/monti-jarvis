@@ -48,6 +48,7 @@ export type CustomerPortalPolicy = {
 export type CustomerQuotaSummary = {
   tenant_id: string;
   customer_id?: string;
+  total_calls?: number;
   daily_remaining_seconds?: number;
   daily_limit_seconds: number;
   max_call_seconds: number;

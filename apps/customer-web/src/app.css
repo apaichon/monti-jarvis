@@ -75,9 +75,12 @@ button {
 }
 
 .conversation-app {
-  width: min(100vw, 1920px);
-  grid-template-columns: minmax(270px, 330px) minmax(560px, 1fr) minmax(230px, 280px);
-  gap: 18px;
+  --conversation-shell-padding: clamp(14px, 2.2vw, 32px);
+  width: min(100%, 1920px);
+  margin-inline: auto;
+  grid-template-columns: minmax(248px, 0.78fr) minmax(0, 1.68fr) minmax(220px, 0.66fr);
+  gap: clamp(12px, 1.4vw, 20px);
+  padding: var(--conversation-shell-padding);
   color: var(--call-text);
 }
 
@@ -2506,7 +2509,7 @@ textarea {
 .conversation-app .control-panel,
 .conversation-app .workspace,
 .conversation-app .insight-panel {
-  height: calc(100vh - (clamp(16px, 4vw, 44px) * 2));
+  height: calc(100dvh - (var(--conversation-shell-padding) * 2));
 }
 
 .conversation-workspace {
@@ -2602,15 +2605,15 @@ textarea {
 .conversation-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) minmax(220px, 310px) minmax(110px, 1fr);
+  grid-template-columns: minmax(90px, 1fr) minmax(190px, 280px) minmax(90px, 1fr);
   grid-template-areas:
     'wave-left avatar wave-right'
     'greeting greeting greeting'
     'controls controls controls';
   align-items: center;
   justify-items: center;
-  gap: 8px 14px;
-  min-height: 460px;
+  gap: 6px 14px;
+  min-height: clamp(320px, 43vh, 500px);
   padding: 4px 0;
   overflow: visible;
 }
@@ -2630,8 +2633,8 @@ textarea {
 
 .conversation-avatar-stage {
   grid-area: avatar;
-  width: min(100%, 310px);
-  min-height: 236px;
+  width: min(100%, 280px);
+  min-height: 210px;
   padding: 4px 0 0;
   border: 0;
   background: transparent;
@@ -2640,8 +2643,8 @@ textarea {
 }
 
 .conversation-avatar-stage .avatar-live-visual {
-  width: clamp(210px, 17vw, 250px);
-  height: clamp(210px, 17vw, 250px);
+  width: clamp(184px, 15vw, 238px);
+  height: clamp(184px, 15vw, 238px);
 }
 
 .conversation-avatar-stage .avatar-pulse-ring {
@@ -2653,8 +2656,8 @@ textarea {
 .conversation-avatar-stage .ring-c { inset: 42px; }
 
 .conversation-avatar-stage .avatar-live-halo {
-  width: clamp(176px, 14.5vw, 210px);
-  height: clamp(176px, 14.5vw, 210px);
+  width: clamp(154px, 12.6vw, 200px);
+  height: clamp(154px, 12.6vw, 200px);
   background:
     radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--assistant-color, var(--cyan)) 16%, transparent), transparent 68%),
     var(--call-panel-strong);
@@ -2662,8 +2665,8 @@ textarea {
 
 .conversation-avatar-stage .avatar-live-halo .portrait:not(.mini),
 .conversation-avatar-stage .avatar-live-halo .portrait.photo {
-  width: clamp(146px, 12vw, 176px);
-  height: clamp(146px, 12vw, 176px);
+  width: clamp(126px, 10.4vw, 166px);
+  height: clamp(126px, 10.4vw, 166px);
   max-height: none;
 }
 
@@ -2713,12 +2716,38 @@ textarea {
   white-space: nowrap;
 }
 
+.capacity-strip {
+  max-width: min(100%, 820px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  color: var(--call-muted);
+  font-size: 0.72rem;
+}
+
+.capacity-strip span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--call-border);
+  border-radius: 999px;
+  padding: 0 9px;
+  background: color-mix(in srgb, var(--control-bg) 82%, transparent);
+  white-space: nowrap;
+}
+
+.capacity-strip .status {
+  color: var(--cyan);
+  border-color: var(--call-border-strong);
+}
+
 .call-control-row {
   grid-area: controls;
   display: grid;
-  grid-template-columns: repeat(5, minmax(64px, 86px));
+  grid-template-columns: repeat(5, minmax(58px, 78px));
   justify-content: center;
-  gap: clamp(10px, 2vw, 24px);
+  gap: clamp(8px, 1.5vw, 20px);
   width: 100%;
 }
 

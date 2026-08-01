@@ -36,20 +36,25 @@ type bonusQuotaStore interface {
 
 // Service enforces package quotas and API rate limits (SPRINT-013).
 type Service struct {
-	ents                 EntitlementReader
-	store                UsageStore
-	rdb                  *redis.Client
-	prefix               string
-	enabled              bool
-	rateEnabled          bool
-	failOpen             bool
-	chatPerMin           int
-	kmPerMin             int
-	voicePerMin          int
-	concurrentTTL        time.Duration
-	previewMaxConcurrent int
-	bonus                bonusQuotaStore
-	now                  func() time.Time // injectable for tests
+	ents                      EntitlementReader
+	store                     UsageStore
+	rdb                       *redis.Client
+	prefix                    string
+	enabled                   bool
+	rateEnabled               bool
+	failOpen                  bool
+	chatPerMin                int
+	kmPerMin                  int
+	voicePerMin               int
+	concurrentTTL             time.Duration
+	callQueueEnabled          bool
+	callQueueMaxWait          time.Duration
+	callQueueMaxPerTenant     int
+	callQueuePromotionLockTTL time.Duration
+	callQueuePositionRefresh  time.Duration
+	previewMaxConcurrent      int
+	bonus                     bonusQuotaStore
+	now                       func() time.Time // injectable for tests
 }
 
 // New builds a quota service from app config + store + entitlements.
@@ -95,21 +100,42 @@ func NewWithBonusDeps(ents EntitlementReader, us UsageStore, rdb *redis.Client, 
 	if previewMax <= 0 {
 		previewMax = 2
 	}
+	queueMaxWait := cfg.CallQueueMaxWait
+	if queueMaxWait <= 0 {
+		queueMaxWait = 120 * time.Second
+	}
+	queueMaxPerTenant := cfg.CallQueueMaxPerTenant
+	if queueMaxPerTenant <= 0 {
+		queueMaxPerTenant = 50
+	}
+	queueLockTTL := cfg.CallQueuePromotionLockTTL
+	if queueLockTTL <= 0 {
+		queueLockTTL = 10 * time.Second
+	}
+	queueRefresh := cfg.CallQueuePositionRefresh
+	if queueRefresh <= 0 {
+		queueRefresh = 2 * time.Second
+	}
 	return &Service{
-		ents:                 ents,
-		store:                us,
-		rdb:                  rdb,
-		prefix:               prefix,
-		enabled:              cfg.QuotaEnabled && rdb != nil,
-		rateEnabled:          cfg.RateLimitEnabled && rdb != nil,
-		failOpen:             cfg.QuotaFailOpen,
-		chatPerMin:           chat,
-		kmPerMin:             km,
-		voicePerMin:          voice,
-		concurrentTTL:        ttl,
-		previewMaxConcurrent: previewMax,
-		bonus:                bonus,
-		now:                  time.Now,
+		ents:                      ents,
+		store:                     us,
+		rdb:                       rdb,
+		prefix:                    prefix,
+		enabled:                   cfg.QuotaEnabled && rdb != nil,
+		rateEnabled:               cfg.RateLimitEnabled && rdb != nil,
+		failOpen:                  cfg.QuotaFailOpen,
+		chatPerMin:                chat,
+		kmPerMin:                  km,
+		voicePerMin:               voice,
+		concurrentTTL:             ttl,
+		callQueueEnabled:          cfg.CallQueueEnabled,
+		callQueueMaxWait:          queueMaxWait,
+		callQueueMaxPerTenant:     queueMaxPerTenant,
+		callQueuePromotionLockTTL: queueLockTTL,
+		callQueuePositionRefresh:  queueRefresh,
+		previewMaxConcurrent:      previewMax,
+		bonus:                     bonus,
+		now:                       time.Now,
 	}
 }
 
@@ -164,6 +190,9 @@ func (s *Service) Snapshot(ctx context.Context, tenantID string) (*Snapshot, err
 		return nil, err
 	}
 	out.Usage = usage
+	if queue, err := s.ConcurrentQueueSnapshot(ctx, tenantID); err == nil {
+		out.ConcurrentQueue = &queue
+	}
 
 	eff, err := s.effective(ctx, tenantID)
 	if err != nil {

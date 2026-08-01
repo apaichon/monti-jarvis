@@ -150,6 +150,159 @@ func TestAcquireConcurrent_Release(t *testing.T) {
 	r3()
 }
 
+func TestWaitForQueuedConcurrent_PromotesAfterRelease(t *testing.T) {
+	rules := starterRules()
+	rules[DimMaxConcurrentCalls] = 1
+	svc, _ := testSvc(t, rules, nil)
+	svc.callQueueEnabled = true
+	svc.callQueueMaxWait = time.Second
+	svc.callQueuePositionRefresh = 10 * time.Millisecond
+	ctx := context.Background()
+
+	releaseActive, err := svc.AcquireConcurrent(ctx, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updates := make(chan QueueUpdate, 4)
+	done := make(chan *QueuedAdmission, 1)
+	errs := make(chan error, 1)
+	go func() {
+		admission, err := svc.WaitForQueuedConcurrent(ctx, "demo", "adm-test", func(update QueueUpdate) error {
+			updates <- update
+			return nil
+		})
+		if err != nil {
+			errs <- err
+			return
+		}
+		done <- admission
+	}()
+
+	select {
+	case update := <-updates:
+		if update.Type != "queue_status" || update.Position != 1 || update.Snapshot.TotalCalls != 2 || update.Snapshot.BusyStatus != "queued" {
+			t.Fatalf("queue update = %+v", update)
+		}
+	case err := <-errs:
+		t.Fatalf("wait failed before release: %v", err)
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for queue status")
+	}
+
+	releaseActive()
+	select {
+	case admission := <-done:
+		if admission.AdmissionID != "adm-test" || admission.Release == nil {
+			t.Fatalf("admission = %+v", admission)
+		}
+		if admission.Snapshot.ActiveCalls != 1 || admission.Snapshot.QueuedCallers != 0 || admission.Snapshot.BusyStatus != "admitted" {
+			t.Fatalf("admitted snapshot = %+v", admission.Snapshot)
+		}
+		admission.Release()
+	case err := <-errs:
+		t.Fatalf("wait failed after release: %v", err)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for promotion")
+	}
+}
+
+func TestWaitForQueuedConcurrent_QueueFull(t *testing.T) {
+	rules := starterRules()
+	rules[DimMaxConcurrentCalls] = 1
+	svc, _ := testSvc(t, rules, nil)
+	svc.callQueueEnabled = true
+	svc.callQueueMaxPerTenant = 1
+	svc.callQueueMaxWait = time.Second
+	svc.callQueuePositionRefresh = 10 * time.Millisecond
+	ctx := context.Background()
+
+	releaseActive, err := svc.AcquireConcurrent(ctx, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer releaseActive()
+
+	firstCtx, cancelFirst := context.WithCancel(ctx)
+	defer cancelFirst()
+	firstReady := make(chan struct{}, 1)
+	go func() {
+		_, _ = svc.WaitForQueuedConcurrent(firstCtx, "demo", "adm-first", func(update QueueUpdate) error {
+			if update.Type == "queue_status" {
+				select {
+				case firstReady <- struct{}{}:
+				default:
+				}
+			}
+			return nil
+		})
+	}()
+	select {
+	case <-firstReady:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("first caller did not queue")
+	}
+
+	_, err = svc.WaitForQueuedConcurrent(ctx, "demo", "adm-second", nil)
+	if !errors.Is(err, ErrQueueFull) {
+		t.Fatalf("second queued caller error = %v, want ErrQueueFull", err)
+	}
+}
+
+func TestConcurrentQueueSnapshot(t *testing.T) {
+	rules := starterRules()
+	rules[DimMaxConcurrentCalls] = 1
+	svc, _ := testSvc(t, rules, nil)
+	svc.callQueueEnabled = true
+	svc.callQueueMaxWait = time.Second
+	ctx := context.Background()
+
+	releaseActive, err := svc.AcquireConcurrent(ctx, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer releaseActive()
+	if _, err := svc.enqueueCaller(ctx, "demo", "adm-1"); err != nil {
+		t.Fatal(err)
+	}
+
+	snap, err := svc.ConcurrentQueueSnapshot(ctx, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snap.QueueEnabled || snap.ActiveCalls != 1 || snap.QueuedCallers != 1 || snap.TotalCalls != 2 || snap.MaxConcurrentCalls != 1 || snap.BusyStatus != "queued" {
+		t.Fatalf("snapshot = %+v", snap)
+	}
+}
+
+func TestQueueEntryMetadataAndDuplicateAdmissionID(t *testing.T) {
+	rules := starterRules()
+	rules[DimMaxConcurrentCalls] = 1
+	svc, mr := testSvc(t, rules, nil)
+	svc.callQueueEnabled = true
+	ctx := context.Background()
+
+	inserted, err := svc.enqueueCaller(ctx, "demo", "adm-dup")
+	if err != nil || !inserted {
+		t.Fatalf("first enqueue inserted=%v err=%v", inserted, err)
+	}
+	inserted, err = svc.enqueueCaller(ctx, "demo", "adm-dup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inserted {
+		t.Fatal("duplicate admission id created a second queue position")
+	}
+	got, err := mr.ZMembers(svc.callQueueKey("demo"))
+	if err != nil || len(got) != 1 || got[0] != "adm-dup" {
+		t.Fatalf("queue members = %#v err=%v", got, err)
+	}
+	entryKey := svc.callQueueEntryKey("demo", "adm-dup")
+	if mr.HGet(entryKey, "status") != "queued" || mr.HGet(entryKey, "admission_id") != "adm-dup" || mr.HGet(entryKey, "tenant_id") != "demo" || mr.HGet(entryKey, "expires_at_ms") == "" {
+		t.Fatalf("entry metadata status=%q admission=%q tenant=%q expires=%q", mr.HGet(entryKey, "status"), mr.HGet(entryKey, "admission_id"), mr.HGet(entryKey, "tenant_id"), mr.HGet(entryKey, "expires_at_ms"))
+	}
+}
+
 func TestAllowRate(t *testing.T) {
 	svc, _ := testSvc(t, starterRules(), nil)
 	ctx := context.Background()

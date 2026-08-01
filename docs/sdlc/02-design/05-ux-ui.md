@@ -3,7 +3,7 @@ id: DES-0005
 title: UX/UI — ASCII Wireframes
 status: shipped
 updated: 2026-08-01
-sprint: SPRINT-064
+sprint: SPRINT-065
 ---
 
 # UX/UI — ASCII Wireframes
@@ -4851,7 +4851,6 @@ GET leads -> {items:[], total:0} -> normalize -> empty message
 | Contract tests | `apps/platform-admin-web/tests/lead-list-contract.test.js` |
 
 See workflow section 140, ER Sprint 63, and API Sprint 63.
-
 ## A64 - Platform Payment Gateway Switch (Sprint 64)
 
 ### Screen map -> API
@@ -4935,3 +4934,118 @@ Tenant Billing -> Buy -> POST checkout
 | Return page | `apps/tenant-web/src/routes/billing/return/+page.svelte` |
 
 See DES-0059, workflow §141-143, ER Sprint 64, and API Sprint 64.
+
+## C65 - Customer queued call waiting state (Sprint 65)
+
+Callers who hit the tenant concurrent-call limit stay on the voice surface and
+see live queue position until a slot opens, they cancel, or the wait expires.
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| C65-A Start call | Start voice while limit full | `GET /ws/voice` |
+| C65-B Queue status | Wait for position updates | WS `queue_status` |
+| C65-C Cancel | Leave queue | WS `queue_cancel` or close |
+| C65-D Auto-start | Slot opens | WS `queue_admitted` then existing `ready` |
+| C65-E Timeout | Wait expires | WS error `queue_timeout` |
+| C65-F Capacity banner | See total calls and busy/live status | WS `queue_status` / `ready` capacity fields |
+
+### Desktop layout
+
+```text
+┌────────────────────┬─────────────────────────────────────────────────────┐
+│ Monti caller desk  │ C65-B Waiting for a call slot                       │
+│                    │                                                     │
+│ Call status         │ Busy · Total calls 3 · Active 1/1 · Queue 2         │
+│                    │                                                     │
+│ Agent selected     │ You are in line / กำลังรอสาย                       │
+│ Package status     │ Position 1 · est. wait 45s                          │
+│                    │                                                     │
+│ [Cancel]           │ The call starts automatically when the next slot    │
+│                    │ opens.                                              │
+└────────────────────┴─────────────────────────────────────────────────────┘
+```
+
+### Live call layout
+
+```text
+┌────────────────────┬─────────────────────────────────────────────────────┐
+│ Monti caller desk  │ On call with Billing                                │
+│                    │                                                     │
+│ Call status         │ Live · Total calls 1 · Active 1/1 · Queue 0         │
+│                    │                                                     │
+│ Timer              │ 03:18                                               │
+│ Controls           │ [Mute] [End call]                                   │
+└────────────────────┴─────────────────────────────────────────────────────┘
+```
+
+### Mobile collapse
+
+```text
+┌───────────────────────────────┐
+│ Waiting for a call slot       │
+│ Busy · total calls 3          │
+│ Position 1                    │
+│ Active 1/1 · Queue 2          │
+│ Starts automatically          │
+│ [Cancel]                      │
+└───────────────────────────────┘
+```
+
+### Flow C65-A - queued then admitted
+
+```text
+Start call
+  |
+  +-> /ws/voice opens
+       |
+       +-> queue_status busy + total_calls + position=1
+       |
+       +-> queue_admitted admitted + total_calls
+       |
+       +-> ready live + total_calls -> normal voice call
+```
+
+### Flow C65-B - cancel / timeout
+
+```text
+Waiting
+  |
+  +-> Cancel or browser close -> queue_cancel -> removed from Redis
+  |
+  +-> timeout -> queue_timeout -> show retry action
+```
+
+### Component -> file
+
+| Component | File |
+| --- | --- |
+| Voice WebSocket client | `apps/customer-web/src/lib/voice/gemini.ts` |
+| Customer/embed voice state | `apps/customer-web/src/routes/embed/+page.svelte` |
+| Shared customer messages | `apps/customer-web/src/lib/i18n/messages.ts` |
+| Admission service | `internal/quota` |
+| Voice quota handler | `cmd/server/quota.go` |
+
+## T65 - Tenant/admin concurrent queue visibility
+
+### Screen map -> API
+
+| UI zone | User action | API / WS |
+| --- | --- | --- |
+| T65-A Current plan quota card | View active/queued capacity | `GET /api/tenant/commercial/current-plan` |
+| T65-B Queue status detail | Refresh support snapshot | `GET /api/tenant/concurrent-call-queue/status` |
+| A65-A Platform tenant usage | Support tenant capacity issue | `GET /api/platform/tenants/{tenant_id}/usage` |
+
+### Tenant layout
+
+```text
+┌ Current plan ───────────────────────────────────────────┐
+│ Shared Cloud Starter                                    │
+│ Concurrent voice: active 1 / limit 1                    │
+│ Total calls: 3 · Queue: 2 waiting · busy                │
+│ Oldest wait 37s · timeouts 1 today                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+See DES-0060, workflow §144, ER Sprint 65, API Sprint 65.

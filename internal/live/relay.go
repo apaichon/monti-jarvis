@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -58,6 +59,60 @@ type UsageEvent struct {
 	AudioSeconds uint32
 }
 
+type AdmissionCapacity struct {
+	AdmissionID          string
+	Position             int
+	EstimatedWaitSeconds int
+	QueueEnabled         bool
+	ActiveCalls          int
+	QueuedCallers        int
+	TotalCalls           int
+	MaxConcurrentCalls   int
+	BusyStatus           string
+}
+
+type AdmissionUpdate struct {
+	AdmissionCapacity
+	Type    string
+	Message string
+	Code    string
+}
+
+type AdmissionResult struct {
+	Release  func()
+	Context  context.Context
+	Cancel   context.CancelFunc
+	Capacity *AdmissionCapacity
+}
+
+type AdmissionFunc func(ctx context.Context, tenantID string, send func(AdmissionUpdate) error) (AdmissionResult, error)
+
+type AdmissionError struct {
+	Code    string
+	Message string
+	Err     error
+}
+
+func (e *AdmissionError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Message != "" {
+		return e.Message
+	}
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return e.Code
+}
+
+func (e *AdmissionError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
 type Relay struct {
 	cfg            Config
 	rag            *rag.Service
@@ -68,6 +123,7 @@ type Relay struct {
 	ToolResolver   ToolResolver
 	ToolExecutor   ToolExecutor
 	UsageSink      func(context.Context, UsageEvent)
+	Admission      AdmissionFunc
 }
 
 func New(cfg Config, ragSvc *rag.Service) *Relay {
@@ -107,6 +163,52 @@ func (r *Relay) Handler() http.HandlerFunc {
 		}
 		// Early status so UI can show loading while Gemini connects (often several seconds).
 		_ = send(serverMsg{Type: "status", Message: "Connecting to AI voice…"})
+		var capacity *AdmissionCapacity
+		if r.Admission != nil {
+			admission, err := r.Admission(ctx, tenantID, func(update AdmissionUpdate) error {
+				return send(serverMsg{
+					Type:                 update.Type,
+					Code:                 update.Code,
+					Message:              update.Message,
+					AdmissionID:          update.AdmissionID,
+					Position:             update.Position,
+					EstimatedWaitSeconds: update.EstimatedWaitSeconds,
+					QueueEnabled:         update.QueueEnabled,
+					ActiveCalls:          update.ActiveCalls,
+					QueuedCallers:        update.QueuedCallers,
+					TotalCalls:           update.TotalCalls,
+					MaxConcurrentCalls:   update.MaxConcurrentCalls,
+					BusyStatus:           update.BusyStatus,
+				})
+			})
+			if err != nil {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || req.Context().Err() != nil {
+					return
+				}
+				msg := serverMsg{Type: "error", Message: "Voice capacity is unavailable — try again"}
+				var admissionErr *AdmissionError
+				if errors.As(err, &admissionErr) {
+					msg.Code = admissionErr.Code
+					msg.Message = admissionErr.Error()
+				}
+				_ = send(msg)
+				return
+			}
+			if admission.Context != nil {
+				ctx = admission.Context
+			}
+			if admission.Cancel != nil {
+				defer admission.Cancel()
+			}
+			if admission.Release != nil {
+				defer admission.Release()
+			}
+			capacity = admission.Capacity
+		}
+		go func(done <-chan struct{}) {
+			<-done
+			_ = client.Close()
+		}(ctx.Done())
 
 		// Scope voice RAG to the same tenant as chat/embed (query tenant_id).
 		relay := r
@@ -147,7 +249,7 @@ func (r *Relay) Handler() http.HandlerFunc {
 			})
 		}()
 
-		_ = send(serverMsg{
+		readyMsg := serverMsg{
 			Type:      "ready",
 			CallID:    callID,
 			Model:     normalizeModel(r.cfg.Model),
@@ -157,7 +259,17 @@ func (r *Relay) Handler() http.HandlerFunc {
 			AgentName: agent.Name,
 			StartedAt: time.Now().UnixMilli(),
 			Message:   "Connected — agent is greeting you…",
-		})
+		}
+		if capacity != nil {
+			readyMsg.AdmissionID = capacity.AdmissionID
+			readyMsg.QueueEnabled = capacity.QueueEnabled
+			readyMsg.ActiveCalls = capacity.ActiveCalls
+			readyMsg.QueuedCallers = capacity.QueuedCallers
+			readyMsg.TotalCalls = capacity.TotalCalls
+			readyMsg.MaxConcurrentCalls = capacity.MaxConcurrentCalls
+			readyMsg.BusyStatus = capacity.BusyStatus
+		}
+		_ = send(readyMsg)
 		if req.URL.Query().Get("mobile") == "1" {
 			_ = send(serverMsg{Type: "call_status", Status: "active", Message: "active"})
 		}
@@ -548,21 +660,30 @@ type clientMsg struct {
 }
 
 type serverMsg struct {
-	Type       string `json:"type"`
-	Code       string `json:"code,omitempty"`
-	CallID     string `json:"call_id,omitempty"`
-	Data       string `json:"data,omitempty"`
-	DataBase64 string `json:"data_base64,omitempty"`
-	Text       string `json:"text,omitempty"`
-	Message    string `json:"message,omitempty"`
-	Role       string `json:"role,omitempty"`
-	Model      string `json:"model,omitempty"`
-	Voice      string `json:"voice,omitempty"`
-	AgentID    string `json:"agent_id,omitempty"`
-	AvatarID   string `json:"avatar_id,omitempty"`
-	AgentName  string `json:"agent_name,omitempty"`
-	StartedAt  int64  `json:"started_at_ms,omitempty"`
-	Status     string `json:"status,omitempty"`
+	Type                 string `json:"type"`
+	Code                 string `json:"code,omitempty"`
+	CallID               string `json:"call_id,omitempty"`
+	Data                 string `json:"data,omitempty"`
+	DataBase64           string `json:"data_base64,omitempty"`
+	Text                 string `json:"text,omitempty"`
+	Message              string `json:"message,omitempty"`
+	Role                 string `json:"role,omitempty"`
+	Model                string `json:"model,omitempty"`
+	Voice                string `json:"voice,omitempty"`
+	AgentID              string `json:"agent_id,omitempty"`
+	AvatarID             string `json:"avatar_id,omitempty"`
+	AgentName            string `json:"agent_name,omitempty"`
+	StartedAt            int64  `json:"started_at_ms,omitempty"`
+	Status               string `json:"status,omitempty"`
+	AdmissionID          string `json:"admission_id,omitempty"`
+	Position             int    `json:"position,omitempty"`
+	EstimatedWaitSeconds int    `json:"estimated_wait_seconds,omitempty"`
+	QueueEnabled         bool   `json:"queue_enabled,omitempty"`
+	ActiveCalls          int    `json:"active_calls,omitempty"`
+	QueuedCallers        int    `json:"queued_callers,omitempty"`
+	TotalCalls           int    `json:"total_calls,omitempty"`
+	MaxConcurrentCalls   int    `json:"max_concurrent_calls,omitempty"`
+	BusyStatus           string `json:"busy_status,omitempty"`
 }
 
 type geminiFrame struct {

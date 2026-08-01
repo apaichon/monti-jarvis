@@ -339,7 +339,7 @@ func (s *server) getTenantCurrentCommercialPlan(w http.ResponseWriter, r *http.R
 	out := map[string]any{
 		"tenant_id": tenantID, "billing_state": "no_plan", "package": nil,
 		"subscription": nil, "next_bill": nil, "quota": []currentPlanQuotaDimension{},
-		"compact_utilization": nil, "documents": []map[string]any{}, "quote": nil,
+		"compact_utilization": nil, "concurrent_queue": nil, "documents": []map[string]any{}, "quote": nil,
 	}
 
 	entitlement, entitlementErr := s.store.GetActiveEntitlement(r.Context(), tenantID)
@@ -385,6 +385,7 @@ func (s *server) getTenantCurrentCommercialPlan(w http.ResponseWriter, r *http.R
 				dimensions, compact := currentPlanQuotaDimensions(snapshot)
 				out["quota"] = dimensions
 				out["compact_utilization"] = compact
+				out["concurrent_queue"] = snapshot.ConcurrentQueue
 			} else {
 				out["quota"] = unavailableQuotaDimensions(entitlement, time.Now().UTC().Format("2006-01"))
 			}
