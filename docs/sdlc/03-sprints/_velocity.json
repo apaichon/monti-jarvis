@@ -407,8 +407,16 @@
       "velocity": 9,
       "closed": "2026-08-01",
       "release": "v2.37.0"
+    },
+    {
+      "id": "SPRINT-066",
+      "committed_points": 0,
+      "completed_points": 0,
+      "velocity": 0,
+      "closed": "2026-08-02",
+      "release": "skipped"
     }
   ],
   "average_velocity": 10.8,
-  "note": "S65 shipped as v2.37.0 (9/9): queued concurrent-call admission adds Redis-backed waiting, slot promotion, timeout/cancel cleanup, customer queue state, tenant capacity visibility, and final conversation-control simplification. S64 shipped as v2.36.0 (12/12): payment gateway portability added Stripe checkout, signed webhooks, provider refs, admin config/test/reconcile, and tenant return-page status sync while preserving mock/ChillPay paths. S63 shipped as v2.35.1 (3/3): Platform Admin Leads now renders Product Web Book Demo rows from the API items[] contract with accurate shown/total counts. S60-S62 shipped together as v2.35.0 (36/36): validated tenant-owned Gemini keys with production fail-closed behavior, localized top-bar Gemini status, and idempotent referral redemption with quota ledger and platform reversal. S59 call conversation UX revamp shipped v2.32.0 (12/12). S58 portal UI language selector EN/TH/JA shipped v2.31.0 (12/12). S57 Monti logo and social preview metadata shipped v2.30.0 (12/12). S56 caller desk branding + mic/speaker shipped v2.29.0 (12/12). S55 tenant call-center topic statistics shipped v2.28.0 (12/12). S54 customer portal tenant list shipped v2.27.0 (12/12). S53 conversation auto-register + app version shipped v2.26.0. S51 commercial operations shipped v2.25.0. S52 tenant avatar library shipped v2.24.0. S50 admin promotional package grant shipped v2.23.0. Earlier shipped releases remain tracked in the per-sprint history."
+  "note": "S66 closed as skipped with no release/tag/merge and is excluded from shipped velocity planning; backup/restore will use external tooling later. S65 shipped as v2.37.0 (9/9): queued concurrent-call admission adds Redis-backed waiting, slot promotion, timeout/cancel cleanup, customer queue state, tenant capacity visibility, and final conversation-control simplification. S64 shipped as v2.36.0 (12/12): payment gateway portability added Stripe checkout, signed webhooks, provider refs, admin config/test/reconcile, and tenant return-page status sync while preserving mock/ChillPay paths. S63 shipped as v2.35.1 (3/3): Platform Admin Leads now renders Product Web Book Demo rows from the API items[] contract with accurate shown/total counts. S60-S62 shipped together as v2.35.0 (36/36): validated tenant-owned Gemini keys with production fail-closed behavior, localized top-bar Gemini status, and idempotent referral redemption with quota ledger and platform reversal. S59 call conversation UX revamp shipped v2.32.0 (12/12). S58 portal UI language selector EN/TH/JA shipped v2.31.0 (12/12). S57 Monti logo and social preview metadata shipped v2.30.0 (12/12). S56 caller desk branding + mic/speaker shipped v2.29.0 (12/12). S55 tenant call-center topic statistics shipped v2.28.0 (12/12). S54 customer portal tenant list shipped v2.27.0 (12/12). S53 conversation auto-register + app version shipped v2.26.0. S51 commercial operations shipped v2.25.0. S52 tenant avatar library shipped v2.24.0. S50 admin promotional package grant shipped v2.23.0. Earlier shipped releases remain tracked in the per-sprint history."
 }

@@ -89,11 +89,11 @@
 | **63** | **Platform Admin / Product Web / Sales** | **Bug fix: product-web Book Demo lead is returned by the admin API but missing from the Leads inbox; render API lead rows and correct shown/total counts** | **BUG/P1** | **48, 51** · ✅ **v2.35.1** · [FEAT-0055](../01-features/FEAT-0055-platform-admin-leads-inbox-rendering.md) · [SPRINT-063](../03-sprints/SPRINT-063.md) |
 | **64** | **Platform Admin / Tenant / Finance** | **Payment gateway portability: switch checkout provider from ChillPay to Stripe with safe provider config, webhooks, receipts, tax invoices, and reconciliation** | **P+** | **8, 9, 10, 12, 13, 45, 48, 50, 51** · ✅ **v2.36.0** · [FEAT-0056](../01-features/FEAT-0056-payment-gateway-portability-stripe.md) · [SPRINT-064](../03-sprints/SPRINT-064.md) · [DES-0059](../02-design/59-payment-gateway-portability-stripe-spec.md) |
 | **65** | **Customer / Tenant / Quota** | **Queued concurrent-call admission: callers wait when tenant package concurrent-call limit is full, then start when another customer finishes** | **A+** | **13, 16, 21, 45, 51, 56** · ✅ **v2.37.0** · [FEAT-0057](../01-features/FEAT-0057-queued-concurrent-call-admission.md) · [SPRINT-065](../03-sprints/SPRINT-065.md) · [DES-0060](../02-design/60-queued-concurrent-call-admission-spec.md) |
-| **66** | **Infra / Platform Admin / DevOps** | **Full and incremental backup/restore for Postgres, ClickHouse, and MinIO with verified recovery runbooks** | **I+** | **2, 22, 25, 28, 29, 36, 41, 49** · backlog |
-| **67** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · backlog |
+| **66** | **Infra / DevOps** | **Backup/restore evaluation for Postgres, ClickHouse, and MinIO skipped; defer to external backup tooling and future runbooks** | **SKIP** | **2, 22, 25, 28, 29, 36, 41, 49** · skipped · no release/tag · not merged · [SPRINT-066](../03-sprints/SPRINT-066.md) |
+| **67** | **Tenant / Security / Back Office** | **Multi-user tenant permissions: tenant admins invite same-domain users and assign menu-level back-office access** | **E+** | **3, 6, 16, 19, 20, 28, 41, 42, 53** · hold · do not plan until reapproved |
 | **68** | **Customer / Tenant / Tickets** | **AI summary before call close: generate call recap, confirm unresolved items, and submit summary to ticket** | **F+** | **1, 21, 22, 23, 24, 43, 53, 55, 56** · backlog |
 | **69** | **Tenant / Customer / Notifications** | **Call schedule email notifications: topic-based handover or sales links redirect customers into an auto-start prepared voice conversation** | **E+** | **1, 16, 20, 21, 23, 43, 53, 56, 68** · backlog |
-| **70** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · backlog · deferred after failed Sprint 64 attempt |
+| **70** | **Tenant / Customer / KM** | **Tenant customer product catalog: upload files and render relevant products, menus, guides, packages, or business records during conversation** | **D+** | **2, 14, 15, 20, 21, 22, 39, 43, 54, 56** · hold · deferred after failed Sprint 64 attempt · do not plan until reapproved |
 
 ---
 
@@ -2585,96 +2585,45 @@ controlled wait queue instead of immediate rejection.
 
 ---
 
-## Backlog: SPRINT-066 — Full and Incremental Backup/Restore
+## Skipped: SPRINT-066 — Backup/Restore Evaluation
 
-**Platform:** Infra / Platform Admin / DevOps · **Feature:** Provide scheduled
-full and incremental backups plus verified restore workflows for Monti
-Postgres, ClickHouse, and MinIO data, including operator runbooks, manifests,
-retention, and audit evidence · **Depends:** 2, 22, 25, 28, 29, 36, 41, 49 ·
-**Status:** backlog
+**Platform:** Infra / DevOps · **Feature:** Backup/restore evaluation for
+Postgres, ClickHouse, and MinIO · **Depends:** 2, 22, 25, 28, 29, 36, 41, 49 ·
+**Status:** skipped · **Release:** none · **Merge:** not merged to main ·
+[SPRINT-066](../03-sprints/SPRINT-066.md)
 
-### Problem today
+### Decision
 
-Monti stores tenant configuration, calls, transcripts, analytics, embeddings,
-and KM assets across Postgres, ClickHouse, and MinIO. Production readiness
-requires repeatable recovery, not only best-effort snapshots. Operators need
-full and incremental backup jobs, off-host retention, and a restore path that is
-tested against staging/local before any production recovery is attempted.
+Sprint 66 is closed as skipped. Monti will use dedicated external tools for
+Postgres, ClickHouse, and MinIO backup/restore later instead of shipping the
+in-app backup/restore implementation in this version.
 
-### Goal
+### Cleanup
 
-1. **Back up all Monti data stores** — Capture Postgres, ClickHouse, and MinIO
-   data with full backups and incremental changes.
-2. **Restore with evidence** — Restore into staging/local and verify schema,
-   row counts, objects, checksums, and application-level consistency.
-3. **Operate safely** — Enforce encryption, retention, audit logs, explicit
-   production confirmation, and clear recovery runbooks.
+- Removed Platform Admin backup/restore UI and API routes from main.
+- Removed backup metadata tables, migration, store helpers, and runner code.
+- Removed backup-related environment variables from examples.
+- Removed Sprint 66 design/API/ER/UX additions from shared design docs.
 
-### Scope
+### Follow-up
 
-### In
-
-- Postgres backup for database `monti_jarvis`, schema `callcenter`, including
-  full logical/physical backup and incremental/PITR or WAL strategy where
-  selected.
-- ClickHouse backup for database `monti_jarvis`, including full snapshots and
-  incremental partition/object backups where supported.
-- MinIO backup for bucket `monti-jarvis`, including full bucket backup and
-  incremental object sync/versioned backup for prefixes `calls/` and `km/`.
-- Backup manifests with timestamp, environment, app version, schema/database
-  names, bucket/prefix list, object counts, sizes, checksums, and source backup
-  cursor/checkpoint.
-- Restore runner for staging/local dry runs and controlled production restore
-  with explicit operator confirmation and maintenance-window evidence.
-- Encrypted backups, off-host storage target, retention policy, pruning, and
-  failed-backup alerting.
-- Platform/admin operations visibility for last backup, status, size, retention
-  window, RPO/RTO estimate, and last restore verification.
-- Recovery runbooks and automated verification scripts that produce deployment
-  or readiness evidence.
-
-### Out
-
-- Backing up unrelated HarvestMax databases, schemas, buckets, or app storage.
-- Restoring production without explicit operator confirmation and rollback plan.
-- Per-customer or tenant self-service restore.
-- Data warehouse redesign, archive product UX, or cold-storage analytics.
-- Schema migrations unrelated to backup/restore correctness.
-
-### Deliverables
-
-| Deliverable | Scope |
-| --- | --- |
-| Backup runner | Scheduled full backups for Postgres, ClickHouse, and MinIO with encryption and off-host target |
-| Incremental strategy | WAL/PITR or selected Postgres incremental path, ClickHouse incremental snapshots, MinIO object delta sync/versioning |
-| Restore runner | Staging/local restore first, optional gated production restore, cleanup and rollback hooks |
-| Manifest/checksum | Per-backup metadata, checksums, cursor/checkpoint, retention, and verification output |
-| Ops dashboard/runbook | Platform/admin backup status, RPO/RTO, last restore test, operator recovery procedure |
-| Verification | Automated dry-run restore, consistency checks, corrupt backup handling, and DEP/readiness evidence |
-
-### Acceptance sketch
-
-1. A full backup captures Postgres `monti_jarvis.callcenter`, ClickHouse
-   database `monti_jarvis`, and MinIO bucket `monti-jarvis` prefixes `calls/`
-   and `km/`.
-2. Incremental backup captures only changes since the last valid checkpoint or
-   snapshot and records that checkpoint in the manifest.
-3. Restore to staging/local reconstructs databases and bucket objects, then
-   passes schema, count, checksum, and application consistency checks.
-4. Production restore requires explicit operator confirmation, records audit
-   evidence, and links the resulting DEP/readiness note.
-5. Corrupt, missing, partial, or checksum-mismatched backups fail safely without
-   silently leaving a partial restore marked successful.
+Pick external backup tooling and document recovery runbooks before revisiting
+any app-level backup visibility or restore workflow.
 
 ---
 
-## Backlog: SPRINT-067 — Multi-User Tenant Permissions
+## Hold: SPRINT-067 — Multi-User Tenant Permissions
 
 **Platform:** Tenant / Security / Back Office · **Feature:** Let tenant admins
 invite same-domain staff users into the tenant portal and assign menu-level
 back-office permissions so multiple users can manage operations without sharing
 one owner account · **Depends:** 3, 6, 16, 19, 20, 28, 41, 42, 53 ·
-**Status:** backlog
+**Status:** hold
+
+### Direction
+
+Held by roadmap direction on 2026-08-02. Do not open sprint planning, design
+packs, or implementation for this item until product reapproves it.
 
 ### Problem today
 
@@ -2931,13 +2880,18 @@ generic greeting.
 
 ---
 
-## Backlog: SPRINT-070 — Tenant Customer Product Catalog
+## Hold: SPRINT-070 — Tenant Customer Product Catalog
 
 **Platform:** Tenant / Customer / KM · **Feature:** Let tenants manage a
 customer-facing product/catalog library with downloadable files and structured
 metadata, then render the most relevant catalog items inside chat or voice
 conversation when the customer's request matches them · **Depends:** 2, 14, 15,
-20, 21, 22, 39, 43, 54, 56 · **Status:** backlog · deferred last after failed Sprint 64 attempt
+20, 21, 22, 39, 43, 54, 56 · **Status:** hold · deferred last after failed Sprint 64 attempt
+
+### Direction
+
+Held by roadmap direction on 2026-08-02. Keep the catalog idea documented, but
+do not plan or rebuild this sprint until product reapproves the scope.
 
 ### Problem today
 
